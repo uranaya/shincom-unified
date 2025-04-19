@@ -92,13 +92,15 @@ def get_eto():
 
 @app.route("/preview/<filename>")
 def preview(filename):
-    path = request.path
-    mode = "ten"
-    if path.startswith("/tenmob/") or "/tenmob" in request.referrer:
+    # リクエスト元のパス（リファラー）からモードを判定
+    referer = request.referrer or ""
+    if "/tenmob" in referer:
         mode = "tenmob"
-    elif path.startswith("/selfmob/") or "/selfmob" in request.referrer:
+    elif "/selfmob" in referer:
         mode = "selfmob"
-    return render_template(f"{mode}/fortune_pdf.html", filename=filename, mode=mode)
+    else:
+        mode = "ten"
+    return render_template("fortune_pdf.html", filename=filename, mode=mode)
 
 @app.route("/view/<filename>")
 def view_pdf(filename):

@@ -2,22 +2,44 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>鑑定結果</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>鑑定結果PDF</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { margin: 0; font-family: sans-serif; text-align: center; }
-    iframe { width: 100%; height: 90vh; border: none; }
-    .btn { margin: 20px; padding: 12px 20px; font-size: 16px; border: none; border-radius: 8px; background-color: #4CAF50; color: white; }
+    body {
+      font-family: sans-serif;
+      padding: 2em;
+      text-align: center;
+    }
+    iframe {
+      width: 100%;
+      height: 85vh;
+      border: none;
+    }
+    .buttons {
+      margin-top: 20px;
+    }
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      margin: 0 10px;
+    }
   </style>
 </head>
 <body>
-  <h2>鑑定結果のPDF</h2>
-  <p>画面右上の「共有」から「プリント」を選んで印刷してください。</p>
-  
-  <iframe src="/view/{{ filename }}"></iframe>
+  <h2>鑑定結果PDF</h2>
+  <iframe src="{{ url_for('view_pdf', filename=filename) }}"></iframe>
 
-  <form action="/{{ mode }}" method="get">
-    <button class="btn">鑑定フォームに戻る</button>
-  </form>
+  <div class="buttons">
+    <button onclick="window.print()">🖨️ 印刷</button>
+    {% if mode == "selfmob" %}
+      <form action="https://komoju.com" method="get" style="display:inline;">
+        <button type="submit">🔁 決済ページに戻る</button>
+      </form>
+    {% else %}
+      <form action="{{ url_for(mode + '_mode') }}" method="get" style="display:inline;">
+        <button type="submit">🔁 鑑定フォームに戻る</button>
+      </form>
+    {% endif %}
+  </div>
 </body>
 </html>
