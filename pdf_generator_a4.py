@@ -73,7 +73,8 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     y = draw_wrapped("今月の運勢", kongetsu, y)
     y = draw_wrapped("来月の運勢", raigetsu, y)
     y = draw_wrapped("易占い", iching_result, y)
-    y = draw_wrapped("ラッキー情報", lucky_info.replace("\n", " ").replace("\", ""), y)
+    y = draw_wrapped("ラッキー情報", lucky_info.replace("\n", " ").replace("\\", ""), y)
+
 
     c.save()
     return filepath
