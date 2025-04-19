@@ -4,6 +4,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.lib.utils import ImageReader
+import io
 import textwrap
 import os
 import base64
