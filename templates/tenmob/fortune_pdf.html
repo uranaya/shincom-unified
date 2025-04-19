@@ -2,16 +2,22 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <title>鑑定結果</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🔮 鑑定結果PDF</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; text-align: center; }
+    iframe { width: 100%; height: 90vh; border: none; }
+    .btn { margin: 20px; padding: 12px 20px; font-size: 16px; border: none; border-radius: 8px; background-color: #4CAF50; color: white; }
+  </style>
 </head>
-<body style="font-size: 18px; padding: 1em; text-align: center;">
-  <h2>🔮 鑑定結果PDF</h2>
+<body>
+  <h2>鑑定結果のPDF</h2>
+  <p>画面右上の「共有」から「プリント」を選んで印刷してください。</p>
+  
+  <iframe src="/view/{{ filename }}"></iframe>
 
-  <iframe src="/view/{{ filename }}" width="100%" height="600px" style="border:1px solid #ccc;"></iframe><br><br>
-
-  <form action="/mobten">
-    <button type="submit" style="font-size: 1em;">⬅ 鑑定ページに戻る</button>
+  <form action="/{{ mode }}" method="get">
+    <button class="btn">鑑定フォームに戻る</button>
   </form>
 </body>
 </html>
