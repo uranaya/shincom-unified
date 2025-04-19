@@ -104,7 +104,9 @@ def preview(filename):
 
 @app.route("/view/<filename>")
 def view_pdf(filename):
-    return send_file(filename, mimetype="application/pdf")
+    filepath = os.path.join("static", filename)
+    return send_file(filepath, mimetype="application/pdf")
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
