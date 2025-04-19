@@ -1,98 +1,79 @@
-from reportlab.pdfgen import canvas
+
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
-from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
+import base64
+import io
 import os
 import textwrap
 from datetime import datetime
-from io import BytesIO
-import base64
 
+# フォント登録
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
-if not os.path.exists(FONT_PATH):
-    raise FileNotFoundError("フォントファイルが見つかりません: ipaexg.ttf")
-pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
+if os.path.exists(FONT_PATH):
+    pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
 def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
-    if not os.path.exists("static"):
-        os.makedirs("static")
+    os.makedirs("static", exist_ok=True)
     filepath = os.path.join("static", filename)
-
     c = canvas.Canvas(filepath, pagesize=A4)
     width, height = A4
     margin = 20 * mm
-    line_height = 13
-    max_chars = 50
+    y = height - margin
 
-    def draw_wrapped(title, text, y):
-        c.setFont(FONT_NAME, 13)
+    c.setFont(FONT_NAME, 14)
+    c.drawString(margin, y, "鑑定結果PDF")
+    y -= 10 * mm
+
+    try:
+        # バナー（上部）
+        if os.path.exists("banner.jpg"):
+            banner = ImageReader("banner.jpg")
+            c.drawImage(banner, margin, y - 20 * mm, width - 2 * margin, 20 * mm, preserveAspectRatio=True, mask='auto')
+        y -= 25 * mm
+
+        # 手相画像
+        if image_data.startswith("data:image"):
+            header, encoded = image_data.split(",", 1)
+            image = ImageReader(io.BytesIO(base64.b64decode(encoded)))
+            c.drawImage(image, margin + 30 * mm, y - 70 * mm, width=110 * mm, height=70 * mm, preserveAspectRatio=True, mask='auto')
+        y -= 75 * mm
+    except Exception as e:
+        c.drawString(margin, y, f"[画像読み込みエラー]")
+        y -= 10 * mm
+
+    c.setFont(FONT_NAME, 10)
+
+    def draw_wrapped(title, content, y):
+        c.setFont(FONT_NAME, 11)
         c.drawString(margin, y, f"■ {title}")
-        y -= line_height
-        for line in textwrap.wrap(text, max_chars):
+        y -= 6 * mm
+        c.setFont(FONT_NAME, 10)
+        lines = textwrap.wrap(content, 50)
+        for line in lines:
             c.drawString(margin, y, line)
-            y -= line_height
-        y -= 5
+            y -= 5 * mm
+        y -= 4 * mm
         return y
 
-    # 1ページ目
-    banner_path = "banner.jpg"
-    if os.path.exists(banner_path):
-        banner = ImageReader(banner_path)
-        c.drawImage(banner, margin, height - 60, width=width - 2 * margin, height=40, preserveAspectRatio=True, mask='auto')
+    y = draw_wrapped("手相鑑定（5項目）", palm_result, y)
 
-    # palm image
-    base64data = image_data.split(",")[1]
-    imgdata = base64.b64decode(base64data)
-    img = ImageReader(BytesIO(imgdata))
-    img_width = width * 0.6
-    c.drawImage(img, (width - img_width) / 2, height / 2, width=img_width, preserveAspectRatio=True, mask='auto')
+    if "■ 今月の運勢" in shichu_result and "■ 来月の運勢" in shichu_result:
+        seikaku = shichu_result.split("■ 今月の運勢")[0].replace("■ 性格", "").strip()
+        kongetsu = shichu_result.split("■ 今月の運勢")[1].split("■ 来月の運勢")[0].strip()
+        raigetsu = shichu_result.split("■ 来月の運勢")[1].strip()
+    else:
+        seikaku = kongetsu = raigetsu = "取得できませんでした"
 
-    # palm_result
-    y = height / 2 - 20
-    c.setFont(FONT_NAME, 13)
-    for line in textwrap.wrap(palm_result, max_chars):
-        c.drawString(margin, y, line)
-        y -= line_height
-        if y < 50:
-            c.showPage()
-            y = height - margin
-
-    c.showPage()
-
-    # 2ページ目
-    y = height - margin
-    c.setFont(FONT_NAME, 14)
-    c.drawString(margin, y, "【総合鑑定結果】")
-    y -= 2 * line_height
-
-    # 安全にセクション分け
-    def extract_section(label, content, fallback="取得できませんでした"):
-        try:
-            parts = content.split(f"■ {label}")
-            if len(parts) > 1:
-                next_part = parts[1]
-                next_label_index = next_part.find("■ ")
-                if next_label_index != -1:
-                    return next_part[:next_label_index].strip()
-                else:
-                    return next_part.strip()
-        except Exception:
-            pass
-        return fallback
-
-    # 四柱推命
-    y = draw_wrapped("性格", extract_section("性格", shichu_result), y)
-    y = draw_wrapped("今月の運勢", extract_section("今月の運勢", shichu_result), y)
-    y = draw_wrapped("来月の運勢", extract_section("来月の運勢", shichu_result), y)
-
-    # 易占い
-    y = draw_wrapped("イーチン占い", iching_result, y)
-
-    # ラッキー情報
-    y = draw_wrapped("ラッキー情報", lucky_info, y)
+    y = draw_wrapped("性格", seikaku, y)
+    y = draw_wrapped("今月の運勢", kongetsu, y)
+    y = draw_wrapped("来月の運勢", raigetsu, y)
+    y = draw_wrapped("易占い", iching_result, y)
+    y = draw_wrapped("ラッキー情報", lucky_info.replace("\n", " ").replace("\", ""), y)
 
     c.save()
     return filepath

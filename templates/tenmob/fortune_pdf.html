@@ -9,6 +9,7 @@
             margin: 0;
             padding: 0;
             height: 100%;
+            background-color: #fff;
         }
         iframe {
             width: 100%;
@@ -18,6 +19,6 @@
     </style>
 </head>
 <body>
-    <iframe src="{{ url_for('view_pdf', filename=filename) }}?v=20250419"></iframe>
+    <iframe src="{{ url_for('view_pdf', filename=filename) }}"></iframe>
 </body>
 </html>
