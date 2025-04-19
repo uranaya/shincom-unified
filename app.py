@@ -114,7 +114,7 @@ mode = request.path.split("/")[1] if len(request.path.split("/")) > 1 else "ten"
 create_pdf = create_pdf_b4 if mode == "ten" else create_pdf_a4
 filepath = create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
 
-        print("✅ filename:", filename, flush=True)
+print("✅ filename:", filename, flush=True)
 
         return redirect(url_for("preview", filename=os.path.basename(filepath)))
 
