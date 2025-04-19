@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from datetime import datetime
 from hayami_table_full_complete import hayami_table
 from fortune_logic import get_nicchu_eto, get_shichu_fortune, get_iching_advice, get_lucky_info, analyze_palm
-
 from pdf_generator_a4 import create_pdf as create_pdf_a4
 from pdf_generator_b4 import create_pdf as create_pdf_b4
 
@@ -18,22 +17,15 @@ load_dotenv()
 PASSWORD = "uranaya2024"
 
 @app.route("/login", methods=["GET", "POST"])
-def login():
+@app.route("/<mode>/login", methods=["GET", "POST"])
+def login(mode="ten"):
     if request.method == "POST":
         if request.form.get("password") == PASSWORD:
             session["authenticated"] = True
-            return redirect(url_for("ten_mode"))
+            return redirect(url_for(f"{mode}_mode"))
         else:
             flash("パスワードが違います")
-    return render_template("ten/login.html")
-
-@app.route("/ten/login", methods=["GET", "POST"])
-def ten_login():
-    return login()
-
-@app.route("/tenmob/login", methods=["GET", "POST"])
-def tenmob_login():
-    return login()
+    return render_template(f"{mode}/login.html")
 
 @app.route("/logout")
 def logout():
@@ -58,7 +50,7 @@ def selfmob_mode():
 
 def handle_mode(mode):
     if not session.get("authenticated") and mode in ["ten", "tenmob"]:
-        return redirect(url_for(f"{mode}_login"))
+        return redirect(url_for("login", mode=mode))
 
     if request.method == "POST":
         image_data = request.form.get("image_data")
@@ -86,8 +78,8 @@ def handle_mode(mode):
         filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         create_pdf = create_pdf_b4 if mode == "ten" else create_pdf_a4
         filepath = create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
-        print("✅ filename:", filename, flush=True)
 
+        print("✅ filename:", filename, flush=True)
         return redirect(url_for("preview", filename=os.path.basename(filepath)))
 
     return render_template(f"{mode}/index.html")
@@ -100,7 +92,12 @@ def get_eto():
 
 @app.route("/preview/<filename>")
 def preview(filename):
-    mode = request.referrer.split("/")[-1] if request.referrer else "ten"
+    path = request.path
+    mode = "ten"
+    if path.startswith("/tenmob/") or "/tenmob" in request.referrer:
+        mode = "tenmob"
+    elif path.startswith("/selfmob/") or "/selfmob" in request.referrer:
+        mode = "selfmob"
     return render_template(f"{mode}/fortune_pdf.html", filename=filename, mode=mode)
 
 @app.route("/view/<filename>")
