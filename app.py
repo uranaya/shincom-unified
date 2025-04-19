@@ -10,29 +10,37 @@ from pdf_generator_b4 import create_pdf as create_pdf_b4
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
+
+# ✅ アップロードサイズ制限を5MBに設定
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+
 load_dotenv()
 PASSWORD = "uranaya2024"
 
-@app.route("/<mode>/login", methods=["GET", "POST"])
-def login(mode):
-    if mode not in ["ten", "tenmob", "selfmob"]:
-        return "無効なモード", 404
-
+@app.route("/login", methods=["GET", "POST"])
+def login():
     if request.method == "POST":
         if request.form.get("password") == PASSWORD:
             session["authenticated"] = True
-            return redirect(url_for(f"{mode}_mode"))
+            return redirect(url_for("ten_mode"))
         else:
             flash("パスワードが違います")
+    return render_template("ten/login.html")
 
-    return render_template(f"{mode}/login.html")
+@app.route("/ten/login", methods=["GET", "POST"])
+def ten_login():
+    return login()
+
+@app.route("/tenmob/login", methods=["GET", "POST"])
+def tenmob_login():
+    return login()
 
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect("/")
+    return redirect(url_for("login"))
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def root():
     return redirect(url_for("ten_mode"))
 
@@ -50,7 +58,7 @@ def selfmob_mode():
 
 def handle_mode(mode):
     if not session.get("authenticated") and mode in ["ten", "tenmob"]:
-        return redirect(f"/{mode}/login")
+        return redirect(url_for(f"{mode}_login"))
 
     if request.method == "POST":
         image_data = request.form.get("image_data")
@@ -80,7 +88,7 @@ def handle_mode(mode):
         filepath = create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
         print("✅ filename:", filename, flush=True)
 
-        return redirect(url_for("preview", filename=os.path.basename(filepath), mode=mode))
+        return redirect(url_for("preview", filename=os.path.basename(filepath)))
 
     return render_template(f"{mode}/index.html")
 
@@ -92,7 +100,7 @@ def get_eto():
 
 @app.route("/preview/<filename>")
 def preview(filename):
-    mode = request.args.get("mode", "ten")
+    mode = request.referrer.split("/")[-1] if request.referrer else "ten"
     return render_template(f"{mode}/fortune_pdf.html", filename=filename, mode=mode)
 
 @app.route("/view/<filename>")
