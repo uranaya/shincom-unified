@@ -88,6 +88,13 @@ def get_eto():
 
 @app.route("/preview/<filename>")
 def preview(filename):
+    referrer = request.referrer or ""
+    if "/tenmob" in referrer:
+        mode = "tenmob"
+    elif "/selfmob" in referrer:
+        mode = "selfmob"
+    else:
+        mode = "ten"
     return render_template("fortune_pdf.html", filename=filename, mode=mode)
 
 @app.route("/view/<filename>")
