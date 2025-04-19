@@ -1,1 +1,60 @@
-<h1>tenmob モード占いフォーム</h1>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📱 手相鑑定フォーム（モバイル）</title>
+</head>
+<body style="font-size: 18px; padding: 1em;">
+  <h2>📸 手相撮影＆送信フォーム</h2>
+  <form method="POST">
+    <video id="camera" autoplay playsinline style="width: 100%; max-width: 300px; border: 1px solid black;"></video><br><br>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <input type="hidden" name="image_data" id="image_data">
+
+    <label>生年月日：</label><br>
+    <input type="date" name="birthdate" required style="font-size: 1em;"><br><br>
+
+    <button type="button" onclick="takePhoto()" style="font-size: 1em;">📷 撮影</button><br><br>
+    <button type="submit" style="font-size: 1em;">送信してPDF作成</button>
+  </form>
+  <form action="/logout"><button style="font-size: 1em;">ログアウト</button></form>
+
+  <script>
+    const video = document.getElementById("camera");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const imageDataInput = document.getElementById("image_data");
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (err) {
+        alert("カメラが使用できません: " + err.message);
+      }
+    }
+
+    function takePhoto() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = canvas.toDataURL("image/png");
+      imageDataInput.value = imageData;
+      alert("📸 撮影完了しました！");
+    }
+
+    window.onload = startCamera;
+  </script>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <ul class="flashes">
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+</body>
+</html>

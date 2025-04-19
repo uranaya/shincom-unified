@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from datetime import datetime
 from hayami_table_full_complete import hayami_table
 from fortune_logic import get_nicchu_eto, get_shichu_fortune, get_iching_advice, get_lucky_info, analyze_palm
-
 from pdf_generator_a4 import create_pdf as create_pdf_a4
 from pdf_generator_b4 import create_pdf as create_pdf_b4
 
@@ -21,14 +20,14 @@ def login():
             return redirect(url_for("ten_mode"))
         else:
             flash("パスワードが違います")
-    return render_template("login.html")
+    return render_template("ten/login.html")
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
 
-@app.route("/", methods=["GET"])
+@app.route("/")
 def root():
     return redirect(url_for("ten_mode"))
 
@@ -72,11 +71,12 @@ def handle_mode(mode):
         print("✅ lucky_info:", lucky_info[:100], flush=True)
 
         filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
         create_pdf = create_pdf_b4 if mode == "ten" else create_pdf_a4
         filepath = create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
         print("✅ filename:", filename, flush=True)
 
-        return redirect(url_for("preview", filename=os.path.basename(filepath)))
+        return redirect(url_for("preview", filename=os.path.basename(filepath), mode=mode))
 
     return render_template(f"{mode}/index.html")
 
@@ -88,13 +88,7 @@ def get_eto():
 
 @app.route("/preview/<filename>")
 def preview(filename):
-    referrer = request.referrer or ""
-    if "/tenmob" in referrer:
-        mode = "tenmob"
-    elif "/selfmob" in referrer:
-        mode = "selfmob"
-    else:
-        mode = "ten"
+    mode = request.args.get("mode", "ten")
     return render_template("fortune_pdf.html", filename=filename, mode=mode)
 
 @app.route("/view/<filename>")
