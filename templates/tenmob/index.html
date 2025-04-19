@@ -42,14 +42,15 @@
 
     function capturePhoto() {
       const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d").drawImage(video, 0, 0);
+      canvas.width = video.videoWidth * 0.5;
+      canvas.height = video.videoHeight * 0.5;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const dataURL = canvas.toDataURL("image/png");
-      image.src = dataURL;
+      const imageData = canvas.toDataURL("image/png", 0.8);
+      image.src = imageData;
       image.style.display = "block";
-      imageDataInput.value = dataURL;
+      imageDataInput.value = imageData;
     }
 
     birthdateInput.addEventListener("change", () => {
