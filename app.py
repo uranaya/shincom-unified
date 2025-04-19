@@ -88,7 +88,7 @@ def get_eto():
 
 @app.route("/preview/<filename>")
 def preview(filename):
-    return render_template("fortune_pdf.html", filename=filename)
+    return render_template("fortune_pdf.html", filename=filename, mode=mode)
 
 @app.route("/view/<filename>")
 def view_pdf(filename):

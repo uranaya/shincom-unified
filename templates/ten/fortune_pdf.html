@@ -5,8 +5,19 @@
     <title>鑑定結果プレビュー</title>
 </head>
 <body>
-    <h1>鑑定結果PDF</h1>
-    <p><a href="{{ url_for('view_pdf', filename=filename) }}" target="_blank">PDFを表示</a></p>
-    <embed src="{{ url_for('view_pdf', filename=filename) }}" width="100%" height="800px" type="application/pdf">
+    <h2>鑑定結果PDF</h2>
+    <iframe src="{{ url_for('view_pdf', filename=filename) }}" width="100%" height="800px"></iframe>
+
+    <div style="text-align:center; margin-top: 30px;">
+        {% if mode == 'selfmob' %}
+            <button onclick="window.location.href='https://checkout.komoju.com/your-payment-page'" style="padding: 10px 20px; font-size: 16px;">
+                印刷完了。決済ページに戻る
+            </button>
+        {% else %}
+            <button onclick="window.location.href='{{ url_for(mode + '_mode') }}'" style="padding: 10px 20px; font-size: 16px;">
+                印刷完了。鑑定ページに戻る
+            </button>
+        {% endif %}
+    </div>
 </body>
 </html>
