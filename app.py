@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 from hayami_table_full_complete import hayami_table
 from fortune_logic import get_nicchu_eto, get_shichu_fortune, get_iching_advice, get_lucky_info, analyze_palm
+
 from pdf_generator_a4 import create_pdf as create_pdf_a4
 from pdf_generator_b4 import create_pdf as create_pdf_b4
 
@@ -12,15 +13,10 @@ app.secret_key = "supersecretkey"
 load_dotenv()
 PASSWORD = "uranaya2024"
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    referer = request.referrer or ""
-    if "/tenmob" in referer:
-        mode = "tenmob"
-    elif "/selfmob" in referer:
-        mode = "selfmob"
-    else:
-        mode = "ten"
+@app.route("/<mode>/login", methods=["GET", "POST"])
+def login(mode):
+    if mode not in ["ten", "tenmob", "selfmob"]:
+        return "無効なモード", 404
 
     if request.method == "POST":
         if request.form.get("password") == PASSWORD:
@@ -31,17 +27,10 @@ def login():
 
     return render_template(f"{mode}/login.html")
 
-
 @app.route("/logout")
 def logout():
     session.clear()
-    referer = request.referrer or ""
-    if "/tenmob" in referer:
-        return redirect("/tenmob")
-    elif "/selfmob" in referer:
-        return redirect("/selfmob")
-    else:
-        return redirect("/ten")
+    return redirect("/")
 
 @app.route("/")
 def root():
@@ -61,7 +50,7 @@ def selfmob_mode():
 
 def handle_mode(mode):
     if not session.get("authenticated") and mode in ["ten", "tenmob"]:
-        return redirect(url_for("login"))
+        return redirect(f"/{mode}/login")
 
     if request.method == "POST":
         image_data = request.form.get("image_data")
@@ -87,7 +76,6 @@ def handle_mode(mode):
         print("✅ lucky_info:", lucky_info[:100], flush=True)
 
         filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-
         create_pdf = create_pdf_b4 if mode == "ten" else create_pdf_a4
         filepath = create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
         print("✅ filename:", filename, flush=True)
@@ -105,7 +93,7 @@ def get_eto():
 @app.route("/preview/<filename>")
 def preview(filename):
     mode = request.args.get("mode", "ten")
-    return render_template("fortune_pdf.html", filename=filename, mode=mode)
+    return render_template(f"{mode}/fortune_pdf.html", filename=filename, mode=mode)
 
 @app.route("/view/<filename>")
 def view_pdf(filename):
