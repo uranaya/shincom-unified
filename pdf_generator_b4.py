@@ -1,6 +1,6 @@
-
 import base64
 import os
+from reportlab.lib.pagesizes import B4
 from datetime import datetime
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
