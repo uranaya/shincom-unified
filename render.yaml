@@ -1,10 +1,13 @@
 services:
   - type: web
-    name: shincom-app
+    name: shincom-unified
     env: python
-    buildCommand: ""
-    startCommand: python app.py
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -t 600 app:app
     envVars:
+      - key: PORT
+        value: 10000
       - key: OPENAI_API_KEY
         sync: false
       - key: SMTP_USER
@@ -12,13 +15,3 @@ services:
       - key: SMTP_PASSWORD
         sync: false
     autoDeploy: true
-
-  - type: web
-    name: shincom-unified
-    env: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -t 120 app:app
-    envVars:
-      - key: PORT
-        value: 10000
