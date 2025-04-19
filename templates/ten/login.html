@@ -1,0 +1,25 @@
+<!-- templates/ten/login.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ログイン</title>
+</head>
+<body>
+  <h2>ログインフォーム（/ten または /tenmob 用）</h2>
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <ul style="color: red;">
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+  <form method="post">
+    <label for="password">パスワード:</label>
+    <input type="password" name="password" required>
+    <button type="submit">ログイン</button>
+  </form>
+</body>
+</html>
