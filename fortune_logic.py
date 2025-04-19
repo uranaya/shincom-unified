@@ -74,12 +74,23 @@ def analyze_palm(image_data):
     try:
         base64data = image_data.split(",", 1)[1]
         response = openai.chat.completions.create(
-            model="gpt-4-vision-preview",
+            model="gpt-4-turbo",
             messages=[
-                {"role": "system", "content": "あなたはプロの手相鑑定士です。以下の条件で手相を鑑定してください。特徴的な線（特殊線含む）を優先的に含め、各項目400文字程度で5項目、最後にまとめのアドバイスを日本語でわかりやすく。"},
-                {"role": "user", "content": [
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64data}"}}
-                ]}
+                {
+                    "role": "system",
+                    "content": "あなたはプロの手相鑑定士です。以下の条件で手相を鑑定してください。1) 特徴的な線（特殊線含む）を優先的に含めること。2) 各項目400文字程度の解説を5項目書くこと。3) 最後にまとめのアドバイスを加えること。日本語でわかりやすく書いてください。"
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{base64data}"
+                            }
+                        }
+                    ]
+                }
             ],
             max_tokens=3000
         )
