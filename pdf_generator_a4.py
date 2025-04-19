@@ -1,101 +1,98 @@
-import base64
-import os
-import textwrap
-from datetime import datetime
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
-from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
 from reportlab.lib.utils import ImageReader
-from affiliate import create_qr_code, get_affiliate_link
+import os
+import textwrap
+from datetime import datetime
+from io import BytesIO
+import base64
 
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 if not os.path.exists(FONT_PATH):
-    raise FileNotFoundError("日本語フォント ipaexg.ttf が見つかりません。")
+    raise FileNotFoundError("フォントファイルが見つかりません: ipaexg.ttf")
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
 def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
-    save_path = os.path.join("static", filename)
-    c = canvas.Canvas(save_path, pagesize=A4)
+    if not os.path.exists("static"):
+        os.makedirs("static")
+    filepath = os.path.join("static", filename)
+
+    c = canvas.Canvas(filepath, pagesize=A4)
     width, height = A4
     margin = 20 * mm
-    wrapper = textwrap.TextWrapper(width=50)
-    font = FONT_NAME
-    y = height - margin
+    line_height = 13
+    max_chars = 50
 
-    # バナー画像
+    def draw_wrapped(title, text, y):
+        c.setFont(FONT_NAME, 13)
+        c.drawString(margin, y, f"■ {title}")
+        y -= line_height
+        for line in textwrap.wrap(text, max_chars):
+            c.drawString(margin, y, line)
+            y -= line_height
+        y -= 5
+        return y
+
+    # 1ページ目
     banner_path = "banner.jpg"
     if os.path.exists(banner_path):
         banner = ImageReader(banner_path)
-        c.drawImage(banner, margin, y - 25 * mm, width=width - 2 * margin, height=20 * mm)
-        y -= 30 * mm
+        c.drawImage(banner, margin, height - 60, width=width - 2 * margin, height=40, preserveAspectRatio=True, mask='auto')
 
-    # 手相画像
-    image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-    with open(image_path, "wb") as f:
-        f.write(base64.b64decode(image_data.split(",", 1)[1]))
-    c.drawImage(image_path, (width - 150 * mm) / 2, y - 90 * mm, width=150 * mm, height=90 * mm)
-    y -= 100 * mm
+    # palm image
+    base64data = image_data.split(",")[1]
+    imgdata = base64.b64decode(base64data)
+    img = ImageReader(BytesIO(imgdata))
+    img_width = width * 0.6
+    c.drawImage(img, (width - img_width) / 2, height / 2, width=img_width, preserveAspectRatio=True, mask='auto')
 
-    # 手相5項目とまとめの分離
-    palm_lines = [line.strip() for line in palm_result.split("\n") if line.strip()]
-    advice_index = -1
-    for i in reversed(range(len(palm_lines))):
-        if "まとめ" in palm_lines[i] or "総合" in palm_lines[i]:
-            advice_index = i
-            break
-    if advice_index != -1:
-        advice_text = "\n".join(palm_lines[advice_index + 1:])
-        main_parts = palm_lines[:advice_index]
-    else:
-        advice_text = ""
-        main_parts = palm_lines
+    # palm_result
+    y = height / 2 - 20
+    c.setFont(FONT_NAME, 13)
+    for line in textwrap.wrap(palm_result, max_chars):
+        c.drawString(margin, y, line)
+        y -= line_height
+        if y < 50:
+            c.showPage()
+            y = height - margin
 
-    # 表面：手相5項目
-    text = c.beginText(margin, y)
-    text.setFont(font, 11)
-    text.textLine("■ 手相鑑定（5項目）")
-    text.textLine("")
-    for paragraph in main_parts:
-        for line in wrapper.wrap(paragraph):
-            text.textLine(line)
-        text.textLine("")
-    c.drawText(text)
-
-    # 裏面
     c.showPage()
-    text = c.beginText(margin, height - margin)
-    text.setFont(font, 11)
 
-    def draw_wrapped(title, content):
-        text.textLine(f"■ {title}")
-        text.textLine("")
-        for line in wrapper.wrap(content.strip()):
-            text.textLine(line)
-        text.textLine("")
+    # 2ページ目
+    y = height - margin
+    c.setFont(FONT_NAME, 14)
+    c.drawString(margin, y, "【総合鑑定結果】")
+    y -= 2 * line_height
 
-    # 各パート分離処理
-    if "■ 今月の運勢" in shichu_result and "■ 来月の運勢" in shichu_result:
-        draw_wrapped("性格", shichu_result.split("■ 今月の運勢")[0].replace("性格：", "").strip())
-        draw_wrapped("今月の運勢", shichu_result.split("■ 今月の運勢")[1].split("■ 来月の運勢")[0].strip())
-        draw_wrapped("来月の運勢", shichu_result.split("■ 来月の運勢")[1].strip())
-    else:
-        draw_wrapped("四柱推命", shichu_result)
+    # 安全にセクション分け
+    def extract_section(label, content, fallback="取得できませんでした"):
+        try:
+            parts = content.split(f"■ {label}")
+            if len(parts) > 1:
+                next_part = parts[1]
+                next_label_index = next_part.find("■ ")
+                if next_label_index != -1:
+                    return next_part[:next_label_index].strip()
+                else:
+                    return next_part.strip()
+        except Exception:
+            pass
+        return fallback
 
-    draw_wrapped("イーチン占い", iching_result)
-    draw_wrapped("ラッキー情報", lucky_info)
-    draw_wrapped("手相まとめアドバイス", advice_text)
+    # 四柱推命
+    y = draw_wrapped("性格", extract_section("性格", shichu_result), y)
+    y = draw_wrapped("今月の運勢", extract_section("今月の運勢", shichu_result), y)
+    y = draw_wrapped("来月の運勢", extract_section("来月の運勢", shichu_result), y)
 
-    # QRコード
-    qr_path = create_qr_code(get_affiliate_link(), path="affiliate_qr.png")
-    if os.path.exists(qr_path):
-        c.drawImage(qr_path, width - margin - 30 * mm, margin, width=30 * mm, height=30 * mm)
-        c.setFont(font, 10)
-        c.drawString(margin, margin + 10 * mm, "📱 ラッキーアイテムはこちらから →")
-        c.drawString(margin, margin, get_affiliate_link())
+    # 易占い
+    y = draw_wrapped("イーチン占い", iching_result, y)
 
-    c.drawText(text)
+    # ラッキー情報
+    y = draw_wrapped("ラッキー情報", lucky_info, y)
+
     c.save()
-    return save_path
+    return filepath
