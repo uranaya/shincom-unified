@@ -8,7 +8,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
-from app import create_qr_code, get_affiliate_link
+from affiliate import create_qr_code, get_affiliate_link
 
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
