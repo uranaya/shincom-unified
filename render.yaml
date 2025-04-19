@@ -11,4 +11,14 @@ services:
         sync: false
       - key: SMTP_PASSWORD
         sync: false
-    autoDeploy: true	
+    autoDeploy: true
+
+  - type: web
+    name: shincom-unified
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -t 120 app:app
+    envVars:
+      - key: PORT
+        value: 10000
