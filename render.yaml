@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: shincom-app
+    env: python
+    buildCommand: ""
+    startCommand: python app.py
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+    autoDeploy: true	

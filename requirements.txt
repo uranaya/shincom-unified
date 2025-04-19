@@ -1,0 +1,6 @@
+Flask
+gunicorn
+openai
+python-dotenv
+reportlab
+qrcode

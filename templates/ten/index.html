@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>店頭用 手相鑑定フォーム</title>
+</head>
+<body>
+  <h2>📸 手相撮影＆送信フォーム（店頭用）</h2>
+  <form method="POST">
+    <video id="camera" autoplay playsinline width="224" height="224" style="border:1px solid black;"></video><br><br>
+    <canvas id="canvas" width="224" height="224" style="border:1px solid gray; display:none;"></canvas><br><br>
+    <input type="hidden" name="image_data" id="image_data">
+
+    <label>生年月日：</label>
+    <input type="date" name="birthdate" required><br><br>
+
+    <button type="button" onclick="takePhoto()">📷 撮影</button><br><br>
+    <button type="submit">送信してPDF生成</button>
+  </form>
+  <form action="/logout"><button>ログアウト</button></form>
+
+  <script>
+    const video = document.getElementById("camera");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const imageDataInput = document.getElementById("image_data");
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (err) {
+        alert("カメラが使用できません: " + err.message);
+      }
+    }
+
+    
+function takePhoto() {
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imageData = canvas.toDataURL("image/png");
+  imageDataInput.value = imageData;
+  canvas.style.display = "block";
+  alert("📷 撮影完了しました！画像が表示されています。");
+
+  const birthdate = document.querySelector('input[name="birthdate"]').value;
+  if (birthdate) {
+    fetch("/get_eto", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ birthdate: birthdate })
+    })
+    .then(response => response.json())
+    .then(data => {
+      alert("📅 入力された生年月日の日柱の干支は「" + data.eto + "」です");
+    })
+    .catch(error => {
+      console.error("干支取得エラー:", error);
+    });
+  }
+}
+
+
+    window.onload = startCamera;
+  </script>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class="flashes">
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+
+</body>
+</html>
