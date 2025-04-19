@@ -14,18 +14,34 @@ PASSWORD = "uranaya2024"
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    referer = request.referrer or ""
+    if "/tenmob" in referer:
+        mode = "tenmob"
+    elif "/selfmob" in referer:
+        mode = "selfmob"
+    else:
+        mode = "ten"
+
     if request.method == "POST":
         if request.form.get("password") == PASSWORD:
             session["authenticated"] = True
-            return redirect(url_for("ten_mode"))
+            return redirect(url_for(f"{mode}_mode"))
         else:
             flash("パスワードが違います")
-    return render_template("ten/login.html")
+
+    return render_template(f"{mode}/login.html")
+
 
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for("login"))
+    referer = request.referrer or ""
+    if "/tenmob" in referer:
+        return redirect("/tenmob")
+    elif "/selfmob" in referer:
+        return redirect("/selfmob")
+    else:
+        return redirect("/ten")
 
 @app.route("/")
 def root():
