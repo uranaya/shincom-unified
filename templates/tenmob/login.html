@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン - スマートフォン店頭モード</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      text-align: center;
+    }
+    input[type="password"] {
+      padding: 8px;
+      font-size: 1.2em;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1.1em;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>ログインフォーム（スマートフォン店頭モード）</h2>
+  
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <ul style="color: red;">
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+
+  <form method="post">
+    <label for="password">パスワード:</label><br>
+    <input type="password" name="password" required><br>
+    <button type="submit">ログイン</button>
+  </form>
+</body>
+</html>
