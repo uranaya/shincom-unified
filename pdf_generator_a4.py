@@ -80,8 +80,8 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     y = draw_wrapped(c, "今月の運勢", extract_section(shichu_result, "■ 今月の運勢", "■ 来月の運勢"), x, y, width - 2 * margin)
     y = draw_wrapped(c, "来月の運勢", extract_section(shichu_result, "■ 来月の運勢", None), x, y, width - 2 * margin)
     y = draw_wrapped(c, "イーチン占い", iching_result, x, y, width - 2 * margin)
-    y = draw_wrapped(c, "ラッキー情報", lucky_info.replace("\n", " ").replace("
-", " "), x, y, width - 2 * margin)
+    y = draw_wrapped(c, "ラッキー情報", lucky_info.replace("\n", " ").replace("\"", ""), y)
+
 
     c.save()
 
