@@ -1,6 +1,6 @@
 import os
 import base64
-from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify
+from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify, session
 from datetime import datetime
 from dotenv import load_dotenv
 from affiliate import create_qr_code, get_affiliate_link
@@ -13,6 +13,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB
+app.secret_key = os.getenv("SECRET_KEY", "defaultsecret")
 
 def generate_fortune(image_data, birthdate):
     palm_result = analyze_palm(image_data)
@@ -25,6 +26,21 @@ def generate_fortune(image_data, birthdate):
 def root():
     return redirect("/ten")
 
+@app.route("/login", methods=["GET"])
+def login():
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    referer = request.referrer or ""
+    if "/tenmob" in referer:
+        return redirect(url_for("tenmob"))
+    elif "/selfmob" in referer:
+        return redirect(url_for("selfmob"))
+    else:
+        return redirect(url_for("ten"))
+
 @app.route("/ten", methods=["GET", "POST"])
 def ten():
     if request.method == "POST":
@@ -34,7 +50,7 @@ def ten():
         filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         create_pdf_b4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
         return redirect(url_for("preview", filename=filename))
-    return render_template("index.html")
+    return render_template("ten/index.html")
 
 @app.route("/tenmob", methods=["GET", "POST"])
 def tenmob():
