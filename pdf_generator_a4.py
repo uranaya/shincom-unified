@@ -44,20 +44,17 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         f.write(base64.b64decode(image_data.split(",", 1)[1]))
 
     # 手相項目分割（5項目）
-    palm_parts = [p.strip() for p in palm_result.split("
-") if p.strip()]
+    palm_parts = [p.strip() for p in palm_result.split("") if p.strip()]
     sections = []
     buffer = []
     for line in palm_parts:
         if re.match(r"^[1-5]\.", line):
             if buffer:
-                sections.append("
-".join(buffer))
+                sections.append("".join(buffer))
                 buffer = []
         buffer.append(line)
     if buffer:
-        sections.append("
-".join(buffer))
+        sections.append("".join(buffer))
     first_parts = sections[:3]
     back_parts = sections[3:5]
 
