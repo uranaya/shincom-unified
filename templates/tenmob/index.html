@@ -1,81 +1,78 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>シン・コンピューター占い（モバイル）</title>
-  <style>
-    body { font-family: sans-serif; padding: 1em; }
-    video, canvas, img { width: 100%; max-width: 300px; }
-    button { font-size: 1.2em; padding: 0.5em 1em; margin: 0.5em 0; }
-  </style>
+  <meta charset="UTF-8">
+  <title>店頭用 手相鑑定フォーム</title>
 </head>
 <body>
-  <h2>手相を撮影して占う</h2>
+  <h2>📸 手相撮影＆送信フォーム（店頭用）</h2>
+  <form method="POST">
+    <video id="camera" autoplay playsinline width="224" height="224" style="border:1px solid black;"></video><br><br>
+    <canvas id="canvas" width="224" height="224" style="border:1px solid gray; display:none;"></canvas><br><br>
+    <input type="hidden" name="image_data" id="image_data">
 
-  <form id="fortuneForm" method="POST">
-    <label>生年月日:
-      <input type="date" name="birthdate" id="birthdate" required />
-    </label><br><br>
+    <label>生年月日：</label>
+    <input type="date" name="birthdate" required><br><br>
 
-    <video id="video" autoplay playsinline></video><br>
-    <button type="button" onclick="capturePhoto()">📸 撮影</button><br><br>
-
-    <img id="capturedImage" style="display:none;" /><br>
-    <input type="hidden" name="image_data" id="image_data" />
-
-    <p>干支（日柱）: <span id="eto_display">未取得</span></p>
-
-    <button type="submit">🔮 PDF作成</button>
+    <button type="button" onclick="takePhoto()">📷 撮影</button><br><br>
+    <button type="submit">送信してPDF生成</button>
   </form>
+  <form action="/logout"><button>ログアウト</button></form>
 
   <script>
-    const video = document.getElementById("video");
-    const image = document.getElementById("capturedImage");
+    const video = document.getElementById("camera");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
     const imageDataInput = document.getElementById("image_data");
-    const birthdateInput = document.getElementById("birthdate");
-    const etoDisplay = document.getElementById("eto_display");
 
-    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-      video.srcObject = stream;
-    });
-
-    function capturePhoto() {
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth * 0.5;
-      canvas.height = video.videoHeight * 0.5;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const imageData = canvas.toDataURL("image/png", 0.8);
-      image.src = imageData;
-      image.style.display = "block";
-      imageDataInput.value = imageData;
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (err) {
+        alert("カメラが使用できません: " + err.message);
+      }
     }
 
-    birthdateInput.addEventListener("change", () => {
-      const birthdate = birthdateInput.value;
-      if (!birthdate) return;
+    
+function takePhoto() {
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imageData = canvas.toDataURL("image/png");
+  imageDataInput.value = imageData;
+  canvas.style.display = "block";
+  alert("📷 撮影完了しました！画像が表示されています。");
 
-      fetch("/get_eto", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ birthdate })
-      })
-      .then(res => res.json())
-      .then(data => {
-        etoDisplay.textContent = data.eto;
-      })
-      .catch(() => {
-        etoDisplay.textContent = "取得失敗";
-      });
+  const birthdate = document.querySelector('input[name="birthdate"]').value;
+  if (birthdate) {
+    fetch("/get_eto", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ birthdate: birthdate })
+    })
+    .then(response => response.json())
+    .then(data => {
+      alert("📅 入力された生年月日の日柱の干支は「" + data.eto + "」です");
+    })
+    .catch(error => {
+      console.error("干支取得エラー:", error);
     });
+  }
+}
+
+
+    window.onload = startCamera;
   </script>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class="flashes">
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+
 </body>
-
-<form method="POST">
-    <!-- 他のフォーム項目 -->
-    <button id="submit-btn" type="submit">PDFを作成</button>
-</form>
-
 </html>

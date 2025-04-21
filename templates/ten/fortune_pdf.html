@@ -3,33 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <title>鑑定結果PDF</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body {
-            font-family: sans-serif;
-            text-align: center;
-            padding: 40px;
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
         }
         iframe {
             width: 100%;
-            height: 800px;
+            height: 100vh;
             border: none;
-        }
-        .btn {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 12px 24px;
-            font-size: 16px;
-            background-color: #0078d7;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
         }
     </style>
 </head>
 <body>
-    <h2>鑑定結果PDF</h2>
     <iframe src="{{ url_for('view_pdf', filename=filename) }}"></iframe>
-    <br>
-    <a href="{{ url_for('ten_mode') }}" class="btn">◀ 鑑定フォームに戻る</a>
 </body>
 </html>
