@@ -1,3 +1,4 @@
+
 import base64
 import os
 from reportlab.lib.pagesizes import A4
@@ -37,32 +38,35 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     wrapper = textwrap.TextWrapper(width=45)
     y = height - margin
 
-    # 画像保存（圧縮付き）
-    image_data = compress_base64_image(image_data)
-    image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-    with open(image_path, "wb") as f:
-        f.write(base64.b64decode(image_data.split(",", 1)[1]))
+    # 圧縮付き画像保存（明示的に600px指定）
+    try:
+        image_data = compress_base64_image(image_data, output_width=600)
+        image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+        with open(image_path, "wb") as f:
+            base64_data = image_data.split(",", 1)[1]
+            f.write(base64.b64decode(base64_data))
+    except Exception as e:
+        print("❌ 画像保存エラー:", e)
+        image_path = None
 
-    # 手相項目分割（5項目）
-    palm_parts = [p.strip() for p in palm_result.split("") if p.strip()]
+    # 手相5項目分割
+    palm_parts = [p.strip() for p in palm_result.split("\n") if p.strip()]
     sections = []
     buffer = []
     for line in palm_parts:
-        if re.match(r"^[1-5]\.", line):
+        if any(line.startswith(f"{i}.") for i in range(1, 6)):
             if buffer:
-                sections.append("".join(buffer))
+                sections.append("\n".join(buffer))
                 buffer = []
         buffer.append(line)
     if buffer:
-        sections.append("".join(buffer))
+        sections.append("\n".join(buffer))
     first_parts = sections[:3]
     back_parts = sections[3:5]
 
-    # === 表面 ===
-
-    # QR広告（右上）＋タイトル
-    y_pos = y
+    # 表面
     qr_ad_path = create_qr_code("https://uranaya.jp", path="qr_uranaya.png")
+    y_pos = y
     if os.path.exists(qr_ad_path):
         c.drawImage(qr_ad_path, width - margin - 30 * mm, y_pos - 30 * mm, width=30 * mm, height=30 * mm)
         ad_text = c.beginText(margin, y_pos - 10)
@@ -74,11 +78,10 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         c.drawText(ad_text)
         y -= 50 * mm
 
-    # 手相画像
-    c.drawImage(image_path, (width - 150 * mm) / 2, y - 90 * mm, width=150 * mm, height=90 * mm)
-    y -= 100 * mm
+    if image_path:
+        c.drawImage(image_path, (width - 150 * mm) / 2, y - 90 * mm, width=150 * mm, height=90 * mm)
+        y -= 100 * mm
 
-    # 手相項目 1～3
     text = c.beginText(margin, y)
     text.setFont(font, font_size)
     text.textLine("■ 手相鑑定（代表3項目）")
@@ -89,13 +92,12 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         text.textLine("")
     c.drawText(text)
 
-    # === 裏面 ===
+    # 裏面
     c.showPage()
     y = height - margin
     text = c.beginText(margin, y)
     text.setFont(font, font_size)
 
-    # 手相 4～5項目
     if back_parts:
         text.textLine("■ 手相鑑定（4〜5項目目）")
         text.textLine("")
@@ -104,7 +106,6 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
                 text.textLine(line)
             text.textLine("")
 
-    # 四柱推命
     text.textLine("■ 四柱推命によるアドバイス")
     text.textLine("")
     for paragraph in shichu_result.split("\n"):
@@ -112,7 +113,6 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
             text.textLine(line)
         text.textLine("")
 
-    # イーチン占い
     text.textLine("■ イーチン占い アドバイス")
     text.textLine("")
     for paragraph in iching_result.split("\n"):
@@ -120,13 +120,12 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
             text.textLine(line)
         text.textLine("")
 
-    # ラッキー情報
     text.textLine("■ ラッキーアイテム・カラー・ナンバー")
     text.textLine("")
     for line in lucky_info.split("\n"):
         for wrapped in wrapper.wrap(line.strip()):
             text.textLine(wrapped)
-    c.drawText(text)
 
+    c.drawText(text)
     c.save()
     return filepath
