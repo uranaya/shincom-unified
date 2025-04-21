@@ -25,7 +25,7 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     y_pos = height - margin
 
 
-    # QR広告
+    # タイトル＋店舗情報広告
     qr_ad_path = create_qr_code("https://uranaya.jp", path="qr_uranaya.png")
     if os.path.exists(qr_ad_path):
         c.drawImage(qr_ad_path, width - margin - 30 * mm, y_pos - 30 * mm, width=30 * mm, height=30 * mm)
