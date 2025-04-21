@@ -7,7 +7,7 @@ from affiliate import create_qr_code, get_affiliate_link
 from pdf_generator_b4 import create_pdf as create_pdf_b4
 from pdf_generator_a4 import create_pdf as create_pdf_a4
 from fortune_logic import analyze_palm, get_shichu_fortune, get_iching_advice, get_lucky_info, get_nicchu_eto
-from hayami_table_full_complete import find_eto
+from hayami_table_full_complete import hayami_table
 
 load_dotenv()
 
