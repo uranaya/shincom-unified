@@ -2,66 +2,39 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>手相鑑定フォーム（スマホ用）</title>
+  <title>店頭用 手相鑑定フォーム</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
-      font-family: sans-serif;
-      padding: 1em;
-      margin: 0;
-      background-color: #f8f8f8;
+      font-size: 18px;
+      padding: 10px;
     }
-    h2 {
-      text-align: center;
-    }
-    video, canvas {
+    input, button {
+      font-size: 20px;
+      padding: 10px;
+      margin: 10px 0;
       width: 100%;
-      max-width: 300px;
-      height: auto;
-      display: block;
-      margin: 0 auto;
-      border: 1px solid #aaa;
+      box-sizing: border-box;
     }
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 1em;
+    #video, #canvas {
+      width: 100%;
       max-width: 400px;
-      margin: 0 auto;
-    }
-    button {
-      padding: 0.8em;
-      font-size: 1em;
-      border: none;
-      border-radius: 6px;
-      background-color: #007bff;
-      color: white;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    label {
-      font-weight: bold;
-    }
-    .flashes {
-      color: red;
-      text-align: center;
+      border: 1px solid #ccc;
     }
   </style>
 </head>
 <body>
-  <h2>📸 手相鑑定フォーム</h2>
-  <form id="palmForm" onsubmit="return false;">
-    <video id="camera" autoplay playsinline></video>
-    <canvas id="canvas" style="display:none;"></canvas>
-    <label for="birthdate">生年月日</label>
-    <input type="date" name="birthdate" id="birthdate" required placeholder="例: 1990-01-01">
+  <h2>📸 手相撮影＆送信フォーム（店頭用）</h2>
+  <video id="camera" autoplay playsinline></video>
+  <canvas id="canvas" style="display:none;"></canvas>
 
-    <button type="button" onclick="takePhoto()">📷 撮影</button>
-    <button type="button" id="submitBtn" onclick="submitForm()" disabled>送信してPDF生成</button>
-  </form>
+  <label>生年月日：</label>
+  <input type="date" id="birthdate" required><br>
 
-  <form action="/logout"><button style="background-color:gray;">ログアウト</button></form>
+  <button onclick="takePhoto()">📷 撮影</button>
+  <button onclick="submitForm()">送信してPDF生成</button>
+
+  <form action="/logout"><button>ログアウト</button></form>
 
   <script>
     const video = document.getElementById("camera");
@@ -72,75 +45,49 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
-      } catch (err) {
-        alert("カメラが使用できません: " + err.message);
+      } catch (e) {
+        alert("カメラが使用できません：" + e.message);
       }
     }
-
-    let imageDataBase64 = "";
 
     function takePhoto() {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      imageDataBase64 = canvas.toDataURL("image/png");
+      const width = 600;  // リサイズ後の幅
+      const height = video.videoHeight * (600 / video.videoWidth);
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(video, 0, 0, width, height);
       canvas.style.display = "block";
       alert("📷 撮影完了しました！");
-      document.getElementById("submitBtn").disabled = false;
-
-      const birthdate = document.getElementById("birthdate").value;
-      if (birthdate) {
-        fetch("/get_eto", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ birthdate })
-        })
-        .then(res => res.json())
-        .then(data => {
-          alert("📅 日柱（干支）：「" + data.eto + "」");
-        });
-      }
     }
 
-    function submitForm() {
+    async function submitForm() {
       const birthdate = document.getElementById("birthdate").value;
-      if (!imageDataBase64 || !birthdate) {
-        alert("画像または生年月日が未入力です。");
+      const imageData = canvas.toDataURL("image/png");
+
+      if (!birthdate || !imageData) {
+        alert("生年月日と手相画像の両方を入力してください。");
         return;
       }
 
-      fetch("/tenmob", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image_data: imageDataBase64,
-          birthdate: birthdate
-        })
-      })
-      .then(res => {
-        if (res.redirected) {
-          window.location.href = res.url;
+      try {
+        const response = await fetch("/tenmob", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_data: imageData, birthdate })
+        });
+
+        if (response.redirected) {
+          window.location.href = response.url;
         } else {
-          alert("送信に失敗しました。");
+          const result = await response.json();
+          alert(result.message || "送信に失敗しました");
         }
-      })
-      .catch(err => {
-        console.error("送信エラー:", err);
-        alert("通信エラーが発生しました。");
-      });
+      } catch (error) {
+        alert("送信中にエラーが発生しました: " + error);
+      }
     }
 
     window.onload = startCamera;
   </script>
-
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      <ul class="flashes">
-        {% for message in messages %}
-          <li>{{ message }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-  {% endwith %}
 </body>
 </html>

@@ -39,35 +39,25 @@ def root():
 def ten_mode():
     return handle_mode("ten")
 
-from flask import request, redirect, url_for, render_template, session, jsonify
-import os
-from datetime import datetime
-
 @app.route("/tenmob", methods=["GET", "POST"])
 def tenmob():
     if request.method == "POST":
-        try:
-            image_data = request.form.get("image_data")
-            birthdate = request.form.get("birthdate")
+        image_data = request.form.get("image_data")
+        birthdate = request.form.get("birthdate")
 
-            if not image_data or not birthdate:
-                flash("画像または生年月日がありません")
-                return redirect(url_for("tenmob"))
-
-            palm_result = analyze_palm(image_data)
-            shichu_result = get_shichu_fortune(birthdate)
-            iching_result = get_iching_advice()
-            lucky_info = get_lucky_info(birthdate)
-
-            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
-
-            return redirect(url_for("preview", filename=filename))
-
-        except Exception as e:
-            print("❌ /tenmob POSTエラー:", e)
-            flash("エラーが発生しました")
+        if not image_data or not birthdate:
+            flash("画像または生年月日がありません")
             return redirect(url_for("tenmob"))
+
+        palm_result = analyze_palm(image_data)
+        shichu_result = get_shichu_fortune(birthdate)
+        iching_result = get_iching_advice()
+        lucky_info = get_lucky_info(birthdate)
+
+        filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, f"static/{filename}")
+
+        return redirect(url_for("preview", filename=filename))
 
     return render_template("tenmob/index.html")
 
@@ -120,23 +110,37 @@ def get_eto():
 
 @app.route("/preview/<filename>")
 def preview(filename):
-    referer = request.referrer or ""
-    if "/tenmob" in referer:
-        mode = "tenmob"
+    # ① クエリパラメータから優先的に mode を取得（例: /preview/result_xxxx.pdf?mode=tenmob）
+    mode = request.args.get("mode")
+
+    # ② mode が指定されていなければ、Referer（直前のページURL）から判定
+    if not mode:
+        referer = request.referrer or ""
+        if "/tenmob" in referer:
+            mode = "tenmob"
+        elif "/selfmob" in referer:
+            mode = "selfmob"
+        else:
+            mode = "ten"
+
+    # ③ テンプレートパス決定（テンプレートが存在しない場合も保険あり）
+    if mode == "tenmob":
         template_path = "tenmob/fortune_pdf.html"
-    elif "/selfmob" in referer:
-        mode = "selfmob"
+    elif mode == "selfmob":
         template_path = "selfmob/fortune_pdf.html"
     else:
-        mode = "ten"
         template_path = "fortune_pdf.html"
+
     return render_template(template_path, filename=filename, mode=mode)
 
 @app.route("/view/<filename>")
 def view_pdf(filename):
     filepath = os.path.join("static", filename)
-    return send_file(filepath, mimetype='application/pdf')
+    if not os.path.exists(filepath):
+        return "PDFファイルが見つかりませんでした。", 404
+    return send_file(filepath, mimetype="application/pdf")
 
+# ※アプリ起動時ポート（Render用環境変数優先）
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
