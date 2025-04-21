@@ -29,6 +29,13 @@
     <button type="submit">🔮 PDF作成</button>
   </form>
 
+<script>
+document.getElementById("submit-btn").addEventListener("click", function() {
+    this.disabled = true;
+    this.innerText = "作成中...";  // 任意：ボタンの表示を変える
+});
+</script>
+
   <script>
     const video = document.getElementById("video");
     const image = document.getElementById("capturedImage");
@@ -72,4 +79,11 @@
     });
   </script>
 </body>
+
+<form method="POST">
+    <!-- 他のフォーム項目 -->
+    <button id="submit-btn" type="submit">PDFを作成</button>
+</form>
+
+
 </html>

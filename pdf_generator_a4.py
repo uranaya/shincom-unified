@@ -1,86 +1,98 @@
-from pathlib import Path
-from datetime import datetime
-import os
-import textwrap
 import base64
+import os
+from datetime import datetime
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import B4
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
+import textwrap
+from app import create_qr_code, get_affiliate_link
 
-FONT_NAME = "IPAexGothic"
-FONT_PATH = "ipaexg.ttf"
-if os.path.exists(FONT_PATH):
-    pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
+pdfmetrics.registerFont(TTFont("IPAexGothic", "ipaexg.ttf"))
+font = "IPAexGothic"
+wrapper = textwrap.TextWrapper(width=50)
+
+def draw_wrapped(c, title, content, y, max_width):
+    text = c.beginText(20 * mm, y)
+    text.setFont(font, 11)
+    text.textLine(f"■ {title}")
+    text.textLine("")
+    for line in content.split("\n"):
+        for wrapped in wrapper.wrap(line.strip()):
+            text.textLine(wrapped)
+        text.textLine("")
+    c.drawText(text)
+    return text.getY()
 
 def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
-    filename = os.path.join("static", filename)
-    c = canvas.Canvas(filename, pagesize=B4)
+    filepath = os.path.join("static", filename)
+    c = canvas.Canvas(filepath, pagesize=B4)
     width, height = B4
-    margin = 20 * mm
-    wrapper = textwrap.TextWrapper(width=50)
-    font = FONT_NAME
 
-    y = height - margin
+    y = height - 20 * mm
 
-    image_path = os.path.join("static", f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png")
+    # === QR広告 ===
+    qr_path = create_qr_code(get_affiliate_link())
+    if os.path.exists(qr_path):
+        c.drawImage(qr_path, width - 50 * mm, y - 30 * mm, width=30 * mm, height=30 * mm)
+        ad = c.beginText(20 * mm, y)
+        ad.setFont(font, 11)
+        ad.textLine("───────── シン・コンピューター占い ─────────")
+        ad.textLine("手相・四柱推命・イーチン占いで未来をサポート")
+        ad.textLine("Instagram → @uranaya_official")
+        ad.textLine("────────────────────────────")
+        c.drawText(ad)
+        y -= 50 * mm
+
+    # === 手相画像 ===
+    image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
     with open(image_path, "wb") as f:
         f.write(base64.b64decode(image_data.split(",", 1)[1]))
     c.drawImage(image_path, (width - 150 * mm) / 2, y - 90 * mm, width=150 * mm, height=90 * mm)
     y -= 100 * mm
 
-    palm_parts = [p.strip() for p in palm_result.split("\n") if p.strip()]
+    # === 手相鑑定文分離 ===
+    palm_lines = [l.strip() for l in palm_result.split("\n") if l.strip()]
     advice_index = -1
-    for i in reversed(range(len(palm_parts))):
-        if "まとめ" in palm_parts[i] or "総合" in palm_parts[i]:
+    for i in reversed(range(len(palm_lines))):
+        if "まとめ" in palm_lines[i] or "総合" in palm_lines[i]:
             advice_index = i
             break
-    advice_text = "\n".join(palm_parts[advice_index + 1:]) if advice_index != -1 else ""
-    main_parts = palm_parts[:advice_index] if advice_index != -1 else palm_parts
+    if advice_index != -1:
+        main_palm = "\n".join(palm_lines[:advice_index])
+        palm_advice = "\n".join(palm_lines[advice_index:])
+    else:
+        main_palm = "\n".join(palm_lines)
+        palm_advice = ""
 
-    text = c.beginText(margin, y)
-    text.setFont(font, 11)
-    text.textLine("■ 手相鑑定（5項目）")
-    text.textLine("")
-    for paragraph in main_parts:
-        for line in wrapper.wrap(paragraph):
-            text.textLine(line)
-        text.textLine("")
-    c.drawText(text)
+    # === 手相5項目 ===
+    y = draw_wrapped(c, "手相鑑定（5項目）", main_palm, y, width - 40 * mm)
 
+    # === 裏面へ ===
     c.showPage()
-    text = c.beginText(margin, height - margin)
-    text.setFont(font, 11)
+    y = height - 20 * mm
 
-    if advice_text:
-        text.textLine("■ 手相からの総合的なアドバイス")
-        text.textLine("")
-        for line in wrapper.wrap(advice_text.strip()):
-            text.textLine(line)
-        text.textLine("")
+    # === 手相まとめ ===
+    if palm_advice.strip():
+        y = draw_wrapped(c, "手相からの総合的なアドバイス", palm_advice, y, width - 40 * mm)
 
-    text.textLine("■ 四柱推命によるアドバイス")
-    text.textLine("")
-    for paragraph in shichu_result.split("\n"):
-        for line in wrapper.wrap(paragraph.strip()):
-            text.textLine(line)
-        text.textLine("")
+    # === 四柱推命 ===
+    y = draw_wrapped(c, "四柱推命によるアドバイス", shichu_result, y, width - 40 * mm)
 
-    text.textLine("■ イーチン占い アドバイス")
-    text.textLine("")
-    for paragraph in iching_result.split("\n"):
-        for line in wrapper.wrap(paragraph.strip()):
-            text.textLine(line)
-        text.textLine("")
+    # === イーチン ===
+    y = draw_wrapped(c, "イーチン占いアドバイス", iching_result, y, width - 40 * mm)
 
-    text.textLine("■ ラッキーアイテム・カラー・ナンバー")
-    text.textLine("")
-    for line in lucky_info.split("\n"):
-        for wrapped in wrapper.wrap(line):
-            text.textLine(wrapped)
+    # === ラッキー項目 ===
+    y = draw_wrapped(c, "ラッキーアイテム・カラー・ナンバー", lucky_info, y, width - 40 * mm)
 
-    c.drawText(text)
+    # === 裏面のQRコード再掲 ===
+    if os.path.exists(qr_path):
+        c.drawImage(qr_path, width - 50 * mm, 20 * mm, width=30 * mm, height=30 * mm)
+        c.setFont(font, 10)
+        c.drawString(20 * mm, 25 * mm, "📱 ラッキーアイテムはこちら →")
+        c.drawString(20 * mm, 20 * mm, get_affiliate_link())
+
     c.save()
-    return filename
+    return filepath
