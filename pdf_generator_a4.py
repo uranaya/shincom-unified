@@ -20,7 +20,7 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     width, height = A4
     margin = 15 * mm
     font = FONT_NAME
-    wrapper = textwrap.TextWrapper(width=50)
+    wrapper = textwrap.TextWrapper(width=45)
 
     y_pos = height - margin
 
