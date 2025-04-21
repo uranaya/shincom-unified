@@ -78,23 +78,38 @@ def analyze_palm(image_data):
             messages=[
                 {
                     "role": "system",
-                    "content": "あなたはプロの手相鑑定士です。以下の条件で手相を鑑定してください。1) 特徴的な線（特殊線含む）を優先的に含めること。2) 各項目400文字程度の解説を5項目書くこと。3) 最後にまとめのアドバイスを加えること。日本語でわかりやすく書いてください。"
+                    "content": (
+                        "あなたはプロの手相鑑定士です。以下の指示に従って、写真から手相を分析し日本語で出力してください。"
+                    ),
                 },
                 {
                     "role": "user",
                     "content": [
                         {
+                            "type": "text",
+                            "text": (
+                                "手相の写真を見て、以下の形式で出力してください：\n"
+                                "### 1. 生命線\n（説明文）\n\n"
+                                "### 2. 知能線\n（説明文）\n\n"
+                                "### 3. 感情線\n（説明文）\n\n"
+                                "### 4. 運命線\n（説明文）\n\n"
+                                "### 5. 太陽線\n（説明文）\n\n"
+                                "### 総合的なアドバイス\n（全体を踏まえたまとめ）\n\n"
+                                "・各項目は400文字前後で\n・丁寧でわかりやすく自然な表現で\n・改行や記号などで項目を明確に区切ってください"
+                            ),
+                        },
+                        {
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:image/png;base64,{base64data}"
-                            }
-                        }
-                    ]
-                }
+                            },
+                        },
+                    ],
+                },
             ],
-            max_tokens=3000
+            max_tokens=3000,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
         print("❌ Vision APIエラー:", e)
-        return "画像読み込みエラー"
+        return "手相診断中にエラーが発生しました。"
