@@ -10,8 +10,7 @@ from pdf_generator_b4 import create_pdf as create_pdf_b4
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
 
-# ★ここを追加
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 最大5MBまで許可
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 最大5MBに設定
 
 load_dotenv()
 PASSWORD = "uranaya2024"
