@@ -9,8 +9,7 @@ from pdf_generator_b4 import create_pdf as create_pdf_b4
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
-
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 最大5MBに設定
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 最大10MBに設定
 
 load_dotenv()
 PASSWORD = "uranaya2024"
@@ -42,25 +41,19 @@ def ten_mode():
 @app.route("/tenmob", methods=["GET", "POST"])
 def tenmob():
     if request.method == "POST":
-        image_data = request.form.get("image_data")
-        birthdate = request.form.get("birthdate")
-
-        if not image_data or not birthdate:
-            flash("画像または生年月日がありません")
-            return redirect(url_for("tenmob"))
-
-        palm_result = analyze_palm(image_data)
-        shichu_result = get_shichu_fortune(birthdate)
-        iching_result = get_iching_advice()
-        lucky_info = get_lucky_info(birthdate)
-
-        filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, f"static/{filename}")
-
-        return redirect(url_for("preview", filename=filename))
-
+        try:
+            data = request.get_json()
+            image_data = data.get("image_data")
+            birthdate = data.get("birthdate")
+            eto = get_nicchu_eto(birthdate)
+            palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
+            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
+            return redirect(url_for("preview", filename=filename))
+        except Exception as e:
+            print("❌ tenmobエラー:", e)
+            return jsonify({"message": "処理中にエラーが発生しました"}), 500
     return render_template("tenmob/index.html")
-
 
 @app.route("/selfmob", methods=["GET", "POST"])
 def selfmob_mode():
@@ -110,10 +103,7 @@ def get_eto():
 
 @app.route("/preview/<filename>")
 def preview(filename):
-    # ① クエリパラメータから優先的に mode を取得（例: /preview/result_xxxx.pdf?mode=tenmob）
     mode = request.args.get("mode")
-
-    # ② mode が指定されていなければ、Referer（直前のページURL）から判定
     if not mode:
         referer = request.referrer or ""
         if "/tenmob" in referer:
@@ -123,7 +113,6 @@ def preview(filename):
         else:
             mode = "ten"
 
-    # ③ テンプレートパス決定（テンプレートが存在しない場合も保険あり）
     if mode == "tenmob":
         template_path = "tenmob/fortune_pdf.html"
     elif mode == "selfmob":
@@ -140,7 +129,6 @@ def view_pdf(filename):
         return "PDFファイルが見つかりませんでした。", 404
     return send_file(filepath, mimetype="application/pdf")
 
-# ※アプリ起動時ポート（Render用環境変数優先）
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
