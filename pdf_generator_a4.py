@@ -8,7 +8,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
 import textwrap
-from app import create_qr_code, get_affiliate_link
+from affiliate import create_qr_code, get_affiliate_link
 
 pdfmetrics.registerFont(TTFont("IPAexGothic", "ipaexg.ttf"))
 font = "IPAexGothic"
