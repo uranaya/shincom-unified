@@ -39,9 +39,38 @@ def root():
 def ten_mode():
     return handle_mode("ten")
 
+from flask import request, redirect, url_for, render_template, session, jsonify
+import os
+from datetime import datetime
+
 @app.route("/tenmob", methods=["GET", "POST"])
-def tenmob_mode():
-    return handle_mode("tenmob")
+def tenmob():
+    if request.method == "POST":
+        try:
+            image_data = request.form.get("image_data")
+            birthdate = request.form.get("birthdate")
+
+            if not image_data or not birthdate:
+                flash("画像または生年月日がありません")
+                return redirect(url_for("tenmob"))
+
+            palm_result = analyze_palm(image_data)
+            shichu_result = get_shichu_fortune(birthdate)
+            iching_result = get_iching_advice()
+            lucky_info = get_lucky_info(birthdate)
+
+            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
+
+            return redirect(url_for("preview", filename=filename))
+
+        except Exception as e:
+            print("❌ /tenmob POSTエラー:", e)
+            flash("エラーが発生しました")
+            return redirect(url_for("tenmob"))
+
+    return render_template("tenmob/index.html")
+
 
 @app.route("/selfmob", methods=["GET", "POST"])
 def selfmob_mode():
@@ -103,13 +132,10 @@ def preview(filename):
         template_path = "fortune_pdf.html"
     return render_template(template_path, filename=filename, mode=mode)
 
-
 @app.route("/view/<filename>")
 def view_pdf(filename):
     filepath = os.path.join("static", filename)
     return send_file(filepath, mimetype='application/pdf')
-
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

@@ -54,7 +54,9 @@
   <form id="palmForm" onsubmit="return false;">
     <video id="camera" autoplay playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
-    <input type="date" name="birthdate" id="birthdate" required>
+    <label for="birthdate">生年月日</label>
+    <input type="date" name="birthdate" id="birthdate" required placeholder="例: 1990-01-01">
+
     <button type="button" onclick="takePhoto()">📷 撮影</button>
     <button type="button" id="submitBtn" onclick="submitForm()" disabled>送信してPDF生成</button>
   </form>
