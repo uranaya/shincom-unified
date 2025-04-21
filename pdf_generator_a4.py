@@ -22,8 +22,12 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     font = FONT_NAME
     font_size = 11
     wrapper = textwrap.TextWrapper(width=50)
-
     y = height - margin
+
+    # 画像保存
+    image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+    with open(image_path, "wb") as f:
+        f.write(base64.b64decode(image_data.split(",", 1)[1]))
 
     # 手相項目分割（5項目）
     palm_parts = [p.strip() for p in palm_result.split("\n") if p.strip()]
@@ -37,11 +41,15 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         buffer.append(line)
     if buffer:
         sections.append("\n".join(buffer))
-
     first_parts = sections[:3]
     back_parts = sections[3:5]
 
-    # === 表面（1〜3項目）===
+    # === 表面 ===
+    # 手相画像
+    c.drawImage(image_path, (width - 150 * mm) / 2, y - 90 * mm, width=150 * mm, height=90 * mm)
+    y -= 100 * mm
+
+    # タイトルと1～3項目
     text = c.beginText(margin, y)
     text.setFont(font, font_size)
     text.textLine("■ 手相鑑定（代表3項目）")
@@ -52,11 +60,6 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         text.textLine("")
     c.drawText(text)
 
-    # QRコード（左下）
-    qr_path = create_qr_code(get_affiliate_link())
-    if os.path.exists(qr_path):
-        c.drawImage(qr_path, margin, margin, width=30 * mm, height=30 * mm)
-
     c.showPage()
 
     # === 裏面 ===
@@ -64,7 +67,14 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     text = c.beginText(margin, y)
     text.setFont(font, font_size)
 
-    # 手相 4〜5項目目
+    # タイトル広告（裏面冒頭）
+    text.textLine("───────── シン・コンピューター占い ─────────")
+    text.textLine("手相・四柱推命・イーチン占いで未来をサポート")
+    text.textLine("Instagram → @uranaya_official")
+    text.textLine("────────────────────────────")
+    text.textLine("")
+
+    # 手相4～5項目目
     if back_parts:
         text.textLine("■ 手相鑑定（4〜5項目目）")
         text.textLine("")
@@ -98,7 +108,8 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
 
     c.drawText(text)
 
-    # 裏面にもQR
+    # QRコード（裏面 左下）
+    qr_path = create_qr_code(get_affiliate_link())
     if os.path.exists(qr_path):
         c.drawImage(qr_path, margin, margin, width=30 * mm, height=30 * mm)
 
