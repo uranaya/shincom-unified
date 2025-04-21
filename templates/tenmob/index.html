@@ -51,16 +51,12 @@
 </head>
 <body>
   <h2>📸 手相鑑定フォーム</h2>
-  <form method="POST">
+  <form id="palmForm" onsubmit="return false;">
     <video id="camera" autoplay playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
-    <input type="hidden" name="image_data" id="image_data">
-
-    <label>生年月日：</label>
-    <input type="date" name="birthdate" required>
-
+    <input type="date" name="birthdate" id="birthdate" required>
     <button type="button" onclick="takePhoto()">📷 撮影</button>
-    <button type="submit">送信してPDF生成</button>
+    <button type="button" id="submitBtn" onclick="submitForm()" disabled>送信してPDF生成</button>
   </form>
 
   <form action="/logout"><button style="background-color:gray;">ログアウト</button></form>
@@ -69,7 +65,6 @@
     const video = document.getElementById("camera");
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
-    const imageDataInput = document.getElementById("image_data");
 
     async function startCamera() {
       try {
@@ -80,30 +75,57 @@
       }
     }
 
+    let imageDataBase64 = "";
+
     function takePhoto() {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = canvas.toDataURL("image/png");
-      imageDataInput.value = imageData;
+      imageDataBase64 = canvas.toDataURL("image/png");
       canvas.style.display = "block";
       alert("📷 撮影完了しました！");
+      document.getElementById("submitBtn").disabled = false;
 
-      const birthdate = document.querySelector('input[name="birthdate"]').value;
+      const birthdate = document.getElementById("birthdate").value;
       if (birthdate) {
         fetch("/get_eto", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ birthdate: birthdate })
+          body: JSON.stringify({ birthdate })
         })
-        .then(response => response.json())
+        .then(res => res.json())
         .then(data => {
-          alert("📅 入力された生年月日の日柱の干支は「" + data.eto + "」です");
-        })
-        .catch(error => {
-          console.error("干支取得エラー:", error);
+          alert("📅 日柱（干支）：「" + data.eto + "」");
         });
       }
+    }
+
+    function submitForm() {
+      const birthdate = document.getElementById("birthdate").value;
+      if (!imageDataBase64 || !birthdate) {
+        alert("画像または生年月日が未入力です。");
+        return;
+      }
+
+      fetch("/tenmob", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_data: imageDataBase64,
+          birthdate: birthdate
+        })
+      })
+      .then(res => {
+        if (res.redirected) {
+          window.location.href = res.url;
+        } else {
+          alert("送信に失敗しました。");
+        }
+      })
+      .catch(err => {
+        console.error("送信エラー:", err);
+        alert("通信エラーが発生しました。");
+      });
     }
 
     window.onload = startCamera;
@@ -112,9 +134,9 @@
   {% with messages = get_flashed_messages() %}
     {% if messages %}
       <ul class="flashes">
-      {% for message in messages %}
-        <li>{{ message }}</li>
-      {% endfor %}
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
       </ul>
     {% endif %}
   {% endwith %}
