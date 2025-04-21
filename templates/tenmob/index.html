@@ -21,6 +21,12 @@
       max-width: 400px;
       border: 1px solid #ccc;
     }
+    #eto-display {
+      font-size: 20px;
+      margin-top: -5px;
+      margin-bottom: 10px;
+      color: #444;
+    }
   </style>
 </head>
 <body>
@@ -29,7 +35,8 @@
   <canvas id="canvas" style="display:none;"></canvas>
 
   <label>生年月日：</label>
-  <input type="date" id="birthdate" required><br>
+  <input type="date" id="birthdate" required oninput="fetchEto()"><br>
+  <div id="eto-display"></div>
 
   <button onclick="takePhoto()">📷 撮影</button>
   <button onclick="submitForm()">送信してPDF生成</button>
@@ -51,13 +58,36 @@
     }
 
     function takePhoto() {
-      const width = 600;  // リサイズ後の幅
+      const width = 600;
       const height = video.videoHeight * (600 / video.videoWidth);
       canvas.width = width;
       canvas.height = height;
       ctx.drawImage(video, 0, 0, width, height);
       canvas.style.display = "block";
       alert("📷 撮影完了しました！");
+    }
+
+    async function fetchEto() {
+      const birthdate = document.getElementById("birthdate").value;
+      const etoDisplay = document.getElementById("eto-display");
+
+      if (!birthdate) {
+        etoDisplay.textContent = "";
+        return;
+      }
+
+      try {
+        const response = await fetch("/get_eto", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ birthdate })
+        });
+
+        const data = await response.json();
+        etoDisplay.textContent = `あなたの干支：${data.eto}`;
+      } catch (error) {
+        etoDisplay.textContent = "干支の取得に失敗しました";
+      }
     }
 
     async function submitForm() {
