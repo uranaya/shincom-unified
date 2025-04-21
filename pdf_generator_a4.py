@@ -1,14 +1,14 @@
 import base64
 import os
-from datetime import datetime
-from io import BytesIO
-from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
+from datetime import datetime
+from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
-from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
 from reportlab.lib.utils import ImageReader
 from PIL import Image
+from io import BytesIO
 import textwrap
 from affiliate import create_qr_code, get_affiliate_link
 
@@ -16,16 +16,17 @@ FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
-def compress_base64_image(base64_image_data, output_width=600):
+def compress_base64_image(base64_image_data, output_width=400):
     image_data = base64.b64decode(base64_image_data.split(",", 1)[1])
     image = Image.open(BytesIO(image_data))
+    image = image.convert("RGB")  # JPEGはRGB形式
     w_percent = output_width / float(image.size[0])
     h_size = int((float(image.size[1]) * float(w_percent)))
     image = image.resize((output_width, h_size), Image.Resampling.LANCZOS)
     buffer = BytesIO()
-    image.save(buffer, format="PNG")
+    image.save(buffer, format="JPEG", quality=85)
     compressed_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{compressed_base64}"
+    return f"data:image/jpeg;base64,{compressed_base64}"
 
 def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
     filepath = os.path.join("static", filename)
@@ -35,13 +36,12 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     font = FONT_NAME
     font_size = 11
     wrapper = textwrap.TextWrapper(width=45)
-
     y = height - margin
 
-    # ===== 画像保存（圧縮）=====
+    # 画像保存（JPEG形式へ軽量化）
     try:
         image_data = compress_base64_image(image_data)
-        image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+        image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
         with open(image_path, "wb") as f:
             base64_data = image_data.split(",", 1)[1]
             f.write(base64.b64decode(base64_data))
@@ -49,13 +49,13 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         print("❌ 画像保存エラー:", e)
         image_path = None
 
-    # ===== 手相項目分割（### 1 ～ ### 総合的なアドバイス）=====
-    palm_parts = [p.strip() for p in palm_result.split("###") if p.strip()]
-    main_parts = palm_parts[:3]
-    back_parts = palm_parts[3:]
+    # 手相項目の分割（###で区切り）
+    sections = [s.strip() for s in palm_result.split("###") if s.strip()]
+    first_parts = sections[:3]
+    back_parts = sections[3:]
 
-    # ===== 表面 =====
-    # QR広告（右上）＋タイトル
+    # === 表面 ===
+    # QR広告 + タイトル
     y_pos = y
     qr_ad_path = create_qr_code("https://uranaya.jp", path="qr_uranaya.png")
     if os.path.exists(qr_ad_path):
@@ -70,30 +70,30 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         y -= 50 * mm
 
     # 手相画像
-    if image_path and os.path.exists(image_path):
+    if image_path:
         c.drawImage(image_path, (width - 150 * mm) / 2, y - 90 * mm, width=150 * mm, height=90 * mm)
         y -= 100 * mm
 
-    # 手相1～3項目
+    # 手相項目 1～3
     text = c.beginText(margin, y)
     text.setFont(font, font_size)
     text.textLine("■ 手相鑑定（代表3項目）")
     text.textLine("")
-    for part in main_parts:
+    for part in first_parts:
         for line in wrapper.wrap(part):
             text.textLine(line)
         text.textLine("")
     c.drawText(text)
 
-    # ===== 裏面 =====
+    # === 裏面 ===
     c.showPage()
     y = height - margin
     text = c.beginText(margin, y)
     text.setFont(font, font_size)
 
-    # 手相4～5 + まとめ
+    # 手相 4～5 + 総合的なアドバイス
     if back_parts:
-        text.textLine("■ 手相鑑定（4〜5項目目とまとめ）")
+        text.textLine("■ 手相鑑定（4〜5項目目・総合的なアドバイス）")
         text.textLine("")
         for part in back_parts:
             for line in wrapper.wrap(part):
@@ -108,7 +108,7 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
             text.textLine(line)
         text.textLine("")
 
-    # イーチン
+    # イーチン占い
     text.textLine("■ イーチン占い アドバイス")
     text.textLine("")
     for paragraph in iching_result.split("\n"):
@@ -122,7 +122,7 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     for line in lucky_info.split("\n"):
         for wrapped in wrapper.wrap(line.strip()):
             text.textLine(wrapped)
-
     c.drawText(text)
+
     c.save()
     return filepath
