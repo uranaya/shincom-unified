@@ -17,7 +17,7 @@ FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
-def compress_base64_image(base64_image_data, output_width=600):
+def compress_base64_image(base64_image_data, output_width=400):
     image_data = base64.b64decode(base64_image_data.split(",", 1)[1])
     image = Image.open(BytesIO(image_data))
     w_percent = output_width / float(image.size[0])
