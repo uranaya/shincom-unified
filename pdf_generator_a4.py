@@ -1,15 +1,14 @@
-
 import base64
 import os
-from reportlab.lib.pagesizes import A4
 from datetime import datetime
+from io import BytesIO
 from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
-from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
 from PIL import Image
-from io import BytesIO
 import textwrap
 from affiliate import create_qr_code, get_affiliate_link
 
@@ -36,11 +35,12 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     font = FONT_NAME
     font_size = 11
     wrapper = textwrap.TextWrapper(width=45)
+
     y = height - margin
 
-    # 圧縮付き画像保存（明示的に600px指定）
+    # ===== 画像保存（圧縮）=====
     try:
-        image_data = compress_base64_image(image_data, output_width=600)
+        image_data = compress_base64_image(image_data)
         image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
         with open(image_path, "wb") as f:
             base64_data = image_data.split(",", 1)[1]
@@ -49,24 +49,15 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         print("❌ 画像保存エラー:", e)
         image_path = None
 
-    # 手相5項目分割
-    palm_parts = [p.strip() for p in palm_result.split("\n") if p.strip()]
-    sections = []
-    buffer = []
-    for line in palm_parts:
-        if any(line.startswith(f"{i}.") for i in range(1, 6)):
-            if buffer:
-                sections.append("\n".join(buffer))
-                buffer = []
-        buffer.append(line)
-    if buffer:
-        sections.append("\n".join(buffer))
-    first_parts = sections[:3]
-    back_parts = sections[3:5]
+    # ===== 手相項目分割（### 1 ～ ### 総合的なアドバイス）=====
+    palm_parts = [p.strip() for p in palm_result.split("###") if p.strip()]
+    main_parts = palm_parts[:3]
+    back_parts = palm_parts[3:]
 
-    # 表面
-    qr_ad_path = create_qr_code("https://uranaya.jp", path="qr_uranaya.png")
+    # ===== 表面 =====
+    # QR広告（右上）＋タイトル
     y_pos = y
+    qr_ad_path = create_qr_code("https://uranaya.jp", path="qr_uranaya.png")
     if os.path.exists(qr_ad_path):
         c.drawImage(qr_ad_path, width - margin - 30 * mm, y_pos - 30 * mm, width=30 * mm, height=30 * mm)
         ad_text = c.beginText(margin, y_pos - 10)
@@ -78,34 +69,38 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         c.drawText(ad_text)
         y -= 50 * mm
 
-    if image_path:
+    # 手相画像
+    if image_path and os.path.exists(image_path):
         c.drawImage(image_path, (width - 150 * mm) / 2, y - 90 * mm, width=150 * mm, height=90 * mm)
         y -= 100 * mm
 
+    # 手相1～3項目
     text = c.beginText(margin, y)
     text.setFont(font, font_size)
     text.textLine("■ 手相鑑定（代表3項目）")
     text.textLine("")
-    for part in first_parts:
+    for part in main_parts:
         for line in wrapper.wrap(part):
             text.textLine(line)
         text.textLine("")
     c.drawText(text)
 
-    # 裏面
+    # ===== 裏面 =====
     c.showPage()
     y = height - margin
     text = c.beginText(margin, y)
     text.setFont(font, font_size)
 
+    # 手相4～5 + まとめ
     if back_parts:
-        text.textLine("■ 手相鑑定（4〜5項目目）")
+        text.textLine("■ 手相鑑定（4〜5項目目とまとめ）")
         text.textLine("")
         for part in back_parts:
             for line in wrapper.wrap(part):
                 text.textLine(line)
             text.textLine("")
 
+    # 四柱推命
     text.textLine("■ 四柱推命によるアドバイス")
     text.textLine("")
     for paragraph in shichu_result.split("\n"):
@@ -113,6 +108,7 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
             text.textLine(line)
         text.textLine("")
 
+    # イーチン
     text.textLine("■ イーチン占い アドバイス")
     text.textLine("")
     for paragraph in iching_result.split("\n"):
@@ -120,6 +116,7 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
             text.textLine(line)
         text.textLine("")
 
+    # ラッキー情報
     text.textLine("■ ラッキーアイテム・カラー・ナンバー")
     text.textLine("")
     for line in lucky_info.split("\n"):
