@@ -1,14 +1,14 @@
 import base64
 import os
+from reportlab.lib.pagesizes import A4
 from datetime import datetime
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.lib.utils import ImageReader
 import textwrap
-from qr_code_generator import create_qr_code, get_affiliate_link
+from affiliate import create_qr_code, get_affiliate_link
 
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
@@ -19,21 +19,13 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     c = canvas.Canvas(filepath, pagesize=A4)
     width, height = A4
     margin = 15 * mm
-    font_size = 11
     font = FONT_NAME
-    wrapper = textwrap.TextWrapper(width=45)
+    font_size = 11
+    wrapper = textwrap.TextWrapper(width=50)
 
-    # === 表面 ===
     y = height - margin
 
-    # 手相画像中央寄せ
-    image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-    with open(image_path, "wb") as f:
-        f.write(base64.b64decode(image_data.split(",", 1)[1]))
-    c.drawImage(image_path, (width - 130 * mm) / 2, y - 100 * mm, width=130 * mm, height=100 * mm)
-    y -= 110 * mm
-
-    # 手相項目分割（5項目 + アドバイス）
+    # 手相項目分割（5項目）
     palm_parts = [p.strip() for p in palm_result.split("\n") if p.strip()]
     sections = []
     buffer = []
@@ -46,21 +38,21 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     if buffer:
         sections.append("\n".join(buffer))
 
-    main_parts = sections[:4]
-    fifth_part = sections[4] if len(sections) > 4 else ""
+    first_parts = sections[:3]
+    back_parts = sections[3:5]
 
-    # 表面：4項目描画
+    # === 表面（1〜3項目）===
     text = c.beginText(margin, y)
     text.setFont(font, font_size)
-    text.textLine("■ 手相鑑定（代表4項目）")
+    text.textLine("■ 手相鑑定（代表3項目）")
     text.textLine("")
-    for part in main_parts:
+    for part in first_parts:
         for line in wrapper.wrap(part):
             text.textLine(line)
         text.textLine("")
     c.drawText(text)
 
-    # QRコード広告（左下）
+    # QRコード（左下）
     qr_path = create_qr_code(get_affiliate_link())
     if os.path.exists(qr_path):
         c.drawImage(qr_path, margin, margin, width=30 * mm, height=30 * mm)
@@ -72,13 +64,14 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     text = c.beginText(margin, y)
     text.setFont(font, font_size)
 
-    # 手相5項目目
-    if fifth_part:
-        text.textLine("■ 手相鑑定（5項目目）")
+    # 手相 4〜5項目目
+    if back_parts:
+        text.textLine("■ 手相鑑定（4〜5項目目）")
         text.textLine("")
-        for line in wrapper.wrap(fifth_part):
-            text.textLine(line)
-        text.textLine("")
+        for part in back_parts:
+            for line in wrapper.wrap(part):
+                text.textLine(line)
+            text.textLine("")
 
     # 四柱推命
     text.textLine("■ 四柱推命によるアドバイス")
