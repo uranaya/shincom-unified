@@ -12,7 +12,7 @@ from hayami_table_full_complete import hayami_table
 load_dotenv()
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 app.secret_key = os.getenv("SECRET_KEY", "defaultsecret")
 
 def generate_fortune(image_data, birthdate):
@@ -26,23 +26,32 @@ def generate_fortune(image_data, birthdate):
 def root():
     return redirect("/ten")
 
-@app.route("/login", methods=["GET"])
-def login():
-    return render_template("login.html")
+@app.route("/login/<mode>", methods=["GET", "POST"])
+def login(mode):
+    if request.method == "POST":
+        password = request.form.get("password")
+        if password == os.getenv("LOGIN_PASSWORD", "uranaya"):
+            session["logged_in"] = True
+            return redirect(f"/{mode}")
+        else:
+            return render_template("login.html", error="パスワードが間違っています", mode=mode)
+    return render_template("login.html", mode=mode)
 
 @app.route("/logout")
 def logout():
     session.clear()
     referer = request.referrer or ""
     if "/tenmob" in referer:
-        return redirect(url_for("tenmob"))
+        return redirect(url_for("login", mode="tenmob"))
     elif "/selfmob" in referer:
-        return redirect(url_for("selfmob"))
+        return redirect(url_for("login", mode="selfmob"))
     else:
-        return redirect(url_for("ten"))
+        return redirect(url_for("login", mode="ten"))
 
 @app.route("/ten", methods=["GET", "POST"])
 def ten():
+    if not session.get("logged_in"):
+        return redirect(url_for("login", mode="ten"))
     if request.method == "POST":
         image_data = request.form.get("image_data")
         birthdate = request.form.get("birthdate")
@@ -54,6 +63,8 @@ def ten():
 
 @app.route("/tenmob", methods=["GET", "POST"])
 def tenmob():
+    if not session.get("logged_in"):
+        return redirect(url_for("login", mode="tenmob"))
     if request.method == "POST":
         try:
             data = request.get_json()
@@ -71,6 +82,8 @@ def tenmob():
 
 @app.route("/selfmob", methods=["GET", "POST"])
 def selfmob():
+    if not session.get("logged_in"):
+        return redirect(url_for("login", mode="selfmob"))
     if request.method == "POST":
         image_data = request.form.get("image_data")
         birthdate = request.form.get("birthdate")
