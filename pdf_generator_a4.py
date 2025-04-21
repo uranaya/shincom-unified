@@ -1,98 +1,101 @@
-import base64
 import os
+import base64
+import textwrap
 from datetime import datetime
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import B4
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
-import textwrap
-from affiliate import create_qr_code, get_affiliate_link
+from affiliate import create_qr_code, get_affiliate_link  # ← 修正済み
 
 pdfmetrics.registerFont(TTFont("IPAexGothic", "ipaexg.ttf"))
-font = "IPAexGothic"
-wrapper = textwrap.TextWrapper(width=50)
 
-def draw_wrapped(c, title, content, y, max_width):
-    text = c.beginText(20 * mm, y)
-    text.setFont(font, 11)
-    text.textLine(f"■ {title}")
-    text.textLine("")
-    for line in content.split("\n"):
-        for wrapped in wrapper.wrap(line.strip()):
-            text.textLine(wrapped)
-        text.textLine("")
-    c.drawText(text)
-    return text.getY()
+def draw_wrapped(c, title, text, y, max_width=50):
+    wrapper = textwrap.TextWrapper(width=max_width)
+    lines = wrapper.wrap(text)
+    c.setFont("IPAexGothic", 11)
+    c.drawString(20 * mm, y, f"■ {title}")
+    y -= 7 * mm
+    for line in lines:
+        c.drawString(20 * mm, y, line)
+        y -= 6 * mm
+    y -= 5 * mm
+    return y
 
 def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
+    if not os.path.exists("static"):
+        os.makedirs("static")
     filepath = os.path.join("static", filename)
-    c = canvas.Canvas(filepath, pagesize=B4)
-    width, height = B4
+    c = canvas.Canvas(filepath, pagesize=A4)
+    width, height = A4
 
     y = height - 20 * mm
 
-    # === QR広告 ===
+    # --- QR広告 ---
+    c.setFont("IPAexGothic", 11)
+    c.drawString(20 * mm, y, "───────── シン・コンピューター占い ─────────")
+    y -= 6 * mm
+    c.drawString(20 * mm, y, "手相・四柱推命・イーチン占いで未来をサポート")
+    y -= 6 * mm
+    c.drawString(20 * mm, y, "Instagram → @uranaya_official")
+    y -= 12 * mm
     qr_path = create_qr_code(get_affiliate_link())
     if os.path.exists(qr_path):
-        c.drawImage(qr_path, width - 50 * mm, y - 30 * mm, width=30 * mm, height=30 * mm)
-        ad = c.beginText(20 * mm, y)
-        ad.setFont(font, 11)
-        ad.textLine("───────── シン・コンピューター占い ─────────")
-        ad.textLine("手相・四柱推命・イーチン占いで未来をサポート")
-        ad.textLine("Instagram → @uranaya_official")
-        ad.textLine("────────────────────────────")
-        c.drawText(ad)
-        y -= 50 * mm
+        c.drawImage(qr_path, width - 50 * mm, y - 10 * mm, width=30 * mm, height=30 * mm)
 
-    # === 手相画像 ===
-    image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+    y -= 40 * mm
+
+    # --- 手相画像 ---
+    image_path = os.path.join("static", f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png")
     with open(image_path, "wb") as f:
         f.write(base64.b64decode(image_data.split(",", 1)[1]))
-    c.drawImage(image_path, (width - 150 * mm) / 2, y - 90 * mm, width=150 * mm, height=90 * mm)
+    c.drawImage(image_path, 30 * mm, y - 90 * mm, width=150 * mm, height=90 * mm)
     y -= 100 * mm
 
-    # === 手相鑑定文分離 ===
-    palm_lines = [l.strip() for l in palm_result.split("\n") if l.strip()]
-    advice_index = -1
-    for i in reversed(range(len(palm_lines))):
-        if "まとめ" in palm_lines[i] or "総合" in palm_lines[i]:
-            advice_index = i
-            break
-    if advice_index != -1:
-        main_palm = "\n".join(palm_lines[:advice_index])
-        palm_advice = "\n".join(palm_lines[advice_index:])
-    else:
-        main_palm = "\n".join(palm_lines)
-        palm_advice = ""
+    # --- 手相鑑定 ---
+    c.setFont("IPAexGothic", 11)
+    c.drawString(20 * mm, y, "■ 手相鑑定（5項目）")
+    y -= 8 * mm
+    wrapper = textwrap.TextWrapper(width=50)
+    for line in palm_result.strip().split("\n"):
+        if line.strip():
+            for l in wrapper.wrap(line.strip()):
+                c.drawString(20 * mm, y, l)
+                y -= 6 * mm
+            y -= 2 * mm
 
-    # === 手相5項目 ===
-    y = draw_wrapped(c, "手相鑑定（5項目）", main_palm, y, width - 40 * mm)
-
-    # === 裏面へ ===
+    # --- 次ページ ---
     c.showPage()
     y = height - 20 * mm
 
-    # === 手相まとめ ===
-    if palm_advice.strip():
-        y = draw_wrapped(c, "手相からの総合的なアドバイス", palm_advice, y, width - 40 * mm)
+    # --- 手相まとめ（抽出） ---
+    if "まとめ" in palm_result:
+        summary_lines = palm_result.split("まとめ")[-1].strip()
+        if summary_lines:
+            y = draw_wrapped(c, "手相からのアドバイス", summary_lines, y)
 
-    # === 四柱推命 ===
-    y = draw_wrapped(c, "四柱推命によるアドバイス", shichu_result, y, width - 40 * mm)
+    # --- 四柱推命 ---
+    if shichu_result.strip():
+        y = draw_wrapped(c, "四柱推命によるアドバイス", shichu_result.strip(), y)
 
-    # === イーチン ===
-    y = draw_wrapped(c, "イーチン占いアドバイス", iching_result, y, width - 40 * mm)
+    # --- イーチン占い ---
+    if iching_result.strip():
+        y = draw_wrapped(c, "イーチン占い アドバイス", iching_result.strip(), y)
 
-    # === ラッキー項目 ===
-    y = draw_wrapped(c, "ラッキーアイテム・カラー・ナンバー", lucky_info, y, width - 40 * mm)
+    # --- ラッキー情報 ---
+    if lucky_info.strip():
+        lucky_clean = lucky_info.replace("\n", " ").replace("\"", "")
+        y = draw_wrapped(c, "ラッキー情報", lucky_clean, y)
 
-    # === 裏面のQRコード再掲 ===
-    if os.path.exists(qr_path):
-        c.drawImage(qr_path, width - 50 * mm, 20 * mm, width=30 * mm, height=30 * mm)
-        c.setFont(font, 10)
-        c.drawString(20 * mm, 25 * mm, "📱 ラッキーアイテムはこちら →")
-        c.drawString(20 * mm, 20 * mm, get_affiliate_link())
+    # --- QRコード再掲 ---
+    qr_path2 = create_qr_code(get_affiliate_link(), path="static/affiliate_qr_back.png")
+    if os.path.exists(qr_path2):
+        c.drawImage(qr_path2, width - 50 * mm, 20 * mm, width=30 * mm, height=30 * mm)
+        c.setFont("IPAexGothic", 10)
+        c.drawString(20 * mm, 30 * mm, "📱 ラッキーアイテムはこちら →")
+        c.drawString(20 * mm, 24 * mm, get_affiliate_link())
 
     c.save()
     return filepath
