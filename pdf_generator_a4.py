@@ -1,5 +1,6 @@
 import base64
 import os
+import re
 from reportlab.lib.pagesizes import A4
 from datetime import datetime
 from reportlab.pdfgen import canvas
@@ -16,17 +17,16 @@ FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
-def compress_base64_image(base64_image_data, output_width=400):
+def compress_base64_image(base64_image_data, output_width=600):
     image_data = base64.b64decode(base64_image_data.split(",", 1)[1])
     image = Image.open(BytesIO(image_data))
-    image = image.convert("RGB")  # JPEGはRGB形式
     w_percent = output_width / float(image.size[0])
     h_size = int((float(image.size[1]) * float(w_percent)))
     image = image.resize((output_width, h_size), Image.Resampling.LANCZOS)
     buffer = BytesIO()
-    image.save(buffer, format="JPEG", quality=85)
+    image.save(buffer, format="PNG")
     compressed_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    return f"data:image/jpeg;base64,{compressed_base64}"
+    return f"data:image/png;base64,{compressed_base64}"
 
 def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
     filepath = os.path.join("static", filename)
@@ -38,10 +38,10 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     wrapper = textwrap.TextWrapper(width=45)
     y = height - margin
 
-    # 画像保存（JPEG形式へ軽量化）
+    # 画像保存（圧縮付き）
     try:
         image_data = compress_base64_image(image_data)
-        image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
+        image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
         with open(image_path, "wb") as f:
             base64_data = image_data.split(",", 1)[1]
             f.write(base64.b64decode(base64_data))
@@ -49,13 +49,18 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         print("❌ 画像保存エラー:", e)
         image_path = None
 
-    # 手相項目の分割（###で区切り）
-    sections = [s.strip() for s in palm_result.split("###") if s.strip()]
-    first_parts = sections[:3]
-    back_parts = sections[3:]
+    # 手相の項目とアドバイスを分離
+    sections = re.split(r"\*\*\s*\d\.\s*", palm_result)
+    sections = [s.strip() for s in sections if s.strip()]
+    main_parts = sections[:5] if len(sections) >= 5 else sections
+    advice_match = re.search(r"\*\*総合的なアドバイス\*\*(.*)", palm_result, re.DOTALL)
+    advice_part = advice_match.group(1).strip() if advice_match else ""
+
+    front_parts = main_parts[:3]
+    back_parts = main_parts[3:]
 
     # === 表面 ===
-    # QR広告 + タイトル
+    # QR広告（右上）
     y_pos = y
     qr_ad_path = create_qr_code("https://uranaya.jp", path="qr_uranaya.png")
     if os.path.exists(qr_ad_path):
@@ -74,12 +79,12 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         c.drawImage(image_path, (width - 150 * mm) / 2, y - 90 * mm, width=150 * mm, height=90 * mm)
         y -= 100 * mm
 
-    # 手相項目 1～3
+    # 手相1〜3
     text = c.beginText(margin, y)
     text.setFont(font, font_size)
     text.textLine("■ 手相鑑定（代表3項目）")
     text.textLine("")
-    for part in first_parts:
+    for part in front_parts:
         for line in wrapper.wrap(part):
             text.textLine(line)
         text.textLine("")
@@ -91,14 +96,22 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     text = c.beginText(margin, y)
     text.setFont(font, font_size)
 
-    # 手相 4～5 + 総合的なアドバイス
+    # 手相4〜5項目
     if back_parts:
-        text.textLine("■ 手相鑑定（4〜5項目目・総合的なアドバイス）")
+        text.textLine("■ 手相鑑定（4〜5項目目）")
         text.textLine("")
         for part in back_parts:
             for line in wrapper.wrap(part):
                 text.textLine(line)
             text.textLine("")
+
+    # 総合的なアドバイス
+    if advice_part:
+        text.textLine("■ 手相からの総合的なアドバイス")
+        text.textLine("")
+        for line in wrapper.wrap(advice_part):
+            text.textLine(line)
+        text.textLine("")
 
     # 四柱推命
     text.textLine("■ 四柱推命によるアドバイス")
@@ -122,7 +135,7 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     for line in lucky_info.split("\n"):
         for wrapped in wrapper.wrap(line.strip()):
             text.textLine(wrapped)
-    c.drawText(text)
 
+    c.drawText(text)
     c.save()
     return filepath
