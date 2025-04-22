@@ -33,6 +33,7 @@ def save_uuids():
 @app.route("/create_payment_link", methods=["GET"])
 def create_payment_link():
     komoju_secret = os.getenv("KOMOJU_API_KEY")
+    komoju_url = os.getenv("KOMOJU_API_URL", "https://sandbox.komoju.com/api/v1/payment_links")
     uuid_str = str(uuid.uuid4())
     redirect_url = f"https://shincom-unified.onrender.com/selfmob/{uuid_str}"
     payload = {
@@ -44,7 +45,7 @@ def create_payment_link():
     }
 
     response = requests.post(
-        "https://komoju.com/api/v1/payment_links",
+        komoju_url,
         auth=(komoju_secret, ""),
         json=payload
     )
