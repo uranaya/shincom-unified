@@ -1,6 +1,9 @@
+
 import os
 import base64
 import uuid
+import json
+import requests
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify
 from datetime import datetime
 from dotenv import load_dotenv
@@ -16,63 +19,52 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "defaultsecretkey")
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 最大10MB
 
-# === /ten（店頭）===
-@app.route("/ten", methods=["GET", "POST"])
-def ten():
-    if "logged_in" not in session:
-        return redirect(url_for("login"))
-    if request.method == "POST":
-        try:
-            image_data = request.form.get("image_data")
-            birthdate = request.form.get("birthdate")
-            eto = get_nicchu_eto(birthdate)
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
-            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            create_pdf_b4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
-            return redirect(url_for("preview", filename=filename))
-        except Exception as e:
-            print("❌ tenエラー:", e)
-            return "処理中にエラーが発生しました"
-    return render_template("index.html")
+uuid_file = "used_uuids.json"
+if os.path.exists(uuid_file):
+    with open(uuid_file, "r") as f:
+        used_uuids = set(json.load(f))
+else:
+    used_uuids = set()
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        password = request.form.get("password")
-        if password == os.getenv("LOGIN_PASSWORD", "pass"):
-            session["logged_in"] = True
-            return redirect(url_for("ten"))
-    return render_template("login.html")
+def save_uuids():
+    with open(uuid_file, "w") as f:
+        json.dump(list(used_uuids), f)
 
-# === /tenmob（スマホ店頭操作）===
-@app.route("/tenmob", methods=["GET", "POST"])
-def tenmob():
-    if "logged_in" not in session:
-        return redirect(url_for("login"))
-    if request.method == "POST":
-        try:
-            data = request.get_json()
-            image_data = data.get("image_data")
-            birthdate = data.get("birthdate")
-            eto = get_nicchu_eto(birthdate)
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
-            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
-            return jsonify({"redirect_url": url_for("preview", filename=filename)})
-        except Exception as e:
-            print("❌ tenmobエラー:", e)
-            return jsonify({"message": "処理中にエラーが発生しました"}), 500
-    return render_template("tenmob/index.html")
+@app.route("/create_payment_link", methods=["GET"])
+def create_payment_link():
+    komoju_secret = os.getenv("KOMOJU_API_KEY")
+    uuid_str = str(uuid.uuid4())
+    redirect_url = f"https://shincom-unified.onrender.com/selfmob/{uuid_str}"
+    payload = {
+        "amount": 500,
+        "currency": "JPY",
+        "payment_method_types": ["konbini", "credit_card"],
+        "external_order_num": uuid_str,
+        "return_url": redirect_url
+    }
 
-# === /selfmob（KOMOJU連携）===
-used_uuids = set()
+    response = requests.post(
+        "https://komoju.com/api/v1/payment_links",
+        auth=(komoju_secret, ""),
+        json=payload
+    )
+
+    if response.status_code == 201:
+        payment_url = response.json()["url"]
+        print(f"🧾 新規UUID生成: {uuid_str}")
+        return redirect(payment_url)
+    else:
+        print("❌ KOMOJU連携失敗:", response.text)
+        return "決済リンク生成に失敗しました", 500
 
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
     data = request.json
     payment_id = data.get("id")
     if payment_id:
+        print(f"✅ Webhook受信: {payment_id}")
         used_uuids.add(payment_id)
+        save_uuids()
     return "", 200
 
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
@@ -94,12 +86,51 @@ def selfmob(uuid_str):
             return jsonify({"message": "処理中にエラーが発生しました"}), 500
     return render_template("selfmob/index.html")
 
-# === 共通ルート ===
-@app.route("/get_eto", methods=["POST"])
-def get_eto():
-    birthdate = request.json.get("birthdate")
-    eto = get_nicchu_eto(birthdate)
-    return {"eto": eto}
+@app.route("/ten", methods=["GET", "POST"])
+def ten():
+    if "logged_in" not in session:
+        return redirect(url_for("login"))
+    if request.method == "POST":
+        try:
+            image_data = request.form.get("image_data")
+            birthdate = request.form.get("birthdate")
+            eto = get_nicchu_eto(birthdate)
+            palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
+            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            create_pdf_b4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
+            return redirect(url_for("preview", filename=filename))
+        except Exception as e:
+            print("❌ tenエラー:", e)
+            return "処理中にエラーが発生しました"
+    return render_template("index.html")
+
+@app.route("/tenmob", methods=["GET", "POST"])
+def tenmob():
+    if "logged_in" not in session:
+        return redirect(url_for("login"))
+    if request.method == "POST":
+        try:
+            data = request.get_json()
+            image_data = data.get("image_data")
+            birthdate = data.get("birthdate")
+            eto = get_nicchu_eto(birthdate)
+            palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
+            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
+            return jsonify({"redirect_url": url_for("preview", filename=filename)})
+        except Exception as e:
+            print("❌ tenmobエラー:", e)
+            return jsonify({"message": "処理中にエラーが発生しました"}), 500
+    return render_template("tenmob/index.html")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        password = request.form.get("password")
+        if password == os.getenv("LOGIN_PASSWORD", "pass"):
+            session["logged_in"] = True
+            return redirect(url_for("ten"))
+    return render_template("login.html")
 
 @app.route("/logout")
 def logout():
@@ -108,7 +139,7 @@ def logout():
     if "/tenmob" in referer:
         return redirect(url_for("login"))
     elif "/selfmob" in referer:
-        return redirect("https://checkout.komoju.com/")  # カスタマイズ可
+        return redirect("https://checkout.komoju.com/")
     else:
         return redirect(url_for("login"))
 
@@ -127,6 +158,12 @@ def preview(filename):
 def view_pdf(filename):
     filepath = os.path.join("static", filename)
     return send_file(filepath, mimetype='application/pdf')
+
+@app.route("/get_eto", methods=["POST"])
+def get_eto():
+    birthdate = request.json.get("birthdate")
+    eto = get_nicchu_eto(birthdate)
+    return {"eto": eto}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
