@@ -113,3 +113,10 @@ def analyze_palm(image_data):
     except Exception as e:
         print("❌ Vision APIエラー:", e)
         return "手相診断中にエラーが発生しました。"
+
+def generate_fortune(image_data, birthdate):
+    palm_result = analyze_palm(image_data)
+    shichu_result = get_shichu_fortune(birthdate)
+    iching_result = get_iching_advice()
+    lucky_info = get_lucky_info(birthdate)
+    return palm_result, shichu_result, iching_result, lucky_info
