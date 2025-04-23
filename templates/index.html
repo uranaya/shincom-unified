@@ -34,31 +34,29 @@
       }
     }
 
-    
-function takePhoto() {
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const imageData = canvas.toDataURL("image/png");
-  imageDataInput.value = imageData;
-  canvas.style.display = "block";
-  alert("📷 撮影完了しました！画像が表示されています。");
+    function takePhoto() {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = canvas.toDataURL("image/png");
+      imageDataInput.value = imageData;
+      canvas.style.display = "block";
+      alert("📷 撮影完了しました！画像が表示されています。");
 
-  const birthdate = document.querySelector('input[name="birthdate"]').value;
-  if (birthdate) {
-    fetch("/get_eto", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ birthdate: birthdate })
-    })
-    .then(response => response.json())
-    .then(data => {
-      alert("📅 入力された生年月日の日柱の干支は「" + data.eto + "」です");
-    })
-    .catch(error => {
-      console.error("干支取得エラー:", error);
-    });
-  }
-}
-
+      const birthdate = document.querySelector('input[name="birthdate"]').value;
+      if (birthdate) {
+        fetch("/get_eto", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ birthdate: birthdate })
+        })
+        .then(response => response.json())
+        .then(data => {
+          alert("📅 干支：「" + data.eto + "」、本命星：「" + data.honmeisei + "」");
+        })
+        .catch(error => {
+          console.error("干支取得エラー:", error);
+        });
+      }
+    }
 
     window.onload = startCamera;
   </script>
@@ -84,7 +82,6 @@ function takePhoto() {
   </nav>
   <p style="margin-top:10px; color:gray;">&copy; 2025 シン・コンピューター占い</p>
 </footer>
-
 
 </body>
 </html>

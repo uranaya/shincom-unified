@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 
 from fortune_logic import generate_fortune, get_nicchu_eto
+from kyusei_utils import get_honmeisei
 from pdf_generator_b4 import create_pdf as create_pdf_b4
 from pdf_generator_a4 import create_pdf as create_pdf_a4
 
@@ -228,7 +229,9 @@ def view_pdf(filename):
 def get_eto():
     birthdate = request.json.get("birthdate")
     eto = get_nicchu_eto(birthdate)
-    return {"eto": eto}
+    y, m, d = map(int, birthdate.split("-"))
+    honmeisei = get_honmeisei(y, m, d)
+    return jsonify({"eto": eto, "honmeisei": honmeisei})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
