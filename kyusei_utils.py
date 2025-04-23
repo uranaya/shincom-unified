@@ -1,70 +1,44 @@
+from datetime import datetime
+import openai
 
-from datetime import date
-
-# 九星の一覧（西暦ベースの本命星）
-NINE_STARS = ["一白水星", "二黒土星", "三碧木星", "四緑木星", "五黄土星", "六白金星", "七赤金星", "八白土星", "九紫火星"]
+NINE_STARS = [
+    "一白水星", "二黒土星", "三碧木星",
+    "四緑木星", "五黄土星", "六白金星",
+    "七赤金星", "八白土星", "九紫火星"
+]
 
 def get_honmeisei(year: int, month: int, day: int) -> str:
-    """
-    正確な九星気学の本命星を返す（節入り＝立春2月4日基準）
-    """
-    # 立春（2/4）前は前年とみなす
-    if month < 2 or (month == 2 and day < 4):
+    if (month < 2) or (month == 2 and day <= 3):
         year -= 1
-
-    # 九星計算： 11 - (年 % 9)
     kyusei_num = (11 - (year % 9)) % 9
     kyusei_num = 9 if kyusei_num == 0 else kyusei_num
+    return NINE_STARS[kyusei_num - 1]
 
-    kyusei_map = {
-        1: "一白水星",
-        2: "二黒土星",
-        3: "三碧木星",
-        4: "四緑木星",
-        5: "五黄土星",
-        6: "六白金星",
-        7: "七赤金星",
-        8: "八白土星",
-        9: "九紫火星"
-    }
-
-    return kyusei_map[kyusei_num]
-
-
-
-# 月盤の吉凶方位（2025年4月と5月のみ簡易定義）
-MONTHLY_DIRECTIONS = {
-    "2025-04": {
-        "一白水星": {"吉": ["東"], "凶": ["西"]},
-        "二黒土星": {"吉": ["北東"], "凶": ["南"]},
-        "三碧木星": {"吉": ["南"], "凶": ["北"]},
-        "四緑木星": {"吉": ["南東"], "凶": ["北西"]},
-        "五黄土星": {"吉": ["西"], "凶": ["東"]},
-        "六白金星": {"吉": ["北"], "凶": ["南東"]},
-        "七赤金星": {"吉": ["北西"], "凶": ["南西"]},
-        "八白土星": {"吉": ["南西"], "凶": ["北東"]},
-        "九紫火星": {"吉": ["南東"], "凶": ["西"]},
-    },
-    "2025-05": {
-        "一白水星": {"吉": ["南東"], "凶": ["北西"]},
-        "二黒土星": {"吉": ["西"], "凶": ["東"]},
-        "三碧木星": {"吉": ["北東"], "凶": ["南"]},
-        "四緑木星": {"吉": ["東"], "凶": ["西"]},
-        "五黄土星": {"吉": ["北"], "凶": ["南東"]},
-        "六白金星": {"吉": ["南"], "凶": ["北"]},
-        "七赤金星": {"吉": ["南西"], "凶": ["北東"]},
-        "八白土星": {"吉": ["北西"], "凶": ["南西"]},
-        "九紫火星": {"吉": ["東"], "凶": ["西"]},
-    }
-}
-
-# 九星気学 吉方位文（1行）を生成
-def get_kyusei_fortune(year: int, month: int, day: int) -> str:
+def get_kyusei_fortune_openai(year: int, month: int, day: int) -> str:
     honmei = get_honmeisei(year, month, day)
-    ym_now = "2025-04"
-    ym_next = "2025-05"
-    now = MONTHLY_DIRECTIONS.get(ym_now, {}).get(honmei, {})
-    nex = MONTHLY_DIRECTIONS.get(ym_next, {}).get(honmei, {})
-    msg = f"今月の吉方位は{','.join(now.get('吉', []))}、凶方位は{','.join(now.get('凶', []))}。"
-    msg += f"来月は{','.join(nex.get('吉', []))}、凶方位は{','.join(nex.get('凶', []))}。"
-    return msg
+    now = datetime.now()
+    now_str = f"{now.year}年{now.month}月"
+    next_month = now.replace(day=1).replace(month=now.month % 12 + 1)
+    next_str = f"{next_month.year}年{next_month.month}月"
+
+    prompt = f"""あなたはプロの九星気学占い師です。
+本命星が「{honmei}」の人に対して、以下の項目に答えてください。
+
+■ {now_str}の吉方位と凶方位
+■ {next_str}の吉方位と凶方位
+
+・各月ごとに1文ずつで簡潔に述べてください。
+・方位は「北」「北東」「東」「南東」「南」「南西」「西」「北西」など、わかりやすく記述してください。
+・本文中に「{honmei}」という星名は使っても使わなくても構いませんが、読みやすい自然な口調で書いてください。
+"""
+
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print("❌ OpenAIによる九星方位占断失敗:", e)
+        return f"{now_str}と{next_str}の吉方位を取得できませんでした。"
