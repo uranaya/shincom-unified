@@ -4,12 +4,18 @@ from datetime import date
 # 九星の一覧（西暦ベースの本命星）
 NINE_STARS = ["一白水星", "二黒土星", "三碧木星", "四緑木星", "五黄土星", "六白金星", "七赤金星", "八白土星", "九紫火星"]
 
-# 本命星の算出（簡易: 2月4日未満は前年扱い）
 def get_honmeisei(year: int, month: int, day: int) -> str:
-    if (month == 1) or (month == 2 and day < 4):
+    """
+    節入り（2月3日以前は前年扱い）を考慮した九星気学の本命星を返す
+    """
+    if (month < 2) or (month == 2 and day <= 3):
         year -= 1
-    index = (11 - (year % 9)) % 9
+
+    base_year = 1900  # 1900年は三碧木星（3）を基準とする
+    index = (3 - ((year - base_year) % 9)) % 9
+    index = 8 if index == 0 else index - 1  # 0〜8のインデックスに変換
     return NINE_STARS[index]
+
 
 # 月盤の吉凶方位（2025年4月と5月のみ簡易定義）
 MONTHLY_DIRECTIONS = {
