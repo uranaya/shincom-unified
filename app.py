@@ -111,6 +111,7 @@ def ten():
             return "処理中にエラーが発生しました"
     return render_template("index.html")
 
+
 @app.route("/tenmob", methods=["GET", "POST"])
 def tenmob():
     if "logged_in" not in session:
@@ -121,19 +122,24 @@ def tenmob():
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             eto = get_nicchu_eto(birthdate)
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
+            palm_result, shichu_result, iching_result, lucky_info = generate_fortune(
+                image_data, birthdate
+            )
 
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
+            create_pdf_a4(
+                image_data, palm_result, shichu_result, iching_result, lucky_info, filename
+            )
 
             redirect_url = url_for("preview", filename=filename)
             print("✅ tenmob PDF作成成功:", redirect_url)
-            return jsonify({"redirect_url": redirect_url})
+            return jsonify({"redirect_url": redirect_url}), 200  # ← ✅重要！
+
         except Exception as e:
             print("❌ tenmob POST処理エラー:", e)
-            return jsonify({"message": "処理中にエラーが発生しました"}), 500
-    return render_template("tenmob/index.html")
+            return jsonify({"error": str(e)}), 500
 
+    return render_template("tenmob/index.html")
 
 
 
