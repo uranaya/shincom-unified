@@ -87,6 +87,12 @@ def selfmob(uuid_str):
             return jsonify({"message": "処理中にエラーが発生しました"}), 500
     return render_template("selfmob/index.html")
 
+
+@app.route("/")
+def index():
+    return redirect(url_for("ten"))
+
+
 @app.route("/ten", methods=["GET", "POST"])
 def ten():
     if "logged_in" not in session:
