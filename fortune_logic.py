@@ -157,7 +157,8 @@ def get_lucky_info(birthdate, palm_result, shichu_result, kyusei_fortune):
         return response.choices[0].message.content.strip()
     except Exception as e:
         print("❌ ラッキー情報取得エラー:", e)
-        return "取得できませんでした。
+        return "取得できませんでした。"
+
 
 
 def generate_fortune(image_data, birthdate):
