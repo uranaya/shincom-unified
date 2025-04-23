@@ -10,7 +10,7 @@ from reportlab.lib.utils import ImageReader
 import textwrap
 from qr_code_generator import create_qr_code, get_affiliate_link
 
-from kyusei_utils import get_kyusei_fortune
+from kyusei_utils import get_kyusei_fortune_openai as get_kyusei_fortune
 
 
 FONT_NAME = "IPAexGothic"
