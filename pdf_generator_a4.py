@@ -155,7 +155,6 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     for line in lucky_info.split("\n"):
         for wrapped in wrapper.wrap(line.strip()):
             text.textLine(wrapped)
-    c.drawText(text)
 
     # 吉方位の追加（例：生年月日 1990年4月15日）
     fortune_text = get_kyusei_fortune(1990, 4, 15)
@@ -163,7 +162,7 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     text.textLine("■ 吉方位（九星気学より）")
     text.textLine(fortune_text)
 
-
+    c.drawText(text)
 
     c.save()
     return filepath
