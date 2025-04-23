@@ -1,4 +1,3 @@
-
 import os
 import base64
 import uuid
@@ -14,6 +13,11 @@ from pdf_generator_b4 import create_pdf as create_pdf_b4
 from pdf_generator_a4 import create_pdf as create_pdf_a4
 
 load_dotenv()
+
+# static フォルダがなければ作成（PDF出力用）
+STATIC_DIR = os.path.join(os.getcwd(), "static")
+if not os.path.exists(STATIC_DIR):
+    os.makedirs(STATIC_DIR)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "defaultsecretkey")
