@@ -184,21 +184,17 @@ def login():
         password = request.form.get("password")
         if password == os.getenv("LOGIN_PASSWORD", "pass"):
             session["logged_in"] = True
-            return redirect(session.get("next_url", url_for("ten")))
+            return redirect(session.get("next_url", url_for("tenmob")))  # ✅ デフォルトは /tenmob に変更
+
+    # GET時のみ next_url を記録
+    referer = request.referrer or ""
+    if "/tenmob" in referer:
+        session["next_url"] = url_for("tenmob")
+    elif "/ten" in referer:
+        session["next_url"] = url_for("ten")
     else:
-        referer = request.referrer or ""
-        if "/tenmob" in referer:
-            session["next_url"] = url_for("tenmob")
-        elif "/ten" in referer:
-            session["next_url"] = url_for("ten")
-        else:
-            session["next_url"] = url_for("ten")
-    return render_template("login.html")
-    if request.method == "POST":
-        password = request.form.get("password")
-        if password == os.getenv("LOGIN_PASSWORD", "pass"):
-            session["logged_in"] = True
-            return redirect(url_for("ten"))
+        session["next_url"] = url_for("tenmob")  # ✅ 安全なデフォルトを tenmob に
+
     return render_template("login.html")
 
 @app.route("/logout")
