@@ -1,5 +1,6 @@
 import openai
 from datetime import datetime
+from base64 import b64decode
 from dateutil.relativedelta import relativedelta
 from hayami_table_full_complete import hayami_table
 
@@ -69,8 +70,36 @@ def get_iching_advice():
         print("❌ 易占い取得エラー:", e)
         return "取得できませんでした。"
 
-def get_lucky_info(birthdate):
-    prompt = "10代の人に向けたラッキーカラー・ラッキーアイテム・ラッキーナンバーを、それぞれ1行で日本語で教えてください。"
+def get_lucky_info(birthdate, palm_result, shichu_result, kyusei_fortune):
+    # 年齢を計算
+    try:
+        birth = datetime.strptime(birthdate, "%Y-%m-%d")
+        today = datetime.today()
+        age = today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
+    except:
+        birth = None
+        age = "不明"
+
+    prompt = f"""以下の鑑定結果と基本情報を参考にして、
+この人にとってのラッキーカラー、ラッキーアイテム、ラッキーナンバーを1行で教えてください。
+
+生年月日：{birthdate}
+年齢：{age}歳
+
+手相結果：
+{palm_result}
+
+四柱推命結果：
+{shichu_result}
+
+九星気学：
+{kyusei_fortune}
+
+・若者向けではなく、全年齢に自然に響く文体で。
+・名称のみ日本語で簡潔に出力してください。
+・親しみやすく穏やかな口調で記述してください。
+"""
+
     try:
         response = openai.chat.completions.create(
             model="gpt-4",
@@ -81,6 +110,7 @@ def get_lucky_info(birthdate):
     except Exception as e:
         print("❌ ラッキー情報取得エラー:", e)
         return "取得できませんでした。"
+
 
 def analyze_palm(image_data):
     try:
