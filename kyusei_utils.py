@@ -22,23 +22,23 @@ def get_kyusei_fortune_openai(year: int, month: int, day: int) -> str:
     next_str = f"{next_month.year}年{next_month.month}月"
 
     prompt = f"""あなたはプロの九星気学占い師です。
-本命星が「{honmei}」の人に対して、以下の項目に答えてください。
+以下の条件で、今月と来月の吉方位と凶方位を1文で出力してください。
 
-■ {now_str}の吉方位と凶方位
-■ {next_str}の吉方位と凶方位
-
-・各月ごとに1文ずつで簡潔に述べてください。
-・方位は「北」「北東」「東」「南東」「南」「南西」「西」「北西」など、わかりやすく記述してください。
-・本文中に「{honmei}」という星名は使っても使わなくても構いませんが、読みやすい自然な口調で書いてください。
+・「今月は◯が吉、×が凶。来月は◯が吉、×が凶。」という形で1文にまとめてください。
+・「今月」「来月」の表現を必ず使ってください。
+・具体的な年月（例：2025年4月）や星名（例：一白水星）は使わないでください。
+・方位は「北」「北東」「東」「南東」「南」「南西」「西」「北西」の中から記述してください。
+・全体を45文字以内にしてください。
+・読みやすく自然な日本語で書いてください。
 """
 
     try:
         response = openai.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=500,
+            max_tokens=300,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
         print("❌ OpenAIによる九星方位占断失敗:", e)
-        return f"{now_str}と{next_str}の吉方位を取得できませんでした。"
+        return "吉方位を取得できませんでした。"
