@@ -5,3 +5,5 @@ python-dotenv
 reportlab
 qrcode
 requests
+python-dateutil
+
