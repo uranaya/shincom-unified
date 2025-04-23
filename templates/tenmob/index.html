@@ -5,28 +5,10 @@
   <title>店頭用 手相鑑定フォーム</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-size: 18px;
-      padding: 10px;
-    }
-    input, button {
-      font-size: 20px;
-      padding: 10px;
-      margin: 10px 0;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    #video, #canvas {
-      width: 100%;
-      max-width: 400px;
-      border: 1px solid #ccc;
-    }
-    #eto-display {
-      font-size: 20px;
-      margin-top: -5px;
-      margin-bottom: 10px;
-      color: #444;
-    }
+    body { font-size: 18px; padding: 10px; }
+    input, button { font-size: 20px; padding: 10px; margin: 10px 0; width: 100%; box-sizing: border-box; }
+    #video, #canvas { width: 100%; max-width: 400px; border: 1px solid #ccc; }
+    #eto-display { font-size: 20px; margin-top: -5px; margin-bottom: 10px; color: #444; }
   </style>
 </head>
 <body>
@@ -84,9 +66,9 @@
         });
 
         const data = await response.json();
-        etoDisplay.textContent = `あなたの干支：${data.eto}`;
+        etoDisplay.textContent = `あなたの干支：${data.eto} ／ あなたの本命星：${data.honmeisei}`;
       } catch (error) {
-        etoDisplay.textContent = "干支の取得に失敗しました";
+        etoDisplay.textContent = "干支と本命星の取得に失敗しました";
       }
     }
 
@@ -138,5 +120,6 @@
     </nav>
     <p style="margin-top:10px; color:gray;">&copy; 2025 シン・コンピューター占い</p>
   </footer>
+
 </body>
 </html>
