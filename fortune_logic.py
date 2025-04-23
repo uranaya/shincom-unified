@@ -1,6 +1,6 @@
-
 import openai
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from hayami_table_full_complete import hayami_table
 
 stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
@@ -21,18 +21,29 @@ def get_nicchu_eto(birthdate):
         print("❌ 日柱計算エラー:", e)
         return "不明"
 
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+
 def get_shichu_fortune(birthdate):
     eto = get_nicchu_eto(birthdate)
+
+    # 今月と来月を計算（日本時間前提）
+    now = datetime.now()
+    this_month = f"{now.year}年{now.month}月"
+    next_month_dt = now + relativedelta(months=1)
+    next_month = f"{next_month_dt.year}年{next_month_dt.month}月"
+
     prompt = f"""あなたはプロの四柱推命鑑定士です。
 以下の干支（日柱）が「{eto}」の人に対して、以下の3つの項目で現実的な鑑定をしてください。
 
 ■ 性格
-■ 今月の運勢
-■ 来月の運勢
+■ {this_month}の運勢
+■ {next_month}の運勢
 
 ・それぞれ300文字以内。
 ・項目ごとに明確に区切ってください。
 ・干支名は本文に含めないでください。"""
+
     try:
         response = openai.chat.completions.create(
             model="gpt-4",
@@ -42,7 +53,8 @@ def get_shichu_fortune(birthdate):
         return response.choices[0].message.content.strip()
     except Exception as e:
         print("❌ 四柱推命取得失敗:", e)
-        return "■ 性格\n取得できませんでした\n■ 今月の運勢\n取得できませんでした\n■ 来月の運勢\n取得できませんでした"
+        return f"■ 性格\n取得できませんでした\n■ {this_month}の運勢\n取得できませんでした\n■ {next_month}の運勢\n取得できませんでした"
+
 
 def get_iching_advice():
     prompt = "今の相談者にとって最適な易占いのアドバイスを、日本語で300文字以内で現実的に書いてください。"
