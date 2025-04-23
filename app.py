@@ -7,8 +7,8 @@ from flask import Flask, render_template, request, redirect, url_for, send_file,
 from datetime import datetime
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
-
-from fortune_logic import generate_fortune, get_nicchu_eto
+from shichu_utils import get_nicchu_eto
+from fortune_logic import generate_fortune
 from kyusei_utils import get_honmeisei
 from pdf_generator_b4 import create_pdf as create_pdf_b4
 from pdf_generator_a4 import create_pdf as create_pdf_a4
