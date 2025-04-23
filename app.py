@@ -130,6 +130,13 @@ def tenmob():
             return jsonify({"message": "処理中にエラーが発生しました"}), 500
     return render_template("tenmob/index.html")
 
+
+@app.route("/tokutei")
+def tokutei():
+    return render_template("tokutei.html")
+
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
