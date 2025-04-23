@@ -164,5 +164,14 @@ def generate_fortune(image_data, birthdate):
     palm_result = analyze_palm(image_data)
     shichu_result = get_shichu_fortune(birthdate)
     iching_result = get_iching_advice()
-    lucky_info = get_lucky_info(birthdate)
+
+    # 年・月・日を分解
+    year, month, day = map(int, birthdate.split("-"))
+    from kyusei_utils import get_kyusei_fortune_openai
+    kyusei_fortune = get_kyusei_fortune_openai(year, month, day)
+
+    # すべての結果を元にラッキー情報生成
+    lucky_info = get_lucky_info(birthdate, palm_result, shichu_result, kyusei_fortune)
+
     return palm_result, shichu_result, iching_result, lucky_info
+
