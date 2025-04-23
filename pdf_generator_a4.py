@@ -12,6 +12,9 @@ from io import BytesIO
 import textwrap
 from affiliate import create_qr_code, get_affiliate_link
 
+from kyusei_utils import get_kyusei_fortune
+
+
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
@@ -112,6 +115,7 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
             for line in wrapper.wrap(sections[i]):
                 text.textLine(line)
             text.textLine("")
+
     c.drawText(text)
 
     # === 裏面 ===
@@ -152,6 +156,14 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         for wrapped in wrapper.wrap(line.strip()):
             text.textLine(wrapped)
     c.drawText(text)
+
+    # 吉方位の追加（例：生年月日 1990年4月15日）
+    fortune_text = get_kyusei_fortune(1990, 4, 15)
+    text.textLine("")
+    text.textLine("■ 吉方位（九星気学より）")
+    text.textLine(fortune_text)
+
+
 
     c.save()
     return filepath

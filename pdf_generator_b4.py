@@ -10,6 +10,9 @@ from reportlab.lib.utils import ImageReader
 import textwrap
 from qr_code_generator import create_qr_code, get_affiliate_link
 
+from kyusei_utils import get_kyusei_fortune
+
+
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
@@ -105,6 +108,13 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     for line in lucky_info.split("\n"):
         for wrapped in wrapper.wrap(line):
             text.textLine(wrapped)
+
+    # 吉方位の追加（例：生年月日 1990年4月15日）
+    fortune_text = get_kyusei_fortune(1990, 4, 15)
+    text.textLine("")
+    text.textLine("■ 吉方位（九星気学より）")
+    text.textLine(fortune_text)
+
     c.drawText(text)
 
     # QRコード広告（裏面）
