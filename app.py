@@ -120,6 +120,7 @@ def ten():
 def tenmob():
     if "logged_in" not in session:
         return redirect(url_for("login"))
+
     if request.method == "POST":
         try:
             print("📩 POST受信開始")
@@ -137,6 +138,9 @@ def tenmob():
             )
             print("🔮 占い生成成功")
 
+            # staticフォルダがなければ作成
+            os.makedirs("static", exist_ok=True)
+
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             create_pdf_a4(
                 image_data, palm_result, shichu_result, iching_result, lucky_info, filename
@@ -153,6 +157,10 @@ def tenmob():
         except Exception as e:
             print("❌ tenmob POST処理エラー:", e)
             return jsonify({"error": str(e)}), 500
+
+    # 🔻 GETリクエストでフォーム画面を表示
+    return render_template("tenmob/index.html")
+
 
 
 
