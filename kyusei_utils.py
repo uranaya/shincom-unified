@@ -6,15 +6,30 @@ NINE_STARS = ["一白水星", "二黒土星", "三碧木星", "四緑木星", "�
 
 def get_honmeisei(year: int, month: int, day: int) -> str:
     """
-    節入り（2月3日以前は前年扱い）を考慮した九星気学の本命星を返す
+    正確な九星気学の本命星を返す（節入り＝立春2月4日基準）
     """
-    if (month < 2) or (month == 2 and day <= 3):
+    # 立春（2/4）前は前年とみなす
+    if month < 2 or (month == 2 and day < 4):
         year -= 1
 
-    base_year = 1900  # 1900年は三碧木星（3）を基準とする
-    index = (3 - ((year - base_year) % 9)) % 9
-    index = 8 if index == 0 else index - 1  # 0〜8のインデックスに変換
-    return NINE_STARS[index]
+    # 九星計算： 11 - (年 % 9)
+    kyusei_num = (11 - (year % 9)) % 9
+    kyusei_num = 9 if kyusei_num == 0 else kyusei_num
+
+    kyusei_map = {
+        1: "一白水星",
+        2: "二黒土星",
+        3: "三碧木星",
+        4: "四緑木星",
+        5: "五黄土星",
+        6: "六白金星",
+        7: "七赤金星",
+        8: "八白土星",
+        9: "九紫火星"
+    }
+
+    return kyusei_map[kyusei_num]
+
 
 
 # 月盤の吉凶方位（2025年4月と5月のみ簡易定義）
