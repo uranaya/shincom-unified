@@ -118,28 +118,38 @@ def tenmob():
         return redirect(url_for("login"))
     if request.method == "POST":
         try:
+            print("📩 POST受信開始")
             data = request.get_json()
+            print("📨 JSON受信成功:", data)
+
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
+
             eto = get_nicchu_eto(birthdate)
+            print("🔢 干支取得成功:", eto)
+
             palm_result, shichu_result, iching_result, lucky_info = generate_fortune(
                 image_data, birthdate
             )
+            print("🔮 占い生成成功")
 
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             create_pdf_a4(
                 image_data, palm_result, shichu_result, iching_result, lucky_info, filename
             )
+            print("📄 PDF生成成功:", filename)
 
             redirect_url = url_for("preview", filename=filename)
             print("✅ tenmob PDF作成成功:", redirect_url)
-            return jsonify({"redirect_url": redirect_url}), 200  # ← ✅重要！
+
+            response = jsonify({"redirect_url": redirect_url})
+            print("📦 JSONレスポンス返却:", response.get_data())
+            return response, 200
 
         except Exception as e:
             print("❌ tenmob POST処理エラー:", e)
             return jsonify({"error": str(e)}), 500
 
-    return render_template("tenmob/index.html")
 
 
 
