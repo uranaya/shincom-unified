@@ -122,13 +122,18 @@ def tenmob():
             birthdate = data.get("birthdate")
             eto = get_nicchu_eto(birthdate)
             palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
+
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
-            return jsonify({"redirect_url": url_for("preview", filename=filename)})
+
+            redirect_url = url_for("preview", filename=filename)
+            print("✅ tenmob PDF作成成功:", redirect_url)
+            return jsonify({"redirect_url": redirect_url})
         except Exception as e:
-            print("❌ tenmobエラー:", e)
+            print("❌ tenmob POST処理エラー:", e)
             return jsonify({"message": "処理中にエラーが発生しました"}), 500
     return render_template("tenmob/index.html")
+
 
 
 
