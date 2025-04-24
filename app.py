@@ -74,24 +74,18 @@ def webhook_selfmob():
         save_uuids()
     return "", 200
 
-@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
-def selfmob(uuid_str):
-    if uuid_str not in used_uuids:
-        return "無効なアクセスです", 403
-    if request.method == "POST":
-        try:
-            data = request.get_json()
-            image_data = data.get("image_data")
-            birthdate = data.get("birthdate")
-            eto = get_nicchu_eto(birthdate)
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
-            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
-            return jsonify({"redirect_url": url_for("preview", filename=filename)})
-        except Exception as e:
-            print("❌ selfmobエラー:", e)
-            return jsonify({"message": "処理中にエラーが発生しました"}), 500
-    return render_template("selfmob/index.html")
+
+@app.route("/selfmob")
+def selfmob_login():
+    return render_template("selfmob_login.html")
+
+@app.route("/selfmob/pay")
+def selfmob_pay():
+    return render_template("selfmob_pay.html")
+
+@app.route("/selfmob/index")
+def selfmob_index():
+    return render_template("index.html")  # 実際の鑑定フォーム
 
 
 @app.route("/")
