@@ -147,15 +147,15 @@ def tenmob():
 
 @app.route("/selfmob")
 def selfmob_login():
-    return render_template("login.html")
+    return render_template("selfmob/login.html")
 
 @app.route("/selfmob/pay")
 def selfmob_pay():
-    return render_template("pay.html")
+    return render_template("selfmob/pay.html")
 
 @app.route("/selfmob/index")
 def selfmob_index():
-    return render_template("index.html")  # 実際の鑑定フォーム
+    return render_template("selfmob/index.html")  # 実際の鑑定フォーム
 
 
 
