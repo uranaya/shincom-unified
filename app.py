@@ -75,19 +75,6 @@ def webhook_selfmob():
     return "", 200
 
 
-@app.route("/selfmob")
-def selfmob_login():
-    return render_template("selfmob_login.html")
-
-@app.route("/selfmob/pay")
-def selfmob_pay():
-    return render_template("selfmob_pay.html")
-
-@app.route("/selfmob/index")
-def selfmob_index():
-    return render_template("index.html")  # 実際の鑑定フォーム
-
-
 @app.route("/")
 def index():
     return redirect(url_for("ten"))
@@ -158,6 +145,17 @@ def tenmob():
     return render_template("tenmob/index.html")
 
 
+@app.route("/selfmob")
+def selfmob_login():
+    return render_template("login.html")
+
+@app.route("/selfmob/pay")
+def selfmob_pay():
+    return render_template("pay.html")
+
+@app.route("/selfmob/index")
+def selfmob_index():
+    return render_template("index.html")  # 実際の鑑定フォーム
 
 
 
