@@ -87,7 +87,7 @@ def analyze_palm(image_data):
                     "content": [
                         {
                             "type": "text",
-                            ""text": (
+                            "text": (
                             "手相の写真を見て、以下の形式で出力してください：\n"
                             "### 1. 生命線\n（説明文）\n\n"
                             "### 2. 知能線\n（説明文）\n\n"
