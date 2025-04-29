@@ -174,22 +174,14 @@ def terms():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    next_url = request.args.get("next", "ten")  # GET時のnextパラメータを取得（デフォルトten）
     if request.method == "POST":
         password = request.form.get("password")
+        next_url_post = request.form.get("next_url", "ten")  # POST時のhidden値を取得
         if password == os.getenv("LOGIN_PASSWORD", "pass"):
             session["logged_in"] = True
-            return redirect(session.get("next_url", url_for("tenmob")))  # ✅ デフォルトは /tenmob に変更
-
-    # GET時のみ next_url を記録
-    referer = request.referrer or ""
-    if "/tenmob" in referer:
-        session["next_url"] = url_for("tenmob")
-    elif "/ten" in referer:
-        session["next_url"] = url_for("ten")
-    else:
-        session["next_url"] = url_for("tenmob")  # ✅ 安全なデフォルトを tenmob に
-
-    return render_template("login.html")
+            return redirect(url_for(next_url_post))
+    return render_template("login.html", next_url=next_url)
 
 @app.route("/logout")
 def logout():

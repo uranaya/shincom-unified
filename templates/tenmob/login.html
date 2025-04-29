@@ -2,148 +2,23 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>店頭用 手相鑑定フォーム</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      font-size: 18px;
-      padding: 10px;
-    }
-    input, button {
-      font-size: 20px;
-      padding: 10px;
-      margin: 10px 0;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    #video, #canvas {
-      width: 100%;
-      max-width: 400px;
-      border: 1px solid #ccc;
-    }
-    #eto-display {
-      font-size: 20px;
-      margin-top: -5px;
-      margin-bottom: 10px;
-      color: #444;
-    }
-  </style>
+  <title>ログイン</title>
 </head>
 <body>
-  <h2>📸 手相撮影＆送信フォーム（店頭用）</h2>
-  <video id="camera" autoplay playsinline></video>
-  <canvas id="canvas" style="display:none;"></canvas>
-
-  <label>生年月日：</label>
-  <input type="date" id="birthdate" required oninput="fetchEto()"><br>
-  <div id="eto-display"></div>
-
-  <button onclick="takePhoto()">📷 撮影</button>
-  <button onclick="submitForm()">送信してPDF生成</button>
-
-  <form action="/logout"><button>ログアウト</button></form>
-
-  <script>
-    const video = document.getElementById("camera");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
-      } catch (e) {
-        alert("カメラが使用できません：" + e.message);
-      }
-    }
-
-    function takePhoto() {
-      const width = 600;
-      const height = video.videoHeight * (600 / video.videoWidth);
-      canvas.width = width;
-      canvas.height = height;
-      ctx.drawImage(video, 0, 0, width, height);
-      canvas.style.display = "block";
-      alert("📷 撮影完了しました！");
-    }
-
-    async function fetchEto() {
-      const birthdate = document.getElementById("birthdate").value;
-      const etoDisplay = document.getElementById("eto-display");
-
-      if (!birthdate) {
-        etoDisplay.textContent = "";
-        return;
-      }
-
-      try {
-        const response = await fetch("/get_eto", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ birthdate })
-        });
-
-        const data = await response.json();
-        etoDisplay.textContent = `あなたの干支：${data.eto}`;
-      } catch (error) {
-        etoDisplay.textContent = "干支の取得に失敗しました";
-      }
-    }
-
-    async function submitForm() {
-      const birthdate = document.getElementById("birthdate").value;
-      const imageData = canvas.toDataURL("image/png");
-
-      if (!birthdate || !imageData) {
-        alert("生年月日と手相画像の両方を入力してください。");
-        return;
-      }
-
-      try {
-        const response = await fetch("/tenmob", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image_data: imageData, birthdate })
-        });
-
-        if (!response.ok) {
-          alert("サーバーエラーが発生しました");
-          return;
-        }
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image_data: imageData, birthdate })
-        });
-
-        if (!response.ok) throw new Error("レスポンスエラー");
-        const result = await response.json();
-        if (!result.redirect_url) throw new Error("リダイレクト先がありません");
-        window.location.href = result.redirect_url;
-          window.location.href = response.url;
-        } else {
-          const result = await response.json();
-          alert(result.message || "送信に失敗しました");
-        }
-      } catch (error) {
-        alert("送信中にエラーが発生しました: " + error);
-      }
-    }
-
-    window.onload = startCamera;
-  </script>
-
-<footer style="text-align:center; font-size:small; margin-top:40px; padding:20px; background-color:#f9f9f9;">
-  <p style="margin-bottom:10px;">
-    ご利用は18歳以上を推奨しています。未成年者のご利用は保護者の同意を前提とします。
-  </p>
-  <nav>
-    <a href="/tokutei" target="_blank" style="margin:0 10px;">特定商取引法に基づく表記</a> |
-    <a href="/privacy" target="_blank" style="margin:0 10px;">プライバシーポリシー</a> |
-    <a href="/terms" target="_blank" style="margin:0 10px;">利用規約</a>
-  </nav>
-  <p style="margin-top:10px; color:gray;">&copy; 2025 シン・コンピューター占い</p>
-</footer>
-
-
+  <h2>🔐 パスワードログイン</h2>
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <ul style="color:red;">
+        {% for msg in messages %}
+          <li>{{ msg }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+<form method="POST">
+  <input type="hidden" name="next_url" value="{{ next_url }}">
+  パスワード: <input type="password" name="password" required>
+  <button type="submit">ログイン</button>
+</form>
 </body>
 </html>

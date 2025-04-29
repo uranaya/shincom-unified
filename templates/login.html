@@ -15,9 +15,10 @@
       </ul>
     {% endif %}
   {% endwith %}
-  <form method="POST">
-    パスワード: <input type="password" name="password" required>
-    <button type="submit">ログイン</button>
-  </form>
+<form method="POST">
+  <input type="hidden" name="next_url" value="{{ next_url }}">
+  パスワード: <input type="password" name="password" required>
+  <button type="submit">ログイン</button>
+</form>
 </body>
 </html>
