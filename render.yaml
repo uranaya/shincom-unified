@@ -15,3 +15,8 @@ services:
       - key: SMTP_PASSWORD
         sync: false
     autoDeploy: true
+
+buildCommand: |
+  pip install --upgrade pip
+  pip uninstall -y openai
+  pip install openai==0.28.1

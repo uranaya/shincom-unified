@@ -1,146 +1,45 @@
-import os
-import base64
-import textwrap
-from datetime import datetime
-from io import BytesIO
-
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.utils import ImageReader
-from affiliate import create_qr_code, get_affiliate_link
-from fortune_logic import generate_fortune
 from PyPDF2 import PdfMerger
-from yearly_fortune_utils import generate_yearly_fortune
-from kyusei_utils import get_kyusei_fortune
+import os
 
+def create_pdf_combined(image_data, birthdate, filename):
+    os.makedirs("static", exist_ok=True)
 
-FONT_NAME = "IPAexGothic"
-FONT_PATH = "ipaexg.ttf"
-pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
-
-def _draw_block(c, title, body, y):
-    c.setFont(FONT_NAME, 12)
-    c.drawString(10 * mm, y, title)
-    y -= 6 * mm
-    c.setFont(FONT_NAME, 10)
-    for line in textwrap.wrap(body, 45):
-        c.drawString(10 * mm, y, line)
-        y -= 5 * mm
-    y -= 4 * mm
-    return y
-
-def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename, birthdate=None):
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    c.setFont(FONT_NAME, 12)
-
-    c.drawImage("banner.jpg", 0, 282 * mm, width=210 * mm, height=30 * mm)
-
-    if image_data:
-        image_binary = base64.b64decode(image_data.split(",")[1])
-        image = ImageReader(BytesIO(image_binary))
-        c.drawImage(image, 35 * mm, 140 * mm, width=140 * mm, height=105 * mm)
-
-    c.setFont(FONT_NAME, 10)
-    text = c.beginText(10 * mm, 135 * mm)
-    wrapper = textwrap.TextWrapper(width=45)
-
-    text.textLine("■ 手相鑑定結果")
-    text.textLine("")
-    for line in palm_result.split("\n"):
-        for wrapped in wrapper.wrap(line.strip()):
-            text.textLine(wrapped)
-    c.drawText(text)
-    c.showPage()
-
-    c.setFont(FONT_NAME, 10)
-    text = c.beginText(10 * mm, 282 * mm)
-
-    text.textLine("■ 四柱推命：性格と今月・来月の運勢")
-    text.textLine("")
-    for line in shichu_result.split("\n"):
-        for wrapped in wrapper.wrap(line.strip()):
-            text.textLine(wrapped)
-
-    text.textLine("")
-    text.textLine("■ 易占いアドバイス")
-    text.textLine("")
-    for line in iching_result.split("\n"):
-        for wrapped in wrapper.wrap(line.strip()):
-            text.textLine(wrapped)
-
-    text.textLine("")
-    text.textLine("■ ラッキーアイテム・カラー・ナンバー")
-    text.textLine("")
-    for line in lucky_info.split("\n"):
-        for wrapped in wrapper.wrap(line.strip()):
-            text.textLine(wrapped)
-
-    if birthdate:
-        try:
-            y, m, d = map(int, birthdate.split("-"))
-            birth = datetime.strptime(birthdate, "%Y-%m-%d")
-            fortune_text = get_kyusei_fortune(birth.year, birth.month, birth.day)
-        except Exception as e:
-            print("❌ 方位取得失敗:", e)
-            fortune_text = "生年月日から方位を取得できませんでした"
-    else:
-        fortune_text = "生年月日が入力されていません"
-
-    text.textLine("")
-    text.textLine("■ 吉方位（九星気学より）")
-    text.textLine(fortune_text)
-
-    c.drawText(text)
-    c.save()
-
-    with open(f"static/{filename}", "wb") as f:
-        f.write(buffer.getvalue())
-
-    return f"static/{filename}"
-
-def create_pdf_yearly(birthdate: str, filename: str):
-    now = datetime.now()
-    data = generate_yearly_fortune(birthdate, now)
-
-    c = canvas.Canvas(f"static/{filename}", pagesize=A4)
-    c.setFont(FONT_NAME, 12)
-
-    c.drawImage("banner.jpg", 0, 282 * mm, width=210 * mm, height=30 * mm)
-    y = 270 * mm
-    y = _draw_block(c, data["year_label"], data["year_text"], y)
-    for m in data["months"][:4]:
-        y = _draw_block(c, m["label"], m["text"], y)
-
-    c.showPage()
-    y = 282 * mm
-    for m in data["months"][4:]:
-        y = _draw_block(c, m["label"], m["text"], y)
-
-    c.save()
-
-def create_pdf_combined(image_data: str, birthdate: str, filename: str):
     file_front = f"front_{filename}"
-    file_year = f"year_{filename}"
+    file_year  = f"year_{filename}"
 
-    palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
-    create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, file_front, birthdate)
-    create_pdf_yearly(birthdate, file_year)
+    print("📄 front作成開始:", file_front)
+    try:
+        palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
+        create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, file_front)
+        if not os.path.exists(file_front):
+            print("❌ front PDFが作成されていません:", file_front)
+    except Exception as e:
+        print("❌ front PDF作成失敗:", e)
+        raise
 
-    merger = PdfMerger()
-    merger.append(file_front)
-    merger.append(file_year)
-    output_path = f"static/{filename}"
-    merger.write(output_path)
-    merger.close()
+    print("📄 yearly作成開始:", file_year)
+    try:
+        create_pdf_yearly(birthdate, file_year)
+        if not os.path.exists(file_year):
+            print("❌ yearly PDFが作成されていません:", file_year)
+    except Exception as e:
+        print("❌ yearly PDF作成失敗:", e)
+        raise
 
-    os.remove(file_front)
-    os.remove(file_year)
+    try:
+        print("📎 PDFマージ開始")
+        merger = PdfMerger()
+        merger.append(file_front)
+        merger.append(file_year)
+        merged_path = f"static/{filename}"
+        merger.write(merged_path)
+        merger.close()
+        print("✅ マージ成功:", merged_path)
 
-    return output_path
+        # 不要な一時ファイルを削除
+        os.remove(file_front)
+        os.remove(file_year)
 
-# エイリアスとして保持
-create_pdf_a4 = create_pdf
+    except Exception as e:
+        print("❌ PDFマージまたは削除失敗:", e)
+        raise
