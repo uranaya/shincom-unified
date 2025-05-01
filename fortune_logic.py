@@ -1,8 +1,12 @@
 import os
 import openai
-import json
+import jsonfrom hayami_table_full_complete import eto_from_table
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def get_nicchu_eto(birthdate: str) -> str:
+    y, m, d = map(int, birthdate.split("-"))
+    return eto_from_table(y, m, d)
 
 def ask_openai(prompt, max_tokens=800):
     try:
