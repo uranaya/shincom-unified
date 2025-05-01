@@ -73,6 +73,7 @@ def split_palm_sections(palm_text):
     return sections
 
 def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
+    create_pdf_a4 = create_pdf
     filepath = os.path.join("static", filename)
     c = canvas.Canvas(filepath, pagesize=A4)
     width, height = A4
