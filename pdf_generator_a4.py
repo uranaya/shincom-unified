@@ -13,9 +13,8 @@ from reportlab.lib.utils import ImageReader
 from affiliate import create_qr_code, get_affiliate_link
 from fortune_logic import generate_fortune
 from kyusei_utils import get_kyusei_fortune
-from kyusei_utils import get_kyusei_fortune_openai as get_kyusei_fortune
-from yearly_fortune_utils import generate_yearly_fortune  # ←必要
-from PyPDF2 import PdfMerger  # ←冒頭で
+from yearly_fortune_utils import generate_yearly_fortune
+from PyPDF2 import PdfMerger
 
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
@@ -120,88 +119,15 @@ def create_pdf_yearly(birthdate: str, filename: str):
         y = _draw_block(c, m["label"], m["text"], y)
 
     c.save()
-<<<<<<< HEAD
-
-def create_pdf_combined(image_data, birthdate, filename):
-    file_front = f"front_{filename}"
-    file_year = f"year_{filename}"
-
-    palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
-
-    create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, file_front, birthdate)
-    create_pdf_yearly(birthdate, file_year)
-
-    merger = PdfMerger()
-    merger.append(file_front)
-    merger.append(file_year)
-    merger.write(f"static/{filename}")
-    merger.close()
-
-    return f"static/{filename}"
-
-create_pdf_a4 = create_pdf
-=======
-    return filepath
-
-def create_pdf_yearly(birthdate: str, filename: str):
-    data = generate_yearly_fortune(birthdate, datetime.now())
-
-    pdf = canvas.Canvas(filename, pagesize=A4)
-    pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
-
-    y = 280 * mm
-    wrapper = textwrap.TextWrapper(width=40)
-
-    # 年運
-    pdf.setFont(FONT_NAME, 12)
-    pdf.drawString(10*mm, y, data["year_label"])
-    y -= 6*mm
-    pdf.setFont(FONT_NAME, 10)
-    for line in wrapper.wrap(data["year_text"]):
-        pdf.drawString(10*mm, y, line)
-        y -= 5*mm
-    y -= 4*mm
-
-    # 1〜4月
-    for m in data["months"][:4]:
-        pdf.setFont(FONT_NAME, 12)
-        pdf.drawString(10*mm, y, m["label"])
-        y -= 6*mm
-        pdf.setFont(FONT_NAME, 10)
-        for line in wrapper.wrap(m["text"]):
-            pdf.drawString(10*mm, y, line)
-            y -= 5*mm
-        y -= 4*mm
-
-    pdf.showPage()
-    y = 280 * mm
-
-    # 5〜12月
-    for m in data["months"][4:]:
-        pdf.setFont(FONT_NAME, 12)
-        pdf.drawString(10*mm, y, m["label"])
-        y -= 6*mm
-        pdf.setFont(FONT_NAME, 10)
-        for line in wrapper.wrap(m["text"]):
-            pdf.drawString(10*mm, y, line)
-            y -= 5*mm
-        y -= 4*mm
-
-    pdf.save()
-    return filename
 
 def create_pdf_combined(image_data: str, birthdate: str, filename: str):
     file_front = f"front_{filename}"
     file_year = f"year_{filename}"
 
-    # 既存2ページ（表裏）
     palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
-    create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, file_front)
-
-    # 年運+月運2ページ
+    create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, file_front, birthdate)
     create_pdf_yearly(birthdate, file_year)
 
-    # 合体
     merger = PdfMerger()
     merger.append(file_front)
     merger.append(file_year)
@@ -209,9 +135,10 @@ def create_pdf_combined(image_data: str, birthdate: str, filename: str):
     merger.write(output_path)
     merger.close()
 
-    # 中間ファイル削除（任意）
     os.remove(file_front)
     os.remove(file_year)
 
     return output_path
->>>>>>> c97330d (Fix: handle month=0 as annual in get_directions prompt)
+
+# エイリアスとして保持
+create_pdf_a4 = create_pdf
