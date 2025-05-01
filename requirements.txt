@@ -1,6 +1,5 @@
 Flask
 gunicorn
-# OpenAI SDK ― 旧インタフェース互換版
 openai==0.28.1
 python-dotenv
 reportlab
