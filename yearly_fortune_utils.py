@@ -1,7 +1,7 @@
 import openai
 from datetime import datetime
 from kyusei_utils import get_honmeisei, get_directions
-from sxtwl_utils import get_nicchu_eto  # 早見表 or sxtwl ラッパー
+from fortune_logic import get_nicchu_eto  # 既存の実装をそのまま利用
 
 MAX_CHAR = 300  # 月運 300 文字以内
 
