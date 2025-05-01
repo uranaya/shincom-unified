@@ -42,3 +42,38 @@ def get_kyusei_fortune_openai(year: int, month: int, day: int) -> str:
     except Exception as e:
         print("❌ OpenAIによる九星方位占断失敗:", e)
         return "吉方位を取得できませんでした。"
+
+
+# ───────────────────────────────────────────────
+#  月ごとの吉方位／凶方位を OpenAI で取得
+# ───────────────────────────────────────────────
+import json
+
+def get_directions(year: int, month: int, honmeisei: str) -> dict:
+    """
+    GPT-4 に JSON 形式だけ返させる。
+    例） {"good":"南東","bad":"北西"}
+    方位は 8 方位のいずれか 1 文字〜2 文字。
+    失敗時は {"good":"取得失敗","bad":"取得失敗"}
+    """
+    prompt = f"""
+あなたはプロの九星気学占い師です。
+{year}年{month}月、本命星が「{honmeisei}」の人について、
+吉方位と凶方位を JSON だけで返してください。
+キーは "good" と "bad"、値は必ず以下 8 つのいずれか 1 つ：
+北, 北東, 東, 南東, 南, 南西, 西, 北西
+説明や改行は書かず、JSON だけで出力してください。
+""".strip()
+
+    try:
+        res = openai.chat.completions.create(
+            model="gpt-4o-mini",          # ← ご契約モデルに合わせて変更可
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=50,
+            temperature=0.3,
+        )
+        txt = res.choices[0].message.content.strip()
+        return json.loads(txt)
+    except Exception as e:
+        print("❌ get_directions エラー:", e)
+        return {"good": "取得失敗", "bad": "取得失敗"}
