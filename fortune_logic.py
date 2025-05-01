@@ -1,6 +1,8 @@
 import os
 import openai
-import jsonfrom hayami_table_full_complete import eto_from_table
+import json
+from hayami_table_full_complete import eto_from_table
+
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
