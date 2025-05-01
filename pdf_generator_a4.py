@@ -167,6 +167,42 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     c.save()
     return filepath
 
+def create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
+    c = canvas.Canvas(f"static/{filename}", pagesize=A4)
+    width, height = A4
+    margin = 20 * mm
+    text_width = width - 2 * margin
+
+    # タイトル
+    c.setFont(FONT_NAME, 16)
+    c.drawCentredString(width / 2, height - margin, "鑑定結果")
+
+    # 手相画像
+    image_path = save_image(image_data, "temp_hand.jpg")
+    if image_path:
+        c.drawImage(image_path, margin, height - 200, width=120, preserveAspectRatio=True)
+
+    # 鑑定内容
+    c.setFont(FONT_NAME, 10)
+    y = height - 220
+
+    for title, content in [
+        ("【手相鑑定】", palm_result),
+        ("【性格・今月・来月の運勢】", shichu_result),
+        ("【今のあなたに必要なメッセージ】", iching_result),
+        ("【ラッキー情報】", lucky_info)
+    ]:
+        c.drawString(margin, y, title)
+        y -= 15
+        for line in textwrap.wrap(content, width=45):
+            c.drawString(margin, y, line)
+            y -= 12
+        y -= 10
+
+    c.showPage()
+    c.save()
+
+
 def create_pdf_yearly(birthdate: str, filename: str):
     data = generate_yearly_fortune(birthdate)
 
