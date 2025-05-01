@@ -18,7 +18,8 @@ def _ask_openai(prompt: str) -> str:
 def generate_yearly_fortune(user_birth: str, now: datetime):
     """干支（日柱）と九星の本命星を求め、年運＋12 か月分を返す"""
     nicchu = get_nicchu_eto(user_birth)
-    honmeisei = get_honmeisei(user_birth)
+    born = datetime.strptime(user_birth, "%Y-%m-%d")
+    honmeisei = get_honmeisei(born.year, born.month, born.day)
 
     # 今年の運勢
     prompt_year = f"""あなたは四柱推命のプロ…（略）:
