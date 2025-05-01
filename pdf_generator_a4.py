@@ -82,13 +82,12 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     try:
         if birthdate:
             y, m, d = map(int, birthdate.split("-"))
-            try:
-    birth = datetime.strptime(birthdate, "%Y-%m-%d")
-    fortune_text = get_kyusei_fortune(birth.year, birth.month, birth.day)
-except:
-    fortune_text = "生年月日から方位を取得できませんでした"
-        else:
-            fortune_text = "生年月日が未指定のため取得できませんでした"
+    try:
+        birth = datetime.strptime(birthdate, "%Y-%m-%d")
+        fortune_text = get_kyusei_fortune(birth.year, birth.month, birth.day)
+    except:
+        fortune_text = "生年月日から方位を取得できませんでした"
+
     except Exception as e:
         print("❌ 方位取得失敗:", e)
         fortune_text = "取得できませんでした"
