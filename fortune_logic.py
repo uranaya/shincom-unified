@@ -2,6 +2,7 @@ import openai
 from datetime import datetime
 from base64 import b64decode
 from hayami_table_full_complete import hayami_table
+from dateutil.relativedelta import relativedelta
 
 stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
 branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
@@ -20,9 +21,6 @@ def get_nicchu_eto(birthdate):
     except Exception as e:
         print("❌ 日柱計算エラー:", e)
         return "不明"
-
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
 
 def get_shichu_fortune(birthdate):
     eto = get_nicchu_eto(birthdate)

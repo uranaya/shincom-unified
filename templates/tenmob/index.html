@@ -21,6 +21,13 @@
   <div id="eto-display"></div>
 
   <button onclick="takePhoto()">📷 撮影</button>
+
+<!-- 送信ボタンの直前あたり -->
+<label class="form-check-label">
+  <input type="checkbox" class="form-check-input" name="full_year" value="yes">
+  1年分の運勢を出す
+</label>
+
   <button onclick="submitForm()">送信してPDF生成</button>
 
   <form action="/logout"><button>ログアウト</button></form>
@@ -75,7 +82,7 @@
     async function submitForm() {
       const birthdate = document.getElementById("birthdate").value;
       const imageData = canvas.toDataURL("image/png");
-
+　　　const fullYear = document.getElementById("full_year").checked;
       if (!birthdate || !imageData) {
         alert("生年月日と手相画像の両方を入力してください。");
         return;
@@ -85,7 +92,8 @@
         const response = await fetch("/tenmob", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image_data: imageData, birthdate })
+          body: JSON.stringify({ image_data: imageData, birthdate,
+　　　　　full_year: fullYear })
         });
 
         if (!response.ok) throw new Error("レスポンスエラー");

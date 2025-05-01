@@ -7,10 +7,11 @@ from flask import Flask, render_template, request, redirect, url_for, send_file,
 from datetime import datetime
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
-# from shichu_utils import get_nicchu_eto  ← これを削除
 from fortune_logic import generate_fortune, get_nicchu_eto
 from fortune_logic import generate_fortune
 from kyusei_utils import get_honmeisei
+from yearly_fortune_utils import generate_yearly_fortune
+from pdf_generator_a4 import create_pdf_yearly
 from pdf_generator_b4 import create_pdf as create_pdf_b4
 from pdf_generator_a4 import create_pdf as create_pdf_a4
 
@@ -106,40 +107,45 @@ def tenmob():
 
     if request.method == "POST":
         try:
-            print("📩 POST受信開始")
+            print("📩 tenmob POST受信開始")
             data = request.get_json()
             print("📨 JSON受信成功:", data)
 
             image_data = data.get("image_data")
-            birthdate = data.get("birthdate")
+            birthdate  = data.get("birthdate")
+            full_year  = data.get("full_year", False)   # ← 追加 (true/false)
 
             eto = get_nicchu_eto(birthdate)
             print("🔢 干支取得成功:", eto)
 
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune(
-                image_data, birthdate
-            )
-            print("🔮 占い生成成功")
-
-            # staticフォルダがなければ作成
-            os.makedirs("static", exist_ok=True)
-
-            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            create_pdf_a4(
-                image_data, palm_result, shichu_result, iching_result, lucky_info, filename
-            )
-            print("📄 PDF生成成功:", filename)
+            # ─────────────────────────────────────────
+            # 1年分チェック有無で処理分岐
+            # ─────────────────────────────────────────
+            if full_year:
+                from pdf_generator_a4 import create_pdf_yearly  # 新関数を呼び出し
+                filename = f"result_year_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                create_pdf_yearly(image_data, birthdate, filename)
+                print("📄 年運PDF生成成功:", filename)
+            else:
+                palm_result, shichu_result, iching_result, lucky_info = generate_fortune(
+                    image_data, birthdate
+                )
+                print("🔮 占い生成成功（通常）")
+                filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                create_pdf_a4(
+                    image_data, palm_result, shichu_result, iching_result, lucky_info, filename
+                )
+                print("📄 通常PDF生成成功:", filename)
 
             redirect_url = url_for("preview", filename=filename)
             print("✅ tenmob PDF作成成功:", redirect_url)
 
-            response = jsonify({"redirect_url": redirect_url})
-            print("📦 JSONレスポンス返却:", response.get_data())
-            return response, 200
+            return jsonify({"redirect_url": redirect_url}), 200
 
         except Exception as e:
             print("❌ tenmob POST処理エラー:", e)
             return jsonify({"error": str(e)}), 500
+
 
     # 🔻 GETリクエストでフォーム画面を表示
     return render_template("tenmob/index.html")

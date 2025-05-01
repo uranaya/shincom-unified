@@ -13,6 +13,8 @@ import textwrap
 from affiliate import create_qr_code, get_affiliate_link
 
 from kyusei_utils import get_kyusei_fortune_openai as get_kyusei_fortune
+from yearly_fortune_utils import generate_yearly_fortune   # ← 追加
+
 
 
 FONT_NAME = "IPAexGothic"
@@ -166,3 +168,60 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
 
     c.save()
     return filepath
+
+# ───────────────────────────────────────────────
+#  年運＋12か月運 PDF 生成  (A4 両面 2ページ)
+# ───────────────────────────────────────────────
+def create_pdf_yearly(user_birth: str, filename: str,
+                      banner_path: str = "static/banner.jpg"):
+    """
+    `filename` … static/ 以下に出力する PDF ファイル名
+    """
+    filepath = os.path.join("static", filename)
+    now = datetime.now()
+
+    data = generate_yearly_fortune(user_birth, now)   # 年運・月運を取得
+
+    c = canvas.Canvas(filepath, pagesize=A4)
+    width, height = A4
+    margin = 15 * mm
+    y = height - margin
+
+    # 1ページ目 ──────────────────────
+    if os.path.exists(banner_path):
+        banner = ImageReader(banner_path)
+        c.drawImage(banner, 0, y - 30 * mm,   # 横幅いっぱい
+                    width=210 * mm, height=30 * mm)
+        y -= 35 * mm
+
+    # 年運
+    y = _draw_block(c, data["year_label"], data["year_text"], y)
+
+    # 1〜4 月
+    for m in data["months"][:4]:
+        y = _draw_block(c, m["label"], m["text"], y)
+
+    # 2ページ目 ──────────────────────
+    c.showPage()
+    y = height - margin
+
+    for m in data["months"][4:]:
+        y = _draw_block(c, m["label"], m["text"], y)
+
+    c.save()
+    return filepath
+
+
+def _draw_block(pdf, title, body, y_start):
+    """見出し＋本文を描画し、次の y 座標を返す"""
+    pdf.setFont(FONT_NAME, 12)
+    pdf.drawString(10 * mm, y_start, title)
+    y = y_start - 6 * mm
+
+    pdf.setFont(FONT_NAME, 10)
+    for line in textwrap.wrap(body, 40):     # 40 文字折り返し
+        pdf.drawString(10 * mm, y, line)
+        y -= 5 * mm
+    y -= 4 * mm                              # ブロック間余白
+    return y
+
