@@ -79,18 +79,16 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         for wrapped in wrapper.wrap(line.strip()):
             text.textLine(wrapped)
 
-    try:
-        if birthdate:
+    if birthdate:
+        try:
             y, m, d = map(int, birthdate.split("-"))
-    try:
-        birth = datetime.strptime(birthdate, "%Y-%m-%d")
-        fortune_text = get_kyusei_fortune(birth.year, birth.month, birth.day)
-    except:
-        fortune_text = "生年月日から方位を取得できませんでした"
-
-    except Exception as e:
-        print("❌ 方位取得失敗:", e)
-        fortune_text = "取得できませんでした"
+            birth = datetime.strptime(birthdate, "%Y-%m-%d")
+            fortune_text = get_kyusei_fortune(birth.year, birth.month, birth.day)
+        except Exception as e:
+            print("❌ 方位取得失敗:", e)
+            fortune_text = "生年月日から方位を取得できませんでした"
+    else:
+        fortune_text = "生年月日が入力されていません"
 
     text.textLine("")
     text.textLine("■ 吉方位（九星気学より）")
