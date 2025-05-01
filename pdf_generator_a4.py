@@ -43,3 +43,6 @@ def create_pdf_combined(image_data, birthdate, filename):
     except Exception as e:
         print("❌ PDFマージまたは削除失敗:", e)
         raise
+
+# pdf_generator_a4.py の末尾に追加
+create_pdf = create_pdf_combined
