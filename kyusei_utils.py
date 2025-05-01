@@ -77,3 +77,27 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
     except Exception as e:
         print("❌ get_directions エラー:", e)
         return {"good": "取得失敗", "bad": "取得失敗"}
+
+def get_kyusei_fortune(year: int, month: int, day: int) -> str:
+    """
+    指定年月日の本命星から、その年・今月・来月の吉方位を返す
+    """
+    try:
+        honmeisei = get_honmeisei(year, month, day)
+
+        now = datetime(year, month, day)
+        next_month = now + relativedelta(months=1)
+
+        directions_year = get_directions(now.year, 0, honmeisei)
+        directions_this_month = get_directions(now.year, now.month, honmeisei)
+        directions_next_month = get_directions(next_month.year, next_month.month, honmeisei)
+
+        text = (
+            f"あなたの本命星は「{honmeisei}」です。\n"
+            f"{now.year}年の吉方位は {directions_year['good']}、\n"
+            f"今月は {directions_this_month['good']}、来月は {directions_next_month['good']} です。"
+        )
+        return text
+    except Exception as e:
+        print("❌ get_kyusei_fortune エラー:", e)
+        return "吉方位を取得できませんでした"
