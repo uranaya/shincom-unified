@@ -135,12 +135,6 @@ def create_pdf_combined(image_data, birthdate, filename):
     merger.write(f"static/{filename}")
     merger.close()
 
-    for f in (file_front, file_year):
-        try:
-            os.remove(f)
-        except FileNotFoundError:
-            pass
-
     return f"static/{filename}"
 
 create_pdf_a4 = create_pdf
