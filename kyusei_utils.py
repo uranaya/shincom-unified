@@ -53,9 +53,14 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
     """
     OpenAIから吉方位と凶方位を取得（JSON形式）
     """
+    if month == 0:
+        period = f"{year}年の年間"
+    else:
+        period = f"{year}年{month}月"
+
     prompt = f"""
 あなたは九星気学の専門家です。
-{year}年{month}月において、本命星「{honmeisei}」の人の
+{period}において、本命星「{honmeisei}」の人の
 吉方位と凶方位を、次のようなJSONだけで出力してください。
 
 {{"good": "南東", "bad": "北西"}}
