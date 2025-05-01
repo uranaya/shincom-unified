@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import openai
 
 NINE_STARS = [
@@ -47,32 +48,31 @@ def get_kyusei_fortune_openai(year: int, month: int, day: int) -> str:
 # ───────────────────────────────────────────────
 #  月ごとの吉方位／凶方位を OpenAI で取得
 # ───────────────────────────────────────────────
-import json
-
 def get_directions(year: int, month: int, honmeisei: str) -> dict:
     """
-    GPT-4 に JSON 形式だけ返させる。
-    例） {"good":"南東","bad":"北西"}
-    方位は 8 方位のいずれか 1 文字〜2 文字。
-    失敗時は {"good":"取得失敗","bad":"取得失敗"}
+    OpenAIから吉方位と凶方位を取得（JSON形式）
     """
     prompt = f"""
-あなたはプロの九星気学占い師です。
-{year}年{month}月、本命星が「{honmeisei}」の人について、
-吉方位と凶方位を JSON だけで返してください。
-キーは "good" と "bad"、値は必ず以下 8 つのいずれか 1 つ：
+あなたは九星気学の専門家です。
+{year}年{month}月において、本命星「{honmeisei}」の人の
+吉方位と凶方位を、次のようなJSONだけで出力してください。
+
+{{"good": "南東", "bad": "北西"}}
+
+方位は次の中から1つずつ選んでください：
 北, 北東, 東, 南東, 南, 南西, 西, 北西
-説明や改行は書かず、JSON だけで出力してください。
+説明文は不要です。JSONだけで返してください。
 """.strip()
 
     try:
         res = openai.ChatCompletion.create(
-            model="gpt-4o-mini",          # ← ご契約モデルに合わせて変更可
+            model="gpt-4",  # 必要に応じて gpt-3.5-turbo に変更可能
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=50,
+            max_tokens=100,
             temperature=0.3,
         )
         txt = res.choices[0].message.content.strip()
+        print(f"📩 GPT方位応答: {txt}")
         return json.loads(txt)
     except Exception as e:
         print("❌ get_directions エラー:", e)
