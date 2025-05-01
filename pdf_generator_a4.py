@@ -13,6 +13,7 @@ import textwrap
 from affiliate import create_qr_code, get_affiliate_link
 from fortune_logic import generate_fortune
 from kyusei_utils import get_kyusei_fortune_openai as get_kyusei_fortune
+from yearly_fortune_utils import generate_yearly_fortune
 
 
 FONT_NAME = "IPAexGothic"
