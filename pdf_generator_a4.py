@@ -19,6 +19,16 @@ FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
+def save_image(image_data, filename):
+    try:
+        with open(filename, "wb") as f:
+            f.write(base64.b64decode(image_data.split(",")[1]))
+        return filename
+    except Exception as e:
+        print(f"❌ 画像保存失敗: {e}")
+        return None
+
+
 def compress_base64_image(base64_image_data, output_width=600):
     image_data = base64.b64decode(base64_image_data.split(",", 1)[1])
     image = Image.open(BytesIO(image_data))
