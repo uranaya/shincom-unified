@@ -11,7 +11,7 @@ from PIL import Image
 from io import BytesIO
 import textwrap
 from affiliate import create_qr_code, get_affiliate_link
-
+from fortune_logic import generate_fortune
 from kyusei_utils import get_kyusei_fortune_openai as get_kyusei_fortune
 
 
