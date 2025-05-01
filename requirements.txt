@@ -7,3 +7,5 @@ reportlab
 qrcode
 requests
 python-dateutil>=2.8
+PyPDF2>=3.0
+

@@ -1,5 +1,7 @@
 import base64
 import os
+from PyPDF2 import PdfMerger
+from fortune_logic import generate_fortune   # 既存占い生成
 from reportlab.lib.pagesizes import A4
 from datetime import datetime
 from reportlab.pdfgen import canvas
@@ -219,9 +221,51 @@ def _draw_block(pdf, title, body, y_start):
     y = y_start - 6 * mm
 
     pdf.setFont(FONT_NAME, 10)
-    for line in textwrap.wrap(body, 40):     # 40 文字折り返し
+    for line in textwrap.wrap(body, 45):     # 40 文字折り返し
         pdf.drawString(10 * mm, y, line)
         y -= 5 * mm
     y -= 4 * mm                              # ブロック間余白
     return y
 
+# ────────────────────────────────────────────────
+# 4ページ合本 PDF : 既存2ページ + 年運2ページ
+# ────────────────────────────────────────────────
+
+def create_pdf_combined(image_data: str, birthdate: str, filename: str):
+    """
+    Parameters
+    ----------
+    image_data : Base64 PNG
+    birthdate  : 'YYYY-MM-DD'
+    filename   : 保存先ファイル名（static/ 内）
+    ----------------------------------------------
+    出力: static/<filename> に 4 ページ PDF を生成
+    """
+    file_front = f"front_{filename}"
+    file_year  = f"year_{filename}"
+
+    # --- 既存 2 ページ（手相・四柱推命など） ---
+    palm_result, shichu_result, iching_result, lucky_info = generate_fortune(
+        image_data, birthdate
+    )
+    create_pdf_a4(image_data, palm_result, shichu_result,
+                  iching_result, lucky_info, file_front)
+
+    # --- 年運＋12か月運 2 ページ ---
+    create_pdf_yearly(birthdate, file_year)
+
+    # --- 連結 ---
+    merger = PdfMerger()
+    merger.append(file_front)
+    merger.append(file_year)
+    merger.write(f"static/{filename}")
+    merger.close()
+
+    # --- 一時ファイル削除（任意・ログ削減） ---
+    for f in (file_front, file_year):
+        try:
+            os.remove(f)
+        except FileNotFoundError:
+            pass
+
+    return f"static/{filename}"
