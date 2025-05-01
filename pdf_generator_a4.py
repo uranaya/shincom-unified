@@ -20,12 +20,10 @@ FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
-# 共通：テキストブロック描画
 def _draw_block(c, title, body, y):
     c.setFont(FONT_NAME, 12)
     c.drawString(10 * mm, y, title)
     y -= 6 * mm
-
     c.setFont(FONT_NAME, 10)
     for line in textwrap.wrap(body, 45):
         c.drawString(10 * mm, y, line)
@@ -33,13 +31,11 @@ def _draw_block(c, title, body, y):
     y -= 4 * mm
     return y
 
-# 通常鑑定PDF（2ページ）
 def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename, birthdate=None):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     c.setFont(FONT_NAME, 12)
 
-    # 1ページ目
     c.drawImage("banner.jpg", 0, 282 * mm, width=210 * mm, height=30 * mm)
 
     if image_data:
@@ -56,11 +52,9 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     for line in palm_result.split("\n"):
         for wrapped in wrapper.wrap(line.strip()):
             text.textLine(wrapped)
-
     c.drawText(text)
     c.showPage()
 
-    # 2ページ目
     c.setFont(FONT_NAME, 10)
     text = c.beginText(10 * mm, 282 * mm)
 
@@ -84,13 +78,12 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         for wrapped in wrapper.wrap(line.strip()):
             text.textLine(wrapped)
 
-    # ✅ 方位占い（修正済み：birthdateから取得）
     try:
         if birthdate:
             y, m, d = map(int, birthdate.split("-"))
             fortune_text = get_kyusei_fortune(y, m, d)
         else:
-            fortune_text = "生年月日が未指定のため、吉方位を取得できませんでした"
+            fortune_text = "生年月日が未指定のため取得できませんでした"
     except Exception as e:
         print("❌ 方位取得失敗:", e)
         fortune_text = "取得できませんでした"
@@ -107,7 +100,6 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
 
     return f"static/{filename}"
 
-# 年運＋12ヶ月（2ページ）
 def create_pdf_yearly(birthdate: str, filename: str):
     now = datetime.now()
     data = generate_yearly_fortune(birthdate, now)
@@ -118,7 +110,6 @@ def create_pdf_yearly(birthdate: str, filename: str):
     c.drawImage("banner.jpg", 0, 282 * mm, width=210 * mm, height=30 * mm)
     y = 270 * mm
     y = _draw_block(c, data["year_label"], data["year_text"], y)
-
     for m in data["months"][:4]:
         y = _draw_block(c, m["label"], m["text"], y)
 
@@ -129,18 +120,13 @@ def create_pdf_yearly(birthdate: str, filename: str):
 
     c.save()
 
-# 両方結合（4ページ）
 def create_pdf_combined(image_data, birthdate, filename):
     file_front = f"front_{filename}"
     file_year = f"year_{filename}"
 
-    palm_result, shichu_result, iching_result, lucky_info = generate_fortune(
-        image_data, birthdate
-    )
+    palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
 
-    create_pdf(image_data, palm_result, shichu_result,
-               iching_result, lucky_info, file_front, birthdate)
-
+    create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, file_front, birthdate)
     create_pdf_yearly(birthdate, file_year)
 
     merger = PdfMerger()
@@ -157,5 +143,4 @@ def create_pdf_combined(image_data, birthdate, filename):
 
     return f"static/{filename}"
 
-# 旧互換名
 create_pdf_a4 = create_pdf
