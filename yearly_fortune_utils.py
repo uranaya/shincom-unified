@@ -1,5 +1,6 @@
 import openai
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from kyusei_utils import get_honmeisei, get_directions
 from fortune_logic import get_nicchu_eto  # 既存の実装をそのまま利用
 
