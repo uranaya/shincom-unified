@@ -66,7 +66,7 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
 """.strip()
 
     try:
-        res = openai.chat.completions.create(
+        res = openai.ChatCompletion.create(
             model="gpt-4o-mini",          # ← ご契約モデルに合わせて変更可
             messages=[{"role": "user", "content": prompt}],
             max_tokens=50,
