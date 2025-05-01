@@ -11,7 +11,7 @@ from fortune_logic import generate_fortune, get_nicchu_eto
 from fortune_logic import generate_fortune
 from kyusei_utils import get_honmeisei
 from yearly_fortune_utils import generate_yearly_fortune
-from pdf_generator_a4 import create_pdf_yearly
+from pdf_generator_a4 import create_pdf_a4, create_pdf_yearly, create_pdf_combined
 from pdf_generator_b4 import create_pdf as create_pdf_b4
 from pdf_generator_a4 import create_pdf as create_pdf_a4
 
