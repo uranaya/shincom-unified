@@ -12,9 +12,10 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
 from affiliate import create_qr_code, get_affiliate_link
 from fortune_logic import generate_fortune
-from kyusei_utils import get_kyusei_fortune
-from yearly_fortune_utils import generate_yearly_fortune
 from PyPDF2 import PdfMerger
+from yearly_fortune_utils import generate_yearly_fortune
+from kyusei_utils import get_kyusei_fortune
+
 
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
