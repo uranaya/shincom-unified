@@ -33,7 +33,7 @@ def get_kyusei_fortune_openai(year: int, month: int, day: int) -> str:
 """
 
     try:
-        response = openai.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,
