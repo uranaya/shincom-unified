@@ -1,270 +1,154 @@
-import base64
 import os
-from PyPDF2 import PdfMerger
-from fortune_logic import generate_fortune   # 既存占い生成
-from reportlab.lib.pagesizes import A4
-from datetime import datetime
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import mm
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase import pdfmetrics
-from reportlab.lib.utils import ImageReader
-from PIL import Image
-from io import BytesIO
+import base64
 import textwrap
-from affiliate import create_qr_code, get_affiliate_link
+from datetime import datetime
+from io import BytesIO
 
-from kyusei_utils import get_kyusei_fortune_openai as get_kyusei_fortune
-from yearly_fortune_utils import generate_yearly_fortune   # ← 追加
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.utils import ImageReader
+from PyPDF2 import PdfMerger
 
-
+from fortune_logic import generate_fortune
+from yearly_fortune_utils import generate_yearly_fortune
+from kyusei_utils import get_kyusei_fortune
 
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
-def compress_base64_image(base64_image_data, output_width=600):
-    image_data = base64.b64decode(base64_image_data.split(",", 1)[1])
-    image = Image.open(BytesIO(image_data))
-    w_percent = output_width / float(image.size[0])
-    h_size = int((float(image.size[1]) * float(w_percent)))
-    image = image.resize((output_width, h_size), Image.Resampling.LANCZOS)
+# 共通：テキストブロック描画
+def _draw_block(c, title, body, y):
+    c.setFont(FONT_NAME, 12)
+    c.drawString(10 * mm, y, title)
+    y -= 6 * mm
+
+    c.setFont(FONT_NAME, 10)
+    for line in textwrap.wrap(body, 45):
+        c.drawString(10 * mm, y, line)
+        y -= 5 * mm
+    y -= 4 * mm
+    return y
+
+# 通常鑑定PDF（2ページ）
+def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename, birthdate=None):
     buffer = BytesIO()
-    image.save(buffer, format="PNG")
-    compressed_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{compressed_base64}"
+    c = canvas.Canvas(buffer, pagesize=A4)
+    c.setFont(FONT_NAME, 12)
 
-def split_palm_sections(palm_text):
-    sections = {}
-    current_key = None
-    buffer = []
+    # 1ページ目
+    c.drawImage("banner.jpg", 0, 282 * mm, width=210 * mm, height=30 * mm)
 
-    for line in palm_text.split("\n"):
-        line = line.strip()
-        if line.startswith("### 1."):
-            if current_key:
-                sections[current_key] = "\n".join(buffer).strip()
-                buffer = []
-            current_key = "1"
-        elif line.startswith("### 2."):
-            sections[current_key] = "\n".join(buffer).strip()
-            current_key = "2"
-            buffer = []
-        elif line.startswith("### 3."):
-            sections[current_key] = "\n".join(buffer).strip()
-            current_key = "3"
-            buffer = []
-        elif line.startswith("### 4."):
-            sections[current_key] = "\n".join(buffer).strip()
-            current_key = "4"
-            buffer = []
-        elif line.startswith("### 5."):
-            sections[current_key] = "\n".join(buffer).strip()
-            current_key = "5"
-            buffer = []
-        elif line.startswith("### 総合的なアドバイス"):
-            sections[current_key] = "\n".join(buffer).strip()
-            current_key = "summary"
-            buffer = []
-        else:
-            buffer.append(line)
-    if current_key:
-        sections[current_key] = "\n".join(buffer).strip()
-    return sections
+    if image_data:
+        image_binary = base64.b64decode(image_data.split(",")[1])
+        image = ImageReader(BytesIO(image_binary))
+        c.drawImage(image, 35 * mm, 140 * mm, width=140 * mm, height=105 * mm)
 
-def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
-    filepath = os.path.join("static", filename)
-    c = canvas.Canvas(filepath, pagesize=A4)
-    width, height = A4
-    margin = 15 * mm
-    font = FONT_NAME
-    font_size = 11
+    c.setFont(FONT_NAME, 10)
+    text = c.beginText(10 * mm, 135 * mm)
     wrapper = textwrap.TextWrapper(width=45)
-    y = height - margin
 
-    # === 手相画像保存（圧縮付き）===
-    image_data = compress_base64_image(image_data)
-    image_path = f"palm_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-    with open(image_path, "wb") as f:
-        f.write(base64.b64decode(image_data.split(",", 1)[1]))
-
-    # === 手相項目分割 ===
-    sections = split_palm_sections(palm_result)
-
-    # === 表面 ===
-    # QR広告（右上）
-    qr_ad_path = create_qr_code("https://uranaya.jp", path="qr_uranaya.png")
-    if os.path.exists(qr_ad_path):
-        c.drawImage(qr_ad_path, width - margin - 30 * mm, y - 30 * mm, width=30 * mm, height=30 * mm)
-        ad_text = c.beginText(margin, y - 10)
-        ad_text.setFont(font, 11)
-        ad_text.textLine("───────── シン・コンピューター占い ─────────")
-        ad_text.textLine("手相・四柱推命・イーチン占いで未来をサポート")
-        ad_text.textLine("Instagram → @uranaya_official")
-        ad_text.textLine("────────────────────────────")
-        c.drawText(ad_text)
-        y -= 50 * mm
-
-    # 手相画像
-    c.drawImage(image_path, (width - 150 * mm) / 2, y - 90 * mm, width=150 * mm, height=90 * mm)
-    y -= 100 * mm
-
-    # 手相項目1〜3
-    text = c.beginText(margin, y)
-    text.setFont(font, font_size)
-    text.textLine("■ 手相鑑定（代表3項目）")
+    text.textLine("■ 手相鑑定結果")
     text.textLine("")
-    for i in ["1", "2", "3"]:
-        if i in sections:
-            for line in wrapper.wrap(sections[i]):
-                text.textLine(line)
-            text.textLine("")
+    for line in palm_result.split("\n"):
+        for wrapped in wrapper.wrap(line.strip()):
+            text.textLine(wrapped)
 
     c.drawText(text)
-
-    # === 裏面 ===
     c.showPage()
-    y = height - margin
-    text = c.beginText(margin, y)
-    text.setFont(font, font_size)
 
-    # 手相項目4〜5＋まとめ
-    text.textLine("■ 手相鑑定（4〜5項目目 + 総合アドバイス）")
+    # 2ページ目
+    c.setFont(FONT_NAME, 10)
+    text = c.beginText(10 * mm, 282 * mm)
+
+    text.textLine("■ 四柱推命：性格と今月・来月の運勢")
     text.textLine("")
-    for i in ["4", "5", "summary"]:
-        if i in sections:
-            for line in wrapper.wrap(sections[i]):
-                text.textLine(line)
-            text.textLine("")
+    for line in shichu_result.split("\n"):
+        for wrapped in wrapper.wrap(line.strip()):
+            text.textLine(wrapped)
 
-    # 四柱推命
-    text.textLine("■ 四柱推命によるアドバイス")
     text.textLine("")
-    for paragraph in shichu_result.split("\n"):
-        for line in wrapper.wrap(paragraph.strip()):
-            text.textLine(line)
-        text.textLine("")
-
-    # イーチン占い
-    text.textLine("■ イーチン占い アドバイス")
+    text.textLine("■ 易占いアドバイス")
     text.textLine("")
-    for paragraph in iching_result.split("\n"):
-        for line in wrapper.wrap(paragraph.strip()):
-            text.textLine(line)
-        text.textLine("")
+    for line in iching_result.split("\n"):
+        for wrapped in wrapper.wrap(line.strip()):
+            text.textLine(wrapped)
 
-    # ラッキー情報
+    text.textLine("")
     text.textLine("■ ラッキーアイテム・カラー・ナンバー")
     text.textLine("")
     for line in lucky_info.split("\n"):
         for wrapped in wrapper.wrap(line.strip()):
             text.textLine(wrapped)
 
-    # 吉方位の追加（例：生年月日 1990年4月15日）
-    fortune_text = get_kyusei_fortune(1990, 4, 15)
+    # ✅ 方位占い（修正済み：birthdateから取得）
+    try:
+        if birthdate:
+            y, m, d = map(int, birthdate.split("-"))
+            fortune_text = get_kyusei_fortune(y, m, d)
+        else:
+            fortune_text = "生年月日が未指定のため、吉方位を取得できませんでした"
+    except Exception as e:
+        print("❌ 方位取得失敗:", e)
+        fortune_text = "取得できませんでした"
+
     text.textLine("")
     text.textLine("■ 吉方位（九星気学より）")
     text.textLine(fortune_text)
 
     c.drawText(text)
-
     c.save()
-    return filepath
 
-# ✅ 関数の外に書くことで他の関数でも使えるようになる
-create_pdf_a4 = create_pdf
+    with open(f"static/{filename}", "wb") as f:
+        f.write(buffer.getvalue())
 
-# ───────────────────────────────────────────────
-#  年運＋12か月運 PDF 生成  (A4 両面 2ページ)
-# ───────────────────────────────────────────────
-def create_pdf_yearly(user_birth: str, filename: str,
-                      banner_path: str = "static/banner.jpg"):
-    """
-    `filename` … static/ 以下に出力する PDF ファイル名
-    """
-    filepath = os.path.join("static", filename)
+    return f"static/{filename}"
+
+# 年運＋12ヶ月（2ページ）
+def create_pdf_yearly(birthdate: str, filename: str):
     now = datetime.now()
+    data = generate_yearly_fortune(birthdate, now)
 
-    data = generate_yearly_fortune(user_birth, now)   # 年運・月運を取得
+    c = canvas.Canvas(f"static/{filename}", pagesize=A4)
+    c.setFont(FONT_NAME, 12)
 
-    c = canvas.Canvas(filepath, pagesize=A4)
-    width, height = A4
-    margin = 15 * mm
-    y = height - margin
-
-    # 1ページ目 ──────────────────────
-    if os.path.exists(banner_path):
-        banner = ImageReader(banner_path)
-        c.drawImage(banner, 0, y - 30 * mm,   # 横幅いっぱい
-                    width=210 * mm, height=30 * mm)
-        y -= 35 * mm
-
-    # 年運
+    c.drawImage("banner.jpg", 0, 282 * mm, width=210 * mm, height=30 * mm)
+    y = 270 * mm
     y = _draw_block(c, data["year_label"], data["year_text"], y)
 
-    # 1〜4 月
     for m in data["months"][:4]:
         y = _draw_block(c, m["label"], m["text"], y)
 
-    # 2ページ目 ──────────────────────
     c.showPage()
-    y = height - margin
-
+    y = 282 * mm
     for m in data["months"][4:]:
         y = _draw_block(c, m["label"], m["text"], y)
 
     c.save()
-    return filepath
 
-
-def _draw_block(pdf, title, body, y_start):
-    """見出し＋本文を描画し、次の y 座標を返す"""
-    pdf.setFont(FONT_NAME, 12)
-    pdf.drawString(10 * mm, y_start, title)
-    y = y_start - 6 * mm
-
-    pdf.setFont(FONT_NAME, 10)
-    for line in textwrap.wrap(body, 45):     # 40 文字折り返し
-        pdf.drawString(10 * mm, y, line)
-        y -= 5 * mm
-    y -= 4 * mm                              # ブロック間余白
-    return y
-
-# ────────────────────────────────────────────────
-# 4ページ合本 PDF : 既存2ページ + 年運2ページ
-# ────────────────────────────────────────────────
-
-def create_pdf_combined(image_data: str, birthdate: str, filename: str):
-    """
-    Parameters
-    ----------
-    image_data : Base64 PNG
-    birthdate  : 'YYYY-MM-DD'
-    filename   : 保存先ファイル名（static/ 内）
-    ----------------------------------------------
-    出力: static/<filename> に 4 ページ PDF を生成
-    """
+# 両方結合（4ページ）
+def create_pdf_combined(image_data, birthdate, filename):
     file_front = f"front_{filename}"
-    file_year  = f"year_{filename}"
+    file_year = f"year_{filename}"
 
-    # --- 既存 2 ページ（手相・四柱推命など） ---
     palm_result, shichu_result, iching_result, lucky_info = generate_fortune(
         image_data, birthdate
     )
-    create_pdf_a4(image_data, palm_result, shichu_result,
-                  iching_result, lucky_info, file_front)
 
-    # --- 年運＋12か月運 2 ページ ---
+    create_pdf(image_data, palm_result, shichu_result,
+               iching_result, lucky_info, file_front, birthdate)
+
     create_pdf_yearly(birthdate, file_year)
 
-    # --- 連結 ---
     merger = PdfMerger()
     merger.append(file_front)
     merger.append(file_year)
     merger.write(f"static/{filename}")
     merger.close()
 
-    # --- 一時ファイル削除（任意・ログ削減） ---
     for f in (file_front, file_year):
         try:
             os.remove(f)
@@ -272,3 +156,6 @@ def create_pdf_combined(image_data: str, birthdate: str, filename: str):
             pass
 
     return f"static/{filename}"
+
+# 旧互換名
+create_pdf_a4 = create_pdf
