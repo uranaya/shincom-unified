@@ -73,7 +73,6 @@ def split_palm_sections(palm_text):
     return sections
 
 def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
-    create_pdf_a4 = create_pdf
     filepath = os.path.join("static", filename)
     c = canvas.Canvas(filepath, pagesize=A4)
     width, height = A4
@@ -171,6 +170,9 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
 
     c.save()
     return filepath
+
+# ✅ 関数の外に書くことで他の関数でも使えるようになる
+create_pdf_a4 = create_pdf
 
 # ───────────────────────────────────────────────
 #  年運＋12か月運 PDF 生成  (A4 両面 2ページ)
