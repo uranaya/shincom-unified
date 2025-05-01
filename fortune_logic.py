@@ -4,7 +4,6 @@ from base64 import b64decode
 from hayami_table_full_complete import hayami_table
 from dateutil.relativedelta import relativedelta
 from kyusei_utils import get_kyusei_fortune_openai
-from palm_reader import analyze_palm
 from iching_utils import get_iching_advice
 from lucky_utils import get_lucky_info
 
