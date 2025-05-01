@@ -24,7 +24,9 @@
 
 <!-- 送信ボタンの直前あたり -->
 <label class="form-check-label">
-  <input type="checkbox" class="form-check-input" name="full_year" value="yes">
+<input type="checkbox" id="full_year" class="form-check-input"
+        name="full_year" value="yes">
+
   1年分の運勢を出す
 </label>
 
@@ -82,7 +84,7 @@
     async function submitForm() {
       const birthdate = document.getElementById("birthdate").value;
       const imageData = canvas.toDataURL("image/png");
-　　　const fullYear = document.getElementById("full_year").checked;
+      const fullYear = document.getElementById("full_year").checked;
       if (!birthdate || !imageData) {
         alert("生年月日と手相画像の両方を入力してください。");
         return;

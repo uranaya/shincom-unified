@@ -124,7 +124,7 @@ def tenmob():
             if full_year:
                 from pdf_generator_a4 import create_pdf_yearly  # 新関数を呼び出し
                 filename = f"result_year_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-                create_pdf_yearly(image_data, birthdate, filename)
+                create_pdf_yearly(birthdate, filename)           # banner_path は既定値を利用
                 print("📄 年運PDF生成成功:", filename)
             else:
                 palm_result, shichu_result, iching_result, lucky_info = generate_fortune(
