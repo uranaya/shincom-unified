@@ -43,10 +43,11 @@ prompt_month = f"""あなたは四柱推命のプロの占い師です。
 - 290 字以内でその月の運勢を説明してください。
 主語は「あなた」で統一。前向きな表現を意識し、現実的なアドバイスで締めくくってください。"""
 
-        month_fortunes.append({
-            "label": f"{y}年{m}月の運勢",
-            "text": _ask_openai(prompt_month)
-        })
+    month_fortunes.append({
+        "label": f"{y}年{m}月の運勢",
+        "text": _ask_openai(prompt_month)
+    })
+
 
     return {
         "year_label": f"{now.year}年の総合運",
