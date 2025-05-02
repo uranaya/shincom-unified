@@ -75,11 +75,9 @@ def webhook_selfmob():
         save_uuids()
     return "", 200
 
-
 @app.route("/")
-def index():
-    return redirect(url_for("ten"))
-
+def home():
+    return render_template("home.html")  # ← 新しいリンクハブ用
 
 @app.route("/ten", methods=["GET", "POST"])
 def ten():
