@@ -226,7 +226,7 @@ def create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_i
     c.save()
 
 
-def create_pdf_yearly(birthdate: str, os.path.join("static", filename: str)):
+def create_pdf_yearly(birthdate: str, filename: str):
     data = generate_yearly_fortune(birthdate, now=datetime.now())
 
     pdf = canvas.Canvas(filename, pagesize=A4)
