@@ -167,10 +167,8 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         for wrapped in wrapper.wrap(line.strip()):
             text.textLine(wrapped)
 
-    # 吉方位の追加（例：生年月日 1990年4月15日）
     fortune_text = get_kyusei_fortune(1990, 4, 15)
     text.textLine("")
-    text.textLine("■ 吉方位（九星気学より）")
     text.textLine(fortune_text)
 
     c.drawText(text)
@@ -260,7 +258,11 @@ def create_pdf_combined(image_data, birthdate, filename):
         raise
 
     try:
-        create_pdf_yearly(birthdate, os.path.join("static", file_year))
+        # 各月の間に空行を挿入
+    for m in data["months"]:
+        m["text"] = m["text"].strip()
+    data["months"] = [dict(label=m["label"], text=m["text"] + "\n\n") for m in data["months"]]
+    create_pdf_yearly(birthdate, os.path.join("static", file_year))
         if not os.path.exists(os.path.join("static", file_year)):
             print("❌ yearly PDFが作成されていません:", file_year)
     except Exception as e:
