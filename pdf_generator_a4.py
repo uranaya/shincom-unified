@@ -252,7 +252,7 @@ def create_pdf_combined(image_data, birthdate, filename):
 
     try:
         palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
-        create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, file_front)
+        create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, file_front)
         if not os.path.exists(os.path.join("static", file_front)):
             print("❌ front PDFが作成されていません:", file_front)
     except Exception as e:
