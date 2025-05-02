@@ -178,6 +178,18 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
     c.save()
     return filepath
 
+def _draw_block(c, title, text, x, y, width=170*mm, line_height=14):
+    c.setFont(FONT_NAME, 12)
+    c.drawString(x, y, title)
+    y -= line_height
+    c.setFont(FONT_NAME, 10)
+    lines = textwrap.wrap(text, width=45)
+    for line in lines:
+        c.drawString(x, y, line)
+        y -= line_height
+    return y
+
+
 def create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
     c = canvas.Canvas(f"static/{filename}", pagesize=A4)
     width, height = A4
