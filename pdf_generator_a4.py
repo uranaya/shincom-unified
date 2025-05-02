@@ -215,7 +215,7 @@ def create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_i
 
 
 def create_pdf_yearly(birthdate: str, filename: str):
-    data = generate_yearly_fortune(birthdate)
+    data = generate_yearly_fortune(birthdate, now=datetime.now())
 
     pdf = canvas.Canvas(filename, pagesize=A4)
     pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
