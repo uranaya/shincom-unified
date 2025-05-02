@@ -270,22 +270,23 @@ def create_pdf_combined(image_data, birthdate, filename):
         raise
 
     try:
-    print("📎 PDFマージ開始")
-    merger = PdfMerger()
-    merger.append(os.path.join("static", file_front))  # ← 修正
-    merger.append(os.path.join("static", file_year))   # ← 修正
-    merged_path = os.path.join("static", filename)     # ← 明示的に
-    merger.write(merged_path)
-    merger.close()
-    print("✅ マージ成功:", merged_path)
+        print("📎 PDFマージ開始")
+        merger = PdfMerger()
+        merger.append(os.path.join("static", file_front))
+        merger.append(os.path.join("static", file_year))
+        merged_path = os.path.join("static", filename)
+        merger.write(merged_path)
+        merger.close()
+        print("✅ マージ成功:", merged_path)
 
-    # 不要な一時ファイルを削除
-    os.remove(os.path.join("static", file_front))  # ← 修正
-    os.remove(os.path.join("static", file_year))   # ← 修正
+        # 不要な一時ファイルを削除
+        os.remove(os.path.join("static", file_front))
+        os.remove(os.path.join("static", file_year))
 
-except Exception as e:
-    print("❌ PDFマージまたは削除失敗:", e)
-    raise
+    except Exception as e:
+        print("❌ PDFマージまたは削除失敗:", e)
+        raise
+
 
 
 # pdf_generator_a4.py の末尾に追加
