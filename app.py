@@ -109,7 +109,7 @@ def tenmob():
         try:
             print("📩 tenmob POST受信開始")
             data = request.get_json()
-            print("📨 JSON受信成功:", data)
+            print("📨 JSON受信成功: キー一覧 →", list(data.keys()))
 
             image_data = data.get("image_data")
             birthdate  = data.get("birthdate")
