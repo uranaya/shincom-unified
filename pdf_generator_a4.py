@@ -261,6 +261,7 @@ def create_pdf_combined(image_data, birthdate, filename):
         print("❌ front PDF作成失敗:", e)
         raise
 
+
     try:
         data = generate_yearly_fortune(birthdate, now=datetime.now())
         for m in data["months"]:
@@ -274,6 +275,10 @@ def create_pdf_combined(image_data, birthdate, filename):
         if not os.path.exists(os.path.join("static", file_year)):
             print("❌ yearly PDFが作成されていません:", file_year)
             raise FileNotFoundError(f"yearly PDF not created: {file_year}")
+    except Exception as e:
+        print("❌ yearly PDF作成失敗:", e)
+        raise
+
 
 
     try:
