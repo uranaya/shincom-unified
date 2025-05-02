@@ -233,10 +233,11 @@ def create_pdf_yearly(birthdate: str, filename: str):
     pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
     y = 280 * mm
-    y = _draw_block(pdf, data["year_label"], data["year_text"], y)
+    x = 20 * mm
+    y = _draw_block(pdf, data["year_label"], data["year_text"], x, y)
 
     for m in data["months"]:
-        y = _draw_block(pdf, m["label"], m["text"], y)
+        y = _draw_block(pdf, m["label"], m["text"], x, y)
         if y < 50 * mm:
             pdf.showPage()
             y = 280 * mm
