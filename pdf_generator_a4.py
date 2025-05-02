@@ -284,4 +284,5 @@ def create_pdf_combined(image_data, birthdate, filename):
         print("❌ PDFマージまたは削除失敗:", e)
         raise
 
+create_pdf = create_pdf_full  # ← 正式な通常版の2ページ構成
 create_pdf = create_pdf_a4
