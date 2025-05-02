@@ -226,8 +226,9 @@ def create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_i
     c.save()
 
 
-def create_pdf_yearly(birthdate: str, filename: str):
-    data = generate_yearly_fortune(birthdate, now=datetime.now())
+def create_pdf_yearly(birthdate: str, filename: str, data=None):
+        if data is None:
+        data = generate_yearly_fortune(birthdate, now=datetime.now())
 
     pdf = canvas.Canvas(filename, pagesize=A4)
     pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
@@ -260,57 +261,7 @@ def create_pdf_combined(image_data, birthdate, filename):
         raise
 
     try:
-        create_pdf_yearly(birthdate, os.path.join("static", file_year))
-        if not os.path.exists(os.path.join("static", file_year)):
-            print("❌ yearly PDFが作成されていません:", file_year)
-    except Exception as e:
-        print("❌ yearly PDF作成失敗:", e)
-        raise
-
-    try:
-        print("📎 PDFマージ開始")
-        merger = PdfMerger()
-        merger.append(os.path.join("static", file_front))
-        merger.append(os.path.join("static", file_year))
-        merged_path = os.path.join("static", filename)
-        merger.write(merged_path)
-        merger.close()
-        print("✅ マージ成功:", merged_path)
-
-        os.remove(os.path.join("static", file_front))
-        os.remove(os.path.join("static", file_year))
-
-    except Exception as e:
-        print("❌ PDFマージまたは削除失敗:", e)
-        raise
-
-def create_pdf_combined(image_data, birthdate, filename):
-    os.makedirs("static", exist_ok=True)
-
-    file_front = f"front_{filename}"
-    file_year  = f"year_{filename}"
-
-    try:
-        palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
-        create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, file_front)
-        if not os.path.exists(os.path.join("static", file_front)):
-            print("❌ front PDFが作成されていません:", file_front)
-    except Exception as e:
-        print("❌ front PDF作成失敗:", e)
-        raise
-
-    try:
-        from yearly_fortune_utils import generate_yearly_fortune
-        now = datetime.now()
-        data = generate_yearly_fortune(birthdate, now)
-
-        for m in data["months"]:
-            m["text"] = m["text"].strip()
-        data["months"] = [
-            dict(label=m["label"], text=m["text"] + "\n\n") for m in data["months"]
-        ]
-
-        create_pdf_yearly(birthdate, os.path.join("static", file_year))
+        create_pdf_yearly(birthdate, os.path.join("static", file_year), data=data)
         if not os.path.exists(os.path.join("static", file_year)):
             print("❌ yearly PDFが作成されていません:", file_year)
     except Exception as e:
