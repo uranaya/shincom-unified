@@ -231,7 +231,7 @@ def create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_i
 
 
 def create_pdf_yearly(birthdate: str, filename: str, data=None):
-    if data is None:
+        if data is None:
         data = generate_yearly_fortune(birthdate, now=datetime.now())
 
     pdf = canvas.Canvas(filename, pagesize=A4)
@@ -265,7 +265,20 @@ def create_pdf_combined(image_data, birthdate, filename):
         raise
 
     try:
+        data = generate_yearly_fortune(birthdate, now=datetime.now())
+        for m in data["months"]:
+            m["text"] = m["text"].strip()
+            m["text"] = "
+".join([
+                line for line in m["text"].split("
+")
+                if not line.startswith("吉方位") and "凶方位" not in line
+            ])
+            m["text"] += "
+
+"
         create_pdf_yearly(birthdate, os.path.join("static", file_year), data=data)
+
         if not os.path.exists(os.path.join("static", file_year)):
             print("❌ yearly PDFが作成されていません:", file_year)
     except Exception as e:
