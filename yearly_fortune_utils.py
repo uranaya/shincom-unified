@@ -33,21 +33,20 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
     # 月運
     month_fortunes = []
     for i in range(12):
-        target = (now.replace(day=15)  # 安全に
-                  + relativedelta(months=i))
+        target = (now.replace(day=15) + relativedelta(months=i))
         y, m = target.year, target.month
         dirs = get_directions(y, m, honmeisei)
-prompt_month = f"""あなたは四柱推命のプロの占い師です。
+
+        prompt_month = f"""あなたは四柱推命のプロの占い師です。
 - 日柱: {nicchu}
 - 対象月: {y} 年 {m} 月
 - 290 字以内でその月の運勢を説明してください。
 主語は「あなた」で統一。前向きな表現を意識し、現実的なアドバイスで締めくくってください。"""
 
-    month_fortunes.append({
-        "label": f"{y}年{m}月の運勢",
-        "text": _ask_openai(prompt_month)
-    })
-
+        month_fortunes.append({
+            "label": f"{y}年{m}月の運勢",
+            "text": _ask_openai(prompt_month)
+        })
 
     return {
         "year_label": f"{now.year}年の総合運",
