@@ -265,12 +265,7 @@ def create_pdf_combined(image_data, birthdate, filename):
     try:
         data = generate_yearly_fortune(birthdate, now=datetime.now())
         for m in data["months"]:
-            m["text"] = m["text"].strip()
-            m["text"] = "\n".join([
-                line for line in m["text"].split("\n")
-                if not line.startswith("吉方位") and "凶方位" not in line
-            ])
-            m["text"] += "\n\n"
+            m["text"] = m["text"].strip() + "\n\n"  # 段落整形だけ残す
         create_pdf_yearly(birthdate, os.path.join("static", file_year), data=data)
         if not os.path.exists(os.path.join("static", file_year)):
             print("❌ yearly PDFが作成されていません:", file_year)
@@ -278,6 +273,7 @@ def create_pdf_combined(image_data, birthdate, filename):
     except Exception as e:
         print("❌ yearly PDF作成失敗:", e)
         raise
+
 
 
 

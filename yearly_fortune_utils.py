@@ -11,7 +11,7 @@ def _ask_openai(prompt: str) -> str:
         model="gpt-3.5-turbo",
         max_tokens=850,
         temperature=0.7,
-        messages=[{"role": "system", "content": "あなたは…（略）"},
+        messages=[{"role": "system", "content": "あなたは四柱推命のプロの占い師です。"},
                   {"role": "user",   "content": prompt}]
     )
     return response.choices[0].message.content.strip()
@@ -23,7 +23,7 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
     honmeisei = get_honmeisei(born.year, born.month, born.day)
 
     # 今年の運勢
-    prompt_year = f"""あなたは四柱推命のプロ…（略）:
+    prompt_year = f"""あなたは四柱推命のプロの占い師です。:
 - 相談者の日柱: {nicchu}
 - 今年: {now.year} 年
 - 300 文字以内、主語を『あなた』で統一、ポジティブ寄り
@@ -37,10 +37,12 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
                   + relativedelta(months=i))
         y, m = target.year, target.month
         dirs = get_directions(y, m, honmeisei)
-        prompt_month = f"""あなたは四柱推命のプロ…（略）
+prompt_month = f"""あなたは四柱推命のプロの占い師です。
 - 日柱: {nicchu}
 - 対象月: {y} 年 {m} 月
-- 290 字以内で月運を述べ、末尾に『吉方位: {dirs['good']} / 凶方位: {dirs['bad']}』を必ず付ける"""
+- 290 字以内でその月の運勢を説明してください。
+主語は「あなた」で統一。前向きな表現を意識し、現実的なアドバイスで締めくくってください。"""
+
         month_fortunes.append({
             "label": f"{y}年{m}月の運勢",
             "text": _ask_openai(prompt_month)
