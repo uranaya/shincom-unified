@@ -257,17 +257,15 @@ def create_pdf_combined(image_data, birthdate, filename):
         print("❌ front PDF作成失敗:", e)
         raise
 
-    try:
-        # 各月の間に空行を挿入
+try:
     for m in data["months"]:
         m["text"] = m["text"].strip()
     data["months"] = [dict(label=m["label"], text=m["text"] + "\n\n") for m in data["months"]]
     create_pdf_yearly(birthdate, os.path.join("static", file_year))
-        if not os.path.exists(os.path.join("static", file_year)):
-            print("❌ yearly PDFが作成されていません:", file_year)
-    except Exception as e:
-        print("❌ yearly PDF作成失敗:", e)
-        raise
+except Exception as e:
+    print("❌ yearly PDF作成失敗:", e)
+    raise
+
 
     try:
         print("📎 PDFマージ開始")
