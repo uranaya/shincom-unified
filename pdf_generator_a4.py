@@ -250,43 +250,37 @@ def create_pdf_combined(image_data, birthdate, filename):
     file_front = f"front_{filename}"
     file_year  = f"year_{filename}"
 
-    print("📄 front作成開始:", file_front)
     try:
         palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
         create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, file_front)
-        if not os.path.exists(file_front):
+        if not os.path.exists(os.path.join("static", file_front)):
             print("❌ front PDFが作成されていません:", file_front)
     except Exception as e:
         print("❌ front PDF作成失敗:", e)
         raise
 
-    print("📄 yearly作成開始:", file_year)
     try:
         create_pdf_yearly(birthdate, os.path.join("static", file_year))
-        if not os.path.exists(file_year):
+        if not os.path.exists(os.path.join("static", file_year)):
             print("❌ yearly PDFが作成されていません:", file_year)
     except Exception as e:
         print("❌ yearly PDF作成失敗:", e)
         raise
 
     try:
-    print("📎 PDFマージ開始")
-    merger = PdfMerger()
-    merger.append(os.path.join("static", file_front))  # ← 修正
-    merger.append(os.path.join("static", file_year))   # ← 修正
-    merged_path = os.path.join("static", filename)     # ← 明示的に
-    merger.write(merged_path)
-    merger.close()
-    print("✅ マージ成功:", merged_path)
+        print("📎 PDFマージ開始")
+        merger = PdfMerger()
+        merger.append(os.path.join("static", file_front))
+        merger.append(os.path.join("static", file_year))
+        merged_path = os.path.join("static", filename)
+        merger.write(merged_path)
+        merger.close()
+        print("✅ マージ成功:", merged_path)
 
-    # 不要な一時ファイルを削除
-    os.remove(os.path.join("static", file_front))  # ← 修正
-    os.remove(os.path.join("static", file_year))   # ← 修正
+        os.remove(os.path.join("static", file_front))
+        os.remove(os.path.join("static", file_year))
 
-except Exception as e:
-    print("❌ PDFマージまたは削除失敗:", e)
-    raise
-
-
-# pdf_generator_a4.py の末尾に追加
+    except Exception as e:
+        print("❌ PDFマージまたは削除失敗:", e)
+        raise
 create_pdf = create_pdf_combined
