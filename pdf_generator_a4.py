@@ -184,17 +184,13 @@ def _draw_block(c, title, text, x, y, width=170*mm, line_height=14):
     c.drawString(x, y, title)
     y -= line_height
     c.setFont(FONT_NAME, 10)
-    for para in text.split("
-
-"):
+    for para in text.split("\n\n"):
         lines = textwrap.wrap(para.strip(), width=45)
         for line in lines:
             c.drawString(x, y, line)
             y -= line_height
         y -= line_height  # 段落間スペース
     return y
-
-
 
 def create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
     c = canvas.Canvas(f"static/{filename}", pagesize=A4)
@@ -231,7 +227,6 @@ def create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_i
     c.showPage()
     c.save()
 
-
 def create_pdf_yearly(birthdate: str, filename: str, data=None):
     if data is None:
         data = generate_yearly_fortune(birthdate, now=datetime.now())
@@ -267,24 +262,19 @@ def create_pdf_combined(image_data, birthdate, filename):
         raise
 
     try:
-    data = generate_yearly_fortune(birthdate, now=datetime.now())
-    for m in data["months"]:
-        m["text"] = m["text"].strip()
-        m["text"] = "
-".join([
-            line for line in m["text"].split("
-")
-            if not line.startswith("吉方位") and "凶方位" not in line
-        ])
-        m["text"] += "
-
-"
-    create_pdf_yearly(birthdate, os.path.join("static", file_year), data=data)
+        data = generate_yearly_fortune(birthdate, now=datetime.now())
+        for m in data["months"]:
+            m["text"] = m["text"].strip()
+            m["text"] = "\n".join([
+                line for line in m["text"].split("\n")
+                if not line.startswith("吉方位") and "凶方位" not in line
+            ])
+            m["text"] += "\n\n"
+        create_pdf_yearly(birthdate, os.path.join("static", file_year), data=data)
         if not os.path.exists(os.path.join("static", file_year)):
             print("❌ yearly PDFが作成されていません:", file_year)
-    except Exception as e:
-        print("❌ yearly PDF作成失敗:", e)
-        raise
+            raise FileNotFoundError(f"yearly PDF not created: {file_year}")
+
 
     try:
         print("📎 PDFマージ開始")
