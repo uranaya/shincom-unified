@@ -167,6 +167,12 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
         for wrapped in wrapper.wrap(line.strip()):
             text.textLine(wrapped)
 
+    # 吉方位の追加（例：生年月日 1990年4月15日）
+    fortune_text = get_kyusei_fortune(1990, 4, 15)
+    text.textLine("")
+    text.textLine("■ 吉方位（九星気学より）")
+    text.textLine(fortune_text)
+
     c.drawText(text)
 
     c.save()
@@ -177,8 +183,12 @@ def _draw_block(c, title, text, x, y, width=170*mm, line_height=14):
     c.drawString(x, y, title)
     y -= line_height
     c.setFont(FONT_NAME, 10)
-    lines = textwrap.wrap(text, width=45)
-    for line in lines:
+    for para in text.split("\n\n"):
+        lines = textwrap.wrap(para.strip(), width=45)
+        for line in lines:
+            c.drawString(x, y, line)
+            y -= line_height
+        y -= line_height
         c.drawString(x, y, line)
         y -= line_height
     return y
@@ -221,7 +231,7 @@ def create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_i
 
 
 def create_pdf_yearly(birthdate: str, filename: str, data=None):
-    if data is None:
+        if data is None:
         data = generate_yearly_fortune(birthdate, now=datetime.now())
 
     pdf = canvas.Canvas(filename, pagesize=A4)
@@ -255,12 +265,6 @@ def create_pdf_combined(image_data, birthdate, filename):
         raise
 
     try:
-        data = generate_yearly_fortune(birthdate, now=datetime.now())
-        for m in data["months"]:
-            m["text"] = m["text"].strip()
-        data["months"] = [
-            dict(label=m["label"], text=m["text"] + "\n\n") for m in data["months"]
-        ]
         create_pdf_yearly(birthdate, os.path.join("static", file_year), data=data)
         if not os.path.exists(os.path.join("static", file_year)):
             print("❌ yearly PDFが作成されていません:", file_year)
