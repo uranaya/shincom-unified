@@ -283,4 +283,5 @@ def create_pdf_combined(image_data, birthdate, filename):
     except Exception as e:
         print("❌ PDFマージまたは削除失敗:", e)
         raise
-create_pdf = create_pdf_combined
+
+create_pdf = create_pdf_a4
