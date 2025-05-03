@@ -127,3 +127,43 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
 
     c.save()
     return filepath
+
+def create_pdf_b4_combined(image_data, palm_result, shichu_result, iching_result, lucky_info, birthdate, filename):
+    # 通常の2ページを作成
+    create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
+
+    # canvasを再開して追加ページ（3〜4）を挿入
+    from yearly_fortune_utils import generate_yearly_fortune
+    filepath = os.path.join("static", filename)
+    c = canvas.Canvas(filepath, pagesize=B4)
+    c.setFont(FONT_NAME, 11)
+    wrapper = textwrap.TextWrapper(width=50)
+
+    # 3ページ目（年運）
+    c.showPage()
+    y = B4[1] - 30 * mm
+    fortunes = generate_yearly_fortune(birthdate)
+    text = c.beginText(15 * mm, y)
+    text.setFont(FONT_NAME, 11)
+    text.textLine("■ あなたの1年の運勢（1〜6月）")
+    text.textLine("")
+    for i in range(6):
+        for line in wrapper.wrap(fortunes[i]):
+            text.textLine(line)
+        text.textLine("")
+    c.drawText(text)
+
+    # 4ページ目（年運 続き）
+    c.showPage()
+    y = B4[1] - 30 * mm
+    text = c.beginText(15 * mm, y)
+    text.setFont(FONT_NAME, 11)
+    text.textLine("■ あなたの1年の運勢（7〜12月）")
+    text.textLine("")
+    for i in range(6, 12):
+        for line in wrapper.wrap(fortunes[i]):
+            text.textLine(line)
+        text.textLine("")
+    c.drawText(text)
+
+    c.save()
