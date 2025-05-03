@@ -230,35 +230,38 @@ def create_pdf_b4_combined(image_data, palm_result, shichu_result, iching_result
         c.drawString(margin, margin + 10 * mm, "📱 ラッキーアイテムはこちらから →")
         c.drawString(margin, margin, get_affiliate_link())
 
-    # 3・4ページ目：1年の運勢
-    fortunes = generate_yearly_fortune(birthdate, datetime.now())
 
-    # 3ページ目：1〜6月
+    # 開始月の取得
+    start_month = datetime.now().month
+
+    # 3ページ目：総合運と前半6か月
     c.showPage()
     text = c.beginText(15 * mm, height - 30 * mm)
     text.setFont(font, 11)
-    text.textLine("■ あなたの1年の運勢（1〜6月）")
+    text.textLine("■ あなたの1年の運勢（前半6か月）")  # ← 汎用的に
     text.textLine("")
-    for month in list(fortunes.keys())[:6]:
-        text.textLine(f"● {month}")
-        for line in fortunes[month]:
-            text.textLine(str(line))  # ← dictでも安全に変換
+
+    text.textLine(f"● {fortunes['year_label']}")
+    for line in wrapper.wrap(fortunes["year_text"]):
+        text.textLine(line)
+    text.textLine("")
+
+    for month in fortunes["months"][:6]:
+        text.textLine(f"● {month['label']}")
+        for line in wrapper.wrap(month["text"]):
+            text.textLine(line)
         text.textLine("")
     c.drawText(text)
 
-    # 4ページ目：7〜12月
+    # 4ページ目：後半6か月
     c.showPage()
     text = c.beginText(15 * mm, height - 30 * mm)
     text.setFont(font, 11)
-    text.textLine("■ あなたの1年の運勢（7〜12月）")
+    text.textLine("■ あなたの1年の運勢（後半6か月）")
     text.textLine("")
-    for month in list(fortunes.keys())[6:]:
-        text.textLine(f"● {month}")
-        for line in fortunes[month]:
-            text.textLine(str(line))
+    for month in fortunes["months"][6:]:
+        text.textLine(f"● {month['label']}")
+        for line in wrapper.wrap(month["text"]):
+            text.textLine(line)
         text.textLine("")
     c.drawText(text)
-
-    # PDF保存
-    c.save()
-
