@@ -142,7 +142,7 @@ def create_pdf_b4_combined(image_data, palm_result, shichu_result, iching_result
     # 3ページ目（年運）
     c.showPage()
     y = B4[1] - 30 * mm
-    fortunes = generate_yearly_fortune(birthdate)
+    fortunes = generate_yearly_fortune(birthdate, datetime.now())
     text = c.beginText(15 * mm, y)
     text.setFont(FONT_NAME, 11)
     text.textLine("■ あなたの1年の運勢（1〜6月）")
