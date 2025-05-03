@@ -231,14 +231,14 @@ def create_pdf_b4_combined(image_data, palm_result, shichu_result, iching_result
         c.drawString(margin, margin, get_affiliate_link())
 
 
-    # 開始月の取得
-    start_month = datetime.now().month
+    # 3・4ページ目：1年の運勢
+    fortunes = generate_yearly_fortune(birthdate, datetime.now())  # ← これが必要！
 
     # 3ページ目：総合運と前半6か月
     c.showPage()
     text = c.beginText(15 * mm, height - 30 * mm)
     text.setFont(font, 11)
-    text.textLine("■ あなたの1年の運勢（前半6か月）")  # ← 汎用的に
+    text.textLine("■ あなたの1年の運勢（前半6か月）")
     text.textLine("")
 
     text.textLine(f"● {fortunes['year_label']}")
@@ -265,3 +265,6 @@ def create_pdf_b4_combined(image_data, palm_result, shichu_result, iching_result
             text.textLine(line)
         text.textLine("")
     c.drawText(text)
+
+    # PDF保存
+    c.save()
