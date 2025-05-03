@@ -233,28 +233,31 @@ def create_pdf_b4_combined(image_data, palm_result, shichu_result, iching_result
     # 3・4ページ目：1年の運勢
     fortunes = generate_yearly_fortune(birthdate, datetime.now())
 
-    # 3ページ目
+    # 3ページ目：1〜6月
     c.showPage()
     text = c.beginText(15 * mm, height - 30 * mm)
     text.setFont(font, 11)
     text.textLine("■ あなたの1年の運勢（1〜6月）")
     text.textLine("")
-    for i in range(6):
-        for line in wrapper.wrap(fortunes[i]):
+    for month in list(fortunes.keys())[:6]:
+        text.textLine(f"● {month}")
+        for line in wrapper.wrap(fortunes[month]):
             text.textLine(line)
         text.textLine("")
     c.drawText(text)
 
-    # 4ページ目
+    # 4ページ目：7〜12月
     c.showPage()
     text = c.beginText(15 * mm, height - 30 * mm)
     text.setFont(font, 11)
     text.textLine("■ あなたの1年の運勢（7〜12月）")
     text.textLine("")
-    for i in range(6, 12):
-        for line in wrapper.wrap(fortunes[i]):
+    for month in list(fortunes.keys())[6:]:
+        text.textLine(f"● {month}")
+        for line in wrapper.wrap(fortunes[month]):
             text.textLine(line)
         text.textLine("")
     c.drawText(text)
 
-    c.save()
+    c.save()  # ←これも関数内最後に忘れずに
+
