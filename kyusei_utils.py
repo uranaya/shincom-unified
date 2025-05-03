@@ -78,7 +78,6 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
             temperature=0.3,
         )
         txt = res.choices[0].message.content.strip()
-        print(f"📩 GPT方位応答: {txt}")
         return json.loads(txt)
     except Exception as e:
         print("❌ get_directions エラー:", e)

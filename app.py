@@ -3,6 +3,7 @@ import base64
 import uuid
 import json
 import requests
+import traceback
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify
 from datetime import datetime
 from dotenv import load_dotenv
@@ -102,9 +103,10 @@ def ten():
 
             return redirect(url_for("preview", filename=filename))
 
-        except Exception as e:
-            print("❌ tenエラー:", e)
-            return "処理中にエラーが発生しました"
+    except Exception as e:
+    print("❌ tenエラー:", repr(e))
+    traceback.print_exc()
+    return "処理中にエラーが発生しました"
 
     return render_template("index.html")
 
