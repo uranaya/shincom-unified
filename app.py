@@ -89,26 +89,28 @@ def ten():
         try:
             image_data = request.form.get("image_data")
             birthdate = request.form.get("birthdate")
-            full_year = request.form.get("full_year") == "yes"  # ← 🔹チェック追加
+            full_year = request.form.get("full_year") == "yes"
 
             eto = get_nicchu_eto(birthdate)
             palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
 
             if full_year:
-                from pdf_generator_b4 import create_pdf_b4_combined  # ← 🔹新関数を使う
+                from pdf_generator_b4 import create_pdf_b4_combined
                 create_pdf_b4_combined(image_data, palm_result, shichu_result, iching_result, lucky_info, birthdate, filename)
             else:
                 create_pdf_b4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
 
             return redirect(url_for("preview", filename=filename))
 
-    except Exception as e:
-    print("❌ tenエラー:", repr(e))
-    traceback.print_exc()
-    return "処理中にエラーが発生しました"
+        except Exception as e:
+            import traceback
+            print("❌ tenエラー:", repr(e))
+            traceback.print_exc()
+            return "処理中にエラーが発生しました"
 
     return render_template("index.html")
+
 
 
 
