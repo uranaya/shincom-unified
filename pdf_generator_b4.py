@@ -242,7 +242,7 @@ def create_pdf_b4_combined(image_data, palm_result, shichu_result, iching_result
     for month in list(fortunes.keys())[:6]:
         text.textLine(f"● {month}")
         for line in fortunes[month]:
-            text.textLine(line)
+            text.textLine(str(line))  # ← dictでも安全に変換
         text.textLine("")
     c.drawText(text)
 
@@ -255,10 +255,10 @@ def create_pdf_b4_combined(image_data, palm_result, shichu_result, iching_result
     for month in list(fortunes.keys())[6:]:
         text.textLine(f"● {month}")
         for line in fortunes[month]:
-            text.textLine(line)
+            text.textLine(str(line))
         text.textLine("")
     c.drawText(text)
 
-    # PDFを保存
+    # PDF保存
     c.save()
 
