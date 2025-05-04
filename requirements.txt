@@ -1,6 +1,7 @@
 Flask
 gunicorn
 openai
+python-dateutil
 python-dotenv
 reportlab
 qrcode
