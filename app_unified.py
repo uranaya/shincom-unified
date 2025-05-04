@@ -1,4 +1,3 @@
-
 import os
 import base64
 import uuid
@@ -9,10 +8,8 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify
 from dotenv import load_dotenv
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
-
 from kyusei_utils import get_honmeisei
 from pdf_generator_unified import create_pdf_unified
-
 from renai_fortune_utils import generate_fortune as generate_renai_fortune
 
 load_dotenv()
