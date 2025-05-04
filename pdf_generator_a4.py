@@ -11,24 +11,13 @@ from PIL import Image
 from io import BytesIO
 import textwrap
 from affiliate import create_qr_code, get_affiliate_link
-from fortune_logic import generate_fortune
-from kyusei_utils import get_kyusei_fortune_openai as get_kyusei_fortune
-from yearly_fortune_utils import generate_yearly_fortune
-from PyPDF2 import PdfMerger
+
+from kyusei_utils import get_kyusei_fortune
+
 
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
-
-def save_image(image_data, filename):
-    try:
-        with open(filename, "wb") as f:
-            f.write(base64.b64decode(image_data.split(",")[1]))
-        return filename
-    except Exception as e:
-        print(f"❌ 画像保存失敗: {e}")
-        return None
-
 
 def compress_base64_image(base64_image_data, output_width=600):
     image_data = base64.b64decode(base64_image_data.split(",", 1)[1])
@@ -177,119 +166,3 @@ def create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info
 
     c.save()
     return filepath
-
-
-def _draw_block(c, title, text, x, y, width=170*mm, line_height=14):
-    c.setFont(FONT_NAME, 12)
-    c.drawString(x, y, title)
-    y -= line_height
-    c.setFont(FONT_NAME, 10)
-    for para in text.split("\n\n"):
-        lines = textwrap.wrap(para.strip(), width=45)
-        for line in lines:
-            c.drawString(x, y, line)
-            y -= line_height
-        y -= line_height  # 段落間スペース
-    return y
-
-def create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename):
-    c = canvas.Canvas(f"static/{filename}", pagesize=A4)
-    width, height = A4
-    margin = 20 * mm
-    text_width = width - 2 * margin
-
-    # タイトル
-    c.setFont(FONT_NAME, 16)
-    c.drawCentredString(width / 2, height - margin, "鑑定結果")
-
-    # 手相画像
-    image_path = save_image(image_data, "temp_hand.jpg")
-    if image_path:
-        c.drawImage(image_path, margin, height - 200, width=120, preserveAspectRatio=True)
-
-    # 鑑定内容
-    c.setFont(FONT_NAME, 10)
-    y = height - 220
-
-    for title, content in [
-        ("【手相鑑定】", palm_result),
-        ("【性格・今月・来月の運勢】", shichu_result),
-        ("【今のあなたに必要なメッセージ】", iching_result),
-        ("【ラッキー情報】", lucky_info)
-    ]:
-        c.drawString(margin, y, title)
-        y -= 15
-        for line in textwrap.wrap(content, width=45):
-            c.drawString(margin, y, line)
-            y -= 12
-        y -= 10
-
-    c.showPage()
-    c.save()
-
-def create_pdf_yearly(birthdate: str, filename: str, data=None):
-    if data is None:
-        data = generate_yearly_fortune(birthdate, now=datetime.now())
-
-    pdf = canvas.Canvas(filename, pagesize=A4)
-    pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
-
-    y = 280 * mm
-    x = 20 * mm
-    y = _draw_block(pdf, data["year_label"], data["year_text"], x, y)
-
-    for m in data["months"]:
-        y = _draw_block(pdf, m["label"], m["text"], x, y)
-        if y < 50 * mm:
-            pdf.showPage()
-            y = 280 * mm
-
-    pdf.save()
-
-def create_pdf_combined(image_data, birthdate, filename):
-    os.makedirs("static", exist_ok=True)
-
-    file_front = f"front_{filename}"
-    file_year  = f"year_{filename}"
-
-    try:
-        palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
-        create_pdf(image_data, palm_result, shichu_result, iching_result, lucky_info, file_front)
-        if not os.path.exists(os.path.join("static", file_front)):
-            print("❌ front PDFが作成されていません:", file_front)
-    except Exception as e:
-        print("❌ front PDF作成失敗:", e)
-        raise
-
-
-    try:
-        data = generate_yearly_fortune(birthdate, now=datetime.now())
-        for m in data["months"]:
-            m["text"] = m["text"].strip() + "\n\n"  # 段落整形だけ残す
-        create_pdf_yearly(birthdate, os.path.join("static", file_year), data=data)
-        if not os.path.exists(os.path.join("static", file_year)):
-            print("❌ yearly PDFが作成されていません:", file_year)
-            raise FileNotFoundError(f"yearly PDF not created: {file_year}")
-    except Exception as e:
-        print("❌ yearly PDF作成失敗:", e)
-        raise
-
-
-
-
-    try:
-        print("📎 PDFマージ開始")
-        merger = PdfMerger()
-        merger.append(os.path.join("static", file_front))
-        merger.append(os.path.join("static", file_year))
-        merged_path = os.path.join("static", filename)
-        merger.write(merged_path)
-        merger.close()
-        print("✅ マージ成功:", merged_path)
-
-        os.remove(os.path.join("static", file_front))
-        os.remove(os.path.join("static", file_year))
-
-    except Exception as e:
-        print("❌ PDFマージまたは削除失敗:", e)
-        raise

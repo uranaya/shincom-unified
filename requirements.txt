@@ -1,10 +1,7 @@
 Flask
 gunicorn
-openai==0.28.1
+openai
 python-dotenv
 reportlab
 qrcode
 requests
-python-dateutil>=2.8
-PyPDF2>=3.0
-

@@ -3,22 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <title>ログイン</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 30px;
+      max-width: 400px;
+      margin: auto;
+    }
+    h2 {
+      font-size: 1.5em;
+      margin-bottom: 20px;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    input[type="password"], button {
+      padding: 10px;
+      font-size: 1rem;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    ul {
+      color: red;
+      list-style-type: none;
+      padding: 0;
+    }
+  </style>
 </head>
 <body>
   <h2>🔐 パスワードログイン</h2>
+
   {% with messages = get_flashed_messages() %}
     {% if messages %}
-      <ul style="color:red;">
+      <ul>
         {% for msg in messages %}
           <li>{{ msg }}</li>
         {% endfor %}
       </ul>
     {% endif %}
   {% endwith %}
-<form method="POST">
-  <input type="hidden" name="next_url" value="{{ next_url }}">
-  パスワード: <input type="password" name="password" required>
-  <button type="submit">ログイン</button>
-</form>
+
+  <form method="POST">
+    <input type="hidden" name="next_url" value="{{ next_url }}">
+    <input type="password" name="password" placeholder="パスワード" required>
+    <button type="submit">ログイン</button>
+  </form>
 </body>
 </html>

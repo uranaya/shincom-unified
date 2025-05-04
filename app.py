@@ -3,16 +3,13 @@ import base64
 import uuid
 import json
 import requests
-import traceback
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify
 from datetime import datetime
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
+
 from fortune_logic import generate_fortune, get_nicchu_eto
-from fortune_logic import generate_fortune
 from kyusei_utils import get_honmeisei
-from yearly_fortune_utils import generate_yearly_fortune
-from pdf_generator_a4 import create_pdf, create_pdf_yearly, create_pdf_combined
 from pdf_generator_b4 import create_pdf as create_pdf_b4
 from pdf_generator_a4 import create_pdf as create_pdf_a4
 
@@ -76,42 +73,48 @@ def webhook_selfmob():
         save_uuids()
     return "", 200
 
+@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
+def selfmob(uuid_str):
+    if uuid_str not in used_uuids:
+        return "無効なアクセスです", 403
+    if request.method == "POST":
+        try:
+            data = request.get_json()
+            image_data = data.get("image_data")
+            birthdate = data.get("birthdate")
+            eto = get_nicchu_eto(birthdate)
+            palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
+            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            create_pdf_a4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
+            return jsonify({"redirect_url": url_for("preview", filename=filename)})
+        except Exception as e:
+            print("❌ selfmobエラー:", e)
+            return jsonify({"message": "処理中にエラーが発生しました"}), 500
+    return render_template("selfmob/index.html")
+
+
 @app.route("/")
-def home():
-    return render_template("home.html")  # ← 新しいリンクハブ用
+def index():
+    return redirect(url_for("ten"))
+
 
 @app.route("/ten", methods=["GET", "POST"])
 def ten():
     if "logged_in" not in session:
         return redirect(url_for("login"))
-
     if request.method == "POST":
         try:
             image_data = request.form.get("image_data")
             birthdate = request.form.get("birthdate")
-            full_year = request.form.get("full_year") == "yes"
-
             eto = get_nicchu_eto(birthdate)
             palm_result, shichu_result, iching_result, lucky_info = generate_fortune(image_data, birthdate)
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-
-            if full_year:
-                from pdf_generator_b4 import create_pdf_b4_combined
-                create_pdf_b4_combined(image_data, palm_result, shichu_result, iching_result, lucky_info, birthdate, filename)
-            else:
-                create_pdf_b4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
-
+            create_pdf_b4(image_data, palm_result, shichu_result, iching_result, lucky_info, filename)
             return redirect(url_for("preview", filename=filename))
-
         except Exception as e:
-            import traceback
-            print("❌ tenエラー:", repr(e))
-            traceback.print_exc()
+            print("❌ tenエラー:", e)
             return "処理中にエラーが発生しました"
-
     return render_template("index.html")
-
-
 
 
 @app.route("/tenmob", methods=["GET", "POST"])
@@ -121,61 +124,45 @@ def tenmob():
 
     if request.method == "POST":
         try:
-            print("📩 tenmob POST受信開始")
+            print("📩 POST受信開始")
             data = request.get_json()
-            print("📨 JSON受信成功: キー一覧 →", list(data.keys()))
+            print("📨 JSON受信成功:", data)
 
             image_data = data.get("image_data")
-            birthdate  = data.get("birthdate")
-            full_year  = data.get("full_year", False)   # ← 追加 (true/false)
+            birthdate = data.get("birthdate")
 
             eto = get_nicchu_eto(birthdate)
             print("🔢 干支取得成功:", eto)
 
-            # ─────────────────────────────────────────
-            # 1年分チェック有無で処理分岐
-            # ─────────────────────────────────────────
-            if full_year:
-                from pdf_generator_a4 import create_pdf_yearly  # 新関数を呼び出し
-                filename = f"result_year_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-                create_pdf_combined(image_data, birthdate, filename)          # banner_path は既定値を利用
-                print("📄 年運PDF生成成功:", filename)
-            else:
-                palm_result, shichu_result, iching_result, lucky_info = generate_fortune(
-                    image_data, birthdate
-                )
-                print("🔮 占い生成成功（通常）")
-                filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-                create_pdf(
-                    image_data, palm_result, shichu_result, iching_result, lucky_info, filename
-                )
-                print("📄 通常PDF生成成功:", filename)
+            palm_result, shichu_result, iching_result, lucky_info = generate_fortune(
+                image_data, birthdate
+            )
+            print("🔮 占い生成成功")
+
+            # staticフォルダがなければ作成
+            os.makedirs("static", exist_ok=True)
+
+            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            create_pdf_a4(
+                image_data, palm_result, shichu_result, iching_result, lucky_info, filename
+            )
+            print("📄 PDF生成成功:", filename)
 
             redirect_url = url_for("preview", filename=filename)
             print("✅ tenmob PDF作成成功:", redirect_url)
 
-            return jsonify({"redirect_url": redirect_url}), 200
+            response = jsonify({"redirect_url": redirect_url})
+            print("📦 JSONレスポンス返却:", response.get_data())
+            return response, 200
 
         except Exception as e:
             print("❌ tenmob POST処理エラー:", e)
             return jsonify({"error": str(e)}), 500
 
-
     # 🔻 GETリクエストでフォーム画面を表示
     return render_template("tenmob/index.html")
 
 
-@app.route("/selfmob")
-def selfmob_login():
-    return render_template("selfmob/login.html")
-
-@app.route("/selfmob/pay")
-def selfmob_pay():
-    return render_template("selfmob/pay.html")
-
-@app.route("/selfmob/index")
-def selfmob_index():
-    return render_template("selfmob/index.html")  # 実際の鑑定フォーム
 
 
 
@@ -194,14 +181,22 @@ def terms():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    next_url = request.args.get("next", "ten")  # GET時のnextパラメータを取得（デフォルトten）
     if request.method == "POST":
         password = request.form.get("password")
-        next_url_post = request.form.get("next_url", "ten")  # POST時のhidden値を取得
         if password == os.getenv("LOGIN_PASSWORD", "pass"):
             session["logged_in"] = True
-            return redirect(url_for(next_url_post))
-    return render_template("login.html", next_url=next_url)
+            return redirect(session.get("next_url", url_for("tenmob")))  # ✅ デフォルトは /tenmob に変更
+
+    # GET時のみ next_url を記録
+    referer = request.referrer or ""
+    if "/tenmob" in referer:
+        session["next_url"] = url_for("tenmob")
+    elif "/ten" in referer:
+        session["next_url"] = url_for("ten")
+    else:
+        session["next_url"] = url_for("tenmob")  # ✅ 安全なデフォルトを tenmob に
+
+    return render_template("login.html")
 
 @app.route("/logout")
 def logout():

@@ -1,0 +1,79 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>恋愛占いフォーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0 auto;
+      max-width: 500px;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    h2 {
+      text-align: center;
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    input[type="date"],
+    input[type="text"],
+    button {
+      width: 100%;
+      padding: 10px;
+      font-size: 1rem;
+      box-sizing: border-box;
+      margin-top: 5px;
+    }
+    .topics {
+      margin-top: 10px;
+    }
+    .topics label {
+      font-weight: normal;
+    }
+    .submit-area {
+      margin-top: 20px;
+      text-align: center;
+    }
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h2>💘 恋愛占いフォーム</h2>
+  <form method="POST">
+    <label for="user_birth">あなたの生年月日</label>
+    <input type="date" id="user_birth" name="user_birth" required>
+
+    <label for="partner_birth">お相手の生年月日</label>
+    <input type="date" id="partner_birth" name="partner_birth" required>
+
+    <label>相談したい内容を選んでください（複数選択可）</label>
+    <div class="checkbox-group">
+      <label><input type="checkbox" name="topics" value="相性"> 相性を知りたい</label>
+      <label><input type="checkbox" name="topics" value="進展"> 今後進展があるか</label>
+      <label><input type="checkbox" name="topics" value="復縁"> 復縁の可能性</label>
+      <label><input type="checkbox" name="topics" value="出会い"> 出会いのタイミング</label>
+      <label><input type="checkbox" name="topics" value="結婚"> 結婚の可能性</label>
+      <label><input type="checkbox" name="topics" value="注意点"> 注意すべき点</label>
+    </div>
+
+    <label>
+      <input type="checkbox" name="include_yearly" value="yes">
+      1年分の運勢も見る
+    </label>
+
+    <div class="submit-area">
+      <button type="submit">🔮 鑑定スタート</button>
+    </div>
+  </form>
+</body>
+</html>
