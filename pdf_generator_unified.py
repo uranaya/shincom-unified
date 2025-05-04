@@ -5,7 +5,6 @@ from pdf_generator_a4 import (
 )
 from pdf_generator_b4 import (
     create_pdf as create_pdf_shincom_b4,
-    create_pdf_b4_combined as create_pdf_combined_b4
 )
 from renai_pdf_generator import (
     create_pdf as create_pdf_renai_a4,
