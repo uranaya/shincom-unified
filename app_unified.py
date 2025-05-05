@@ -87,7 +87,8 @@ def ten_shincom():
 
             # ✅ 年運追加
             if full_year:
-                result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate)
+                now = datetime.now()
+                result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
 
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
