@@ -7,9 +7,15 @@ from lucky_utils import draw_lucky_section
 from header_utils import draw_header
 from yearly_fortune_utils import generate_yearly_fortune
 from yearly_love_fortune_utils import generate_yearly_love_fortune
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import os
 
-
-FONT_NAME = "IPAexGothic"
+FONT_PATH = "ipaexg.ttf"
+if os.path.exists(FONT_PATH):
+    pdfmetrics.registerFont(TTFont("IPAexGothic", FONT_PATH))
+else:
+    raise FileNotFoundError("ipaexg.ttf フォントファイルが見つかりません。Render環境にアップロードしてください。")
 
 
 def wrap_text(text, width=45):
