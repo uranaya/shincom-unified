@@ -120,3 +120,45 @@ def generate_fortune(image_data, birthdate):
     iching_result = get_iching_advice()
     lucky_info = get_lucky_info(birthdate)
     return palm_result, shichu_result, iching_result, lucky_info
+
+def generate_renai_fortune(user_birth, partner_birth=None, include_yearly=False):
+    result = {
+        "compatibility_text": "",
+        "overall_love_fortune": "",
+        "topic_fortunes": [],
+        "yearly_love_fortunes": None
+    }
+
+    # 干支（日柱）の計算
+    user_eto = get_nicchu_eto(user_birth)
+    partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
+
+    # 相性占いパート
+    if partner_eto:
+        prompt_compatibility = f"""
+あなたは四柱推命に基づく恋愛占いの専門家です。
+- あなたの日柱: {user_eto}
+- お相手の日柱: {partner_eto}
+
+この2人の恋愛相性や関係性の特徴、注意点などを自然で現実的な文章で解説してください。
+"""
+    else:
+        prompt_compatibility = f"""
+あなたは四柱推命に基づく恋愛占いの専門家です。
+- あなたの日柱: {user_eto}
+
+あなたの性格、恋愛傾向、理想の相手像、そして出会いのチャンスについて自然で現実的な文章で解説してください。
+"""
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt_compatibility}],
+            temperature=0.9
+        )
+        result["compatibility_text"] = response.choices[0].message.content.strip()
+    except Exception as e:
+        result["compatibility_text"] = f"[エラー] 相性占いの生成に失敗しました：{e}"
+
+    # 今後必要ならば、以下にトピック占いや年運の生成処理を追加可能
+    return result
