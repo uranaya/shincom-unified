@@ -69,24 +69,39 @@ def renai():
 
     size = "A4" if request.path == "/renai" else "B4"
     if request.method == "POST":
-    user_birth = request.form.get("user_birth")
-    partner_birth = request.form.get("partner_birth")
-    selected_topics = request.form.getlist("topics")
-    include_yearly = request.form.get("include_yearly") == "yes"
+        user_birth = request.form.get("user_birth")
+        partner_birth = request.form.get("partner_birth")
+        selected_topics = request.form.getlist("topics")
+        include_yearly = request.form.get("include_yearly") == "yes"
 
-    result_text = generate_renai_fortune(user_birth, partner_birth, selected_topics, include_yearly)
+        result_data = generate_renai_fortune(user_birth, partner_birth, selected_topics, include_yearly)
 
-    filename = f"renai_{uuid.uuid4()}.pdf"
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
+        if isinstance(result_data, str):
+            result_data = {
+                "compatibility_text": result_data,
+                "overall_love_fortune": "",
+                "lucky_direction": "",
+                "topic_fortunes": {},
+                "yearly_love_fortunes": {},
+                "image_data": ""
+            }
 
-    create_pdf_unified("renai", size, {
-        "compatibility_text": result_text
-    }, filepath)
+        filename = f"renai_{uuid.uuid4()}.pdf"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
 
-    return send_file(filepath, as_attachment=True)
+        create_pdf_unified("renai", size, {
+            "image_data": result_data["image_data"],
+            "compatibility_text": result_data["compatibility_text"],
+            "overall_love_fortune": result_data["overall_love_fortune"],
+            "lucky_direction": result_data["lucky_direction"],
+            "topic_fortunes": result_data["topic_fortunes"],
+            "yearly_love_fortunes": result_data.get("yearly_love_fortunes")
+        }, filepath)
 
+        return send_file(filepath, as_attachment=True)
 
     return render_template("renai_form.html")
+
 
 
 
