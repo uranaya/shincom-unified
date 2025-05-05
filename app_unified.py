@@ -8,7 +8,7 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify
 from dotenv import load_dotenv
 from yearly_fortune_utils import generate_yearly_fortune
-from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto, renai_generate_fortune
+from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto, generate_renai_fortune as renai_generate_fortune
 from kyusei_utils import get_honmeisei
 from pdf_generator_unified import create_pdf_unified
 
