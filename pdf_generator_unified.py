@@ -244,7 +244,8 @@ def draw_yearly_pages_shincom(c, yearly_fortunes):
         c.setFont(FONT_NAME, 12)
         y = height - 30 * mm
         
-y = draw_header(c, width, margin, y)c.drawString(margin, y, f"◆ 年間の運勢（{'前半' if page_num == 0 else '後半'}）")
+y = draw_header(c, width, margin, y)
+c.drawString(margin, y, f"◆ 年間の運勢（{'前半' if page_num == 0 else '後半'}）")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         for i in range(6):
@@ -265,7 +266,8 @@ def draw_yearly_pages_renai(c, yearly_fortunes):
         c.setFont(FONT_NAME, 12)
         y = height - 30 * mm
         
-y = draw_header(c, width, margin, y)c.drawString(margin, y, f"◆ 年間の恋愛運（{'前半' if page_num == 0 else '後半'}）")
+y = draw_header(c, width, margin, y)
+c.drawString(margin, y, f"◆ 年間の恋愛運（{'前半' if page_num == 0 else '後半'}）")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         for i in range(6):
@@ -290,7 +292,8 @@ y = draw_header(c, width, margin, y)c.drawString(margin, y, f"◆ 年間の恋�
         c.setFont(FONT_NAME, 12)
         y = height - 30 * mm
         
-y = draw_header(c, width, margin, y)c.drawString(margin, y, f"◆ 年間の運勢（{ '前半' if page_num == 0 else '後半' }）")
+y = draw_header(c, width, margin, y)
+c.drawString(margin, y, f"◆ 年間の運勢（{ '前半' if page_num == 0 else '後半' }）")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
 
