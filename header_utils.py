@@ -1,9 +1,13 @@
-FONT_NAME = "IPAexGothic"
-
 import os
 from reportlab.lib.units import mm
 from reportlab.graphics.barcode import qr
 from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
+
+FONT_NAME = "IPAexGothic"
+FONT_PATH = "ipaexg.ttf"
+pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
 
 def create_qr_code(url, path="qr_uranaya.png"):
