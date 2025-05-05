@@ -1,4 +1,3 @@
-
 import os
 import base64
 import uuid
@@ -9,10 +8,9 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify
 from dotenv import load_dotenv
 from yearly_fortune_utils import generate_yearly_fortune
-from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
+from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto, renai_generate_fortune
 from kyusei_utils import get_honmeisei
 from pdf_generator_unified import create_pdf_unified
-from renai_fortune_utils import generate_fortune as generate_renai_fortune
 
 load_dotenv()
 
@@ -28,7 +26,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def ten_shincom():
     if "logged_in" not in session:
         return redirect(url_for("login"))
-    
+
     mode = "shincom"
     size = "B4" if request.path == "/ten" else "A4"
     is_json = request.is_json
@@ -43,15 +41,16 @@ def ten_shincom():
             eto = get_nicchu_eto(birthdate)
             palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate)
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
 
-            create_pdf_unified(mode, size, {
+            create_pdf_unified(filepath, {
                 "image_data": image_data,
                 "palm_result": palm_result,
                 "shichu_result": shichu_result,
                 "iching_result": iching_result,
                 "lucky_info": lucky_info,
                 "birthdate": birthdate
-            }, filename, include_yearly=full_year)
+            }, mode, size=size, include_yearly=full_year)
 
             redirect_url = url_for("preview", filename=filename)
             return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
@@ -75,25 +74,13 @@ def renai():
         selected_topics = request.form.getlist("topics")
         include_yearly = request.form.get("include_yearly") == "yes"
 
-        full_text = generate_renai_fortune(user_birth, partner_birth, selected_topics, include_yearly)
-
-        result_data = {
-            "titles": {
-                "compatibility": "相性鑑定と総合恋愛運"
-            },
-            "texts": {
-                "compatibility": full_text
-            },
-            "lucky_info": "",
-            "lucky_direction": "",
-            "themes": [],
-            "yearly_fortunes": {}
-        }
+        result_data = renai_generate_fortune(user_birth, partner_birth, selected_topics, include_yearly)
 
         filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
 
-        create_pdf_unified(filepath, result_data, "renai", size.lower(), include_yearly)
+        create_pdf_unified(filepath, result_data, "renai", size=size, include_yearly=include_yearly)
+
         return send_file(filepath, as_attachment=True)
 
     return render_template("renai_form.html")
