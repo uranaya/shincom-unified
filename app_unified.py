@@ -68,41 +68,36 @@ def renai():
         return redirect(url_for("login", next=request.endpoint))
 
     size = "A4" if request.path == "/renai" else "B4"
+
     if request.method == "POST":
         user_birth = request.form.get("user_birth")
         partner_birth = request.form.get("partner_birth")
         selected_topics = request.form.getlist("topics")
         include_yearly = request.form.get("include_yearly") == "yes"
 
-        result_data = generate_renai_fortune(user_birth, partner_birth, selected_topics, include_yearly)
+        result_text = generate_renai_fortune(user_birth, partner_birth, selected_topics, include_yearly)
 
-        if isinstance(result_data, str):
-            result_data = {
-                "compatibility_text": result_data,
-                "overall_love_fortune": "",
-                "lucky_direction": "",
-                "topic_fortunes": {},
-                "yearly_love_fortunes": {},
-                "image_data": ""
-            }
+        result_data = {
+            "titles": {
+                "compatibility": "相性と恋愛全体の鑑定",
+                "love_summary": "総合アドバイス"
+            },
+            "texts": {
+                "compatibility": result_text,
+                "love_summary": ""
+            },
+            "themes": [],
+            "lucky_info": "",
+            "lucky_direction": ""
+        }
 
         filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
 
-        create_pdf_unified("renai", size, {
-            "image_data": result_data["image_data"],
-            "compatibility_text": result_data["compatibility_text"],
-            "overall_love_fortune": result_data["overall_love_fortune"],
-            "lucky_direction": result_data["lucky_direction"],
-            "topic_fortunes": result_data["topic_fortunes"],
-            "yearly_love_fortunes": result_data.get("yearly_love_fortunes")
-        }, filepath)
-
+        create_pdf_unified("renai", size, result_data, filepath, include_yearly=include_yearly)
         return send_file(filepath, as_attachment=True)
 
     return render_template("renai_form.html")
-
-
 
 
 @app.route("/preview/<filename>")
@@ -148,7 +143,6 @@ def logout():
 @app.route("/")
 def home():
     return render_template("home-unified.html")
-
 
 
 if __name__ == "__main__":
