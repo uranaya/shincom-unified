@@ -21,7 +21,7 @@ def wrap_text(text, width=40):
 def draw_wrapped_text(c, text, x, y, max_width):
     lines = wrap(text, width=max_width)
     for line in lines:
-        c.drawString(x, y, line)
+    c.drawString(x, y, line)
         y -= 12
     return y
 
@@ -33,7 +33,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
     y = height - 30 * mm
 
     
-y = draw_header(c, width, margin, y)
+    y = draw_header(c, width, margin, y)
 # 表面（1ページ目）：手相3項目＋ラッキーまとめ
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 手相鑑定（特徴）")
@@ -51,8 +51,8 @@ y = draw_header(c, width, margin, y)
     # 裏面（2ページ目）：手相2項目＋総合＋性格・運勢
     y = height - 30 * mm
     
-y = draw_header(c, width, margin, y)
-c.setFont(FONT_NAME, 12)
+    y = draw_header(c, width, margin, y)
+    c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 手相鑑定（続き）")
     y -= 8 * mm
     c.setFont(FONT_NAME, 10)
@@ -86,7 +86,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
     y = height - 30 * mm
 
     
-y = draw_header(c, width, margin, y)
+    y = draw_header(c, width, margin, y)
 # 表面（1ページ目）：手相のみ
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 手相鑑定")
@@ -104,8 +104,8 @@ y = draw_header(c, width, margin, y)
     # 裏面（2ページ目）：性格・運勢＋ラッキーまとめ
     y = height - 30 * mm
     
-y = draw_header(c, width, margin, y)
-c.setFont(FONT_NAME, 12)
+    y = draw_header(c, width, margin, y)
+    c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 性格診断（四柱推命）")
     y -= 6 * mm
     c.setFont(FONT_NAME, 10)
@@ -124,7 +124,7 @@ c.setFont(FONT_NAME, 12)
     y -= 6 * mm
     c.setFont(FONT_NAME, 10)
     for item in data["lucky_info"]:
-        c.drawString(margin, y, f"・{item}")
+    c.drawString(margin, y, f"・{item}")
         y -= 6 * mm
 
     c.showPage()
@@ -140,7 +140,7 @@ def draw_renai_a4(c, data, include_yearly=False):
     y = height - 30 * mm
 
     
-y = draw_header(c, width, margin, y)
+    y = draw_header(c, width, margin, y)
 # 表面（1ページ目）：相性＋総合＋ラッキーまとめ
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 相性診断結果")
@@ -161,7 +161,7 @@ y = draw_header(c, width, margin, y)
     y -= 6 * mm
     c.setFont(FONT_NAME, 10)
     for item in data["lucky_info"]:
-        c.drawString(margin, y, f"・{item}")
+    c.drawString(margin, y, f"・{item}")
         y -= 6 * mm
 
     c.showPage()
@@ -169,15 +169,15 @@ y = draw_header(c, width, margin, y)
     # 裏面（2ページ目）：テーマ別恋愛運（3項目以内推奨）
     y = height - 30 * mm
     
-y = draw_header(c, width, margin, y)
-c.setFont(FONT_NAME, 12)
+    y = draw_header(c, width, margin, y)
+    c.setFont(FONT_NAME, 12)
     for title, text in data["topic_fortunes"].items():
-        c.drawString(margin, y, f"◆ {title}")
+    c.drawString(margin, y, f"◆ {title}")
         y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
+    c.setFont(FONT_NAME, 10)
         y = draw_wrapped_text(c, text, margin, y, 40)
         y -= 4 * mm
-        c.setFont(FONT_NAME, 12)
+    c.setFont(FONT_NAME, 12)
 
     c.showPage()
 
@@ -191,7 +191,7 @@ def draw_renai_b4(c, data, include_yearly=False):
     y = height - 30 * mm
 
     
-y = draw_header(c, width, margin, y)
+    y = draw_header(c, width, margin, y)
 # 表面（1ページ目）：相性＋総合＋ラッキーまとめ
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 相性診断結果")
@@ -212,7 +212,7 @@ y = draw_header(c, width, margin, y)
     y -= 6 * mm
     c.setFont(FONT_NAME, 10)
     for item in data["lucky_info"]:
-        c.drawString(margin, y, f"・{item}")
+    c.drawString(margin, y, f"・{item}")
         y -= 6 * mm
 
     c.showPage()
@@ -220,15 +220,15 @@ y = draw_header(c, width, margin, y)
     # 裏面（2ページ目）：テーマ別恋愛運
     y = height - 30 * mm
     
-y = draw_header(c, width, margin, y)
-c.setFont(FONT_NAME, 12)
+    y = draw_header(c, width, margin, y)
+    c.setFont(FONT_NAME, 12)
     for title, text in data["topic_fortunes"].items():
-        c.drawString(margin, y, f"◆ {title}")
+    c.drawString(margin, y, f"◆ {title}")
         y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
+    c.setFont(FONT_NAME, 10)
         y = draw_wrapped_text(c, text, margin, y, 40)
         y -= 4 * mm
-        c.setFont(FONT_NAME, 12)
+    c.setFont(FONT_NAME, 12)
 
     c.showPage()
 
@@ -241,18 +241,18 @@ def draw_yearly_pages_shincom(c, yearly_fortunes):
     margin = 20 * mm
     items = list(yearly_fortunes.items())
     for page_num in range(2):
-        c.setFont(FONT_NAME, 12)
+    c.setFont(FONT_NAME, 12)
         y = height - 30 * mm
         
-y = draw_header(c, width, margin, y)
-c.drawString(margin, y, f"◆ 年間の運勢（{'前半' if page_num == 0 else '後半'}）")
+    y = draw_header(c, width, margin, y)
+    c.drawString(margin, y, f"◆ 年間の運勢（{'前半' if page_num == 0 else '後半'}）")
         y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
+    c.setFont(FONT_NAME, 10)
         for i in range(6):
             idx = page_num * 6 + i
             if idx >= len(items): break
             month, text = items[idx]
-            c.drawString(margin, y, f"・{month}月")
+    c.drawString(margin, y, f"・{month}月")
             y -= 6 * mm
             y = draw_wrapped_text(c, text, margin + 10 * mm, y, 40)
             y -= 8 * mm
@@ -263,18 +263,18 @@ def draw_yearly_pages_renai(c, yearly_fortunes):
     margin = 20 * mm
     items = list(yearly_fortunes.items())
     for page_num in range(2):
-        c.setFont(FONT_NAME, 12)
+    c.setFont(FONT_NAME, 12)
         y = height - 30 * mm
         
-y = draw_header(c, width, margin, y)
-c.drawString(margin, y, f"◆ 年間の恋愛運（{'前半' if page_num == 0 else '後半'}）")
+    y = draw_header(c, width, margin, y)
+    c.drawString(margin, y, f"◆ 年間の恋愛運（{'前半' if page_num == 0 else '後半'}）")
         y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
+    c.setFont(FONT_NAME, 10)
         for i in range(6):
             idx = page_num * 6 + i
             if idx >= len(items): break
             month, text = items[idx]
-            c.drawString(margin, y, f"・{month}月")
+    c.drawString(margin, y, f"・{month}月")
             y -= 6 * mm
             y = draw_wrapped_text(c, text, margin + 10 * mm, y, 40)
             y -= 8 * mm
@@ -289,20 +289,20 @@ c.drawString(margin, y, f"◆ 年間の恋愛運（{'前半' if page_num == 0 el
     items = list(yearly_fortunes.items())
 
     for page_num in range(2):  # 最大2ページ
-        c.setFont(FONT_NAME, 12)
+    c.setFont(FONT_NAME, 12)
         y = height - 30 * mm
         
-y = draw_header(c, width, margin, y)
-c.drawString(margin, y, f"◆ 年間の運勢（{ '前半' if page_num == 0 else '後半' }）")
+    y = draw_header(c, width, margin, y)
+    c.drawString(margin, y, f"◆ 年間の運勢（{ '前半' if page_num == 0 else '後半' }）")
         y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
+    c.setFont(FONT_NAME, 10)
 
         for i in range(6):
             idx = page_num * 6 + i
             if idx >= len(items):
                 break
             month, text = items[idx]
-            c.drawString(margin, y, f"・{month}")
+    c.drawString(margin, y, f"・{month}")
             y -= 6 * mm
             y = draw_wrapped_text(c, text, margin + 10 * mm, y, 40)
             y -= 8 * mm
