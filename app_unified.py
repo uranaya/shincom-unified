@@ -1,3 +1,4 @@
+
 import os
 import base64
 import uuid
@@ -74,19 +75,17 @@ def renai():
         selected_topics = request.form.getlist("topics")
         include_yearly = request.form.get("include_yearly") == "yes"
 
-        result_text = generate_renai_fortune(user_birth, partner_birth, selected_topics, include_yearly)
+        full_text = generate_renai_fortune(user_birth, partner_birth, selected_topics, include_yearly)
 
         result_data = {
             "titles": {
-                "compatibility": "相性診断",
-                "love_summary": "総合恋愛運"
+                "compatibility": "相性鑑定と総合恋愛運"
             },
             "texts": {
-                "compatibility": result_text,
-                "love_summary": ""
+                "compatibility": full_text
             },
-            "lucky_info": [],
-            "lucky_direction": {},
+            "lucky_info": "",
+            "lucky_direction": "",
             "themes": [],
             "yearly_fortunes": {}
         }
@@ -94,8 +93,7 @@ def renai():
         filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
 
-        create_pdf_unified(filepath, result_data, mode="renai", size=size.lower(), include_yearly=include_yearly)
-
+        create_pdf_unified(filepath, result_data, "renai", size.lower(), include_yearly)
         return send_file(filepath, as_attachment=True)
 
     return render_template("renai_form.html")
