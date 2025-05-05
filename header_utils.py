@@ -1,7 +1,20 @@
-def draw_header(c, width, margin, y_pos, font=FONT_NAME):
-    from common_qr import create_qr_code  # QR作成ユーティリティ（既存利用）
-    import os
+FONT_NAME = "IPAexGothic"
 
+import os
+from reportlab.lib.units import mm
+from reportlab.graphics.barcode import qr
+from reportlab.lib.pagesizes import A4
+
+
+def create_qr_code(url, path="qr_uranaya.png"):
+    if not os.path.exists(path):
+        import qrcode
+        img = qrcode.make(url)
+        img.save(path)
+    return path
+
+
+def draw_header(c, width, margin, y_pos, font=FONT_NAME):
     qr_ad_path = create_qr_code("https://uranaya.jp", path="qr_uranaya.png")
     if os.path.exists(qr_ad_path):
         c.drawImage(qr_ad_path, width - margin - 30 * mm, y_pos - 30 * mm, width=30 * mm, height=30 * mm)
@@ -12,5 +25,5 @@ def draw_header(c, width, margin, y_pos, font=FONT_NAME):
         ad_text.textLine("Instagram → @uranaya_official")
         ad_text.textLine("────────────────────────────")
         c.drawText(ad_text)
-        return y_pos - 50 * mm
+        y_pos -= 50 * mm
     return y_pos
