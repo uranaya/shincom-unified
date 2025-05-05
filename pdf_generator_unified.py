@@ -13,13 +13,10 @@ from fortune_logic import generate_yearly_fortune
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "./ipaexg.ttf"
 
-
 def wrap_text(text, width=40):
     return "\n".join(wrap(text, width))
 
-
 def draw_wrapped_text(c, text, x, y, max_width):
-    lines = wrap(text, width=max_width)
     lines = wrap(text, width=max_width)
     for line in lines:
         c.drawString(x, y, line)
@@ -33,8 +30,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
     margin = 20 * mm
     y = height - 30 * mm
 
-    
-    y = draw_header(c, width, margin, y)
+y = draw_header(c, width, margin, y)
 # 表面（1ページ目）：手相3項目＋ラッキーまとめ
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 手相鑑定（特徴）")
@@ -52,8 +48,8 @@ def draw_shincom_a4(c, data, include_yearly=False):
     # 裏面（2ページ目）：手相2項目＋総合＋性格・運勢
     y = height - 30 * mm
     
-    y = draw_header(c, width, margin, y)
-    c.setFont(FONT_NAME, 12)
+y = draw_header(c, width, margin, y)
+c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 手相鑑定（続き）")
     y -= 8 * mm
     c.setFont(FONT_NAME, 10)
@@ -86,8 +82,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
     margin = 20 * mm
     y = height - 30 * mm
 
-    
-    y = draw_header(c, width, margin, y)
+y = draw_header(c, width, margin, y)
 # 表面（1ページ目）：手相のみ
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 手相鑑定")
@@ -105,8 +100,8 @@ def draw_shincom_b4(c, data, include_yearly=False):
     # 裏面（2ページ目）：性格・運勢＋ラッキーまとめ
     y = height - 30 * mm
     
-    y = draw_header(c, width, margin, y)
-    c.setFont(FONT_NAME, 12)
+y = draw_header(c, width, margin, y)
+c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 性格診断（四柱推命）")
     y -= 6 * mm
     c.setFont(FONT_NAME, 10)
@@ -140,8 +135,7 @@ def draw_renai_a4(c, data, include_yearly=False):
     margin = 20 * mm
     y = height - 30 * mm
 
-    
-    y = draw_header(c, width, margin, y)
+y = draw_header(c, width, margin, y)
 # 表面（1ページ目）：相性＋総合＋ラッキーまとめ
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 相性診断結果")
@@ -170,8 +164,8 @@ def draw_renai_a4(c, data, include_yearly=False):
     # 裏面（2ページ目）：テーマ別恋愛運（3項目以内推奨）
     y = height - 30 * mm
     
-    y = draw_header(c, width, margin, y)
-    c.setFont(FONT_NAME, 12)
+y = draw_header(c, width, margin, y)
+c.setFont(FONT_NAME, 12)
     for title, text in data["topic_fortunes"].items():
         c.drawString(margin, y, f"◆ {title}")
         y -= 6 * mm
@@ -185,14 +179,12 @@ def draw_renai_a4(c, data, include_yearly=False):
     if include_yearly:
         draw_yearly_pages_renai(c, data["yearly_love_fortunes"])
 
-
 def draw_renai_b4(c, data, include_yearly=False):
     width, height = B4
     margin = 20 * mm
     y = height - 30 * mm
 
-    
-    y = draw_header(c, width, margin, y)
+y = draw_header(c, width, margin, y)
 # 表面（1ページ目）：相性＋総合＋ラッキーまとめ
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 相性診断結果")
@@ -221,8 +213,8 @@ def draw_renai_b4(c, data, include_yearly=False):
     # 裏面（2ページ目）：テーマ別恋愛運
     y = height - 30 * mm
     
-    y = draw_header(c, width, margin, y)
-    c.setFont(FONT_NAME, 12)
+y = draw_header(c, width, margin, y)
+c.setFont(FONT_NAME, 12)
     for title, text in data["topic_fortunes"].items():
         c.drawString(margin, y, f"◆ {title}")
         y -= 6 * mm
@@ -236,7 +228,6 @@ def draw_renai_b4(c, data, include_yearly=False):
     if include_yearly:
         draw_yearly_pages_renai(c, data["yearly_love_fortunes"])
 
-
 def draw_yearly_pages_shincom(c, yearly_fortunes):
     width, height = A4
     margin = 20 * mm
@@ -245,8 +236,8 @@ def draw_yearly_pages_shincom(c, yearly_fortunes):
         c.setFont(FONT_NAME, 12)
         y = height - 30 * mm
         
-    y = draw_header(c, width, margin, y)
-    c.drawString(margin, y, f"◆ 年間の運勢（{'前半' if page_num == 0 else '後半'}）")
+y = draw_header(c, width, margin, y)
+c.drawString(margin, y, f"◆ 年間の運勢（{'前半' if page_num == 0 else '後半'}）")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         for i in range(6):
@@ -267,8 +258,8 @@ def draw_yearly_pages_renai(c, yearly_fortunes):
         c.setFont(FONT_NAME, 12)
         y = height - 30 * mm
         
-    y = draw_header(c, width, margin, y)
-    c.drawString(margin, y, f"◆ 年間の恋愛運（{'前半' if page_num == 0 else '後半'}）")
+y = draw_header(c, width, margin, y)
+c.drawString(margin, y, f"◆ 年間の恋愛運（{'前半' if page_num == 0 else '後半'}）")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         for i in range(6):
@@ -281,7 +272,6 @@ def draw_yearly_pages_renai(c, yearly_fortunes):
             y -= 8 * mm
         c.showPage()
 
-
 # ===================== 年運ページ（共通） =====================
 
 # 年運ページ描画をモードごとに分離c, yearly_fortunes):
@@ -293,8 +283,8 @@ def draw_yearly_pages_renai(c, yearly_fortunes):
         c.setFont(FONT_NAME, 12)
         y = height - 30 * mm
         
-    y = draw_header(c, width, margin, y)
-    c.drawString(margin, y, f"◆ 年間の運勢（{ '前半' if page_num == 0 else '後半' }）")
+y = draw_header(c, width, margin, y)
+c.drawString(margin, y, f"◆ 年間の運勢（{ '前半' if page_num == 0 else '後半' }）")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
 
@@ -309,7 +299,6 @@ def draw_yearly_pages_renai(c, yearly_fortunes):
             y -= 8 * mm
 
         c.showPage()
-
 
 # ===================== PDF生成ルート関数 =====================
 
