@@ -68,7 +68,6 @@ def renai():
         return redirect(url_for("login", next=request.endpoint))
 
     size = "A4" if request.path == "/renai" else "B4"
-
     if request.method == "POST":
         user_birth = request.form.get("user_birth")
         partner_birth = request.form.get("partner_birth")
@@ -79,22 +78,24 @@ def renai():
 
         result_data = {
             "titles": {
-                "compatibility": "相性と恋愛全体の鑑定",
-                "love_summary": "総合アドバイス"
+                "compatibility": "相性診断",
+                "love_summary": "総合恋愛運"
             },
             "texts": {
                 "compatibility": result_text,
                 "love_summary": ""
             },
+            "lucky_info": [],
+            "lucky_direction": {},
             "themes": [],
-            "lucky_info": "",
-            "lucky_direction": ""
+            "yearly_fortunes": {}
         }
 
         filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
 
-        create_pdf_unified("renai", size, result_data, filepath, include_yearly=include_yearly)
+        create_pdf_unified(filepath, result_data, mode="renai", size=size.lower(), include_yearly=include_yearly)
+
         return send_file(filepath, as_attachment=True)
 
     return render_template("renai_form.html")
