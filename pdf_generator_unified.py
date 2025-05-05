@@ -1,21 +1,21 @@
-import os
 from reportlab.lib.pagesizes import A4, B4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
-from textwrap import wrap
-from lucky_utils import draw_lucky_section
-from header_utils import draw_header
-from yearly_fortune_utils import generate_yearly_fortune
-from yearly_love_fortune_utils import generate_yearly_love_fortune
-from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
+from textwrap import wrap
 import os
 
+from fortune_logic import generate_fortune
+from renai_fortune_utils import generate_renai_fortune
+from yearly_fortune_utils import generate_yearly_fortune
+from yearly_love_fortune_utils import generate_yearly_love_fortune
+from header_utils import draw_header
+from lucky_utils import draw_lucky_section
+
+FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
-if os.path.exists(FONT_PATH):
-    pdfmetrics.registerFont(TTFont("IPAexGothic", FONT_PATH))
-else:
-    raise FileNotFoundError("ipaexg.ttf フォントファイルが見つかりません。Render環境にアップロードしてください。")
+pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
 
 def wrap_text(text, width=45):
