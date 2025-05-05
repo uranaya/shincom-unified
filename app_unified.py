@@ -40,20 +40,61 @@ def ten_shincom():
 
             eto = get_nicchu_eto(birthdate)
             palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate)
+
+            # --- palm_result を構造化 ---
+            palm_titles, palm_texts, summary_text = [], [], ""
+            for part in palm_result.split("### "):
+                if part.strip():
+                    if "総合的なアドバイス" in part:
+                        summary_text = part.replace("総合的なアドバイス", "").strip()
+                    else:
+                        try:
+                            title, content = part.strip().split("\n", 1)
+                            palm_titles.append(title.strip())
+                            palm_texts.append(content.strip())
+                        except:
+                            continue
+
+            # --- shichu_result を構造化 ---
+            shichu_texts = {"性格": "", "今月の運勢": "", "来月の運勢": ""}
+            for part in shichu_result.split("■"):
+                for key in shichu_texts:
+                    if key in part:
+                        shichu_texts[key] = part.replace(key, "").strip()
+
+            # --- lucky_direction（九星気学などで拡張可） ---
+            lucky_direction = ""  # 現時点では空欄
+
+            # --- PDF用データにまとめる ---
+            result_data = {
+                "image_data": image_data,
+                "palm_titles": palm_titles,
+                "palm_texts": palm_texts,
+                "titles": {
+                    "palm_summary": "手相の総合アドバイス",
+                    "personality": "性格診断",
+                    "month_fortune": "今月の運勢",
+                    "next_month_fortune": "来月の運勢",
+                },
+                "texts": {
+                    "palm_summary": summary_text,
+                    "personality": shichu_texts["性格"],
+                    "month_fortune": shichu_texts["今月の運勢"],
+                    "next_month_fortune": shichu_texts["来月の運勢"],
+                },
+                "lucky_info": lucky_info,
+                "lucky_direction": lucky_direction,
+                "birthdate": birthdate
+            }
+
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
 
-            create_pdf_unified(filepath, {
-                "image_data": image_data,
-                "palm_result": palm_result,
-                "shichu_result": shichu_result,
-                "iching_result": iching_result,
-                "lucky_info": lucky_info,
-                "birthdate": birthdate
-            }, mode, size=size, include_yearly=full_year)
+            create_pdf_unified(filepath, result_data, mode, size=size, include_yearly=full_year)
 
             redirect_url = url_for("preview", filename=filename)
             return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
+
         except Exception as e:
             traceback.print_exc()
             return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
@@ -74,7 +115,37 @@ def renai():
         selected_topics = request.form.getlist("topics")
         include_yearly = request.form.get("include_yearly") == "yes"
 
-        result_data = renai_generate_fortune(user_birth, partner_birth, selected_topics, include_yearly)
+        raw_result = renai_generate_fortune(user_birth, partner_birth, selected_topics, include_yearly)
+
+        # --- titles/texts 分離 ---
+        titles = {
+            "compatibility": "相性診断" if partner_birth else "恋愛傾向と出会い",
+            "love_summary": "総合恋愛運"
+        }
+        texts = {
+            "compatibility": raw_result.get("compatibility_text", ""),
+            "love_summary": raw_result.get("overall_love_fortune", "")
+        }
+
+        # --- テーマ占い ---
+        themes = raw_result.get("topic_fortunes", [])  # 例: [{"title": "...", "content": "..."}]
+
+        # --- 年運恋愛 ---
+        yearly_fortunes = raw_result.get("yearly_love_fortunes") if include_yearly else None
+
+        # --- ラッキー情報・方位（必要に応じて追加可能）---
+        lucky_info = raw_result.get("lucky_info", "取得できませんでした。")
+        lucky_direction = raw_result.get("lucky_direction", "")
+
+        result_data = {
+            "titles": titles,
+            "texts": texts,
+            "themes": themes,
+            "yearly_fortunes": yearly_fortunes,
+            "lucky_info": lucky_info,
+            "lucky_direction": lucky_direction,
+            "birthdate": user_birth
+        }
 
         filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
