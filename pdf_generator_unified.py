@@ -33,7 +33,8 @@ def draw_shincom_a4(c, data, include_yearly=False):
     y = height - 30 * mm
 
     
-y = draw_header(c, width, margin, y)# 表面（1ページ目）：手相3項目＋ラッキーまとめ
+y = draw_header(c, width, margin, y)
+# 表面（1ページ目）：手相3項目＋ラッキーまとめ
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 手相鑑定（特徴）")
     y -= 8 * mm
@@ -50,7 +51,8 @@ y = draw_header(c, width, margin, y)# 表面（1ページ目）：手相3項目�
     # 裏面（2ページ目）：手相2項目＋総合＋性格・運勢
     y = height - 30 * mm
     
-y = draw_header(c, width, margin, y)c.setFont(FONT_NAME, 12)
+y = draw_header(c, width, margin, y)
+c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 手相鑑定（続き）")
     y -= 8 * mm
     c.setFont(FONT_NAME, 10)
@@ -84,7 +86,8 @@ def draw_shincom_b4(c, data, include_yearly=False):
     y = height - 30 * mm
 
     
-y = draw_header(c, width, margin, y)# 表面（1ページ目）：手相のみ
+y = draw_header(c, width, margin, y)
+# 表面（1ページ目）：手相のみ
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 手相鑑定")
     y -= 6 * mm
@@ -101,7 +104,8 @@ y = draw_header(c, width, margin, y)# 表面（1ページ目）：手相のみ
     # 裏面（2ページ目）：性格・運勢＋ラッキーまとめ
     y = height - 30 * mm
     
-y = draw_header(c, width, margin, y)c.setFont(FONT_NAME, 12)
+y = draw_header(c, width, margin, y)
+c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 性格診断（四柱推命）")
     y -= 6 * mm
     c.setFont(FONT_NAME, 10)
@@ -136,7 +140,8 @@ def draw_renai_a4(c, data, include_yearly=False):
     y = height - 30 * mm
 
     
-y = draw_header(c, width, margin, y)# 表面（1ページ目）：相性＋総合＋ラッキーまとめ
+y = draw_header(c, width, margin, y)
+# 表面（1ページ目）：相性＋総合＋ラッキーまとめ
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 相性診断結果")
     y -= 6 * mm
@@ -164,7 +169,8 @@ y = draw_header(c, width, margin, y)# 表面（1ページ目）：相性＋総�
     # 裏面（2ページ目）：テーマ別恋愛運（3項目以内推奨）
     y = height - 30 * mm
     
-y = draw_header(c, width, margin, y)c.setFont(FONT_NAME, 12)
+y = draw_header(c, width, margin, y)
+c.setFont(FONT_NAME, 12)
     for title, text in data["topic_fortunes"].items():
         c.drawString(margin, y, f"◆ {title}")
         y -= 6 * mm
@@ -185,7 +191,8 @@ def draw_renai_b4(c, data, include_yearly=False):
     y = height - 30 * mm
 
     
-y = draw_header(c, width, margin, y)# 表面（1ページ目）：相性＋総合＋ラッキーまとめ
+y = draw_header(c, width, margin, y)
+# 表面（1ページ目）：相性＋総合＋ラッキーまとめ
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "◆ 相性診断結果")
     y -= 6 * mm
@@ -213,7 +220,8 @@ y = draw_header(c, width, margin, y)# 表面（1ページ目）：相性＋総�
     # 裏面（2ページ目）：テーマ別恋愛運
     y = height - 30 * mm
     
-y = draw_header(c, width, margin, y)c.setFont(FONT_NAME, 12)
+y = draw_header(c, width, margin, y)
+c.setFont(FONT_NAME, 12)
     for title, text in data["topic_fortunes"].items():
         c.drawString(margin, y, f"◆ {title}")
         y -= 6 * mm
