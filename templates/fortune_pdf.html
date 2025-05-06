@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -28,13 +27,15 @@
   </style>
 </head>
 <body>
-  <div class="back">
-    {% if 'renai' in referer %}
-      <a href="{{ url_for('renai') }}">🔙 恋愛鑑定に戻る</a>
-    {% else %}
-      <a href="{{ url_for('ten_shincom') }}">🔙 占い画面に戻る</a>
-    {% endif %}
-  </div>
-  <iframe src="{{ url_for('preview', filename=filename) }}"></iframe>
+  {% if referer %}
+    <div class="back">
+      {% if 'renai' in referer %}
+        <a href="{{ url_for('renai') }}">🔙 恋愛鑑定に戻る</a>
+      {% else %}
+        <a href="{{ url_for('ten_shincom') }}">🔙 占い画面に戻る</a>
+      {% endif %}
+    </div>
+  {% endif %}
+  <iframe src="{{ url_for('view_pdf', filename=filename) }}"></iframe>
 </body>
 </html>

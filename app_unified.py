@@ -156,6 +156,15 @@ def preview(filename):
         return redirect(url_for("view_pdf", filename=filename))
     return render_template("fortune_pdf.html", filename=filename, referer=referer)
 
+
+@app.route("/view/<filename>")
+def view_pdf(filename):
+    path = os.path.join("static", filename)
+    if os.path.exists(path):
+        return send_file(path, mimetype='application/pdf')
+    return "ファイルが見つかりません", 404
+
+
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
     birthdate = request.json.get("birthdate")
