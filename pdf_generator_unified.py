@@ -53,27 +53,28 @@ def draw_yearly_pages_shincom(c, yearly_data):
     y = height - 30 * mm
 
     # 年運の見出しと本文
-    c.setFont("HeiseiKakuGo-W5", 13)
+    c.setFont(FONT_NAME, 13)
     c.drawString(margin, y, f"■ {yearly_data['year_label']}")
     y -= 10 * mm
-    c.setFont("HeiseiKakuGo-W5", 11)
+    c.setFont(FONT_NAME, 11)
     y = draw_wrapped_text(c, yearly_data['year_text'], margin, y, 40)
 
+    y -= 6  # 空白行を追加
     c.showPage()
     y = height - 30 * mm
 
     # 月運12か月分
     for month in yearly_data["months"]:
-        c.setFont("HeiseiKakuGo-W5", 13)
+        c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {month['label']}")
         y -= 10 * mm
-        c.setFont("HeiseiKakuGo-W5", 11)
+        c.setFont(FONT_NAME, 11)
         y = draw_wrapped_text(c, month['text'], margin, y, 40)
+        y -= 6  # 空白行を追加
 
         if y < 50 * mm:
             c.showPage()
             y = height - 30 * mm
-
 
 
 def draw_yearly_pages_renai(c, yearly_fortunes):
@@ -178,9 +179,10 @@ def draw_shincom_b4(c, data, include_yearly):
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
+    # 2ページ目：※ここでは draw_header を削除
     c.showPage()
     y = height - 30 * mm
-    y = draw_header(c, width, margin, y)
+    # y = draw_header(c, width, margin, y) ← 削除済
 
     # 総合・性格・今月・来月
     for key in ["palm_summary", "personality", "month_fortune", "next_month_fortune"]:
@@ -201,6 +203,7 @@ def draw_shincom_b4(c, data, include_yearly):
     # 年運
     if include_yearly:
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
+
 
 
 
