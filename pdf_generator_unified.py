@@ -112,23 +112,32 @@ def draw_shincom_b4(c, data, include_yearly):
 
     c.showPage()
     text = c.beginText(margin, height - 30 * mm)
-    text.setFont(FONT_NAME, 12)
+    text.setFont(FONT_NAME, 11)
 
-    for key in ["palm_summary", "personality", "month_fortune", "next_month_fortune"]:
-        text.textLine(f"- {data['titles'][key]}")
-        text.setFont(FONT_NAME, 10)
-        for line in wrap(data["texts"][key], 45):
-            text.textLine(line)
-        text.textLine("")
-        text.setFont(FONT_NAME, 12)
+    text.textLine("■ 手相からの総合的なアドバイス")
+    text.textLine("")
+    for line in wrap(data["texts"]["palm_summary"], 45):
+        text.textLine(line)
+    text.textLine("")
 
-    text.textLine("- ラッキー情報")
-    text.setFont(FONT_NAME, 10)
+    text.textLine("■ 四柱推命によるアドバイス")
+    text.textLine("")
+    for line in wrap(data["texts"]["personality"], 45):
+        text.textLine(line)
+    for line in wrap(data["texts"]["month_fortune"], 45):
+        text.textLine(line)
+    for line in wrap(data["texts"]["next_month_fortune"], 45):
+        text.textLine(line)
+    text.textLine("")
+
+    text.textLine("■ ラッキー情報")
+    text.textLine("")
     for label, content in data["lucky_info"].items():
         wrapped = wrap(f"◆ {label}：{content}", 45)
         for line in wrapped:
             text.textLine(line)
     text.textLine("")
+
     c.drawText(text)
 
     if include_yearly:
