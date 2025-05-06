@@ -59,7 +59,7 @@ def draw_yearly_pages_shincom(c, yearly_data):
     c.setFont(FONT_NAME, 11)
     y = draw_wrapped_text(c, yearly_data['year_text'], margin, y, 40)
 
-    y -= 6  # 空白行を追加
+    y -= 10  # 空白行を追加
     c.showPage()
     y = height - 30 * mm
 
@@ -70,7 +70,7 @@ def draw_yearly_pages_shincom(c, yearly_data):
         y -= 10 * mm
         c.setFont(FONT_NAME, 11)
         y = draw_wrapped_text(c, month['text'], margin, y, 40)
-        y -= 6  # 空白行を追加
+        y -= 10  # 空白行を追加
 
         if y < 50 * mm:
             c.showPage()
@@ -170,7 +170,7 @@ def draw_shincom_b4(c, data, include_yearly):
 
     c.setFont(FONT_NAME, 12)
     for i in range(5):
-        c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
+        c.drawString(margin, y, f"- {data['palm_titles'][i]}")  # 記号変更
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         for line in wrap(data["palm_texts"][i], 45):
@@ -179,14 +179,13 @@ def draw_shincom_b4(c, data, include_yearly):
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
-    # 2ページ目：※ここでは draw_header を削除
+    # 2ページ目：明示的に初期化
     c.showPage()
     y = height - 30 * mm
-    # y = draw_header(c, width, margin, y) ← 削除済
+    c.setFont(FONT_NAME, 12)
 
-    # 総合・性格・今月・来月
     for key in ["palm_summary", "personality", "month_fortune", "next_month_fortune"]:
-        c.drawString(margin, y, f"◆ {data['titles'][key]}")
+        c.drawString(margin, y, f"- {data['titles'][key]}")  # 記号変更
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         for line in wrap(data["texts"][key], 45):
@@ -196,13 +195,14 @@ def draw_shincom_b4(c, data, include_yearly):
         c.setFont(FONT_NAME, 12)
 
     # ラッキー情報
-    c.drawString(margin, y, "◆ ラッキー情報")
+    c.drawString(margin, y, "- ラッキー情報")
     y -= 6 * mm
     y = draw_lucky_info(c, data["lucky_info"], margin, y)
 
     # 年運
     if include_yearly:
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
+
 
 
 
