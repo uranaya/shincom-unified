@@ -32,8 +32,7 @@ def draw_wrapped_text(c, text, x, y, max_width):
 
 def draw_yearly_pages_shincom(c, yearly_data):
     from reportlab.lib.units import mm
-    from .utils import draw_wrapped_text  # あなたの構成に応じて調整
-
+    
     width, height = c._pagesize
     margin = 25 * mm
     y = height - 30 * mm
