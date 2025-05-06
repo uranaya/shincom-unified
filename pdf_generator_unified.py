@@ -86,7 +86,6 @@ def draw_shincom_b4(c, data, include_yearly):
     width, height = B4
     margin = 20 * mm
     y = height - 30 * mm
-
     y = draw_header(c, width, margin, y)
 
     if data.get("image_data"):
@@ -99,44 +98,60 @@ def draw_shincom_b4(c, data, include_yearly):
         c.drawImage(img, img_x, img_y, width=img_width, height=img_height)
         y = img_y - 10 * mm
 
-    # 表面：TextObjectで手相5項目
+    # 表面描画（TextObject）
     text = c.beginText(margin, y)
     text.setFont(FONT_NAME, 11)
-
     for i in range(5):
         text.textLine(f"■ {data['palm_titles'][i]}")
         text.textLine("")
         for line in wrap(data["palm_texts"][i], 45):
             text.textLine(line)
         text.textLine("")
-
     c.drawText(text)
 
-    # 裏面：手相総合・四柱推命・ラッキー
-    c.showPage()
-    text = c.beginText(margin, height - 30 * mm)
-    text.setFont(FONT_NAME, 11)
+    # 裏面（複数ページに分割可能）
+    def start_text():
+        t = c.beginText(margin, height - 30 * mm)
+        t.setFont(FONT_NAME, 11)
+        return t
 
+    def check_and_commit(text_obj):
+        if text_obj.getY() < 30 * mm:
+            c.drawText(text_obj)
+            c.showPage()
+            return start_text()
+        return text_obj
+
+    c.showPage()
+    text = start_text()
+
+    # 手相まとめ
     text.textLine("■ 手相からの総合的なアドバイス")
     text.textLine("")
     for line in wrap(data["texts"]["palm_summary"], 45):
         text.textLine(line)
+        text = check_and_commit(text)
     text.textLine("")
 
+    # 四柱推命
     text.textLine("■ 四柱推命によるアドバイス")
     text.textLine("")
     for key in ["personality", "month_fortune", "next_month_fortune"]:
         for line in wrap(data["texts"][key], 45):
             text.textLine(line)
+            text = check_and_commit(text)
         text.textLine("")
+        text = check_and_commit(text)
 
+    # ラッキー情報
     text.textLine("■ ラッキー情報")
     text.textLine("")
     for label, content in data["lucky_info"].items():
-        wrapped = wrap(f"◆ {label}：{content}", 45)
-        for line in wrapped:
+        for line in wrap(f"◆ {label}：{content}", 45):
             text.textLine(line)
-    text.textLine("")
+            text = check_and_commit(text)
+        text.textLine("")
+        text = check_and_commit(text)
 
     c.drawText(text)
 
