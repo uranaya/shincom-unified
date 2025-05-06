@@ -7,12 +7,14 @@ from fortune_logic import get_nicchu_eto  # 既存の実装をそのまま利用
 MAX_CHAR = 300  # 月運 300 文字以内
 
 def _ask_openai(prompt: str) -> str:
-    response = openai.ChatCompletion.create(
+    response = openai.chat.completions.create(
         model="gpt-3.5-turbo",
         max_tokens=850,
         temperature=0.7,
-        messages=[{"role": "system", "content": "あなたは四柱推命のプロの占い師です。"},
-                  {"role": "user",   "content": prompt}]
+        messages=[
+            {"role": "system", "content": "あなたは四柱推命のプロの占い師です。"},
+            {"role": "user", "content": prompt}
+        ]
     )
     return response.choices[0].message.content.strip()
 
@@ -52,7 +54,6 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
             "label": f"{y}年{m}月の運勢",
             "text": _ask_openai(prompt_month)
         })
-
 
     return {
         "year_label": f"{now.year}年の総合運",
