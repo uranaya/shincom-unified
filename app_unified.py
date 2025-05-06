@@ -20,7 +20,6 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-
 @app.route("/ten", methods=["GET", "POST"])
 @app.route("/tenmob", methods=["GET", "POST"])
 def ten_shincom():
@@ -82,10 +81,9 @@ def ten_shincom():
                 },
                 "lucky_info": lucky_info,
                 "lucky_direction": lucky_direction,
-                "birthdate": birthdate
+                "birthdate": birthdate,
             }
 
-            # ✅ 年運追加
             if full_year:
                 now = datetime.now()
                 result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
@@ -157,12 +155,6 @@ def preview(filename):
     if any(x in referer for x in ["/tenmob", "/selfmob", "/renai"]):
         return redirect(url_for("view_pdf", filename=filename))
     return render_template("fortune_pdf.html", filename=filename, referer=referer)
-
-
-@app.route("/view/<filename>")
-def view_pdf(filename):
-    return send_file(os.path.join("static", filename), mimetype='application/pdf')
-
 
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
