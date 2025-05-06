@@ -28,6 +28,12 @@ pdfmetrics.registerFont(TTFont("HeiseiKakuGo-W5", "./ipaexg.ttf"))
 def wrap_text(text, width=45):
     return "\n".join(wrap(text, width))
 
+def draw_lucky_info(c, data, x, y):
+    c.setFont(FONT_NAME, 11)
+    for label, content in data.items():
+        c.drawString(x, y, f"◆ {label}：{content}")
+        y -= 14
+    return y
 
 def draw_wrapped_text(c, text, x, y, max_width):
     lines = wrap(text, width=max_width)
