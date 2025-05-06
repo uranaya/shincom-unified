@@ -30,21 +30,36 @@ def draw_wrapped_text(c, text, x, y, max_width):
     return y
 
 
-def draw_yearly_pages_shincom(c, yearly_fortunes):
+def draw_yearly_pages_shincom(c, yearly_data):
+    from reportlab.lib.units import mm
+    from .utils import draw_wrapped_text  # あなたの構成に応じて調整
+
+    width, height = c._pagesize
+    margin = 25 * mm
+    y = height - 30 * mm
+
+    # 年運の見出しと本文
+    c.setFont("HeiseiKakuGo-W5", 13)
+    c.drawString(margin, y, f"■ {yearly_data['year_label']}")
+    y -= 10 * mm
+    c.setFont("HeiseiKakuGo-W5", 11)
+    y = draw_wrapped_text(c, yearly_data['year_text'], margin, y, 40)
+
     c.showPage()
-    c.setFont(FONT_NAME, 12)
-    c.drawString(20 * mm, 275 * mm, "◆ 年間運勢（四柱推命）")
-    y = 265 * mm
-    c.setFont(FONT_NAME, 10)
-    for month, text in yearly_fortunes.items():
-        c.drawString(20 * mm, y, f"◉ {month}月")
-        y -= 12
-        y = draw_wrapped_text(c, text, 25 * mm, y, 40)
-        y -= 6
-        if y < 40 * mm:
+    y = height - 30 * mm
+
+    # 月運12か月分
+    for month in yearly_data["months"]:
+        c.setFont("HeiseiKakuGo-W5", 13)
+        c.drawString(margin, y, f"■ {month['label']}")
+        y -= 10 * mm
+        c.setFont("HeiseiKakuGo-W5", 11)
+        y = draw_wrapped_text(c, month['text'], margin, y, 40)
+
+        if y < 50 * mm:
             c.showPage()
-            y = 275 * mm
-            c.setFont(FONT_NAME, 10)
+            y = height - 30 * mm
+
 
 
 def draw_yearly_pages_renai(c, yearly_fortunes):
