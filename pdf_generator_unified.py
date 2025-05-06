@@ -1,10 +1,16 @@
 from reportlab.lib.pagesizes import A4, B4
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
+
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from textwrap import wrap
+import base64
+import io
 import os
+
+from datetime import datetime
 
 from fortune_logic import generate_fortune
 from renai_fortune_utils import generate_fortune as generate_renai_fortune
