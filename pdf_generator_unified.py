@@ -153,58 +153,74 @@ def draw_shincom_a4(c, data, include_yearly=False):
 def draw_shincom_b4(c, data, include_yearly):
     width, height = B4
     margin = 20 * mm
-    y = height - 30 * mm
+    text = c.beginText(margin, height - 30 * mm)
+    text.setFont(FONT_NAME, 12)
 
-    # 1ページ目：ヘッダーと手相画像
-    y = draw_header(c, width, margin, y)
-
+    # 1ページ目：手相画像
     if data.get("image_data"):
         img_data = base64.b64decode(data["image_data"].split(",")[1])
         img = ImageReader(io.BytesIO(img_data))
         img_width = 130 * mm
         img_height = 100 * mm
         img_x = (width - img_width) / 2
-        img_y = y - img_height - 10 * mm
+        img_y = height - img_height - 50 * mm
         c.drawImage(img, img_x, img_y, width=img_width, height=img_height)
-        y = img_y - 10 * mm
+        text.moveCursor(0, img_height + 20)
 
-    c.setFont(FONT_NAME, 12)
     for i in range(5):
-        c.drawString(margin, y, f"- {data['palm_titles'][i]}")  # 記号変更
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
-        for line in wrap(data["palm_texts"][i], 45):
-            c.drawString(margin, y, line)
-            y -= 6 * mm
-        y -= 3 * mm
-        c.setFont(FONT_NAME, 12)
+        text.textLine(f"- {data['palm_titles'][i]}")
+        text.setFont(FONT_NAME, 10)
+        draw_wrapped_lines(text, wrap_text(data['palm_texts'][i]))
+        text.moveCursor(0, 10)
+        text.setFont(FONT_NAME, 12)
 
-    # 2ページ目：明示的に初期化
+    c.drawText(text)
     c.showPage()
-    y = height - 30 * mm
-    c.setFont(FONT_NAME, 12)
 
+    # 2ページ目
+    text = c.beginText(margin, height - 30 * mm)
+    text.setFont(FONT_NAME, 12)
     for key in ["palm_summary", "personality", "month_fortune", "next_month_fortune"]:
-        c.drawString(margin, y, f"- {data['titles'][key]}")  # 記号変更
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
-        for line in wrap(data["texts"][key], 45):
-            c.drawString(margin, y, line)
-            y -= 6 * mm
-        y -= 3 * mm
-        c.setFont(FONT_NAME, 12)
+        text.textLine(f"- {data['titles'][key]}")
+        text.setFont(FONT_NAME, 10)
+        draw_wrapped_lines(text, wrap_text(data['texts'][key]))
+        text.moveCursor(0, 10)
+        text.setFont(FONT_NAME, 12)
 
-    # ラッキー情報
-    c.drawString(margin, y, "- ラッキー情報")
-    y -= 6 * mm
-    y = draw_lucky_info(c, data["lucky_info"], margin, y)
+    text.textLine("- ラッキー情報")
+    text.setFont(FONT_NAME, 10)
+    for label, content in data["lucky_info"].items():
+        lines = wrap_text(f"◆ {label}：{content}", 45)
+        draw_wrapped_lines(text, lines)
+        text.moveCursor(0, 5)
 
-    # 年運
+    c.drawText(text)
+
+    # 年運ページ
     if include_yearly:
-        draw_yearly_pages_shincom(c, data["yearly_fortunes"])
+        c.showPage()
+        text = c.beginText(margin, height - 30 * mm)
+        text.setFont(FONT_NAME, 13)
+        text.textLine(f"■ {data['yearly_fortunes']['year_label']}")
+        text.setFont(FONT_NAME, 11)
+        draw_wrapped_lines(text, wrap_text(data['yearly_fortunes']['year_text']))
+        text.moveCursor(0, 10)
+        c.drawText(text)
 
+        c.showPage()
+        text = c.beginText(margin, height - 30 * mm)
+        for month in data['yearly_fortunes']['months']:
+            text.setFont(FONT_NAME, 13)
+            text.textLine(f"■ {month['label']}")
+            text.setFont(FONT_NAME, 11)
+            draw_wrapped_lines(text, wrap_text(month['text']))
+            text.moveCursor(0, 10)
+            if text.getY() < 50 * mm:
+                c.drawText(text)
+                c.showPage()
+                text = c.beginText(margin, height - 30 * mm)
 
-
+        c.drawText(text)
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
