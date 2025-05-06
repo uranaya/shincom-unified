@@ -159,10 +159,16 @@ def preview(filename):
 
 @app.route("/view/<filename>")
 def view_pdf(filename):
-    path = os.path.join("static", filename)
-    if os.path.exists(path):
-        return send_file(path, mimetype='application/pdf')
-    return "ファイルが見つかりません", 404
+    filepath = os.path.join("static", "uploads", filename)  # 修正点ここ
+    print(f"[DEBUG] Looking for PDF at: {filepath}")
+
+    if not os.path.exists(filepath):
+        print("[ERROR] PDF file not found!")
+        return "ファイルが存在しません", 404
+
+    return send_file(filepath, mimetype='application/pdf')
+
+
 
 
 @app.route("/get_eto", methods=["POST"])
