@@ -139,7 +139,24 @@ def draw_shincom_b4(c, data, include_yearly=False):
     width, height = B4
     margin = 20 * mm
     y = height - margin
+
+    # ✅ 1ページ目: ヘッダー + 手相画像 + 手相5項目
     y = draw_header(c, width, margin, y)
+
+    # ✅ 手相画像表示（中央寄せ）
+    if data.get("image_data"):
+        from reportlab.lib.utils import ImageReader
+        import base64
+        from io import BytesIO
+
+        image_data = base64.b64decode(data["image_data"].split(",")[1])
+        image = ImageReader(BytesIO(image_data))
+        img_width = 120 * mm
+        img_height = 90 * mm
+        x_img = (width - img_width) / 2
+        y -= img_height
+        c.drawImage(image, x_img, y, width=img_width, height=img_height)
+        y -= 10 * mm
 
     c.setFont(FONT_NAME, 12)
     for i in range(5):
@@ -152,10 +169,13 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
+    # ✅ 2ページ目
     c.showPage()
     y = height - margin
-    y = draw_header(c, width, margin, y)
 
+    # ❌ ヘッダー不要（被るため削除）
+
+    # 手相総合 + 四柱推命3種
     for key in ["palm_summary", "personality", "month_fortune", "next_month_fortune"]:
         c.drawString(margin, y, f"◆ {data['titles'][key]}")
         y -= 6 * mm
@@ -166,10 +186,13 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
+    # ✅ ラッキー情報（はみ出し防止）
     y = draw_lucky_section(c, width, margin, y, data["lucky_info"], data["lucky_direction"])
 
+    # ✅ 年運（見出しと本文の順序修正済み）
     if include_yearly:
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
+
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
