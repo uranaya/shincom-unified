@@ -16,6 +16,7 @@ from lucky_utils import draw_lucky_section
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
+pdfmetrics.registerFont(TTFont("HeiseiKakuGo-W5", "./ipaexg.ttf"))
 
 
 def wrap_text(text, width=45):
