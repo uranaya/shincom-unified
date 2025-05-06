@@ -35,6 +35,6 @@
       <a href="{{ url_for('ten_shincom') }}">🔙 占い画面に戻る</a>
     {% endif %}
   </div>
-  <iframe src="{{ url_for('view_pdf', filename=filename) }}"></iframe>
+  <iframe src="{{ url_for('preview', filename=filename) }}"></iframe>
 </body>
 </html>
