@@ -87,7 +87,6 @@ def draw_shincom_b4(c, data, include_yearly):
     margin = 20 * mm
     y = height - 30 * mm
 
-    # 1ページ目：ヘッダーと手相画像
     y = draw_header(c, width, margin, y)
 
     if data.get("image_data"):
@@ -105,13 +104,13 @@ def draw_shincom_b4(c, data, include_yearly):
         c.drawString(margin, y, f"- {data['palm_titles'][i]}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        for line in wrap(data["palm_texts"][i], 45):
+        for line in wrap_text(data["palm_texts"][i], 45):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
-    # 2ページ目：完全に TextObject で記述（被り防止）
+    # 2ページ目完全 TextObject で出力（重なり防止）
     c.showPage()
     text = c.beginText(margin, height - 30 * mm)
     text.setFont(FONT_NAME, 12)
@@ -119,21 +118,20 @@ def draw_shincom_b4(c, data, include_yearly):
     for key in ["palm_summary", "personality", "month_fortune", "next_month_fortune"]:
         text.textLine(f"- {data['titles'][key]}")
         text.setFont(FONT_NAME, 10)
-        for line in wrap(data["texts"][key], 45):
+        for line in wrap_text(data["texts"][key], 45):
             text.textLine(line)
-        text.textLine("")  # 空行
+        text.textLine("")
         text.setFont(FONT_NAME, 12)
 
-    # ラッキー情報
     text.textLine("- ラッキー情報")
     text.setFont(FONT_NAME, 10)
     for label, content in data["lucky_info"].items():
-        for line in wrap(f"◆ {label}：{content}", 40):
+        wrapped = wrap_text(f"◆ {label}：{content}", 45)
+        for line in wrapped:
             text.textLine(line)
-
+    text.textLine("")
     c.drawText(text)
 
-    # 年運
     if include_yearly:
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
 
