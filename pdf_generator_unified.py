@@ -111,7 +111,7 @@ def draw_shincom_b4(c, data, include_yearly):
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
-    # 2ページ目：被り対策に beginText を使って丁寧に書く
+    # 2ページ目：完全に TextObject で記述（被り防止）
     c.showPage()
     text = c.beginText(margin, height - 30 * mm)
     text.setFont(FONT_NAME, 12)
@@ -121,7 +121,7 @@ def draw_shincom_b4(c, data, include_yearly):
         text.setFont(FONT_NAME, 10)
         for line in wrap(data["texts"][key], 45):
             text.textLine(line)
-        text.textLine("")
+        text.textLine("")  # 空行
         text.setFont(FONT_NAME, 12)
 
     # ラッキー情報
@@ -136,6 +136,7 @@ def draw_shincom_b4(c, data, include_yearly):
     # 年運
     if include_yearly:
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
+
 
 
 
