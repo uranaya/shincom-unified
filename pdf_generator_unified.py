@@ -99,17 +99,20 @@ def draw_shincom_b4(c, data, include_yearly):
         c.drawImage(img, img_x, img_y, width=img_width, height=img_height)
         y = img_y - 10 * mm
 
-    c.setFont(FONT_NAME, 12)
-    for i in range(5):
-        c.drawString(margin, y, f"- {data['palm_titles'][i]}")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
-        for line in wrap(data["palm_texts"][i], 45):
-            c.drawString(margin, y, line)
-            y -= 6 * mm
-        y -= 3 * mm
-        c.setFont(FONT_NAME, 12)
+    # 表面：TextObjectで手相5項目
+    text = c.beginText(margin, y)
+    text.setFont(FONT_NAME, 11)
 
+    for i in range(5):
+        text.textLine(f"■ {data['palm_titles'][i]}")
+        text.textLine("")
+        for line in wrap(data["palm_texts"][i], 45):
+            text.textLine(line)
+        text.textLine("")
+
+    c.drawText(text)
+
+    # 裏面：手相総合・四柱推命・ラッキー
     c.showPage()
     text = c.beginText(margin, height - 30 * mm)
     text.setFont(FONT_NAME, 11)
@@ -122,13 +125,10 @@ def draw_shincom_b4(c, data, include_yearly):
 
     text.textLine("■ 四柱推命によるアドバイス")
     text.textLine("")
-    for line in wrap(data["texts"]["personality"], 45):
-        text.textLine(line)
-    for line in wrap(data["texts"]["month_fortune"], 45):
-        text.textLine(line)
-    for line in wrap(data["texts"]["next_month_fortune"], 45):
-        text.textLine(line)
-    text.textLine("")
+    for key in ["personality", "month_fortune", "next_month_fortune"]:
+        for line in wrap(data["texts"][key], 45):
+            text.textLine(line)
+        text.textLine("")
 
     text.textLine("■ ラッキー情報")
     text.textLine("")
@@ -142,6 +142,7 @@ def draw_shincom_b4(c, data, include_yearly):
 
     if include_yearly:
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
+
 
 def draw_yearly_pages_shincom(c, yearly_data):
     width, height = c._pagesize
