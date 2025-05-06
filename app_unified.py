@@ -23,7 +23,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 @app.route("/ten", methods=["GET", "POST"])
 @app.route("/tenmob", methods=["GET", "POST"])
 def ten_shincom():
-    if "logged_in" not in session:
+    if "logged_in" not in session and request.path == "/ten":
         return redirect(url_for("login"))
 
     mode = "shincom"
@@ -40,7 +40,10 @@ def ten_shincom():
             eto = get_nicchu_eto(birthdate)
             palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate)
 
-            # palm_result 構造化
+            # lucky_info が str の場合に dict に変換（安全対策）
+            if isinstance(lucky_info, str):
+                lucky_info = {"情報": lucky_info}
+
             palm_titles, palm_texts, summary_text = [], [], ""
             for part in palm_result.split("### "):
                 if part.strip():
@@ -54,7 +57,6 @@ def ten_shincom():
                         except:
                             continue
 
-            # shichu_result 構造化
             shichu_texts = {"性格": "", "今月の運勢": "", "来月の運勢": ""}
             for part in shichu_result.split("■"):
                 for key in shichu_texts:
@@ -101,6 +103,7 @@ def ten_shincom():
             return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
 
     return render_template("index.html")
+
 
 
 @app.route("/renai", methods=["GET", "POST"])
