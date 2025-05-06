@@ -86,8 +86,11 @@ def draw_shincom_b4(c, data, include_yearly):
     width, height = B4
     margin = 20 * mm
     y = height - 30 * mm
+
+    # ヘッダーは1ページ目のみに描画
     y = draw_header(c, width, margin, y)
 
+    # 手相画像
     if data.get("image_data"):
         img_data = base64.b64decode(data["image_data"].split(",")[1])
         img = ImageReader(io.BytesIO(img_data))
@@ -98,6 +101,7 @@ def draw_shincom_b4(c, data, include_yearly):
         c.drawImage(img, img_x, img_y, width=img_width, height=img_height)
         y = img_y - 10 * mm
 
+    # 手相5項目
     c.setFont(FONT_NAME, 12)
     for i in range(5):
         c.drawString(margin, y, f"- {data['palm_titles'][i]}")
@@ -109,26 +113,39 @@ def draw_shincom_b4(c, data, include_yearly):
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
+    # 2ページ目へ
     c.showPage()
     y = height - 30 * mm
-    y = draw_header(c, width, margin, y)
+    c.setFont(FONT_NAME, 12)
 
+    # 手相総合 + 性格 + 月運
     for key in ["palm_summary", "personality", "month_fortune", "next_month_fortune"]:
+        wrapped_lines = wrap(data["texts"][key], 45)
+        total_height = (1 + len(wrapped_lines)) * 6 * mm + 3 * mm
+        if y - total_height < 30 * mm:
+            c.showPage()
+            y = height - 30 * mm
+            c.setFont(FONT_NAME, 12)
+
         c.drawString(margin, y, f"- {data['titles'][key]}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        for line in wrap(data["texts"][key], 45):
+        for line in wrapped_lines:
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
+    # ラッキー情報
     c.drawString(margin, y, "- ラッキー情報")
     y -= 6 * mm
     y = draw_lucky_info(c, data["lucky_info"], margin, y)
 
+    # 年運
     if include_yearly:
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
+
+
 
 def draw_yearly_pages_shincom(c, yearly_data):
     width, height = c._pagesize
