@@ -158,6 +158,9 @@ def draw_yearly_pages_shincom(c, yearly_data):
 
     months = yearly_data['months']
     for i, month in enumerate(months):
+        if i == 5:
+            c.showPage()
+            y = height - 30 * mm
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {month['label']}")
         y -= 10 * mm
