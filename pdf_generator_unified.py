@@ -21,9 +21,11 @@ FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
+
 def draw_wrapped_lines(text_obj, lines):
     for line in lines:
         text_obj.textLine(line)
+
 
 def draw_lucky_info(c, data, x, y):
     c.setFont(FONT_NAME, 11)
@@ -34,11 +36,34 @@ def draw_lucky_info(c, data, x, y):
             y -= 12
     return y
 
+
+def create_pdf_unified(filepath, data, mode, size=A4, include_yearly=False):
+    c = canvas.Canvas(filepath, pagesize=size)
+
+    if mode == "shincom":
+        if size == B4:
+            draw_shincom_b4(c, data, include_yearly)
+        else:
+            draw_shincom_a4(c, data, include_yearly)
+    elif mode == "renai":
+        if size == B4:
+            draw_renai_b4(c, data, include_yearly)
+        else:
+            draw_renai_a4(c, data, include_yearly)
+
+    c.save()
+
+
+def draw_header(c, width, height):
+    c.setFont(FONT_NAME, 16)
+    c.drawString(20 * mm, height - 20 * mm, "鑑定結果")
+
+
 def draw_shincom_a4(c, data, include_yearly=False):
     width, height = A4
     margin = 20 * mm
     y = height - margin
-    y = draw_header(c, width, margin, y)
+    y = draw_header(c, width, margin)
 
     c.setFont(FONT_NAME, 12)
     for i in range(3):
@@ -82,6 +107,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
     if include_yearly:
         c.showPage()
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
+
 
 def draw_shincom_b4(c, data, include_yearly):
     width, height = B4
@@ -209,15 +235,3 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
 
     if include_yearly:
         draw_yearly_pages_renai(c, data["yearly_fortunes"])
-
-def create_pdf_unified(filepath, data, mode, size="a4", include_yearly=False):
-    c = canvas.Canvas(filepath, pagesize=A4 if size == "a4" else B4)
-    c.setTitle("占い結果")
-    if mode == "shincom":
-        if size == "a4":
-            draw_shincom_a4(c, data, include_yearly)
-        else:
-            draw_shincom_b4(c, data, include_yearly)
-    else:
-        draw_renai_pdf(c, data, size, include_yearly)
-    c.save()
