@@ -134,13 +134,8 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawText(text)
 
         if include_yearly:
-            draw_yearly_pages_shincom(c, data["yearly_fortunes"])        def draw_block(title, content):
-            text.textLine(f"■ {title}")
-            text.textLine("")
-            for paragraph in content.split("\n"):
-                for line in wrap(paragraph.strip(), 40):
-                    text.textLine(line)
-            text.textLine("")
+    if include_yearly:
+        draw_yearly_pages_shincom(c, data["yearly_fortunes"])
 
         draw_block("手相からの総合的なアドバイス", data["texts"]["palm_summary"])
         draw_block("性格診断", data["texts"]["personality"])
