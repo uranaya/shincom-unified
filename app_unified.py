@@ -11,7 +11,7 @@ from yearly_fortune_utils import generate_yearly_fortune
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
 from kyusei_utils import get_honmeisei
 from pdf_generator_unified import create_pdf_unified
-from renai_fortune_utils import generate_fortune as generate_renai_fortune
+from fortune_logic import generate_renai_fortune
 
 load_dotenv()
 
