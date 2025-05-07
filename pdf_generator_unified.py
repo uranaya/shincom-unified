@@ -86,65 +86,57 @@ def draw_shincom_a4(c, data, include_yearly=False):
 def draw_shincom_b4(c, data, include_yearly):
     width, height = B4
     margin = 20 * mm
-    initial_y = height - 30 * mm
-    y_header_end = draw_header(c, width, margin, initial_y)
 
-    if data.get("image_data"):
-        img_data = base64.b64decode(data["image_data"].split(",")[1])
-        img = ImageReader(io.BytesIO(img_data))
-        img_width = 130 * mm
-        img_height = 100 * mm
-        img_x = (width - img_width) / 2
-        img_top_y = y_header_end - img_height - 10 * mm
-        c.drawImage(img, img_x, img_top_y, width=img_width, height=img_height)
-        y = img_top_y - 10 * mm
-    else:
-        y = y_header_end
+    # ヘッダー
+    draw_header(c, width, height)
 
-    # 1ページ目：5項目の手相
-    
-    for idx, (title, body) in enumerate(zip(data["palm_titles"], data["palm_texts"])):
-        if idx == 3:
-            c.drawText(text)
-            c.showPage()
-            text = c.beginText(margin, height - 30 * mm)
-            text.setFont(FONT_NAME, 11)
+    # 手相画像
+    img_path = data["image_path"]
+    img_width = 120 * mm
+    img_height = 90 * mm
+    y_header_end = height - 30 * mm
+    img_top_y = y_header_end - img_height - 3 * mm
+    c.drawImage(img_path, (width - img_width) / 2, img_top_y, width=img_width, height=img_height)
+    y = img_top_y - 3 * mm
 
-        text.textLine(f"■ {title}")
+    # 1ページ目：手相 1〜3項目
+    text = c.beginText(margin, y)
+    text.setFont(FONT_NAME, 11)
+
+    for idx in range(3):
+        text.textLine(f"■ {data['palm_titles'][idx]}")
         text.textLine("")
-        for line in wrap(body, 40):
+        for line in wrap(data["palm_texts"][idx], 40):
             text.textLine(line)
         text.textLine("")
 
     c.drawText(text)
 
-
-    # 2ページ目：裏面まとめて1TextObject
+    # 2ページ目：手相4〜5項目＋手相総合
     c.showPage()
     text = c.beginText(margin, height - 30 * mm)
+    text.setFont(FONT_NAME, 11)
 
-    def draw_block(title, content):
-        text.setFont(FONT_NAME, 12)
-        text.textLine(f"■ {title}")
-        text.textLine("")
-        text.setFont(FONT_NAME, 10)
-        for paragraph in content.split("\n"):
-            for line in wrap(paragraph.strip(), 40):
+    text.textLine("■ 手相鑑定（4〜5項目目 + 総合アドバイス）")
+    text.textLine("")
+    for key in ["4", "5", "summary"]:
+        if key in data["palm_sections"]:
+            for line in wrap(data["palm_sections"][key], 40):
                 text.textLine(line)
-        text.textLine("")
+            text.textLine("")
 
-    draw_block("手相からの総合的なアドバイス", data["texts"]["palm_summary"])
-    draw_block("性格診断", data["texts"]["personality"])
-    draw_block("今月の運勢", data["texts"]["month_fortune"])
-    draw_block("来月の運勢", data["texts"]["next_month_fortune"])
-    draw_block("易占いによるアドバイス", data["iching_result"])
-    lucky_text = "\n".join([f"◆ {k}：{v}" for k, v in data["lucky_info"].items()])
-    draw_block("ラッキー情報", lucky_text)
+    # 性格・運勢・ラッキー情報
+    for key in ["personality", "month_fortune", "next_month_fortune", "lucky_info", "lucky_direction"]:
+        text.textLine(f"■ {data['titles'][key]}")
+        text.textLine("")
+        for line in wrap(data["texts"][key], 40):
+            text.textLine(line)
+        text.textLine("")
 
     c.drawText(text)
 
+    # 年運ページ（必要な場合）
     if include_yearly:
-        c.showPage()
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
 
 def draw_yearly_pages_shincom(c, yearly_data):
