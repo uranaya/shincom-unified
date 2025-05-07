@@ -28,86 +28,38 @@ def ten_shincom():
 
     mode = "shincom"
     size = "B4" if request.path == "/ten" else "A4"
-    is_json = request.is_json
 
     if request.method == "POST":
-        try:
-            data = request.get_json() if is_json else request.form
-            image_data = data.get("image_data")
-            birthdate = data.get("birthdate")
-            full_year = data.get("full_year", False) if is_json else data.get("full_year") == "yes"
+        if request.is_json:
+            data = request.get_json()
+            image_data = data["image"]
+            birthdate = data["birthdate"]
+            eto = data["eto"]
+        else:
+            image_data = request.form["image"]
+            birthdate = request.form["birthdate"]
+            eto = request.form["eto"]
 
-            eto = get_nicchu_eto(birthdate)
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate)
+        result_data = generate_fortune(birthdate, eto, mode=mode)
+        result_data["image_path"] = save_image(image_data)
+        result_data["titles"] = get_titles(mode)
+        result_data["palm_titles"] = get_palm_titles(mode)
 
-            # lucky_info が str の場合に dict に変換（安全対策）
-            if isinstance(lucky_info, str):
-                lucky_info = {"情報": lucky_info}
+        filename = generate_filename()
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
 
-            palm_titles, palm_texts, summary_text = [], [], ""
-            for part in palm_result.split("### "):
-                if part.strip():
-                    if "総合的なアドバイス" in part:
-                        summary_text = part.replace("総合的なアドバイス", "").strip()
-                    else:
-                        try:
-                            title, content = part.strip().split("\n", 1)
-                            palm_titles.append(title.strip())
-                            palm_texts.append(content.strip())
-                        except:
-                            continue
+        full_year = "full_year" in request.form or (
+            request.is_json and data.get("full_year")
+        )
+        create_pdf_unified(filepath, result_data, mode, size=size, include_yearly=full_year)
 
-            shichu_texts = {"性格": "", "今月の運勢": "", "来月の運勢": ""}
-            for part in shichu_result.split("■"):
-                for key in shichu_texts:
-                    if key in part:
-                        shichu_texts[key] = part.replace(key, "").strip()
+        if request.is_json:
+            return jsonify({"redirect_url": url_for("download_file", filename=filename)})
+        else:
+            return redirect(url_for("download_file", filename=filename))
 
-            lucky_direction = ""
+    return render_template("index.html", mode="ten", size="B4")
 
-            result_data = {
-                "image_data": image_data,
-                "palm_titles": ["生命線", "知能線", "感情線", "運命線", "太陽線"],
-                "palm_texts": palm_texts,
-                "titles": {
-                    "palm_summary": "手相の総合アドバイス",
-                    "personality": "性格診断",
-                    "month_fortune": "今月の運勢",
-                    "next_month_fortune": "来月の運勢",
-                },
-                "texts": {
-                    "palm_summary": summary_text,
-                    "personality": shichu_texts["性格"],
-                    "month_fortune": shichu_texts["今月の運勢"],
-                    "next_month_fortune": shichu_texts["来月の運勢"],
-                },
-                "lucky_info": lucky_info,
-                "lucky_direction": lucky_direction,
-                "birthdate": birthdate,
-                "palm_result": "\n".join(palm_texts),
-                "shichu_result": shichu_result.replace("\r\n", "\n").replace("\r", "\n"),
-                "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n")
-            }
-
-            print("[DEBUG] result_data['texts'].keys() =", result_data["texts"].keys())
-
-            if full_year:
-                now = datetime.now()
-                result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
-
-            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            filepath = os.path.join(UPLOAD_FOLDER, filename)
-
-            create_pdf_unified(filepath, result_data, mode, size=size, include_yearly=full_year)
-
-            redirect_url = url_for("preview", filename=filename)
-            return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
-
-        except Exception as e:
-            traceback.print_exc()
-            return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
-
-    return render_template("index.html")
 
 
 
