@@ -98,7 +98,6 @@ def draw_shincom_b4(c, data, include_yearly):
         c.drawImage(img, img_x, img_y, width=img_width, height=img_height)
         y = img_y - 10 * mm
 
-    # 表面：手相5項目（項目ごとに表示）
     text = c.beginText(margin, y)
     text.setFont(FONT_NAME, 11)
     for title, body in zip(data["palm_titles"], data["palm_texts"]):
@@ -109,40 +108,49 @@ def draw_shincom_b4(c, data, include_yearly):
         text.textLine("")
     c.drawText(text)
 
-    # 裏面
-    c.showPage()
-    text = c.beginText(margin, height - 30 * mm)
-    text.setFont(FONT_NAME, 11)
+    # 裏面：各項目分割して改ページ対応
+    def start_text():
+        t = c.beginText(margin, height - 30 * mm)
+        t.setFont(FONT_NAME, 11)
+        return t
 
-    text.textLine("■ 手相からの総合的なアドバイス")
-    text.textLine("")
-    for line in data["texts"]["palm_summary"].split("\n"):
-        for wrapped in wrap(line, 40):
-            text.textLine(wrapped)
-    text.textLine("")
+    def check_page(t):
+        if t.getY() < 30 * mm:
+            c.drawText(t)
+            c.showPage()
+            return start_text()
+        return t
 
-    text.textLine("■ 四柱推命によるアドバイス")
-    text.textLine("")
-    for line in data["shichu_result"].split("\n"):
-        for wrapped in wrap(line, 40):
-            text.textLine(wrapped)
-    text.textLine("")
-
-    text.textLine("■ 易占いによるアドバイス")
-    text.textLine("")
-    for line in data["iching_result"].split("\n"):
-        for wrapped in wrap(line, 40):
-            text.textLine(wrapped)
-    text.textLine("")
-
-    text.textLine("■ ラッキー情報")
-    text.textLine("")
-    for label, content in data["lucky_info"].items():
-        for line in wrap(f"◆ {label}：{content}", 40):
-            text.textLine(line)
+    def draw_section(text, title, content):
+        text.textLine(f"■ {title}")
         text.textLine("")
+        for line in content.split("\n"):
+            for w in wrap(line, 40):
+                text.textLine(w)
+                text = check_page(text)
+        text.textLine("")
+        return check_page(text)
 
-    c.drawText(text)
+    # section構成
+    sections = [
+        ("手相からの総合的なアドバイス", data["texts"]["palm_summary"]),
+        ("性格診断", data["texts"]["personality"]),
+        ("今月の運勢", data["texts"]["month_fortune"]),
+        ("来月の運勢", data["texts"]["next_month_fortune"]),
+        ("易占いによるアドバイス", data["iching_result"]),
+    ]
+
+    # ラッキー情報を整形して末尾に追加
+    lucky_combined = "\n".join([f"◆ {k}：{v}" for k, v in data["lucky_info"].items()])
+    sections.append(("ラッキー情報", lucky_combined))
+
+    c.showPage()
+    text = start_text()
+    for title, content in sections:
+        text = draw_section(text, title, content)
+
+    if text.getY() > 30 * mm:
+        c.drawText(text)
 
     if include_yearly:
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
