@@ -16,12 +16,36 @@ def get_nicchu_eto(birthdate):
             while index >= 60:
                 index -= 60
             return stems[index % 10] + branches[index % 12]
+    # 今後必要ならば、以下にトピック占いや年運の生成処理を追加可能
         return "不明"
     except Exception as e:
         print("❌ 日柱計算エラー:", e)
         return "不明"
 
 def get_shichu_fortune(birthdate):
+
+    def get_shichu_fortune_structured(birthdate):
+        raw = get_shichu_fortune(birthdate)
+        sections = {
+            "personality": "",
+            "month_fortune": "",
+            "next_month_fortune": ""
+        }
+        current_key = None
+        mapping = {
+            "性格": "personality",
+            "今月の運勢": "month_fortune",
+            "来月の運勢": "next_month_fortune"
+        }
+
+        for line in raw.splitlines():
+            line = line.strip()
+            if line.startswith("■"):
+                title = line.replace("■", "").strip()
+                current_key = mapping.get(title)
+            elif current_key:
+                sections[current_key] += line + "\n"
+        return sections
     eto = get_nicchu_eto(birthdate)
     prompt = f"""あなたはプロの四柱推命鑑定士です。
 以下の干支（日柱）が「{eto}」の人に対して、以下の3つの項目で現実的な鑑定をしてください。
