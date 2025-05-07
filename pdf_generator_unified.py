@@ -95,9 +95,9 @@ def draw_shincom_b4(c, data, include_yearly):
         img_width = 130 * mm
         img_height = 100 * mm
         img_x = (width - img_width) / 2
-        img_top_y = y_header_end - img_height - 10 * mm
+        img_top_y = y_header_end - img_height - 5 * mm
         c.drawImage(img, img_x, img_top_y, width=img_width, height=img_height)
-        y = img_top_y - 10 * mm
+        y = img_top_y - 5 * mm
     else:
         y = y_header_end
 
@@ -168,7 +168,7 @@ def draw_yearly_pages_shincom(c, yearly_data):
         for line in wrap(month['text'], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
-        y -= 10 * mm
+        y -= 5 * mm
 
         if i < len(months) - 1 and y < 50 * mm:
             y -= 10 * mm
