@@ -89,6 +89,8 @@ def ten_shincom():
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n")
             }
 
+            print("[DEBUG] result_data['texts'].keys() =", result_data["texts"].keys())
+
             if full_year:
                 now = datetime.now()
                 result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
