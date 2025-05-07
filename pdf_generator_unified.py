@@ -138,7 +138,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
 
     if include_yearly:
         c.showPage()
-        draw_yearly_pages_shincom(c, data['yearly_fortunes'])
+        draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
 
 
 def draw_shincom_b4(c, data, include_yearly=False):
@@ -205,7 +205,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
 
     if include_yearly:
         c.showPage()
-        draw_yearly_pages_shincom(c, data['yearly_fortunes'])
+        draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
@@ -238,8 +238,62 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             y -= 6 * mm
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
+
     if include_yearly:
-        draw_yearly_pages_shincom(c, data['yearly_fortunes'])
+        if size == "b4":
+            draw_yearly_pages_renai_b4(c, data['yearly_fortunes'])
+        else:
+            draw_yearly_pages_renai_a4(c, data['yearly_fortunes'])
+
+
+def draw_yearly_pages_renai_b4(c, yearly):
+    from reportlab.lib.units import mm
+    width, height = B4
+    margin = 20 * mm
+    y = height - 30 * mm
+
+    def draw_text_block(title, text):
+        nonlocal y
+        c.setFont(FONT_NAME, 13)
+        c.drawString(margin, y, f"■ {title}")
+        y -= 10 * mm
+        c.setFont(FONT_NAME, 11)
+        for line in (text or "").splitlines():
+            c.drawString(margin, y, line)
+            y -= 7 * mm
+            if y < 30 * mm:
+                c.showPage()
+                y = height - 30 * mm
+
+    c.showPage()
+    draw_text_block(yearly["year_label"], yearly["year_text"])
+    for month in yearly["months"]:
+        draw_text_block(month["label"], month["text"])
+
+def draw_yearly_pages_renai_a4(c, yearly):
+    from reportlab.lib.units import mm
+    width, height = A4
+    margin = 20 * mm
+    y = height - 30 * mm
+
+    def draw_text_block(title, text):
+        nonlocal y
+        c.setFont(FONT_NAME, 13)
+        c.drawString(margin, y, f"■ {title}")
+        y -= 10 * mm
+        c.setFont(FONT_NAME, 11)
+        for line in (text or "").splitlines():
+            c.drawString(margin, y, line)
+            y -= 7 * mm
+            if y < 30 * mm:
+                c.showPage()
+                y = height - 30 * mm
+
+    c.showPage()
+    draw_text_block(yearly["year_label"], yearly["year_text"])
+    for month in yearly["months"]:
+        draw_text_block(month["label"], month["text"])
+
 
 def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
     size = size.lower()
