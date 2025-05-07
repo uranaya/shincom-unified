@@ -26,40 +26,85 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 @app.route("/ten", methods=["GET", "POST"])
 @app.route("/tenmob", methods=["GET", "POST"])
 def ten_shincom():
-    if "logged_in" not in session:
+    if "logged_in" not in session and request.path == "/ten":
         return redirect(url_for("login"))
-    
+
     mode = "shincom"
     size = "B4" if request.path == "/ten" else "A4"
-    is_json = request.is_json
+    full_year = request.args.get("full_year", "0") == "1"
 
     if request.method == "POST":
-        try:
-            data = request.get_json() if is_json else request.form
-            image_data = data.get("image_data")
+        if request.is_json:
+            data = request.get_json()
+            image_data = data.get("image")
             birthdate = data.get("birthdate")
-            full_year = data.get("full_year", False) if is_json else data.get("full_year") == "yes"
+            eto = data.get("eto")
+        else:
+            image_data = request.form.get("image")
+            birthdate = request.form.get("birthdate")
+            eto = request.form.get("eto")
 
-            eto = get_nicchu_eto(birthdate)
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate)
-            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        if not image_data:
+            return "画像データが送信されていません", 400
 
-            create_pdf_unified(mode, size, {
-                "image_data": image_data,
-                "palm_result": palm_result,
-                "shichu_result": shichu_result,
-                "iching_result": iching_result,
+        now = datetime.now()
+        image_path = save_base64_image(image_data, UPLOAD_FOLDER)
+
+        # 四柱推命・手相・イーチン・ラッキー情報
+        nicchu = eto
+        palm_result, palm_titles, palm_sections, palm_summary = analyze_palm(image_path)
+        shichu_result = generate_shichu_fortune(nicchu, now)
+        iching_result = generate_iching_advice(nicchu, now)
+        lucky_info, lucky_direction = get_lucky_info(birthdate, now)
+
+        # 年間運勢（任意）
+        if full_year:
+            yearly_fortune = generate_yearly_fortune(birthdate, now)
+        else:
+            yearly_fortune = None
+
+        # 出力データ構成
+        result_data = {
+            "image_path": image_path,
+            "titles": {
+                "palm": "手相鑑定",
+                "palm_summary": "手相からの総合的なアドバイス",
+                "personality": "あなたの性格",
+                "month_fortune": "今月の運勢",
+                "next_month_fortune": "来月の運勢",
+                "iching": "イーチン占いのアドバイス",
+                "lucky_info": "ラッキー情報",
+                "lucky_direction": "吉方位（九星気学より）"
+            },
+            "texts": {
+                "palm_summary": palm_summary,
+                "personality": shichu_result["personality"],
+                "month_fortune": shichu_result["month_fortune"],
+                "next_month_fortune": shichu_result["next_month_fortune"],
+                "iching": iching_result,
                 "lucky_info": lucky_info,
-                "birthdate": birthdate
-            }, filename, include_yearly=full_year)
+                "lucky_direction": lucky_direction
+            },
+            "palm_titles": palm_titles,
+            "palm_sections": palm_sections,
+            "yearly_fortune": yearly_fortune,
+            "nicchu": nicchu
+        }
 
-            redirect_url = url_for("preview", filename=filename)
-            return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
-        except Exception as e:
-            traceback.print_exc()
-            return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
+        filename = f"result_{uuid.uuid4().hex}.pdf"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
 
-    return render_template("index.html")
+        create_pdf_unified(
+            mode=mode,
+            size=size,
+            data=result_data,
+            filepath=filepath,
+            include_yearly=full_year
+        )
+
+        return jsonify({"redirect_url": url_for("static", filename=f"pdf/{filename}")})
+
+    return render_template("index.html", mode=mode, size=size)
 
 
 @app.route("/renai", methods=["GET", "POST"])
