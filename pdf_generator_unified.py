@@ -34,6 +34,29 @@ def draw_lucky_info(c, data, x, y):
             y -= 12
     return y
 
+def create_pdf_unified(mode, size, data, include_yearly=False):
+
+    # サイズ判定
+    pagesize = A4 if size == "A4" else B4
+    filepath = data.get("filepath", "output.pdf")
+    c = canvas.Canvas(filepath, pagesize=pagesize)
+    
+    print(f"[DEBUG] create_pdf_unified: mode={mode}, size={size}, include_yearly={include_yearly}")
+
+    if mode == "renai":
+        draw_renai_pdf(c, data, size, include_yearly)
+    elif mode == "shincom":
+        if size == "A4":
+            draw_shincom_a4(c, data, include_yearly)
+        else:
+            draw_shincom_b4(c, data, include_yearly)
+    else:
+        raise ValueError(f"未対応の mode: {mode}")
+
+    c.save()
+    print(f"[DEBUG] PDF saved to {filepath}")
+
+
 def draw_shincom_a4(c, data, include_yearly=False):
     width, height = A4
     margin = 20 * mm
@@ -211,14 +234,3 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     if include_yearly:
         draw_yearly_pages_renai(c, data["yearly_fortunes"])
 
-def create_pdf_unified(filepath, data, mode, size="a4", include_yearly=False):
-    c = canvas.Canvas(filepath, pagesize=A4 if size == "a4" else B4)
-    c.setTitle("占い結果")
-    if mode == "shincom":
-        if size == "a4":
-            draw_shincom_a4(c, data, include_yearly)
-        else:
-            draw_shincom_b4(c, data, include_yearly)
-    else:
-        draw_renai_pdf(c, data, size, include_yearly)
-    c.save()
