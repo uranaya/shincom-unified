@@ -154,8 +154,7 @@ def draw_yearly_pages_shincom(c, yearly_data):
         y -= 6 * mm
 
     y -= 10 * mm
-    c.showPage()
-    y = height - 30 * mm
+    y -= 10 * mm
 
     months = yearly_data['months']
     for i, month in enumerate(months):
@@ -169,8 +168,7 @@ def draw_yearly_pages_shincom(c, yearly_data):
         y -= 10 * mm
 
         if i < len(months) - 1 and y < 50 * mm:
-            c.showPage()
-            y = height - 30 * mm
+            y -= 10 * mm
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
     width, height = A4 if size == "a4" else B4
