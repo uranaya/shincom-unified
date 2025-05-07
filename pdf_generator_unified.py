@@ -103,9 +103,9 @@ def draw_shincom_b4(c, data, include_yearly):
     text.setFont(FONT_NAME, 11)
     text.textLine("■ 手相の鑑定結果")
     text.textLine("")
-    palm_result_lines = data["palm_result"].split("\n")
-    for line in palm_result_lines:
-        text.textLine(line)
+    for line in data["palm_result"].split("\n"):
+        for wrapped_line in wrap(line, 40):
+            text.textLine(wrapped_line)
     c.drawText(text)
 
     # 裏面（手相総合・四柱推命・イーチン・ラッキー）
@@ -116,25 +116,28 @@ def draw_shincom_b4(c, data, include_yearly):
     text.textLine("■ 手相からの総合的なアドバイス")
     text.textLine("")
     for line in data["texts"]["palm_summary"].split("\n"):
-        text.textLine(line)
+        for wrapped in wrap(line, 40):
+            text.textLine(wrapped)
     text.textLine("")
 
     text.textLine("■ 四柱推命によるアドバイス")
     text.textLine("")
     for line in data["shichu_result"].split("\n"):
-        text.textLine(line)
+        for wrapped in wrap(line, 40):
+            text.textLine(wrapped)
     text.textLine("")
 
     text.textLine("■ 易占いによるアドバイス")
     text.textLine("")
     for line in data["iching_result"].split("\n"):
-        text.textLine(line)
+        for wrapped in wrap(line, 40):
+            text.textLine(wrapped)
     text.textLine("")
 
     text.textLine("■ ラッキー情報")
     text.textLine("")
     for label, content in data["lucky_info"].items():
-        for line in wrap(f"◆ {label}：{content}", 45):
+        for line in wrap(f"◆ {label}：{content}", 40):
             text.textLine(line)
         text.textLine("")
 
@@ -142,7 +145,6 @@ def draw_shincom_b4(c, data, include_yearly):
 
     if include_yearly:
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
-
 
 
 def draw_yearly_pages_shincom(c, yearly_data):
