@@ -58,54 +58,81 @@ def draw_header(c, width, height):
     c.setFont(FONT_NAME, 16)
     c.drawString(20 * mm, height - 20 * mm, "鑑定結果")
 
-
-def draw_shincom_a4(c, data, include_yearly=False):
+def draw_shincom_a4(c, data, include_yearly):
     width, height = A4
     margin = 20 * mm
-    y = height - margin
-    y = draw_header(c, width, margin)
+    y = height - 30 * mm
 
-    c.setFont(FONT_NAME, 12)
+    # ヘッダー
+    draw_header(c, width, height)
+
+    # 手相画像
+    img_path = data["image_path"]
+    img_width = 120 * mm
+    img_height = 90 * mm
+    img_top_y = y - 10 * mm
+    c.drawImage(img_path, (width - img_width) / 2, img_top_y - img_height, width=img_width, height=img_height)
+    y = img_top_y - img_height - 5 * mm
+
+    # 手相項目1〜3 + ラッキー情報（1ページ目）
     for i in range(3):
+        c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
+        y -= 10 * mm
+        c.setFont(FONT_NAME, 11)
         for line in wrap(data["palm_texts"][i], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
-        y -= 3 * mm
-        c.setFont(FONT_NAME, 12)
+        y -= 5 * mm
 
-    y -= 3 * mm
-    y = draw_lucky_section(c, width, margin, y, data["lucky_info"], data["lucky_direction"])
-
-    c.showPage()
-    y = height - margin
-    y = draw_header(c, width, margin, y)
-
-    c.setFont(FONT_NAME, 12)
-    for i in range(3, 5):
-        c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
-        for line in wrap(data["palm_texts"][i], 40):
-            c.drawString(margin, y, line)
-            y -= 6 * mm
-        y -= 3 * mm
-        c.setFont(FONT_NAME, 12)
-
-    for key in ["palm_summary", "personality", "month_fortune", "next_month_fortune"]:
-        c.drawString(margin, y, f"◆ {data['titles'][key]}")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
+    c.setFont(FONT_NAME, 13)
+    c.drawString(margin, y, "◆ ラッキー情報まとめ")
+    y -= 10 * mm
+    c.setFont(FONT_NAME, 11)
+    for key in ["lucky_info", "lucky_direction"]:
         for line in wrap(data["texts"][key], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
-        y -= 3 * mm
-        c.setFont(FONT_NAME, 12)
+        y -= 5 * mm
 
+    # 2ページ目：手相項目4〜5＋手相総合＋運勢など
+    c.showPage()
+    y = height - 30 * mm
+
+    for i in [3, 4]:
+        c.setFont(FONT_NAME, 13)
+        c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
+        y -= 10 * mm
+        c.setFont(FONT_NAME, 11)
+        for line in wrap(data["palm_texts"][i], 40):
+            c.drawString(margin, y, line)
+            y -= 6 * mm
+        y -= 5 * mm
+
+    # 手相総合
+    if "summary" in data["palm_sections"]:
+        c.setFont(FONT_NAME, 13)
+        c.drawString(margin, y, "◆ 手相からの総合的なアドバイス")
+        y -= 10 * mm
+        c.setFont(FONT_NAME, 11)
+        for line in wrap(data["palm_sections"]["summary"], 40):
+            c.drawString(margin, y, line)
+            y -= 6 * mm
+        y -= 5 * mm
+
+    # 性格・運勢
+    for key in ["personality", "month_fortune", "next_month_fortune"]:
+        c.setFont(FONT_NAME, 13)
+        c.drawString(margin, y, f"◆ {data['titles'][key]}")
+        y -= 10 * mm
+        c.setFont(FONT_NAME, 11)
+        for line in wrap(data["texts"][key], 40):
+            c.drawString(margin, y, line)
+            y -= 6 * mm
+        y -= 5 * mm
+
+    # 年運（必要な場合）
     if include_yearly:
-        c.showPage()
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
 
 
