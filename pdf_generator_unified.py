@@ -21,6 +21,26 @@ FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
+
+def draw_palm_image(c, base64_image, width, y):
+
+    try:
+        image_data = base64.b64decode(base64_image.split(',')[1])
+        img = ImageReader(io.BytesIO(image_data))
+        img_width, img_height = img.getSize()
+        scale = (width * 0.6) / img_width
+        img_width *= scale
+        img_height *= scale
+        x_center = (width - img_width) / 2
+        y -= img_height + 5 * mm
+        c.drawImage(img, x_center, y, width=img_width, height=img_height)
+        y -= 10 * mm
+    except Exception as e:
+        print("Image decode error:", e)
+
+    return y
+
+
 def draw_yearly_pages_shincom_a4(c, yearly):
     from reportlab.lib.units import mm
     width, height = A4
@@ -79,22 +99,8 @@ def draw_shincom_a4(c, data, include_yearly=False):
     margin = 20 * mm
     y = height - margin
     y = draw_header(c, width, margin, y)
+    y = draw_palm_image(c, data["palm_image"], width, y)
 
-    # 手相画像表示（センター）
-    if 'image_path' in data:
-        try:
-            image_data = base64.b64decode(data['image_path'].split(',')[1])
-            img = ImageReader(io.BytesIO(image_data))
-            img_width, img_height = img.getSize()
-            scale = (width * 0.6) / img_width
-            img_width *= scale
-            img_height *= scale
-            x_center = (width - img_width) / 2
-            y -= img_height + 5 * mm
-            c.drawImage(img, x_center, y, width=img_width, height=img_height)
-            y -= 10 * mm
-        except Exception as e:
-            print("Image decode error:", e)
 
     c.setFont(FONT_NAME, 12)
     for i in range(3):
@@ -146,22 +152,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
     margin = 20 * mm
     y = height - margin
     y = draw_header(c, width, margin, y)
-
-    # 手相画像表示（センター）
-    if 'image_path' in data:
-        try:
-            image_data = base64.b64decode(data['image_path'].split(',')[1])
-            img = ImageReader(io.BytesIO(image_data))
-            img_width, img_height = img.getSize()
-            scale = (width * 0.6) / img_width
-            img_width *= scale
-            img_height *= scale
-            x_center = (width - img_width) / 2
-            y -= img_height + 5 * mm
-            c.drawImage(img, x_center, y, width=img_width, height=img_height)
-            y -= 10 * mm
-        except Exception as e:
-            print("Image decode error:", e)
+    y = draw_palm_image(c, data["palm_image"], width, y)
 
     c.setFont(FONT_NAME, 12)
     for i in range(3):
@@ -209,10 +200,14 @@ def draw_shincom_b4(c, data, include_yearly=False):
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
+
     width, height = A4 if size == 'a4' else B4
     margin = 20 * mm
+
     y = height - margin
     y = draw_header(c, width, margin, y)
+    y = draw_palm_image(c, data["palm_image"], width, y)
+
     c.setFont(FONT_NAME, 12)
     for key in ['compatibility', 'love_summary']:
         c.drawString(margin, y, f"◆ {data['titles'][key]}")
@@ -226,6 +221,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
         c.setFont(FONT_NAME, 12)
     y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
     c.showPage()
+
     y = height - margin
     y = draw_header(c, width, margin, y)
     for text in data['themes']:
