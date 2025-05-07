@@ -95,16 +95,27 @@ def draw_shincom_b4(c, data, include_yearly):
         img_width = 130 * mm
         img_height = 100 * mm
         img_x = (width - img_width) / 2
-        img_top_y = y_header_end - img_height - 5 * mm
+        img_top_y = y_header_end - img_height - 10 * mm
         c.drawImage(img, img_x, img_top_y, width=img_width, height=img_height)
-        y = img_top_y - 5 * mm
+        y = img_top_y - 10 * mm
     else:
         y = y_header_end
 
     # 1ページ目：5項目の手相
-    text = c.beginText(margin, y)
-    text.setFont(FONT_NAME, 11)
-    for title, body in zip(data["palm_titles"], data["palm_texts"]):
+    
+    for idx, (title, body) in enumerate(zip(data["palm_titles"], data["palm_texts"])):
+        if idx == 3:
+            c.drawText(text)
+            c.showPage()
+            text = c.beginText(margin, height - 30 * mm)
+            text.setFont(FONT_NAME, 11)
+        text.textLine(f"■ {title}")
+        text.textLine("")
+        for line in wrap(body, 40):
+            text.textLine(line)
+        text.textLine("")
+    c.drawText(text)
+
         text.textLine(f"■ {title}")
         text.textLine("")
         for line in wrap(body, 40):
@@ -147,14 +158,14 @@ def draw_yearly_pages_shincom(c, yearly_data):
 
     c.setFont(FONT_NAME, 13)
     c.drawString(margin, y, f"■ {yearly_data['year_label']}")
-    y -= 10 * mm
+    y -= 5 * mm
     c.setFont(FONT_NAME, 11)
     for line in wrap(yearly_data['year_text'], 40):
         c.drawString(margin, y, line)
         y -= 6 * mm
 
-    y -= 10 * mm
-    y -= 10 * mm
+    y -= 5 * mm
+    y -= 5 * mm
 
     months = yearly_data['months']
     for i, month in enumerate(months):
@@ -163,7 +174,7 @@ def draw_yearly_pages_shincom(c, yearly_data):
             y = height - 30 * mm
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {month['label']}")
-        y -= 10 * mm
+        y -= 5 * mm
         c.setFont(FONT_NAME, 11)
         for line in wrap(month['text'], 40):
             c.drawString(margin, y, line)
@@ -171,7 +182,7 @@ def draw_yearly_pages_shincom(c, yearly_data):
         y -= 5 * mm
 
         if i < len(months) - 1 and y < 50 * mm:
-            y -= 10 * mm
+            y -= 5 * mm
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
     width, height = A4 if size == "a4" else B4
