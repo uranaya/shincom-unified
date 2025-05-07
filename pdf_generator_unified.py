@@ -63,18 +63,18 @@ def draw_shincom_a4(c, data, include_yearly):
     margin = 20 * mm
     y = height - 30 * mm
 
-    # ヘッダー
     draw_header(c, width, height)
 
-    # 手相画像
-    img_path = data["image_path"]
-    img_width = 120 * mm
-    img_height = 90 * mm
-    img_top_y = y - 10 * mm
-    c.drawImage(img_path, (width - img_width) / 2, img_top_y - img_height, width=img_width, height=img_height)
-    y = img_top_y - img_height - 5 * mm
+    # 手相画像（存在確認）
+    img_path = data.get("image_path")
+    if img_path:
+        img_width = 120 * mm
+        img_height = 90 * mm
+        img_top_y = y - 10 * mm
+        c.drawImage(img_path, (width - img_width) / 2, img_top_y - img_height, width=img_width, height=img_height)
+        y = img_top_y - img_height - 5 * mm
 
-    # 手相項目1〜3 + ラッキー情報（1ページ目）
+    # 手相1〜3項目
     for i in range(3):
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
@@ -83,8 +83,9 @@ def draw_shincom_a4(c, data, include_yearly):
         for line in wrap(data["palm_texts"][i], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
-        y -= 5 * mm
+        y -= 4 * mm
 
+    # ラッキー情報まとめ
     c.setFont(FONT_NAME, 13)
     c.drawString(margin, y, "◆ ラッキー情報まとめ")
     y -= 10 * mm
@@ -93,12 +94,13 @@ def draw_shincom_a4(c, data, include_yearly):
         for line in wrap(data["texts"][key], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
-        y -= 5 * mm
+        y -= 4 * mm
 
-    # 2ページ目：手相項目4〜5＋手相総合＋運勢など
+    # 2ページ目へ
     c.showPage()
     y = height - 30 * mm
 
+    # 手相4・5項目
     for i in [3, 4]:
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
@@ -107,20 +109,21 @@ def draw_shincom_a4(c, data, include_yearly):
         for line in wrap(data["palm_texts"][i], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
-        y -= 5 * mm
+        y -= 4 * mm
 
-    # 手相総合
-    if "summary" in data["palm_sections"]:
+    # 手相総合アドバイス
+    advice = data["palm_sections"].get("summary")
+    if advice:
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, "◆ 手相からの総合的なアドバイス")
         y -= 10 * mm
         c.setFont(FONT_NAME, 11)
-        for line in wrap(data["palm_sections"]["summary"], 40):
+        for line in wrap(advice, 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
-        y -= 5 * mm
+        y -= 4 * mm
 
-    # 性格・運勢
+    # 性格・今月・来月の運勢
     for key in ["personality", "month_fortune", "next_month_fortune"]:
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"◆ {data['titles'][key]}")
@@ -129,9 +132,9 @@ def draw_shincom_a4(c, data, include_yearly):
         for line in wrap(data["texts"][key], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
-        y -= 5 * mm
+        y -= 4 * mm
 
-    # 年運（必要な場合）
+    # 年運ページ描画（3〜4ページ）
     if include_yearly:
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
 
