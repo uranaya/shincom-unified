@@ -67,7 +67,7 @@ def ten_shincom():
 
             result_data = {
                 "image_data": image_data,
-                "palm_titles": palm_titles,
+                "palm_titles": ["生命線", "知能線", "感情線", "運命線", "太陽線"],
                 "palm_texts": palm_texts,
                 "titles": {
                     "palm_summary": "手相の総合アドバイス",
@@ -84,8 +84,6 @@ def ten_shincom():
                 "lucky_info": lucky_info,
                 "lucky_direction": lucky_direction,
                 "birthdate": birthdate,
-
-                # ✅ 以下を追加（b4構成互換用）
                 "palm_result": "\n".join(palm_texts),
                 "shichu_result": shichu_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n")

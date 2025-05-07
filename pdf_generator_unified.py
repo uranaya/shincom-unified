@@ -98,17 +98,18 @@ def draw_shincom_b4(c, data, include_yearly):
         c.drawImage(img, img_x, img_y, width=img_width, height=img_height)
         y = img_y - 10 * mm
 
-    # 表面（手相5項目）
+    # 表面：手相5項目（項目ごとに表示）
     text = c.beginText(margin, y)
     text.setFont(FONT_NAME, 11)
-    text.textLine("■ 手相の鑑定結果")
-    text.textLine("")
-    for line in data["palm_result"].split("\n"):
-        for wrapped_line in wrap(line, 40):
-            text.textLine(wrapped_line)
+    for title, body in zip(data["palm_titles"], data["palm_texts"]):
+        text.textLine(f"■ {title}")
+        text.textLine("")
+        for line in wrap(body, 40):
+            text.textLine(line)
+        text.textLine("")
     c.drawText(text)
 
-    # 裏面（手相総合・四柱推命・イーチン・ラッキー）
+    # 裏面
     c.showPage()
     text = c.beginText(margin, height - 30 * mm)
     text.setFont(FONT_NAME, 11)
