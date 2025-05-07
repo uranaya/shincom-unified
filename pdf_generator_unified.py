@@ -21,153 +21,96 @@ FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
-def draw_wrapped_lines(text_obj, lines):
-    for line in lines:
-        text_obj.textLine(line)
-
-def draw_lucky_info(c, data, x, y):
-    c.setFont(FONT_NAME, 11)
-    for label, content in data.items():
-        wrapped = wrap(f"◆ {label}：{content}", width=40)
-        for line in wrapped:
-            c.drawString(x, y, line)
-            y -= 12
-    return y
-
-def create_pdf_unified(mode, size, data, include_yearly=False):
-
-    # サイズ判定
-    pagesize = A4 if size == "A4" else B4
-    filepath = data.get("filepath", "output.pdf")
-    c = canvas.Canvas(filepath, pagesize=pagesize)
-    
-    print(f"[DEBUG] create_pdf_unified: mode={mode}, size={size}, include_yearly={include_yearly}")
-
-    if mode == "renai":
-        draw_renai_pdf(c, data, size, include_yearly)
-    elif mode == "shincom":
-        if size == "A4":
-            draw_shincom_a4(c, data, include_yearly)
-        else:
-            draw_shincom_b4(c, data, include_yearly)
-    else:
-        raise ValueError(f"未対応の mode: {mode}")
-
-    c.save()
-    print(f"[DEBUG] PDF saved to {filepath}")
-
-
 def draw_shincom_a4(c, data, include_yearly=False):
     width, height = A4
     margin = 20 * mm
     y = height - margin
     y = draw_header(c, width, margin, y)
-
     c.setFont(FONT_NAME, 12)
     for i in range(3):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        for line in wrap(data["palm_texts"][i], 40):
+        for line in wrap(data['palm_texts'][i], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
-
     y -= 3 * mm
-    y = draw_lucky_section(c, width, margin, y, data["lucky_info"], data["lucky_direction"])
-
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
     c.showPage()
     y = height - margin
     y = draw_header(c, width, margin, y)
-
     c.setFont(FONT_NAME, 12)
     for i in range(3, 5):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        for line in wrap(data["palm_texts"][i], 40):
+        for line in wrap(data['palm_texts'][i], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
-
-    for key in ["palm_summary", "personality", "month_fortune", "next_month_fortune"]:
+    for key in ['palm_summary', 'personality', 'month_fortune', 'next_month_fortune']:
         c.drawString(margin, y, f"◆ {data['titles'][key]}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        for line in wrap(data["texts"][key], 40):
+        for line in wrap(data['texts'][key], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
-
     if include_yearly:
         c.showPage()
-        draw_yearly_pages_shincom(c, data["yearly_fortunes"])
+        draw_yearly_pages_shincom(c, data['yearly_fortunes'])
 
-def draw_shincom_b4(c, data, include_yearly):
+def draw_shincom_b4(c, data, include_yearly=False):
     width, height = B4
     margin = 20 * mm
-    initial_y = height - 30 * mm
-    y_header_end = draw_header(c, width, margin, initial_y)
-
-    if data.get("image_data"):
-        img_data = base64.b64decode(data["image_data"].split(",")[1])
-        img = ImageReader(io.BytesIO(img_data))
-        img_width = 130 * mm
-        img_height = 100 * mm
-        img_x = (width - img_width) / 2
-        img_top_y = y_header_end - img_height - 5 * mm
-        c.drawImage(img, img_x, img_top_y, width=img_width, height=img_height)
-        y = img_top_y - 5 * mm
-    else:
-        y = y_header_end
-
-    # 1ページ目：5項目の手相
-    text = c.beginText(margin, y)
-    text.setFont(FONT_NAME, 11)
-    for title, body in zip(data["palm_titles"], data["palm_texts"]):
-        text.textLine(f"■ {title}")
-        text.textLine("")
-        for line in wrap(body, 40):
-            text.textLine(line)
-        text.textLine("")
-    c.drawText(text)
-
-    # 2ページ目：裏面まとめて1TextObject
+    y = height - margin
+    y = draw_header(c, width, margin, y)
+    c.setFont(FONT_NAME, 12)
+    for i in range(3):
+        c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
+        y -= 6 * mm
+        c.setFont(FONT_NAME, 10)
+        for line in wrap(data['palm_texts'][i], 45):
+            c.drawString(margin, y, line)
+            y -= 6 * mm
+        y -= 3 * mm
+        c.setFont(FONT_NAME, 12)
+    y -= 3 * mm
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
     c.showPage()
-    text = c.beginText(margin, height - 30 * mm)
-
-    def draw_block(title, content):
-        text.setFont(FONT_NAME, 12)
-        text.textLine(f"■ {title}")
-        text.textLine("")
-        text.setFont(FONT_NAME, 10)
-        for paragraph in content.split("\n"):
-            for line in wrap(paragraph.strip(), 40):
-                text.textLine(line)
-        text.textLine("")
-
-    draw_block("手相からの総合的なアドバイス", data["texts"]["palm_summary"])
-    draw_block("性格診断", data["texts"]["personality"])
-    draw_block("今月の運勢", data["texts"]["month_fortune"])
-    draw_block("来月の運勢", data["texts"]["next_month_fortune"])
-    draw_block("易占いによるアドバイス", data["iching_result"])
-    lucky_text = "\n".join([f"◆ {k}：{v}" for k, v in data["lucky_info"].items()])
-    draw_block("ラッキー情報", lucky_text)
-
-    c.drawText(text)
-
+    y = height - margin
+    y = draw_header(c, width, margin, y)
+    c.setFont(FONT_NAME, 12)
+    for i in range(3, 5):
+        c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
+        y -= 6 * mm
+        c.setFont(FONT_NAME, 10)
+        for line in wrap(data['palm_texts'][i], 45):
+            c.drawString(margin, y, line)
+            y -= 6 * mm
+        y -= 3 * mm
+        c.setFont(FONT_NAME, 12)
+    for key in ['palm_summary', 'personality', 'month_fortune', 'next_month_fortune']:
+        c.drawString(margin, y, f"◆ {data['titles'][key]}")
+        y -= 6 * mm
+        c.setFont(FONT_NAME, 10)
+        for line in wrap(data['texts'][key], 45):
+            c.drawString(margin, y, line)
+            y -= 6 * mm
+        y -= 3 * mm
+        c.setFont(FONT_NAME, 12)
     if include_yearly:
         c.showPage()
-        draw_yearly_pages_shincom(c, data["yearly_fortunes"])
+        draw_yearly_pages_shincom(c, data['yearly_fortunes'])
 
 def draw_yearly_pages_shincom(c, yearly_data):
     width, height = c._pagesize
     margin = 25 * mm
     y = height - 30 * mm
-
     c.setFont(FONT_NAME, 13)
     c.drawString(margin, y, f"■ {yearly_data['year_label']}")
     y -= 10 * mm
@@ -175,14 +118,12 @@ def draw_yearly_pages_shincom(c, yearly_data):
     for line in wrap(yearly_data['year_text'], 40):
         c.drawString(margin, y, line)
         y -= 6 * mm
-
     y -= 10 * mm
-    y -= 10 * mm
-
-    months = yearly_data['months']
+    months = yearly_data.get('months', [])
     for i, month in enumerate(months):
         if i == 5:
             c.showPage()
+            width, height = c._pagesize
             y = height - 30 * mm
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {month['label']}")
@@ -192,45 +133,51 @@ def draw_yearly_pages_shincom(c, yearly_data):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 5 * mm
-
         if i < len(months) - 1 and y < 50 * mm:
-            y -= 10 * mm
+            y -= 5 * mm
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
-    width, height = A4 if size == "a4" else B4
+    width, height = A4 if size == 'a4' else B4
     margin = 20 * mm
     y = height - margin
     y = draw_header(c, width, margin, y)
-
     c.setFont(FONT_NAME, 12)
-    for key in ["compatibility", "love_summary"]:
+    for key in ['compatibility', 'love_summary']:
         c.drawString(margin, y, f"◆ {data['titles'][key]}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        lines = wrap(data["texts"][key], 40 if size == "a4" else 45)
+        lines = wrap(data['texts'][key], 40 if size == 'a4' else 45)
         for line in lines:
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
-
-    y = draw_lucky_section(c, width, margin, y, data["lucky_info"], data["lucky_direction"])
-
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
     c.showPage()
     y = height - margin
     y = draw_header(c, width, margin, y)
-
-    for text in data["themes"]:
+    for text in data['themes']:
         c.drawString(margin, y, f"◆ {text['title']}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        lines = wrap(text["content"], 40 if size == "a4" else 45)
+        lines = wrap(text['content'], 40 if size == 'a4' else 45)
         for line in lines:
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
-
     if include_yearly:
-        draw_yearly_pages_renai(c, data["yearly_fortunes"])
+        draw_yearly_pages_shincom(c, data['yearly_fortunes'])
 
+def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
+    size = size.lower()
+    c = canvas.Canvas(filepath, pagesize=A4 if size == 'a4' else B4)
+    c.setTitle('占い結果')
+    if mode == 'shincom':
+        if size == 'a4':
+            draw_shincom_a4(c, data, include_yearly)
+        else:
+            draw_shincom_b4(c, data, include_yearly)
+    else:
+        draw_renai_pdf(c, data, size, include_yearly)
+    c.save()
