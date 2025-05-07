@@ -80,7 +80,6 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.setFont(FONT_NAME, 12)
 
     if include_yearly:
-    draw_yearly_pages_shincom(c, data["yearly_fortunes"])
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
 
 def draw_shincom_b4(c, data, include_yearly):
@@ -156,7 +155,6 @@ def draw_shincom_b4(c, data, include_yearly):
         c.drawText(text)
 
     if include_yearly:
-    draw_yearly_pages_shincom(c, data["yearly_fortunes"])
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
 
 
@@ -227,7 +225,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
         c.setFont(FONT_NAME, 12)
 
     if include_yearly:
-    draw_yearly_pages_shincom(c, data["yearly_fortunes"])
+        draw_yearly_pages_shincom(c, data["yearly_fortunes"])
         draw_yearly_pages_renai(c, data["yearly_fortunes"])
 
 def create_pdf_unified(filepath, data, mode, size="a4", include_yearly=False):
