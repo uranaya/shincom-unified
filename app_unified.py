@@ -20,6 +20,37 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+def save_image(image_data):
+    filename = f"{uuid.uuid4()}.png"
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    with open(filepath, "wb") as f:
+        f.write(base64.b64decode(image_data.split(",")[-1]))
+    return filepath
+
+def generate_filename():
+    return f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+def get_titles(mode):
+    if mode == "shincom":
+        return {
+            "palm_summary": "手相からの総合的なアドバイス",
+            "personality": "あなたの性格",
+            "month_fortune": "今月の運勢",
+            "next_month_fortune": "来月の運勢"
+        }
+    return {}
+
+def get_palm_titles(mode):
+    if mode == "shincom":
+        return [
+            "知能線（頭脳線）",
+            "感情線（ハート線）",
+            "生命線（ライフライン）",
+            "運命線（キャリア）",
+            "太陽線（人気と成功）"
+        ]
+    return []
+
 @app.route("/ten", methods=["GET", "POST"])
 @app.route("/tenmob", methods=["GET", "POST"])
 def ten_shincom():
@@ -32,25 +63,26 @@ def ten_shincom():
     if request.method == "POST":
         if request.is_json:
             data = request.get_json()
-            image_data = data["image"]
-            birthdate = data["birthdate"]
-            eto = data["eto"]
+            image_data = data.get("image")
+            birthdate = data.get("birthdate")
+            eto = data.get("eto")
+            full_year = data.get("full_year", False)
         else:
-            image_data = request.form["image"]
-            birthdate = request.form["birthdate"]
-            eto = request.form["eto"]
+            image_data = request.form.get("image")
+            birthdate = request.form.get("birthdate")
+            eto = request.form.get("eto")
+            full_year = "full_year" in request.form
 
-        result_data = generate_fortune(birthdate, eto, mode=mode)
+        if not image_data or not birthdate or not eto:
+            return "必要な情報が不足しています", 400
+
+        result_data = generate_fortune_shincom(birthdate, eto, mode=mode)
         result_data["image_path"] = save_image(image_data)
         result_data["titles"] = get_titles(mode)
         result_data["palm_titles"] = get_palm_titles(mode)
 
         filename = generate_filename()
         filepath = os.path.join(UPLOAD_FOLDER, filename)
-
-        full_year = "full_year" in request.form or (
-            request.is_json and data.get("full_year")
-        )
         create_pdf_unified(filepath, result_data, mode, size=size, include_yearly=full_year)
 
         if request.is_json:
@@ -58,10 +90,7 @@ def ten_shincom():
         else:
             return redirect(url_for("download_file", filename=filename))
 
-    return render_template("index.html", mode="ten", size="B4")
-
-
-
+    return render_template("index.html", mode="ten", size=size)
 
 @app.route("/renai", methods=["GET", "POST"])
 @app.route("/renaib4", methods=["GET", "POST"])
@@ -101,13 +130,11 @@ def renai():
 
         filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
-
         create_pdf_unified(filepath, result_data, "renai", size=size, include_yearly=include_yearly)
 
         return send_file(filepath, as_attachment=True)
 
     return render_template("renai_form.html")
-
 
 @app.route("/preview/<filename>")
 def preview(filename):
@@ -116,20 +143,19 @@ def preview(filename):
         return redirect(url_for("view_pdf", filename=filename))
     return render_template("fortune_pdf.html", filename=filename, referer=referer)
 
-
 @app.route("/view/<filename>")
 def view_pdf(filename):
-    filepath = os.path.join("static", "uploads", filename)  # 修正点ここ
-    print(f"[DEBUG] Looking for PDF at: {filepath}")
-
+    filepath = os.path.join("static", "uploads", filename)
     if not os.path.exists(filepath):
-        print("[ERROR] PDF file not found!")
         return "ファイルが存在しません", 404
-
     return send_file(filepath, mimetype='application/pdf')
 
-
-
+@app.route("/download/<filename>")
+def download_file(filename):
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.exists(filepath):
+        return "ファイルが存在しません", 404
+    return send_file(filepath, as_attachment=True)
 
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
@@ -138,7 +164,6 @@ def get_eto():
     y, m, d = map(int, birthdate.split("-"))
     honmeisei = get_honmeisei(y, m, d)
     return jsonify({"eto": eto, "honmeisei": honmeisei})
-
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -149,19 +174,16 @@ def login():
         if password == os.getenv("LOGIN_PASSWORD", "pass"):
             session["logged_in"] = True
             return redirect(url_for(next_url_post))
-        return render_template("login.html", next_url=next_url)
-
+    return render_template("login.html", next_url=next_url)
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
 
-
 @app.route("/")
 def home():
     return render_template("home-unified.html")
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
