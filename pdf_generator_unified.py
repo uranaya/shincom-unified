@@ -109,19 +109,15 @@ def draw_shincom_b4(c, data, include_yearly):
             c.showPage()
             text = c.beginText(margin, height - 30 * mm)
             text.setFont(FONT_NAME, 11)
-        text.textLine(f"■ {title}")
-        text.textLine("")
-        for line in wrap(body, 40):
-            text.textLine(line)
-        text.textLine("")
-    c.drawText(text)
 
         text.textLine(f"■ {title}")
         text.textLine("")
         for line in wrap(body, 40):
             text.textLine(line)
         text.textLine("")
+
     c.drawText(text)
+
 
     # 2ページ目：裏面まとめて1TextObject
     c.showPage()
