@@ -80,13 +80,14 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.setFont(FONT_NAME, 12)
 
     if include_yearly:
+        c.showPage()
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
 
 def draw_shincom_b4(c, data, include_yearly):
     width, height = B4
     margin = 20 * mm
-    y = height - 30 * mm
-    y = draw_header(c, width, margin, y)
+    initial_y = height - 30 * mm
+    y_header_end = draw_header(c, width, margin, initial_y)
 
     if data.get("image_data"):
         img_data = base64.b64decode(data["image_data"].split(",")[1])
@@ -94,10 +95,13 @@ def draw_shincom_b4(c, data, include_yearly):
         img_width = 130 * mm
         img_height = 100 * mm
         img_x = (width - img_width) / 2
-        img_y = y - img_height - 10 * mm
-        c.drawImage(img, img_x, img_y, width=img_width, height=img_height)
-        y = img_y - 10 * mm
+        img_top_y = y_header_end - img_height - 10 * mm
+        c.drawImage(img, img_x, img_top_y, width=img_width, height=img_height)
+        y = img_top_y - 10 * mm
+    else:
+        y = y_header_end
 
+    # 1ページ目：5項目の手相
     text = c.beginText(margin, y)
     text.setFont(FONT_NAME, 11)
     for title, body in zip(data["palm_titles"], data["palm_texts"]):
@@ -107,56 +111,34 @@ def draw_shincom_b4(c, data, include_yearly):
             text.textLine(line)
         text.textLine("")
     c.drawText(text)
-    if include_yearly:
-        draw_yearly_pages_shincom(c, data["yearly_fortunes"])
 
-    # 裏面：各項目分割して改ページ対応
-    def start_text():
-        t = c.beginText(margin, height - 30 * mm)
-        t.setFont(FONT_NAME, 11)
-        return t
+    # 2ページ目：裏面まとめて1TextObject
+    c.showPage()
+    text = c.beginText(margin, height - 30 * mm)
 
-    def check_page(t):
-        if t.getY() < 30 * mm:
-            c.drawText(t)
-            c.showPage()
-            return start_text()
-        return t
-
-    def draw_section(text, title, content):
+    def draw_block(title, content):
+        text.setFont(FONT_NAME, 12)
         text.textLine(f"■ {title}")
         text.textLine("")
-        for line in content.split("\n"):
-            for w in wrap(line, 40):
-                text.textLine(w)
-                text = check_page(text)
+        text.setFont(FONT_NAME, 10)
+        for paragraph in content.split("\n"):
+            for line in wrap(paragraph.strip(), 40):
+                text.textLine(line)
         text.textLine("")
-        return check_page(text)
 
-    # section構成
-    sections = [
-        ("手相からの総合的なアドバイス", data["texts"]["palm_summary"]),
-        ("性格診断", data["texts"]["personality"]),
-        ("今月の運勢", data["texts"]["month_fortune"]),
-        ("来月の運勢", data["texts"]["next_month_fortune"]),
-        ("易占いによるアドバイス", data["iching_result"]),
-    ]
+    draw_block("手相からの総合的なアドバイス", data["texts"]["palm_summary"])
+    draw_block("性格診断", data["texts"]["personality"])
+    draw_block("今月の運勢", data["texts"]["month_fortune"])
+    draw_block("来月の運勢", data["texts"]["next_month_fortune"])
+    draw_block("易占いによるアドバイス", data["iching_result"])
+    lucky_text = "\n".join([f"◆ {k}：{v}" for k, v in data["lucky_info"].items()])
+    draw_block("ラッキー情報", lucky_text)
 
-    # ラッキー情報を整形して末尾に追加
-    lucky_combined = "\n".join([f"◆ {k}：{v}" for k, v in data["lucky_info"].items()])
-    sections.append(("ラッキー情報", lucky_combined))
-
-    c.showPage()
-    text = start_text()
-    for title, content in sections:
-        text = draw_section(text, title, content)
-
-    if text.getY() > 30 * mm:
-        c.drawText(text)
+    c.drawText(text)
 
     if include_yearly:
+        c.showPage()
         draw_yearly_pages_shincom(c, data["yearly_fortunes"])
-
 
 def draw_yearly_pages_shincom(c, yearly_data):
     width, height = c._pagesize
@@ -171,11 +153,12 @@ def draw_yearly_pages_shincom(c, yearly_data):
         c.drawString(margin, y, line)
         y -= 6 * mm
 
-    y -= 10
+    y -= 10 * mm
     c.showPage()
     y = height - 30 * mm
 
-    for month in yearly_data["months"]:
+    months = yearly_data['months']
+    for i, month in enumerate(months):
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {month['label']}")
         y -= 10 * mm
@@ -183,9 +166,9 @@ def draw_yearly_pages_shincom(c, yearly_data):
         for line in wrap(month['text'], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
-        y -= 10
+        y -= 10 * mm
 
-        if y < 50 * mm:
+        if i < len(months) - 1 and y < 50 * mm:
             c.showPage()
             y = height - 30 * mm
 
@@ -225,7 +208,6 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
         c.setFont(FONT_NAME, 12)
 
     if include_yearly:
-        draw_yearly_pages_shincom(c, data["yearly_fortunes"])
         draw_yearly_pages_renai(c, data["yearly_fortunes"])
 
 def create_pdf_unified(filepath, data, mode, size="a4", include_yearly=False):
