@@ -9,7 +9,7 @@ from flask import Flask, render_template, request, redirect, url_for, send_file,
 from dotenv import load_dotenv
 from yearly_fortune_utils import generate_yearly_fortune
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
-from kyusei_utils import get_honmeisei
+from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
 from fortune_logic import generate_renai_fortune
 
@@ -21,23 +21,9 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-
 @app.route("/ten", methods=["GET", "POST"])
 @app.route("/tenmob", methods=["GET", "POST"])
 def ten_shincom():
-
-    image_data = data.get("image_data")
-    birthdate = data.get("birthdate")
-
-    # ✅ 九星気学 lucky_direction を生成（安全な構文とインデント）
-    try:
-        year, month, day = map(int, birthdate.split("-"))
-        from kyusei_utils import get_kyusei_fortune
-        kyusei_text = get_kyusei_fortune(year, month, day)
-    except Exception as e:
-        print("❌ lucky_direction 取得エラー:", e)
-        kyusei_text = ""
-
     if "logged_in" not in session:
         return redirect(url_for("login"))
     mode = "shincom"
@@ -46,7 +32,16 @@ def ten_shincom():
     if request.method == "POST":
         try:
             data = request.get_json() if is_json else request.form
-full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
+            image_data = data.get("image_data")
+            birthdate = data.get("birthdate")
+            full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
+            # 九星気学の吉方位テキストを取得
+            try:
+                year, month, day = map(int, birthdate.split("-"))
+                kyusei_text = get_kyusei_fortune(year, month, day)
+            except Exception as e:
+                print("❌ lucky_direction 取得エラー:", e)
+                kyusei_text = ""
             # 占い結果を生成
             eto = get_nicchu_eto(birthdate)
             palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate, kyusei_text)
@@ -80,7 +75,7 @@ full_year = data.get("full_year", False) if is_json else (data.get("full_year") 
                     title, body = part, ""
                 shichu_texts[title] = body.strip()
             # ラッキー情報をリスト化
-            lucky_direction = ""
+            lucky_direction = kyusei_text
             lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
@@ -116,6 +111,7 @@ full_year = data.get("full_year", False) if is_json else (data.get("full_year") 
                 "shichu_result": shichu_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n")
             }
+            result_data["palm_image"] = image_data
             if full_year:
                 now = datetime.now()
                 result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
@@ -128,7 +124,6 @@ full_year = data.get("full_year", False) if is_json else (data.get("full_year") 
             traceback.print_exc()
             return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
     return render_template("index.html")
-
 
 @app.route("/renai", methods=["GET", "POST"])
 @app.route("/renaib4", methods=["GET", "POST"])
@@ -166,14 +161,12 @@ def renai():
         return send_file(filepath, as_attachment=True)
     return render_template("renai_form.html")
 
-
 @app.route("/preview/<filename>")
 def preview(filename):
     referer = request.referrer or ""
     if any(x in referer for x in ["/tenmob", "/selfmob", "/renai"]):
         return redirect(url_for("view_pdf", filename=filename))
     return render_template("fortune_pdf.html", filename=filename, referer=referer)
-
 
 @app.route("/view/<filename>")
 def view_pdf(filename):
@@ -182,7 +175,6 @@ def view_pdf(filename):
         return "ファイルが存在しません", 404
     return send_file(filepath, mimetype='application/pdf')
 
-
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
     birthdate = request.json.get("birthdate")
@@ -190,7 +182,6 @@ def get_eto():
     y, m, d = map(int, birthdate.split("-"))
     honmeisei = get_honmeisei(y, m, d)
     return jsonify({"eto": eto, "honmeisei": honmeisei})
-
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -204,17 +195,14 @@ def login():
         return render_template("login.html", next_url=next_url)
     return render_template("login.html", next_url=next_url)
 
-
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
 
-
 @app.route("/")
 def home():
     return render_template("home-unified.html")
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
