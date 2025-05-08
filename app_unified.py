@@ -35,10 +35,18 @@ def ten_shincom():
             data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
+    try:
+        year, month, day = map(int, birthdate.split("-"))
+        from kyusei_utils import get_kyusei_fortune
+        kyusei_text = get_kyusei_fortune(year, month, day)
+    except Exception as e:
+        print("❌ lucky_direction 取得エラー:", e)
+        kyusei_text = ""
+
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
             # 占い結果を生成
             eto = get_nicchu_eto(birthdate)
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate)
+            palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate, kyusei_text)
             # palm_resultテキストを解析し各項目を抽出
             palm_sections = [sec for sec in palm_result.split("### ") if sec.strip()]
             palm_texts = []
@@ -69,13 +77,8 @@ def ten_shincom():
                     title, body = part, ""
                 shichu_texts[title] = body.strip()
             # ラッキー情報をリスト化
-
-
-    # ✅ 九星気学による lucky_direction を生成（構文修正版）
-
-
-
-
+            lucky_direction = ""
+            lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
                     line = line.strip()
@@ -104,7 +107,7 @@ def ten_shincom():
                     "next_month_fortune": shichu_texts.get("来月の運勢", "")
                 },
                 "lucky_info": lucky_lines,
-                "lucky_direction": kyusei_text,
+                "lucky_direction": lucky_direction,
                 "birthdate": birthdate,
                 "palm_result": "\n".join(palm_texts),
                 "shichu_result": shichu_result.replace("\r\n", "\n").replace("\r", "\n"),
