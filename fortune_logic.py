@@ -34,7 +34,7 @@ def get_shichu_fortune(birthdate):
 ・項目ごとに明確に区切ってください。
 ・干支名は本文に含めないでください。"""
     try:
-        response = openai.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=1000
@@ -47,7 +47,7 @@ def get_shichu_fortune(birthdate):
 def get_iching_advice():
     prompt = "今の相談者にとって最適な易占いのアドバイスを、日本語で300文字以内で現実的に書いてください。"
     try:
-        response = openai.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=500
@@ -90,7 +90,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 def analyze_palm(image_data):
     try:
         base64data = image_data.split(",", 1)[1]
-        response = openai.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4-turbo",
             messages=[
                 {
