@@ -73,9 +73,7 @@ def ten_shincom():
 
 
     # ✅ 九星気学による lucky_direction を生成（構文修正版）
-    try:
-        year, month, day = map(int, birthdate.split("-"))
-        kyusei_text = get_kyusei_fortune(year, month, day)
+
     except Exception as e:
         print("❌ lucky_direction 取得エラー:", e)
         kyusei_text = ""
