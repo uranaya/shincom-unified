@@ -69,14 +69,11 @@ def ten_shincom():
                     title, body = part, ""
                 shichu_texts[title] = body.strip()
             # ラッキー情報をリスト化
-            lucky_direction = ""
 
 
     # ✅ 九星気学による lucky_direction を生成（構文修正版）
 
-    except Exception as e:
-        print("❌ lucky_direction 取得エラー:", e)
-        kyusei_text = ""
+
 
 
             if isinstance(lucky_info, str):
@@ -107,7 +104,7 @@ def ten_shincom():
                     "next_month_fortune": shichu_texts.get("来月の運勢", "")
                 },
                 "lucky_info": lucky_lines,
-                "lucky_direction": lucky_direction,
+                "lucky_direction": kyusei_text,
                 "birthdate": birthdate,
                 "palm_result": "\n".join(palm_texts),
                 "shichu_result": shichu_result.replace("\r\n", "\n").replace("\r", "\n"),
