@@ -4,6 +4,9 @@ import openai
 import os
 
 
+# ✅ APIキーの指定（必須）
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
 def generate_lucky_info(nicchu_eto: str, birthdate: str) -> list[str]:
     prompt = f"""
 あなたは占いのプロです。以下の干支と誕生日から、ラッキーアイテム、ラッキーカラー、ラッキーナンバー、ラッキーフード、ラッキーデーを1つずつ箇条書きで出力してください。
