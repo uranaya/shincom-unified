@@ -162,7 +162,6 @@ def draw_shincom_a4(c, data, include_yearly=False):
     y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
-        c.showPage()
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
 
 
@@ -214,7 +213,6 @@ def draw_shincom_b4(c, data, include_yearly=False):
     y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
-        c.showPage()
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])
 
 
