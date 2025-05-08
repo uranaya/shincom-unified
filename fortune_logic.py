@@ -16,36 +16,12 @@ def get_nicchu_eto(birthdate):
             while index >= 60:
                 index -= 60
             return stems[index % 10] + branches[index % 12]
-    # 今後必要ならば、以下にトピック占いや年運の生成処理を追加可能
         return "不明"
     except Exception as e:
         print("❌ 日柱計算エラー:", e)
         return "不明"
 
 def get_shichu_fortune(birthdate):
-
-    def get_shichu_fortune_structured(birthdate):
-        raw = get_shichu_fortune(birthdate)
-        sections = {
-            "personality": "",
-            "month_fortune": "",
-            "next_month_fortune": ""
-        }
-        current_key = None
-        mapping = {
-            "性格": "personality",
-            "今月の運勢": "month_fortune",
-            "来月の運勢": "next_month_fortune"
-        }
-
-        for line in raw.splitlines():
-            line = line.strip()
-            if line.startswith("■"):
-                title = line.replace("■", "").strip()
-                current_key = mapping.get(title)
-            elif current_key:
-                sections[current_key] += line + "\n"
-        return sections
     eto = get_nicchu_eto(birthdate)
     prompt = f"""あなたはプロの四柱推命鑑定士です。
 以下の干支（日柱）が「{eto}」の人に対して、以下の3つの項目で現実的な鑑定をしてください。
@@ -81,18 +57,35 @@ def get_iching_advice():
         print("❌ 易占い取得エラー:", e)
         return "取得できませんでした。"
 
-def get_lucky_info(birthdate):
-    prompt = "10代の人に向けたラッキーカラー・ラッキーアイテム・ラッキーナンバーを、それぞれ1行で日本語で教えてください。"
+def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
+    prompt = f"""あなたは占いの専門家です。
+相談者は現在{age}歳です。以下の3つの鑑定結果を参考にしてください。
+
+【手相】\n{palm_result}\n
+【四柱推命】\n{shichu_result}\n
+【九星気学の方位】\n{kyusei_text}
+
+この内容を元に、相談者にとって今最も運気を高めるための
+ラッキーアイテム・ラッキーカラー・ラッキーナンバー・ラッキーフード・ラッキーデー
+をそれぞれ1つずつ、以下の形式で提案してください：
+
+・ラッキーアイテム：〇〇
+・ラッキーカラー：〇〇
+・ラッキーナンバー：〇〇
+・ラッキーフード：〇〇
+・ラッキーデー：〇曜日
+
+自然で前向きな言葉で書いてください。"""
     try:
-        response = openai.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=300
+            temperature=0.7
         )
-        return response.choices[0].message.content.strip()
+        return response["choices"][0]["message"]["content"].splitlines()
     except Exception as e:
-        print("❌ ラッキー情報取得エラー:", e)
-        return "取得できませんでした。"
+        print("❌ ラッキー情報取得失敗:", e)
+        return ["取得できませんでした。"]
 
 def analyze_palm(image_data):
     try:
@@ -103,7 +96,7 @@ def analyze_palm(image_data):
                 {
                     "role": "system",
                     "content": (
-                        "あなたはプロの手相鑑定士です。以下の指示に従って、写真から手相を分析し日本語で出力してください。"
+                        "あなたはプロの手相鑑定士です。以下の条件に従い、特殊線を優先的にピックアップし、金運に関する要素があれば優先的に言及し、なければ無理に言及しないようにしてください。全体として相談者の魅力を引き出す自然な文章で出力してください。"
                     ),
                 },
                 {
@@ -119,7 +112,7 @@ def analyze_palm(image_data):
                                 "### 4. 運命線\n（説明文）\n\n"
                                 "### 5. 太陽線\n（説明文）\n\n"
                                 "### 総合的なアドバイス\n（全体を踏まえたまとめ）\n\n"
-                                "・各項目は400文字前後で\n・丁寧でわかりやすく自然な表現で\n・改行や記号などで項目を明確に区切ってください"
+                                "・各項目は400文字以内\n・改行や記号などで項目を明確に区切ること\n・特殊線があれば必ず言及し、無ければ触れずに他の魅力を強調する"
                             ),
                         },
                         {
@@ -138,12 +131,15 @@ def analyze_palm(image_data):
         print("❌ Vision APIエラー:", e)
         return "手相診断中にエラーが発生しました。"
 
-def generate_fortune(image_data, birthdate):
+def generate_fortune(image_data, birthdate, kyusei_text):
     palm_result = analyze_palm(image_data)
     shichu_result = get_shichu_fortune(birthdate)
     iching_result = get_iching_advice()
-    lucky_info = get_lucky_info(birthdate)
+    age = datetime.today().year - int(birthdate[:4])
+    nicchu_eto = get_nicchu_eto(birthdate)
+    lucky_info = get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text)
     return palm_result, shichu_result, iching_result, lucky_info
+
 
 def generate_renai_fortune(user_birth, partner_birth=None, include_yearly=False):
     result = {

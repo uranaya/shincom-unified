@@ -8,9 +8,11 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify
 from dotenv import load_dotenv
 from yearly_fortune_utils import generate_yearly_fortune
+from kyusei_utils import get_kyusei_fortune
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
 from kyusei_utils import get_honmeisei
 from pdf_generator_unified import create_pdf_unified
+from kyusei_utils import get_kyusei_fortune
 from fortune_logic import generate_renai_fortune
 
 load_dotenv()
@@ -70,7 +72,11 @@ def ten_shincom():
                 shichu_texts[title] = body.strip()
             # ラッキー情報をリスト化
             lucky_direction = ""
-            lucky_lines = []
+        
+    # ✅ 九星気学による lucky_direction を生成
+    year, month, day = map(int, birthdate.split("-"))
+    kyusei_text = get_kyusei_fortune(year, month, day)
+    lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
                     line = line.strip()
@@ -99,7 +105,7 @@ def ten_shincom():
                     "next_month_fortune": shichu_texts.get("来月の運勢", "")
                 },
                 "lucky_info": lucky_lines,
-                "lucky_direction": lucky_direction,
+                "lucky_direction": kyusei_text,
                 "birthdate": birthdate,
                 "palm_result": "\n".join(palm_texts),
                 "shichu_result": shichu_result.replace("\r\n", "\n").replace("\r", "\n"),

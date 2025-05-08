@@ -42,6 +42,7 @@ def draw_palm_image(c, base64_image, width, y):
 
 
 def draw_yearly_pages_shincom_a4(c, yearly):
+    from reportlab.lib.units import mm
     width, height = A4
     margin = 20 * mm
     y = height - 30 * mm
@@ -50,20 +51,19 @@ def draw_yearly_pages_shincom_a4(c, yearly):
         nonlocal y
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {title}")
-        y -= 3 * mm
+        y -= 10 * mm
         c.setFont(FONT_NAME, 11)
         from textwrap import wrap
         for line in wrap(text or "", 40):
+            c.drawString(margin, y, line)
+            y -= 7 * mm
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
-            c.drawString(margin, y, line)
-            y -= 7 * mm
-        y -= 10 * mm
 
     # ページ3：年運＋前半6か月
     c.showPage()
-    y = height - 30 * mm
+    y = height - 30 * mm  # ← 初期化を忘れずに
     draw_text_block(yearly["year_label"], yearly["year_text"])
     for month in yearly["months"][:6]:
         draw_text_block(month["label"], month["text"])
@@ -75,7 +75,9 @@ def draw_yearly_pages_shincom_a4(c, yearly):
         draw_text_block(month["label"], month["text"])
 
 
+
 def draw_yearly_pages_shincom_b4(c, yearly):
+    from reportlab.lib.units import mm
     width, height = B4
     margin = 20 * mm
     y = height - 30 * mm
@@ -84,20 +86,19 @@ def draw_yearly_pages_shincom_b4(c, yearly):
         nonlocal y
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {title}")
-        y -= 3 * mm
+        y -= 10 * mm
         c.setFont(FONT_NAME, 11)
         from textwrap import wrap
         for line in wrap(text or "", 45):
+            c.drawString(margin, y, line)
+            y -= 7 * mm
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
-            c.drawString(margin, y, line)
-            y -= 7 * mm
-        y -= 10 * mm
 
     # ページ3：年運＋前半6か月
     c.showPage()
-    y = height - 30 * mm
+    y = height - 30 * mm  # ← 必ず初期化
     draw_text_block(yearly["year_label"], yearly["year_text"])
     for month in yearly["months"][:6]:
         draw_text_block(month["label"], month["text"])
@@ -107,6 +108,7 @@ def draw_yearly_pages_shincom_b4(c, yearly):
     y = height - 30 * mm
     for month in yearly["months"][6:]:
         draw_text_block(month["label"], month["text"])
+
 
 
 
@@ -318,3 +320,36 @@ def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
     else:
         draw_renai_pdf(c, data, size, include_yearly)
     c.save()
+
+def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
+    from reportlab.lib.units import mm
+    c.setFont("IPAexGothic", 12)
+
+    # ラッキー情報タイトル
+    c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
+    y -= 10 * mm
+
+    # ラッキー情報リスト（存在チェック）
+    if lucky_info:
+        for item in lucky_info:
+            if item and isinstance(item, str):
+                c.drawString(margin + 10, y, item.strip())
+                y -= 7 * mm
+    else:
+        c.drawString(margin + 10, y, "情報が取得できませんでした。")
+        y -= 7 * mm
+
+    y -= 5 * mm  # 少し余白
+
+    # 吉方位タイトル＋中身（存在チェック）
+    if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
+        c.drawString(margin, y, "■ 吉方位（九星気学より）")
+        y -= 7 * mm
+        for line in lucky_direction.strip().splitlines():
+            c.drawString(margin + 10, y, line)
+            y -= 7 * mm
+    else:
+        c.drawString(margin, y, "■ 吉方位（九星気学より）情報未取得")
+        y -= 7 * mm
+
+    return y - 10 * mm

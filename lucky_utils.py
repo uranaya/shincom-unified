@@ -33,9 +33,9 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
     c.setFont("IPAexGothic", 12)
     c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
     y -= 12
-    c.setFont("IPAexGothic", 10)
+    c.setFont("IPAexGothic", 12)
     for item in lucky_info:
-        c.drawString(margin + 10, y, item)
+        c.drawString(margin + 12, y, item)
         y -= 12
     y -= 6
     c.drawString(margin, y, f"■ 吉方位（九星気学より）{lucky_direction}")
