@@ -51,7 +51,7 @@ def draw_yearly_pages_shincom_a4(c, yearly):
         nonlocal y
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {title}")
-        y -= 10 * mm
+        y -= 6 * mm
         c.setFont(FONT_NAME, 11)
         from textwrap import wrap
         for line in wrap(text or "", 40):
@@ -60,6 +60,8 @@ def draw_yearly_pages_shincom_a4(c, yearly):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
+        y -= 6 * mm
+
 
     # ページ3：年運＋前半6か月
     c.showPage()
@@ -86,7 +88,7 @@ def draw_yearly_pages_shincom_b4(c, yearly):
         nonlocal y
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {title}")
-        y -= 10 * mm
+        y -= 6 * mm
         c.setFont(FONT_NAME, 11)
         from textwrap import wrap
         for line in wrap(text or "", 45):
@@ -95,6 +97,7 @@ def draw_yearly_pages_shincom_b4(c, yearly):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
+        y -= 6 * mm
 
     # ページ3：年運＋前半6か月
     c.showPage()

@@ -26,7 +26,7 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
     prompt_year = f"""あなたは四柱推命のプロの占い師です。
 - 日柱: {nicchu}
 - 対象年: {now.year}
-- 200文字以内、主語は「あなた」、現実的な文体でお願いします。"""
+- 150文字以内、主語は「あなた」、現実的な文体でお願いします。"""
 
     year_fortune = _ask_openai(prompt_year)
 
