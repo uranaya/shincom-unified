@@ -70,7 +70,8 @@ def ten_shincom():
                 shichu_texts[title] = body.strip()
             # ラッキー情報をリスト化
             lucky_direction = ""
-        
+
+
     # ✅ 九星気学による lucky_direction を生成（構文修正版）
     try:
         year, month, day = map(int, birthdate.split("-"))
@@ -78,7 +79,8 @@ def ten_shincom():
     except Exception as e:
         print("❌ lucky_direction 取得エラー:", e)
         kyusei_text = ""
-    lucky_lines = []
+
+
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
                     line = line.strip()
