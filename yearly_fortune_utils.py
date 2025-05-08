@@ -42,7 +42,7 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
 - 年月: {y}年{m}月
 
 以下の条件で月運を作成してください:
-- 約150文字
+- 約120文字
 - 仕事・人間関係・感情面・健康などを含めて具体的に
 - 主語「あなた」、温かみある語り口で"""
 
