@@ -7,7 +7,7 @@ from fortune_logic import get_nicchu_eto  # 既存の実装をそのまま利用
 MAX_CHAR = 300  # 月運 300 文字以内
 
 def _ask_openai(prompt: str) -> str:
-    response = openai.ChatCompletion.create(
+    response = openai.client.chat.completions.create(
         model="gpt-3.5-turbo",
         max_tokens=850,
         temperature=0.7,

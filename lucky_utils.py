@@ -15,7 +15,7 @@ def generate_lucky_info(nicchu_eto: str, birthdate: str) -> list[str]:
 ・ラッキーフード：〇〇
 ・ラッキーデー：〇曜日
 """
-    response = openai.ChatCompletion.create(
+    response = openai.client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7
