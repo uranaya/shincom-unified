@@ -74,8 +74,12 @@ def ten_shincom():
             lucky_direction = ""
         
     # ✅ 九星気学による lucky_direction を生成
-    year, month, day = map(int, birthdate.split("-"))
-    kyusei_text = get_kyusei_fortune(year, month, day)
+    try:
+        year, month, day = map(int, birthdate.split("-"))
+        kyusei_text = get_kyusei_fortune(year, month, day)
+    except Exception as e:
+        print("❌ 九星気学 lucky_direction エラー:", e)
+        kyusei_text = ""
     lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
