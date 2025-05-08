@@ -49,17 +49,17 @@ def draw_yearly_pages_shincom_a4(c, yearly):
 
     def draw_text_block(title, text):
         nonlocal y
-        c.setFont(FONT_NAME, 13)
+        c.setFont(FONT_NAME, 12)
         c.drawString(margin, y, f"■ {title}")
-        y -= 3 * mm
+        y -= 4 * mm
         c.setFont(FONT_NAME, 10)
         for line in wrap(text or "", 46):
             c.drawString(margin, y, line)
-            y -= 6 * mm
+            y -= 4 * mm
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
-        y -= 3 * mm
+        y -= 4 * mm
 
     # ページ3：年運＋前半6か月
     c.showPage()
@@ -326,33 +326,33 @@ def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
 
 def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
     from reportlab.lib.units import mm
-    from textwrap import wrap
-
     c.setFont("IPAexGothic", 12)
     c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
     y -= 8 * mm
-    c.setFont("IPAexGothic", 10)  # ← 本文サイズ統一
+    c.setFont("IPAexGothic", 10)
 
-    # ラッキー情報（1行ずつ・40文字で折り返し）
     if lucky_info:
         for item in lucky_info:
             if item and isinstance(item, str):
-                for line in wrap(item.strip(), 40):
-                    c.drawString(margin + 10, y, line)
+                # 「：」で区切って右側を1文に制限（句点で区切る）
+                if '：' in item:
+                    title, content = item.split('：', 1)
+                    content_short = content.split('。')[0] + '。' if '。' in content else content
+                    text = f"{title}：{content_short.strip()}"
+                    c.drawString(margin + 10, y, text)
                     y -= 6 * mm
     else:
         c.drawString(margin + 10, y, "情報が取得できませんでした。")
         y -= 6 * mm
 
-    y -= 4 * mm  # 余白
+    y -= 4 * mm
 
-    # 吉方位
     c.setFont("IPAexGothic", 12)
     if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
         c.drawString(margin, y, "■ 吉方位（九星気学より）")
         y -= 6 * mm
         c.setFont("IPAexGothic", 10)
-        for line in wrap(lucky_direction.strip(), 42):
+        for line in lucky_direction.strip().splitlines():
             c.drawString(margin + 10, y, line)
             y -= 6 * mm
     else:
