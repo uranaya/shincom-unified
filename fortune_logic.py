@@ -77,7 +77,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 自然で前向きな言葉で書いてください。"""
     try:
-        response = openai.openai.ChatCompletion.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
@@ -171,7 +171,7 @@ def generate_renai_fortune(user_birth, partner_birth=None, include_yearly=False)
 """
 
     try:
-        response = openai.openai.ChatCompletion.create(
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_compatibility}],
             temperature=0.9
