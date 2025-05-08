@@ -63,9 +63,9 @@ def draw_yearly_pages_shincom_a4(c, yearly):
 
     # ページ3：年運＋前半6か月
     c.showPage()
-    y = height - 30 * mm
+    y = height - 30 * mm  # ← 初期化を忘れずに
     draw_text_block(yearly["year_label"], yearly["year_text"])
-    for i, month in enumerate(yearly["months"][:6]):
+    for month in yearly["months"][:6]:
         draw_text_block(month["label"], month["text"])
 
     # ページ4：後半6か月
@@ -73,6 +73,7 @@ def draw_yearly_pages_shincom_a4(c, yearly):
     y = height - 30 * mm
     for month in yearly["months"][6:]:
         draw_text_block(month["label"], month["text"])
+
 
 
 def draw_yearly_pages_shincom_b4(c, yearly):
@@ -97,9 +98,9 @@ def draw_yearly_pages_shincom_b4(c, yearly):
 
     # ページ3：年運＋前半6か月
     c.showPage()
-    y = height - 30 * mm
+    y = height - 30 * mm  # ← 必ず初期化
     draw_text_block(yearly["year_label"], yearly["year_text"])
-    for i, month in enumerate(yearly["months"][:6]):
+    for month in yearly["months"][:6]:
         draw_text_block(month["label"], month["text"])
 
     # ページ4：後半6か月
@@ -107,6 +108,7 @@ def draw_yearly_pages_shincom_b4(c, yearly):
     y = height - 30 * mm
     for month in yearly["months"][6:]:
         draw_text_block(month["label"], month["text"])
+
 
 
 
