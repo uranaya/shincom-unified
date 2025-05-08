@@ -25,16 +25,11 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 @app.route("/ten", methods=["GET", "POST"])
 @app.route("/tenmob", methods=["GET", "POST"])
 def ten_shincom():
-    if "logged_in" not in session:
-        return redirect(url_for("login"))
-    mode = "shincom"
-    size = "B4" if request.path == "/ten" else "A4"
-    is_json = request.is_json
-    if request.method == "POST":            data = request.get_json() if is_json else request.form
-            image_data = data.get("image_data")
-            birthdate = data.get("birthdate")
 
-    # ✅ 九星気学による lucky_direction を生成（構文・インデント修正版）
+    image_data = data.get("image_data")
+    birthdate = data.get("birthdate")
+
+    # ✅ 九星気学 lucky_direction を生成（安全な構文とインデント）
     try:
         year, month, day = map(int, birthdate.split("-"))
         from kyusei_utils import get_kyusei_fortune
@@ -43,7 +38,15 @@ def ten_shincom():
         print("❌ lucky_direction 取得エラー:", e)
         kyusei_text = ""
 
-            full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
+    if "logged_in" not in session:
+        return redirect(url_for("login"))
+    mode = "shincom"
+    size = "B4" if request.path == "/ten" else "A4"
+    is_json = request.is_json
+    if request.method == "POST":
+        try:
+            data = request.get_json() if is_json else request.form
+full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
             # 占い結果を生成
             eto = get_nicchu_eto(birthdate)
             palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate, kyusei_text)
@@ -113,9 +116,6 @@ def ten_shincom():
                 "shichu_result": shichu_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n")
             }
-            result_data["palm_image"] = image_data  # ←これを追加
-
-
             if full_year:
                 now = datetime.now()
                 result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
