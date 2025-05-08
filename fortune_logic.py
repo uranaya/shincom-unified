@@ -1,5 +1,13 @@
+from openai import OpenAI
 
-import openai
+client = OpenAI()
+
+response = client.chat.completions.create(
+    model="gpt-4",
+    messages=[...],
+    temperature=1.0
+)
+
 from datetime import datetime
 from hayami_table_full_complete import hayami_table
 

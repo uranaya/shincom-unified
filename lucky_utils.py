@@ -1,7 +1,15 @@
-
 import datetime
 from kyusei_utils import get_honmeisei, get_directions
-import openai
+from openai import OpenAI
+
+client = OpenAI()
+
+response = client.chat.completions.create(
+    model="gpt-4",
+    messages=[...],
+    temperature=1.0
+)
+
 
 def generate_lucky_info(nicchu_eto: str, birthdate: str) -> list[str]:
     prompt = f"""
