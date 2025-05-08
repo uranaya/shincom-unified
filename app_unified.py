@@ -35,6 +35,8 @@ def ten_shincom():
             data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
+
+    # ✅ 九星気学による lucky_direction を生成（構文修正版）
     try:
         year, month, day = map(int, birthdate.split("-"))
         from kyusei_utils import get_kyusei_fortune
