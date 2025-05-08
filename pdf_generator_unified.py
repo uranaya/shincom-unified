@@ -55,7 +55,7 @@ def draw_yearly_pages_shincom_a4(c, yearly):
         c.setFont(FONT_NAME, 10)
         for line in wrap(text or "", 46):
             c.drawString(margin, y, line)
-            y -= 3 * mm
+            y -= 6 * mm
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
