@@ -53,17 +53,25 @@ def draw_yearly_pages_shincom_a4(c, yearly):
         c.drawString(margin, y, f"■ {title}")
         y -= 10 * mm
         c.setFont(FONT_NAME, 11)
-        for line in text.splitlines():
+        from textwrap import wrap
+        for line in wrap(text or "", 40):
             c.drawString(margin, y, line)
             y -= 7 * mm
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
 
+    # ページ3：年運＋前半6か月
     c.showPage()
     y = height - 30 * mm
     draw_text_block(yearly["year_label"], yearly["year_text"])
-    for month in yearly["months"]:
+    for i, month in enumerate(yearly["months"][:6]):
+        draw_text_block(month["label"], month["text"])
+
+    # ページ4：後半6か月
+    c.showPage()
+    y = height - 30 * mm
+    for month in yearly["months"][6:]:
         draw_text_block(month["label"], month["text"])
 
 
@@ -79,18 +87,27 @@ def draw_yearly_pages_shincom_b4(c, yearly):
         c.drawString(margin, y, f"■ {title}")
         y -= 10 * mm
         c.setFont(FONT_NAME, 11)
-        for line in text.splitlines():
+        from textwrap import wrap
+        for line in wrap(text or "", 45):
             c.drawString(margin, y, line)
             y -= 7 * mm
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
 
+    # ページ3：年運＋前半6か月
     c.showPage()
     y = height - 30 * mm
     draw_text_block(yearly["year_label"], yearly["year_text"])
-    for month in yearly["months"]:
+    for i, month in enumerate(yearly["months"][:6]):
         draw_text_block(month["label"], month["text"])
+
+    # ページ4：後半6か月
+    c.showPage()
+    y = height - 30 * mm
+    for month in yearly["months"][6:]:
+        draw_text_block(month["label"], month["text"])
+
 
 
 def draw_shincom_a4(c, data, include_yearly=False):
