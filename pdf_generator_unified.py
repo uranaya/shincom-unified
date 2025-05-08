@@ -47,20 +47,21 @@ def draw_yearly_pages_shincom_a4(c, yearly):
     margin = 20 * mm
     y = height - 30 * mm
 
-    def draw_text_block(title, text):
-        nonlocal y
-        c.setFont(FONT_NAME, 13)
-        c.drawString(margin, y, f"■ {title}")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
-        from textwrap import wrap
-        for line in wrap(text or "", 42):  # ← 横幅緩和
-            c.drawString(margin, y, line)
-            y -= 6 * mm
-            if y < 30 * mm:
-                c.showPage()
-                y = height - 30 * mm
-        y -= 6 * mm
+def draw_text_block(title, text):
+    nonlocal y
+    c.setFont(FONT_NAME, 13)
+    c.drawString(margin, y, f"■ {title}")
+    y -= 6 * mm
+    c.setFont(FONT_NAME, 10)  # ← フォントサイズ統一
+    from textwrap import wrap
+    for line in wrap(text or "", 46):  # ← 横幅を広げる
+        c.drawString(margin, y, line)
+        y -= 6 * mm  # ← 行間も少し詰める
+        if y < 30 * mm:
+            c.showPage()
+            y = height - 30 * mm
+    y -= 6 * mm
+
 
     c.showPage()
     y = height - 30 * mm
