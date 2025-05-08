@@ -37,7 +37,7 @@ def get_kyusei_fortune_openai(year: int, month: int, day: int) -> str:
 """
 
     try:
-        response = openai.openai.ChatCompletion.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,
@@ -73,7 +73,7 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
 """.strip()
 
     try:
-        res = openai.openai.ChatCompletion.create(
+        res = openai.ChatCompletion.create(
             model="gpt-4",  # 必要に応じて gpt-3.5-turbo に変更可能
             messages=[{"role": "user", "content": prompt}],
             max_tokens=100,
