@@ -52,29 +52,27 @@ def draw_yearly_pages_shincom_a4(c, yearly):
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {title}")
         y -= 6 * mm
-        c.setFont(FONT_NAME, 11)
+        c.setFont(FONT_NAME, 10)
         from textwrap import wrap
-        for line in wrap(text or "", 40):
+        for line in wrap(text or "", 42):  # ← 横幅緩和
             c.drawString(margin, y, line)
-            y -= 7 * mm
+            y -= 6 * mm
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
         y -= 6 * mm
 
-
-    # ページ3：年運＋前半6か月
     c.showPage()
-    y = height - 30 * mm  # ← 初期化を忘れずに
+    y = height - 30 * mm
     draw_text_block(yearly["year_label"], yearly["year_text"])
     for month in yearly["months"][:6]:
         draw_text_block(month["label"], month["text"])
 
-    # ページ4：後半6か月
     c.showPage()
     y = height - 30 * mm
     for month in yearly["months"][6:]:
         draw_text_block(month["label"], month["text"])
+
 
 
 
