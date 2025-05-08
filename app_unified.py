@@ -105,6 +105,9 @@ def ten_shincom():
                 "shichu_result": shichu_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n")
             }
+            result_data["palm_image"] = image_data  # ←これを追加
+
+
             if full_year:
                 now = datetime.now()
                 result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
