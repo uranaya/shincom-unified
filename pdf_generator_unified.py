@@ -51,15 +51,15 @@ def draw_yearly_pages_shincom_a4(c, yearly):
         nonlocal y
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {title}")
-        y -= 6 * mm
+        y -= 3 * mm
         c.setFont(FONT_NAME, 10)
         for line in wrap(text or "", 46):
             c.drawString(margin, y, line)
-            y -= 6 * mm
+            y -= 3 * mm
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
-        y -= 6 * mm
+        y -= 3 * mm
 
     # ページ3：年運＋前半6か月
     c.showPage()
@@ -326,33 +326,37 @@ def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
 
 def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
     from reportlab.lib.units import mm
+    from textwrap import wrap
+
     c.setFont("IPAexGothic", 12)
-
-    # ラッキー情報タイトル
     c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
-    y -= 10 * mm
+    y -= 8 * mm
+    c.setFont("IPAexGothic", 10)  # ← 本文サイズ統一
 
-    # ラッキー情報リスト（存在チェック）
+    # ラッキー情報（1行ずつ・40文字で折り返し）
     if lucky_info:
         for item in lucky_info:
             if item and isinstance(item, str):
-                c.drawString(margin + 10, y, item.strip())
-                y -= 7 * mm
+                for line in wrap(item.strip(), 40):
+                    c.drawString(margin + 10, y, line)
+                    y -= 6 * mm
     else:
         c.drawString(margin + 10, y, "情報が取得できませんでした。")
-        y -= 7 * mm
+        y -= 6 * mm
 
-    y -= 5 * mm  # 少し余白
+    y -= 4 * mm  # 余白
 
-    # 吉方位タイトル＋中身（存在チェック）
+    # 吉方位
+    c.setFont("IPAexGothic", 12)
     if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
         c.drawString(margin, y, "■ 吉方位（九星気学より）")
-        y -= 7 * mm
-        for line in lucky_direction.strip().splitlines():
+        y -= 6 * mm
+        c.setFont("IPAexGothic", 10)
+        for line in wrap(lucky_direction.strip(), 42):
             c.drawString(margin + 10, y, line)
-            y -= 7 * mm
+            y -= 6 * mm
     else:
         c.drawString(margin, y, "■ 吉方位（九星気学より）情報未取得")
-        y -= 7 * mm
+        y -= 6 * mm
 
     return y - 10 * mm

@@ -9,18 +9,17 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def generate_lucky_info(nicchu_eto: str, birthdate: str) -> list[str]:
     prompt = f"""
-あなたは占いのプロです。以下の干支と生年月日から、ラッキー情報を端的に1行ずつ出力してください。補足説明は不要です。
+あなたは占いのプロです。以下の干支と生年月日から、ラッキー情報を1行だけ端的に出力してください。補足説明は不要です。
 
 - 干支（日柱）: {nicchu_eto}
 - 生年月日: {birthdate}
 
-以下の形式で出力してください（各項目は1語または短文）：
+以下の形式で出力してください（1行のみ、補足文や助言は不要）：
 ・ラッキーアイテム：〇〇  
 ・ラッキーカラー：〇〇  
 ・ラッキーナンバー：〇〇  
 ・ラッキーフード：〇〇  
 ・ラッキーデー：〇曜日
-
 """
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
@@ -28,6 +27,7 @@ def generate_lucky_info(nicchu_eto: str, birthdate: str) -> list[str]:
         temperature=0.7
     )
     return response["choices"][0]["message"]["content"].splitlines()
+
 
 def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
     honmeisei = get_honmeisei(birthdate)
