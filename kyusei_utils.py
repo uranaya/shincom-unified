@@ -1,15 +1,8 @@
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import json
-from openai import OpenAI
-
-client = OpenAI()
-
-response = client.chat.completions.create(
-    model="gpt-4",
-    messages=[...],
-    temperature=1.0
-)
+import openai
+import os
 
 
 NINE_STARS = [
@@ -44,7 +37,7 @@ def get_kyusei_fortune_openai(year: int, month: int, day: int) -> str:
 """
 
     try:
-        response = openai.client.chat.completions.create(
+        response = openai.openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,
@@ -80,7 +73,7 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
 """.strip()
 
     try:
-        res = openai.client.chat.completions.create(
+        res = openai.openai.ChatCompletion.create(
             model="gpt-4",  # 必要に応じて gpt-3.5-turbo に変更可能
             messages=[{"role": "user", "content": prompt}],
             max_tokens=100,

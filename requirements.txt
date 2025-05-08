@@ -1,6 +1,6 @@
 Flask
 gunicorn
-openai>=1.2.0
+openai==0.28.1
 python-dateutil
 python-dotenv
 reportlab

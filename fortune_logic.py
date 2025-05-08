@@ -1,13 +1,5 @@
-from openai import OpenAI
-
-client = OpenAI()
-
-response = client.chat.completions.create(
-    model="gpt-4",
-    messages=[...],
-    temperature=1.0
-)
-
+import openai
+import os
 from datetime import datetime
 from hayami_table_full_complete import hayami_table
 
@@ -85,7 +77,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 自然で前向きな言葉で書いてください。"""
     try:
-        response = openai.client.chat.completions.create(
+        response = openai.openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
@@ -179,7 +171,7 @@ def generate_renai_fortune(user_birth, partner_birth=None, include_yearly=False)
 """
 
     try:
-        response = openai.client.chat.completions.create(
+        response = openai.openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_compatibility}],
             temperature=0.9

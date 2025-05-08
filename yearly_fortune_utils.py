@@ -1,13 +1,5 @@
-from openai import OpenAI
-
-client = OpenAI()
-
-response = client.chat.completions.create(
-    model="gpt-4",
-    messages=[...],
-    temperature=1.0
-)
-
+import openai
+import os
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from kyusei_utils import get_honmeisei, get_directions
