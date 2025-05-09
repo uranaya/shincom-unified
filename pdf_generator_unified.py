@@ -24,12 +24,6 @@ def wrap(text, limit):
     return _wrap(text, limit)
 
 
-def draw_header(c, width, margin, y):
-    c.setFont(FONT_NAME, 14)
-    c.drawString(margin, y, "💖 恋愛運鑑定書")
-    return y - 15 * mm
-
-
 def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
     from reportlab.lib.units import mm
     c.setFont("IPAexGothic", 12)

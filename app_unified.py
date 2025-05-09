@@ -145,14 +145,14 @@ def renai():
             "compatibility": raw_result.get("compatibility_text", ""),
             "love_summary": raw_result.get("overall_love_fortune", "")
         }
-        result_data = {
-            "titles": titles,
-            "texts": texts,
-            "themes": raw_result.get("topic_fortunes", []),
-            "lucky_info": raw_result.get("lucky_info", "取得できませんでした。"),
-            "lucky_direction": raw_result.get("lucky_direction", ""),
-            "birthdate": user_birth
+        result_data["texts"] = {
+            "compatibility": raw_result["compatibility_text"],
+            "overall_love_fortune": raw_result.get("overall_love_fortune", ""),
+            "year_love": raw_result.get("year_love", ""),
+            "month_love": raw_result.get("month_love", ""),
+            "next_month_love": raw_result.get("next_month_love", "")
         }
+
         if include_yearly:
             result_data["yearly_love_fortunes"] = raw_result.get("yearly_love_fortunes", {})
         filename = f"renai_{uuid.uuid4()}.pdf"
