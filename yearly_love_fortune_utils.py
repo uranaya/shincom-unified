@@ -19,7 +19,7 @@ def _ask_openai(prompt: str) -> str:
 
 def generate_yearly_love_fortune(user_birth: str, now: datetime):
 
-from nicchu_utils import get_nicchu_eto
+    from nicchu_utils import get_nicchu_eto
 
     """干支（日柱）と九星の本命星を求め、年運＋12 か月分を返す"""
     nicchu = get_nicchu_eto(user_birth)
