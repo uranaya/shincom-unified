@@ -31,8 +31,20 @@ def generate_lucky_info(nicchu_eto: str, birthdate: str) -> list[str]:
     )
     return response["choices"][0]["message"]["content"].splitlines()
 
-
 def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
+    # 生年月日から本命星を取得
+    try:
+        bd = (birthdate if isinstance(birthdate, datetime.date) 
+              else datetime.datetime.strptime(birthdate, "%Y-%m-%d").date())
+    except Exception as e:
+        bd = today  # パース失敗時は今日の日付で代用
+    honmeisei = get_honmeisei(bd.year, bd.month, bd.day)
+    # 今年・今月・来月の吉方位を取得
+    good_dir_year, _ = get_directions(today.year, 0, honmeisei)
+    good_dir, _ = get_directions(today.year, today.month, honmeisei)
+    next_month = today + datetime.timedelta(days=30)
+    good_dir_next, _ = get_directions(next_month.year, next_month.month, honmeisei)
+    return f"今年の吉方位は{good_dir_year}、今月は{good_dir}、来月は{good_dir_next}です。"def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
     honmeisei = get_honmeisei(birthdate)
     good_dir, bad_dir = get_directions(today.year, today.month, honmeisei)
     next_month = today + datetime.timedelta(days=30)
