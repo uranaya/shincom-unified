@@ -31,6 +31,7 @@ def generate_lucky_info(nicchu_eto: str, birthdate: str) -> list[str]:
     )
     return response["choices"][0]["message"]["content"].splitlines()
 
+
 def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
     # 生年月日から本命星を取得
     try:
@@ -50,6 +51,7 @@ def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
     next_month = today + datetime.timedelta(days=30)
     good_dir_next, bad_dir_next = get_directions(next_month.year, next_month.month, honmeisei)
     return f"今年の吉方位は{good_dir}、今月は{good_dir}、来月は{good_dir_next}です。"
+
 
 def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
     from reportlab.lib.units import mm
