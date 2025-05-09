@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 from kyusei_utils import get_honmeisei, get_directions
 from fortune_logic import get_nicchu_eto  # 既存の実装をそのまま利用
 
-MAX_CHAR = 300  # 月運 300 文字以内
+MAX_CHAR = 250  # 月運 250 文字以内
 
 def _ask_openai(prompt: str) -> str:
     response = openai.ChatCompletion.create(
@@ -27,14 +27,14 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
     prompt_year = f"""あなたは四柱推命のプロの占い師です。
 - 日柱: {nicchu}
 - 対象年: {now.year}
-- 120文字以内、主語は「あなた」、現実的な文体でお願いします。"""
+- 100文字以内、主語は「あなた」、現実的な文体でお願いします。"""
 
     year_fortune = _ask_openai(prompt_year)
 
     # 月運リスト（get_directions 削除）
     month_fortunes = []
     for i in range(12):
-        target = (now.replace(day=15) + relativedelta(months=i))
+2       target = (now.replace(day=15) + relativedelta(months=i))
         y, m = target.year, target.month
 
         prompt_month = f"""あなたは四柱推命のプロの占い師です。

@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 from kyusei_utils import get_honmeisei, get_directions
 
 
-MAX_CHAR = 150  # 月運 150 文字以内
+MAX_CHAR = 120  # 月運 120 文字以内
 
 def _ask_openai(prompt: str) -> str:
     response = openai.ChatCompletion.create(
