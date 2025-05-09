@@ -325,9 +325,7 @@ def draw_yearly_pages_renai_b4(c, yearly):
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
-    from reportlab.lib.pagesizes import A4, B4
-    from reportlab.lib.units import mm
-    from pdf_utils import wrap, FONT_NAME, draw_header, draw_lucky_section
+
     from pdf_generator_unified import draw_yearly_pages_renai_a4, draw_yearly_pages_renai_b4
 
     width, height = A4 if size == 'a4' else B4
