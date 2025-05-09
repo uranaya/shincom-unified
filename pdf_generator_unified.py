@@ -330,3 +330,63 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
         y -= 6 * mm
 
     return y - 10 * mm
+
+def draw_yearly_pages_renai_a4(c, yearly):
+    width, height = A4
+    margin = 20 * mm
+    y = height - 30 * mm
+
+    def draw_text_block(title, text):
+        nonlocal y
+        c.setFont(FONT_NAME, 12)
+        c.drawString(margin, y, f"■ {title}")
+        y -= 6 * mm
+        c.setFont(FONT_NAME, 10)
+        for line in wrap(text or "", 46):
+            c.drawString(margin, y, line)
+            y -= 6 * mm
+            if y < 30 * mm:
+                c.showPage()
+                y = height - 30 * mm
+        y -= 4 * mm
+
+    c.showPage()
+    y = height - 30 * mm
+    draw_text_block(yearly["year_label"], yearly["year_text"])
+    for month in yearly["months"][:6]:
+        draw_text_block(month["label"], month["text"])
+
+    c.showPage()
+    y = height - 30 * mm
+    for month in yearly["months"][6:]:
+        draw_text_block(month["label"], month["text"])
+
+def draw_yearly_pages_renai_b4(c, yearly):
+    width, height = B4
+    margin = 20 * mm
+    y = height - 30 * mm
+
+    def draw_text_block(title, text):
+        nonlocal y
+        c.setFont(FONT_NAME, 13)
+        c.drawString(margin, y, f"■ {title}")
+        y -= 6 * mm
+        c.setFont(FONT_NAME, 11)
+        for line in wrap(text or "", 45):
+            c.drawString(margin, y, line)
+            y -= 7 * mm
+            if y < 30 * mm:
+                c.showPage()
+                y = height - 30 * mm
+        y -= 6 * mm
+
+    c.showPage()
+    y = height - 30 * mm
+    draw_text_block(yearly["year_label"], yearly["year_text"])
+    for month in yearly["months"][:6]:
+        draw_text_block(month["label"], month["text"])
+
+    c.showPage()
+    y = height - 30 * mm
+    for month in yearly["months"][6:]:
+        draw_text_block(month["label"], month["text"])
