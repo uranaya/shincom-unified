@@ -154,7 +154,7 @@ def renai():
             "birthdate": user_birth
         }
         if include_yearly:
-            result_data["yearly_fortunes"] = raw_result.get("yearly_love_fortunes", {})
+            result_data["yearly_love_fortunes"] = raw_result.get("yearly_love_fortunes", {})
         filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         create_pdf_unified(filepath, result_data, "renai", size=size.lower(), include_yearly=include_yearly)
