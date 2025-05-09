@@ -277,11 +277,12 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     # -----------------------
     # 年運ページ（3〜4ページ目）
     # -----------------------
-    if include_yearly and data.get("yearly_fortunes"):
+     if include_yearly and data.get("yearly_love_fortunes"):
         if size == "a4":
-            draw_yearly_pages_renai_a4(c, data["yearly_fortunes"])
+            draw_yearly_pages_renai_a4(c, data["yearly_love_fortunes"])
         else:
-            draw_yearly_pages_renai_b4(c, data["yearly_fortunes"])
+            draw_yearly_pages_renai_b4(c, data["yearly_love_fortunes"])
+
 
 
 
