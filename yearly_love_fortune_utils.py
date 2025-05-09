@@ -30,17 +30,18 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
     # 年運プロンプト（改良）
     prompt_year = f"""
 あなたは恋愛占いの専門家です。
-以下の干支と通変星の情報をもとに、{now.year}年の恋愛傾向を100文字以内で具体的かつ印象的に表現してください。
+以下の情報をもとに、{now.year}年の恋愛傾向を100文字以内で表現してください。
 
 - 日柱: {nicchu}
 - 年の通変星: {tsuhen_year}
 
 条件：
+- 占い用語（例：比肩、傷官など）や干支名は文章に出さず、
+  その意味を自然な日本語に置き換えてください
 - 主語は「あなた」
-- ポジティブだが具体性を重視
-- 無難で抽象的な表現を避け、印象に残る言い回しにしてください
-- 月運と差別化してください
+- 現実的かつ印象に残るアドバイスとしてください
 """.strip()
+
 
     year_fortune = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
@@ -57,9 +58,11 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
         dirs = get_directions(y, m, honmeisei)
 
-        prompt_month = f"""
+
+    # 月運プロンプト（改良）
+    prompt_month = f"""
 あなたは恋愛占いの専門家です。
-以下の情報をもとに、その月の恋愛運を100文字で簡潔に教えてください。
+以下の情報をもとに、その月の恋愛運を100文字以内で自然な日本語で表現してください。
 
 - 日柱: {nicchu}
 - 年の通変星: {tsuhen_year}
@@ -67,12 +70,14 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
 
 条件：
 - 主語は「あなた」
-- 「○年○月の恋愛運は〜」のような前置きは不要（タイトルに記載されます）
-- 毎月異なる恋愛の展開を描写してください
-- 無難な言い回しを避け、印象に残る表現で個性を出してください
-- 出会い・進展・揺らぎ・期待・焦りなど変化を感じさせてください
-- 実際の恋愛場面を想起させる具体的な内容を含めてください
+- 占い用語（例：偏印、正官など）や干支名は出さず、
+  意味に沿った自然な表現にしてください
+- 現実味のある恋愛展開や気持ちの動きを含めてください
+- 毎月の変化が感じられるようにしてください
 """.strip()
+
+
+
 
         text = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
