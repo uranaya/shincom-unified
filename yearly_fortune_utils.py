@@ -1,11 +1,13 @@
-import openai
-import os
+
+from fortune_logic import get_nicchu_eto
+from tsuhensei_utils import get_tsuhensei
+from kyusei_utils import get_honmeisei, get_directions
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from kyusei_utils import get_honmeisei, get_directions
-from fortune_logic import get_nicchu_eto  # 既存の実装をそのまま利用
+import openai
+import os
 
-MAX_CHAR = 250  # 月運 250 文字以内
+MAX_CHAR = 120
 
 def _ask_openai(prompt: str) -> str:
     response = openai.ChatCompletion.create(
@@ -22,30 +24,37 @@ def _ask_openai(prompt: str) -> str:
 def generate_yearly_fortune(user_birth: str, now: datetime):
     nicchu = get_nicchu_eto(user_birth)
     born = datetime.strptime(user_birth, "%Y-%m-%d")
+    honmeisei = get_honmeisei(born.year, born.month, born.day)
 
-    # 総合年運
-    prompt_year = f"""あなたは四柱推命のプロの占い師です。
+    # 年運（通変星あり）
+    tsuhen_year = get_tsuhensei(now.year, 0, nicchu)
+    prompt_year = f"""あなたは占いの専門家です。以下の情報をもとに、性格や考え方を踏まえた現実的な開運アドバイスをください。
+
 - 日柱: {nicchu}
-- 対象年: {now.year}
-- 100文字以内、主語は「あなた」、現実的な文体でお願いします。"""
+- 今年の通変星: {tsuhen_year}
+- 対象年: {now.year} 年
 
+120文字以内で、運気の流れや注意点、やると良いことなど前向きにまとめてください。"""
     year_fortune = _ask_openai(prompt_year)
 
-    # 月運リスト（get_directions 削除）
+    # 月運
     month_fortunes = []
     for i in range(12):
-2       target = (now.replace(day=15) + relativedelta(months=i))
+        target = (now.replace(day=15) + relativedelta(months=i))
         y, m = target.year, target.month
+        tsuhen_month = get_tsuhensei(y, m, nicchu)
+        dirs = get_directions(y, m, honmeisei)
+        prompt_month = f"""あなたは占いの専門家です。以下の条件で対象月の総合運を占ってください。
 
-        prompt_month = f"""あなたは四柱推命のプロの占い師です。
 - 日柱: {nicchu}
+- 通変星: {tsuhen_month}
 - 年月: {y}年{m}月
 
-以下の条件で月運を作成してください:
-- 約100文字
-- 仕事・人間関係・感情面・健康などを含めて具体的に
-- 主語「あなた」、温かみある語り口で"""
-
+条件:
+- 約120文字以内
+- 運気の流れや心がけ、やると良いことを具体的に
+- 前向きな語り口で、親しみやすく
+"""
         month_fortunes.append({
             "label": f"{y}年{m}月の運勢",
             "text": _ask_openai(prompt_month)
