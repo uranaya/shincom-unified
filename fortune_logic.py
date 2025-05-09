@@ -135,12 +135,13 @@ def generate_fortune(image_data, birthdate, kyusei_text):
     return palm_result, shichu_result, iching_result, lucky_info
 
 
-def generate_renai_fortune(user_birth: str, partner_birth: str = None,
-                           include_yearly: bool = False, size: str = 'a4') -> dict:
+
+def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = 'a4') -> dict:
     from datetime import datetime
     from lucky_utils import generate_lucky_info, generate_lucky_direction
     from yearly_love_fortune_utils import generate_yearly_love_fortune
     from nicchu_utils import get_nicchu_eto
+    import openai
 
     user_eto = get_nicchu_eto(user_birth)
     partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
@@ -151,21 +152,21 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None,
 - あなたの日柱: {user_eto}
 - お相手の日柱: {partner_eto}
 
-この2人の恋愛相性や関係性の特徴、注意点について、現実的で温かい口調で200文字程度で教えてください。主語は「あなた」で記述してください。"""
+この2人の恋愛相性や関係性の特徴、注意点について、200文字で教えてください。"""
             prompt_future = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}
 - お相手の日柱: {partner_eto}
 
-お相手の気持ちと今後の展開について、現実的で温かい口調で100文字程度で教えてください。主語は「あなた」で記述してください。"""
+お相手の気持ちと今後の展開について、200文字で教えてください。"""
         else:
             prompt_comp = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}
 
-あなたの性格や恋愛傾向について、現実的で温かい口調で100文字程度で教えてください。主語は「あなた」で記述してください。"""
+あなたの性格や恋愛傾向について、200文字で教えてください。"""
             prompt_future = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}
 
-あなたにとっての理想の相手像と出会いのチャンスについて、現実的で温かい口調で400文字程度で教えてください。主語は「あなた」で記述してください。"""
+理想の相手像と出会いのチャンスについて、200文字で教えてください。"""
 
         comp_text = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
@@ -184,49 +185,25 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None,
         comp_text = f"（相性・性格占い取得エラー: {e}）"
         future_text = ""
 
-    # トピック固定3項目：「注意点」「復縁」「結婚」
-    fixed_topics = ["注意点", "復縁", "結婚"]
     topic_sections = []
-
-    for topic in fixed_topics:
+    for topic in ["注意点", "復縁", "結婚"]:
         try:
-            if topic == "注意点":
-                prompt_topic = (
-                    f"あなたは恋愛占いの専門家です。\n"
-                    f"- あなたの日柱: {user_eto}\n" +
-                    (f"- お相手の日柱: {partner_eto}\n" if partner_eto else "") +
-                    "恋愛において注意すべき点や気をつけるべきことについて、200文字程度で優しくアドバイスしてください。"
-                )
-            elif topic == "復縁":
-                prompt_topic = (
-                    f"あなたは恋愛占いの専門家です。\n"
-                    f"- あなたの日柱: {user_eto}\n" +
-                    (f"- お相手の日柱: {partner_eto}\n" if partner_eto else "") +
-                    "復縁の可能性やそのために必要なことについて、200文字程度で教えてください。"
-                )
-            elif topic == "結婚":
-                prompt_topic = (
-                    f"あなたは恋愛占いの専門家です。\n"
-                    f"- あなたの日柱: {user_eto}\n" +
-                    (f"- お相手の日柱: {partner_eto}\n" if partner_eto else "") +
-                    "将来の結婚の可能性や良いタイミングについて、200文字程度で教えてください。"
-                )
-            else:
-                continue
+            topic_prompt = f"あなたは恋愛占いの専門家です。\n- あなたの日柱: {user_eto}\n"
+            if partner_eto:
+                topic_prompt += f"- お相手の日柱: {partner_eto}\n"
+            topic_prompt += f"{topic}について200文字で教えてください。"
 
             topic_text = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt_topic}],
+                messages=[{"role": "user", "content": topic_prompt}],
                 max_tokens=600,
                 temperature=0.9
             ).choices[0].message.content.strip()
 
             topic_sections.append({"title": topic, "content": topic_text})
-
         except Exception as e:
             topic_sections.append({"title": topic, "content": f"（この項目の取得エラー: {e}）"})
 
-    # 年運（変数名・戻り値キーどちらも揃える）
     yearly_love_fortunes = {}
     if include_yearly:
         try:
@@ -234,13 +211,12 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None,
             print("✅ 年運データ取得:", yearly_love_fortunes)
         except Exception as e:
             print(f"❌ 年運取得失敗: {e}")
-            yearly_love_fortunes = {}
 
-    # ラッキー情報・吉方位
     try:
         lucky_info = generate_lucky_info(user_eto, user_birth)
     except:
         lucky_info = []
+
     try:
         lucky_direction = generate_lucky_direction(user_birth, datetime.now().date())
     except:
