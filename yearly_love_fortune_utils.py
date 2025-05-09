@@ -2,6 +2,7 @@ import openai
 import os
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from nicchu_utils import get_nicchu_eto
 from kyusei_utils import get_honmeisei, get_directions
 
 
@@ -18,7 +19,6 @@ def _ask_openai(prompt: str) -> str:
     return response.choices[0].message.content.strip()
 
 def generate_yearly_love_fortune(user_birth: str, now: datetime):
-    from fortune_logic import get_nicchu_eto  # ←ここに移動
 
     """干支（日柱）と九星の本命星を求め、年運＋12 か月分を返す"""
     nicchu = get_nicchu_eto(user_birth)
