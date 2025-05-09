@@ -414,13 +414,13 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None,
     # 🔁 ここで data を返すように変更
 # 末尾の戻り値部分のみ修正（compatibility_textは共通）
 
-return {
-    "compatibility_text": data["texts"].get("compatibility", ""),
-    "overall_love_fortune": "" if partner_birth else data["texts"].get("love_summary", ""),
-    "topic_fortunes": data.get("themes", []),
-    "lucky_info": data.get("lucky_info", []),
-    "lucky_direction": data.get("lucky_direction", ""),
-    "yearly_love_fortunes": data.get("yearly_fortunes", {})
-}
+    return {
+        "compatibility_text": data["texts"].get("compatibility", ""),
+        "overall_love_fortune": "" if partner_birth else data["texts"].get("love_summary", ""),
+        "topic_fortunes": data.get("themes", []),
+        "lucky_info": data.get("lucky_info", []),
+        "lucky_direction": data.get("lucky_direction", ""),
+        "yearly_love_fortunes": data.get("yearly_fortunes", {})
+    }
 
 
