@@ -43,13 +43,17 @@ def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
 
     honmeisei = get_honmeisei(bd.year, bd.month, bd.day)
 
-    # 今年・今月・来月の吉方位を取得
-    good_dir_year, _ = get_directions(today.year, 0, honmeisei)
-    good_dir, _ = get_directions(today.year, today.month, honmeisei)
+    # 今年・今月・来月の吉方位を取得（辞書形式で正しく取り出す）
+    dir_year = get_directions(today.year, 0, honmeisei)
+    dir_now = get_directions(today.year, today.month, honmeisei)
     next_month = today + datetime.timedelta(days=30)
-    good_dir_next, _ = get_directions(next_month.year, next_month.month, honmeisei)
+    dir_next = get_directions(next_month.year, next_month.month, honmeisei)
 
-    return f"今年の吉方位は{good_dir_year}、今月は{good_dir}、来月は{good_dir_next}です。"
+    good_dir_year = dir_year.get("good", "不明")
+    good_dir_now = dir_now.get("good", "不明")
+    good_dir_next = dir_next.get("good", "不明")
+
+    return f"今年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。"
 
 
 

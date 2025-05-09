@@ -29,7 +29,7 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
     prompt_year = f"""あなたは恋愛占いのプロの占い師です。以下の情報をもとに、恋愛運について150文字以内で現実的かつ温かいアドバイスをください。
 - 相談者の日柱: {nicchu}
 - 今年: {now.year} 年
-- 150 文字以内、主語を『あなた』で統一、ポジティブ寄り
+- 120 文字以内、主語を『あなた』で統一、ポジティブ寄り
 """
     year_fortune = _ask_openai(prompt_year)
 
