@@ -1,27 +1,96 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>KOMOJU決済ページ（仮）</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { font-family: sans-serif; padding: 20px; line-height: 1.8; text-align: center; }
-    .btn {
-      display: inline-block;
-      margin-top: 30px;
-      padding: 15px 30px;
-      background-color: #28a745;
-      color: white;
-      font-size: 18px;
-      text-decoration: none;
-      border-radius: 8px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>お支払い - シン・コンピューター占い</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 1em;
+            max-width: 700px;
+            margin: auto;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 24px;
+            text-align: center;
+            font-size: 16px;
+            margin-top: 20px;
+            text-decoration: none;
+            border-radius: 6px;
+        }
+        footer {
+            margin-top: 50px;
+            padding-top: 1em;
+            border-top: 1px solid #ccc;
+            font-size: 0.9em;
+            color: #555;
+            text-align: center;
+        }
+        footer a {
+            margin: 0 10px;
+            color: #333;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
-  <h1>ここでKOMOJU決済が完了する想定です</h1>
-  <p>※実際にはこのページは決済完了後にリダイレクトされます。</p>
 
-  <a class="btn" href="/selfmob/index">占いをはじめる（鑑定フォームへ）</a>
+    <h1>鑑定のお支払いについて</h1>
+
+    <p>
+        このページでは、AIとプロの知識を融合した「シン・コンピューター占い」のご利用料金（500円）をお支払いいただきます。
+    </p>
+
+    <h2>サービス内容</h2>
+    <ul>
+        <li>お客様の手相画像をAIが解析し、5つの主要線の特徴を診断</li>
+        <li>生年月日をもとにした性格診断と今月・来月の運勢を鑑定</li>
+        <li>吉方位やラッキー情報も含めたPDFを即時で生成</li>
+        <li>PDFはスマートフォン画面で確認・印刷が可能</li>
+    </ul>
+
+    <h2>鑑定の流れ</h2>
+    <ol>
+        <li>「占いをはじめる」ボタンを押すと鑑定フォームに移動します</li>
+        <li>生年月日と手相写真を入力・送信</li>
+        <li>占い結果がPDFで表示され、その場で保存・印刷可能です</li>
+    </ol>
+
+    <h2>お支払い後について</h2>
+    <p>
+        決済完了後に1回のみ鑑定が可能です。PDF表示後は最初の画面（お支払いページ）に戻ります。
+    </p>
+
+    <h2>注意事項</h2>
+    <ul>
+        <li>ご利用は<strong>18歳以上</strong>を推奨しています</li>
+        <li>未成年者のご利用には<strong>保護者の同意</strong>が必要です</li>
+        <li>占い結果はエンターテインメントとしてご活用ください</li>
+    </ul>
+
+    <div style="text-align:center;">
+        <a href="/selfmob/index" class="button">占いをはじめる</a>
+    </div>
+
+    <footer>
+        <p>
+            お問い合わせ：<a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a> ／
+            TEL：<a href="tel:09075062065">090-7506-2065</a>
+        </p>
+        <p>
+            <a href="/terms">特定商取引法に基づく表記</a> |
+            <a href="/privacy">プライバシーポリシー</a> |
+            <a href="/rules">利用規約</a>
+        </p>
+        <p>© 2025 シン・コンピューター占い</p>
+    </footer>
+
 </body>
 </html>
