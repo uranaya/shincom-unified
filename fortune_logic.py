@@ -31,18 +31,6 @@ def get_shichu_fortune(birthdate):
         print("❌ 四柱推命取得失敗:", e)
         return "■ 性格\n取得できませんでした\n■ 今月の運勢\n取得できませんでした\n■ 来月の運勢\n取得できませんでした"
 
-def get_iching_advice():
-    prompt = "今の相談者にとって最適な易占いのアドバイスを、日本語で300文字以内で現実的に書いてください。"
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=500
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print("❌ 易占い取得エラー:", e)
-        return "取得できませんでした。"
 
 def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
     prompt = f"""あなたは占いの専門家です。
@@ -73,6 +61,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
     except Exception as e:
         print("❌ ラッキー情報取得失敗:", e)
         return ["取得できませんでした。"]
+
 
 def analyze_palm(image_data):
     try:
@@ -125,6 +114,8 @@ def analyze_palm(image_data):
         print("❌ Vision APIエラー:", e)
         return "手相診断中にエラーが発生しました。"
 
+
+
 def generate_fortune(image_data, birthdate, kyusei_text):
     palm_result = analyze_palm(image_data)
     shichu_result = get_shichu_fortune(birthdate)
@@ -133,7 +124,6 @@ def generate_fortune(image_data, birthdate, kyusei_text):
     nicchu_eto = get_nicchu_eto(birthdate)
     lucky_info = get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text)
     return palm_result, shichu_result, iching_result, lucky_info
-
 
 
 
@@ -174,14 +164,14 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         comp_text = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_comp}],
-            max_tokens=600,
+            max_tokens=400,
             temperature=0.9
         ).choices[0].message.content.strip()
 
         future_text = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_future}],
-            max_tokens=600,
+            max_tokens=400,
             temperature=0.9
         ).choices[0].message.content.strip()
     except Exception as e:
@@ -248,13 +238,13 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         month_love = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_month}],
-            max_tokens=350
+            max_tokens=400
         ).choices[0].message.content.strip()
 
         next_month_love = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_next}],
-            max_tokens=350
+            max_tokens=400
         ).choices[0].message.content.strip()
     except Exception as e:
         year_love = month_love = next_month_love = f"（恋愛運取得エラー: {e}）"
