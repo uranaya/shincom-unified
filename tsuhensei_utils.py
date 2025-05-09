@@ -47,14 +47,14 @@ def get_tsuhensei(nikkang: str, branch: str) -> str:
     return "不明"
 
 def get_tsuhensei_for_date(birthdate: str, year: int, month: int) -> str:
-    from hayami_table_full_complete import get_nicchu_eto
+    from nicchu_utils import get_nicchu_eto
     nikkanshi = get_nicchu_eto(birthdate)
     nikkang = nikkanshi[0]
     branch = get_eto_month_branch(month)
     return get_tsuhensei(nikkang, branch)
 
 def get_tsuhensei_for_year(birthdate: str, year: int) -> str:
-    from hayami_table_full_complete import get_nicchu_eto
+    from nicchu_utils import get_nicchu_eto
     nikkanshi = get_nicchu_eto(birthdate)
     nikkang = nikkanshi[0]
     branch = get_eto_branch(year)

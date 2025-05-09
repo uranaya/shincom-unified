@@ -11,7 +11,7 @@ MAX_CHAR = 120  # 月運 120 文字以内
 def _ask_openai(prompt: str) -> str:
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
-        max_tokens=850,
+        max_tokens=200,
         temperature=0.7,
         messages=[{"role": "system", "content": "あなたは四柱推命のプロの占い師です。"},
                   {"role": "user",   "content": prompt}]
@@ -45,7 +45,7 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
     year_fortune = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt_year}],
-        max_tokens=100,
+        max_tokens=150,
         temperature=0.8
     ).choices[0].message.content.strip()
 
@@ -77,7 +77,7 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
         text = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_month}],
-            max_tokens=100,
+            max_tokens=150,
             temperature=0.9
         ).choices[0].message.content.strip()
 
