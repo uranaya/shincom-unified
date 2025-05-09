@@ -409,4 +409,15 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None,
     # PDF生成（A4/B4, レイアウトはshincom準拠）
     output_file = f"renai_fortune_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     create_pdf_unified(output_file, data, mode="renai", size=size, include_yearly=include_yearly)
-    return output_file
+
+
+    # 🔁 ここで data を返すように変更
+    return {
+        "compatibility_text": data["texts"].get("compatibility", ""),
+        "overall_love_fortune": data["texts"].get("love_summary", ""),
+        "topic_fortunes": data.get("themes", []),
+        "lucky_info": data.get("lucky_info", []),
+        "lucky_direction": data.get("lucky_direction", ""),
+        "yearly_love_fortunes": data.get("yearly_fortunes", {})
+    }
+
