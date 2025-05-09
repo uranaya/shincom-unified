@@ -1,3 +1,4 @@
+
 import openai
 import os
 from datetime import datetime
@@ -20,7 +21,6 @@ def _ask_openai(prompt: str) -> str:
 
 
 def generate_yearly_love_fortune(user_birth: str, now: datetime):
-    
     nicchu = get_nicchu_eto(user_birth)
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
@@ -42,7 +42,6 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
 - 現実的かつ印象に残るアドバイスとしてください
 """.strip()
 
-
     year_fortune = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt_year}],
@@ -58,9 +57,8 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
         dirs = get_directions(y, m, honmeisei)
 
-
-    # 月運プロンプト（改良）
-    prompt_month = f"""
+        # 月運プロンプト（改良）
+        prompt_month = f"""
 あなたは恋愛占いの専門家です。
 以下の情報をもとに、その月の恋愛運を100文字以内で自然な日本語で表現してください。
 
@@ -75,9 +73,6 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
 - 現実味のある恋愛展開や気持ちの動きを含めてください
 - 毎月の変化が感じられるようにしてください
 """.strip()
-
-
-
 
         text = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
