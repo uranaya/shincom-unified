@@ -10,8 +10,6 @@ import io
 import os
 from datetime import datetime
 
-from yearly_fortune_utils import generate_yearly_fortune
-from yearly_love_fortune_utils import generate_yearly_love_fortune
 from header_utils import draw_header
 from lucky_utils import draw_lucky_section
 
