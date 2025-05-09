@@ -58,6 +58,13 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
         })
 
 
+    print("📦 年運生成結果（内部）:", {
+        "year_label": f"{now.year}年の総合運",
+        "year_text": year_fortune,
+        "months": month_fortunes
+    })
+
+
     return {
         "year_label": f"{now.year}年の総合運",
         "year_text": year_fortune,
