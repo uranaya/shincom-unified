@@ -134,32 +134,37 @@ def renai():
     if request.method == "POST":
         user_birth = request.form.get("user_birth")
         partner_birth = request.form.get("partner_birth")
-        selected_topics = request.form.getlist("topics")
         include_yearly = request.form.get("include_yearly") == "yes"
-        raw_result = generate_renai_fortune(user_birth, partner_birth, selected_topics, include_yearly)
-        titles = {
-            "compatibility": "相性診断" if partner_birth else "恋愛傾向と出会い",
-            "love_summary": "総合恋愛運"
-        }
-        texts = {
-            "compatibility": raw_result.get("compatibility_text", ""),
-            "love_summary": raw_result.get("overall_love_fortune", "")
-        }
-        result_data["texts"] = {
-            "compatibility": raw_result["compatibility_text"],
-            "overall_love_fortune": raw_result.get("overall_love_fortune", ""),
-            "year_love": raw_result.get("year_love", ""),
-            "month_love": raw_result.get("month_love", ""),
-            "next_month_love": raw_result.get("next_month_love", "")
+
+        raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
+
+        result_data = {
+            "texts": {
+                "compatibility": raw_result.get("compatibility_text", ""),
+                "overall_love_fortune": raw_result.get("overall_love_fortune", ""),
+                "year_love": raw_result.get("year_love", ""),
+                "month_love": raw_result.get("month_love", ""),
+                "next_month_love": raw_result.get("next_month_love", "")
+            },
+            "titles": {
+                "compatibility": "相性診断" if partner_birth else "恋愛傾向と出会い",
+                "overall_love_fortune": "総合恋愛運",
+                "year_love": "今年の恋愛運",
+                "month_love": "今月の恋愛運",
+                "next_month_love": "来月の恋愛運"
+            },
+            "themes": raw_result.get("topic_fortunes", []),
+            "lucky_info": raw_result.get("lucky_info", []),
+            "lucky_direction": raw_result.get("lucky_direction", ""),
+            "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
         }
 
-        if include_yearly:
-            result_data["yearly_love_fortunes"] = raw_result.get("yearly_love_fortunes", {})
         filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         create_pdf_unified(filepath, result_data, "renai", size=size.lower(), include_yearly=include_yearly)
         return send_file(filepath, as_attachment=True)
     return render_template("renai_form.html")
+
 
 
 @app.route("/selfmob", methods=["GET"])
