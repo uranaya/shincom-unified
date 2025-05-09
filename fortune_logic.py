@@ -140,6 +140,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None,
     from datetime import datetime
     from lucky_utils import generate_lucky_info, generate_lucky_direction
     from yearly_love_fortune_utils import generate_yearly_love_fortune
+    from nicchu_utils import get_nicchu_eto
 
     user_eto = get_nicchu_eto(user_birth)
     partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
@@ -225,13 +226,15 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None,
         except Exception as e:
             topic_sections.append({"title": topic, "content": f"（この項目の取得エラー: {e}）"})
 
-    # 年運
-    yearly_fortunes = {}
+    # 年運（変数名・戻り値キーどちらも揃える）
+    yearly_love_fortunes = {}
     if include_yearly:
         try:
-            yearly_fortunes = generate_yearly_love_fortune(user_birth, datetime.now())
+            yearly_love_fortunes = generate_yearly_love_fortune(user_birth, datetime.now())
+            print("✅ 年運データ取得:", yearly_love_fortunes)
         except Exception as e:
-            print(f"年運取得失敗: {e}")
+            print(f"❌ 年運取得失敗: {e}")
+            yearly_love_fortunes = {}
 
     # ラッキー情報・吉方位
     try:
@@ -249,5 +252,5 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None,
         "topic_fortunes": topic_sections,
         "lucky_info": lucky_info,
         "lucky_direction": lucky_direction,
-        "yearly_love_fortunes": yearly_fortunes
+        "yearly_love_fortunes": yearly_love_fortunes
     }
