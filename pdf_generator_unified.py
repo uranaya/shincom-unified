@@ -10,7 +10,6 @@ import io
 import os
 from datetime import datetime
 
-from fortune_logic import generate_renai_fortune
 from yearly_fortune_utils import generate_yearly_fortune
 from yearly_love_fortune_utils import generate_yearly_love_fortune
 from header_utils import draw_header
