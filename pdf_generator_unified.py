@@ -285,7 +285,6 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
 
 
 
-
 def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
     size = size.lower()
     c = canvas.Canvas(filepath, pagesize=A4 if size == 'a4' else B4)
