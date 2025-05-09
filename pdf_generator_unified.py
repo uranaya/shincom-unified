@@ -264,11 +264,11 @@ def draw_yearly_pages_renai_a4(c, yearly):
         nonlocal y
         c.setFont(FONT_NAME, 12)
         c.drawString(margin, y, f"■ {title}")
-        y -= 6 * mm
+        y -= 4 * mm
         c.setFont(FONT_NAME, 10)
         for line in wrap(text or "", 46):
             c.drawString(margin, y, line)
-            y -= 6 * mm
+            y -= 4 * mm
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
