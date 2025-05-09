@@ -152,275 +152,120 @@ def generate_fortune(image_data, birthdate, kyusei_text):
     return palm_result, shichu_result, iching_result, lucky_info
 
 
-def generate_renai_fortune(user_birth: str, partner_birth: str = None, 
-                           selected_topics: list[str] = None, include_yearly: bool = False,
-                           size: str = 'a4') -> str:
-    """恋愛占い結果を生成し、PDFファイルとして保存する。保存先パスを返す。"""
-    if selected_topics is None:
-        selected_topics = []
+def generate_renai_fortune(user_birth: str, partner_birth: str = None,
+                           include_yearly: bool = False, size: str = 'a4') -> dict:
+    from datetime import datetime
+    from lucky_utils import generate_lucky_info, generate_lucky_direction
+    from yearly_love_fortune_utils import generate_yearly_love_fortune
+    from hayami_table_full_complete import get_nicchu_eto
 
-    # 生年月日から日柱干支を取得
     user_eto = get_nicchu_eto(user_birth)
     partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
 
-    # 1ページ目メイン占いテキスト生成
     try:
         if partner_eto:
-            # お相手あり：相性・（お相手の気持ち＋今後）の2セクション生成
-            prompt_comp = (
-                "あなたは四柱推命に基づく恋愛占いの専門家です。\n"
-                f"- あなたの日柱: {user_eto}\n"
-                f"- お相手の日柱: {partner_eto}\n\n"
-                "この2人の恋愛相性や関係性の特徴、注意点について、" 
-                "現実的で温かい口調で400文字程度で教えてください。主語は「あなた」で記述してください。"
-            )
-            prompt_future = (
-                "あなたは四柱推命に基づく恋愛占いの専門家です。\n"
-                f"- あなたの日柱: {user_eto}\n"
-                f"- お相手の日柱: {partner_eto}\n\n"
-                "お相手の気持ちと今後の展開について、"
-                "現実的で温かい口調で400文字程度で教えてください。主語は「あなた」で記述してください。"
-            )
-            # OpenAI API呼び出し（GPT-3.5-Turbo）
-            comp_response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt_comp}],
-                max_tokens=600,
-                temperature=0.9
-            )
-            future_response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt_future}],
-                max_tokens=600,
-                temperature=0.9
-            )
-            comp_text = comp_response.choices[0].message.content.strip()
-            future_text = future_response.choices[0].message.content.strip()
+            prompt_comp = f"""あなたは恋愛占いの専門家です。
+- あなたの日柱: {user_eto}
+- お相手の日柱: {partner_eto}
+
+この2人の恋愛相性や関係性の特徴、注意点について、現実的で温かい口調で400文字程度で教えてください。主語は「あなた」で記述してください。"""
+            prompt_future = f"""あなたは恋愛占いの専門家です。
+- あなたの日柱: {user_eto}
+- お相手の日柱: {partner_eto}
+
+お相手の気持ちと今後の展開について、現実的で温かい口調で400文字程度で教えてください。主語は「あなた」で記述してください。"""
         else:
-            # お相手なし：性格・恋愛傾向と理想の相手・出会いのチャンスの2セクション生成
-            prompt_personality = (
-                "あなたは四柱推命に基づく恋愛占いの専門家です。\n"
-                f"- あなたの日柱: {user_eto}\n\n"
-                "あなたの性格や恋愛傾向について、"
-                "現実的で温かい口調で400文字程度で教えてください。主語は「あなた」で記述してください。"
-            )
-            prompt_ideal = (
-                "あなたは四柱推命に基づく恋愛占いの専門家です。\n"
-                f"- あなたの日柱: {user_eto}\n\n"
-                "あなたにとっての理想の相手像と出会いのチャンスについて、"
-                "現実的で温かい口調で400文字程度で教えてください。主語は「あなた」で記述してください。"
-            )
-            personality_response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt_personality}],
-                max_tokens=600,
-                temperature=0.9
-            )
-            ideal_response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt_ideal}],
-                max_tokens=600,
-                temperature=0.9
-            )
-            comp_text = personality_response.choices[0].message.content.strip()
-            future_text = ideal_response.choices[0].message.content.strip()
+            prompt_comp = f"""あなたは恋愛占いの専門家です。
+- あなたの日柱: {user_eto}
+
+あなたの性格や恋愛傾向について、現実的で温かい口調で400文字程度で教えてください。主語は「あなた」で記述してください。"""
+            prompt_future = f"""あなたは恋愛占いの専門家です。
+- あなたの日柱: {user_eto}
+
+あなたにとっての理想の相手像と出会いのチャンスについて、現実的で温かい口調で400文字程度で教えてください。主語は「あなた」で記述してください。"""
+
+        comp_text = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt_comp}],
+            max_tokens=600,
+            temperature=0.9
+        ).choices[0].message.content.strip()
+
+        future_text = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt_future}],
+            max_tokens=600,
+            temperature=0.9
+        ).choices[0].message.content.strip()
     except Exception as e:
-        # 万一APIエラーが発生した場合、エラーメッセージをテキストに設定
-        error_msg = f"（エラーにより占い結果を取得できませんでした: {e}）"
-        comp_text = error_msg
+        comp_text = f"（相性・性格占い取得エラー: {e}）"
         future_text = ""
 
-    # トピック別占い結果生成（選択された最大3項目）
-    topic_sections = []  # [{ "title": タイトル, "content": テキスト }, ...]
-    for topic in selected_topics[:3]:
+    # トピック固定3項目：「注意点」「復縁」「結婚」
+    fixed_topics = ["注意点", "復縁", "結婚"]
+    topic_sections = []
+
+    for topic in fixed_topics:
         try:
-            if topic == "相性":
-                if partner_eto:
-                    # お相手ありの相性（詳細解説やアドバイス）
-                    prompt_topic = (
-                        "あなたは恋愛占いの専門家です。\n"
-                        f"- あなたの日柱: {user_eto}\n"
-                        f"- お相手の日柱: {partner_eto}\n\n"
-                        "二人の相性についてさらに深く教えてください。"
-                        "今後の付き合い方のアドバイスも含め、400文字程度でお願いします。"
-                    )
-                    title = "相性"
-                else:
-                    # お相手なしの相性（どんな人と相性が良いかなど）
-                    prompt_topic = (
-                        "あなたは恋愛占いの専門家です。\n"
-                        f"- あなたの日柱: {user_eto}\n\n"
-                        "あなたに合う異性のタイプや、恋愛における相性の傾向について、"
-                        "400文字程度で教えてください。"
-                    )
-                    title = "相性"
-            elif topic == "進展":
-                if partner_eto:
-                    prompt_topic = (
-                        "あなたは恋愛占いの専門家です。\n"
-                        f"- あなたの日柱: {user_eto}\n"
-                        f"- お相手の日柱: {partner_eto}\n\n"
-                        "この二人の関係が今後進展する可能性について、"
-                        "400文字程度で詳しく教えてください。"
-                    )
-                else:
-                    prompt_topic = (
-                        "あなたは恋愛占いの専門家です。\n"
-                        f"- あなたの日柱: {user_eto}\n\n"
-                        "今後あなたに訪れる恋愛の進展（新たな出会いや関係の深まり）の可能性について、"
-                        "400文字程度で教えてください。"
-                    )
-                title = "今後の進展"
+            if topic == "注意点":
+                prompt_topic = (
+                    f"あなたは恋愛占いの専門家です。\n"
+                    f"- あなたの日柱: {user_eto}\n" +
+                    (f"- お相手の日柱: {partner_eto}\n" if partner_eto else "") +
+                    "恋愛において注意すべき点や気をつけるべきことについて、400文字程度で優しくアドバイスしてください。"
+                )
             elif topic == "復縁":
-                if partner_eto:
-                    prompt_topic = (
-                        "あなたは恋愛占いの専門家です。\n"
-                        f"- あなたの日柱: {user_eto}\n"
-                        f"- お相手の日柱: {partner_eto}\n\n"
-                        "一度離れたこの二人が復縁する可能性について、"
-                        "現実的に占ってください。400文字程度でお願いします。"
-                    )
-                else:
-                    prompt_topic = (
-                        "あなたは恋愛占いの専門家です。\n"
-                        f"- あなたの日柱: {user_eto}\n\n"
-                        "過去の恋人との復縁の可能性について、"
-                        "400文字程度で現実的に教えてください。"
-                    )
-                title = "復縁の可能性"
-            elif topic == "出会い":
-                if partner_eto:
-                    # お相手がいる場合でも選択されたら一般論として回答
-                    prompt_topic = (
-                        "あなたは恋愛占いの専門家です。\n"
-                        f"- あなたの日柱: {user_eto}\n"
-                        f"- お相手の日柱: {partner_eto}\n\n"
-                        "今後新たな出会いが訪れるか、またそのタイミングについて、"
-                        "400文字程度で教えてください。"
-                    )
-                else:
-                    prompt_topic = (
-                        "あなたは恋愛占いの専門家です。\n"
-                        f"- あなたの日柱: {user_eto}\n\n"
-                        "運命の人との出会いのタイミングや機会について、"
-                        "400文字程度で具体的に教えてください。"
-                    )
-                title = "出会いのタイミング"
+                prompt_topic = (
+                    f"あなたは恋愛占いの専門家です。\n"
+                    f"- あなたの日柱: {user_eto}\n" +
+                    (f"- お相手の日柱: {partner_eto}\n" if partner_eto else "") +
+                    "復縁の可能性やそのために必要なことについて、400文字程度で教えてください。"
+                )
             elif topic == "結婚":
-                if partner_eto:
-                    prompt_topic = (
-                        "あなたは恋愛占いの専門家です。\n"
-                        f"- あなたの日柱: {user_eto}\n"
-                        f"- お相手の日柱: {partner_eto}\n\n"
-                        "この二人が将来結婚に至る可能性について、"
-                        "400文字程度で教えてください。"
-                    )
-                else:
-                    prompt_topic = (
-                        "あなたは恋愛占いの専門家です。\n"
-                        f"- あなたの日柱: {user_eto}\n\n"
-                        "あなたの結婚運や将来結婚できる可能性について、"
-                        "400文字程度で教えてください。"
-                    )
-                title = "結婚の可能性"
-            elif topic == "注意点":
-                if partner_eto:
-                    prompt_topic = (
-                        "あなたは恋愛占いの専門家です。\n"
-                        f"- あなたの日柱: {user_eto}\n"
-                        f"- お相手の日柱: {partner_eto}\n\n"
-                        "二人の関係において注意すべき点や乗り越える課題について、"
-                        "400文字程度でアドバイスしてください。"
-                    )
-                else:
-                    prompt_topic = (
-                        "あなたは恋愛占いの専門家です。\n"
-                        f"- あなたの日柱: {user_eto}\n\n"
-                        "あなたの恋愛において注意すべきポイントや気をつけるべきことを、"
-                        "400文字程度で教えてください。"
-                    )
-                title = "注意すべき点"
+                prompt_topic = (
+                    f"あなたは恋愛占いの専門家です。\n"
+                    f"- あなたの日柱: {user_eto}\n" +
+                    (f"- お相手の日柱: {partner_eto}\n" if partner_eto else "") +
+                    "将来の結婚の可能性や良いタイミングについて、400文字程度で教えてください。"
+                )
             else:
-                # 未知のトピックは無視
                 continue
 
-            topic_response = openai.ChatCompletion.create(
+            topic_text = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt_topic}],
                 max_tokens=600,
                 temperature=0.9
-            )
-            topic_text = topic_response.choices[0].message.content.strip()
+            ).choices[0].message.content.strip()
+
+            topic_sections.append({"title": topic, "content": topic_text})
+
         except Exception as e:
-            topic_text = f"（この項目の占い結果を取得できませんでした: {e}）"
-            title = topic  # そのまま
+            topic_sections.append({"title": topic, "content": f"（この項目の取得エラー: {e}）"})
 
-        topic_sections.append({"title": title, "content": topic_text})
-
-    # 年運・月運（恋愛）データ生成
-    yearly_fortunes = None
+    # 年運
+    yearly_fortunes = {}
     if include_yearly:
         try:
-            now = datetime.now()
-            yearly_fortunes = generate_yearly_love_fortune(user_birth, now)
+            yearly_fortunes = generate_yearly_love_fortune(user_birth, datetime.now())
         except Exception as e:
-            print(f"❌ 年運占いの取得に失敗しました: {e}")
-            include_yearly = False  # エラー時は年運出力を無効化
+            print(f"年運取得失敗: {e}")
 
-    # ラッキー情報・吉方位取得
+    # ラッキー情報・吉方位
     try:
-        lucky_info = generate_lucky_info(user_eto, user_birth)  # 5項目のリスト
-    except Exception as e:
+        lucky_info = generate_lucky_info(user_eto, user_birth)
+    except:
         lucky_info = []
-        print(f"❌ ラッキー情報取得エラー: {e}")
     try:
         lucky_direction = generate_lucky_direction(user_birth, datetime.now().date())
-    except Exception as e:
+    except:
         lucky_direction = ""
-        print(f"❌ 吉方位取得エラー: {e}")
-
-    # PDF用データ組み立て
-    data = {
-        "palm_image": None,  # 恋愛占いでは手相画像は使用しない
-        "titles": {},
-        "texts": {},
-        "lucky_info": lucky_info,
-        "lucky_direction": lucky_direction,
-        "themes": topic_sections,
-        "yearly_fortunes": yearly_fortunes
-    }
-    if partner_eto:
-        data["titles"]["compatibility"] = "お二人の相性"
-        data["texts"]["compatibility"] = comp_text
-        data["titles"]["feelings"] = "お相手の気持ち"
-        data["texts"]["feelings"] = future_text.split("。", 1)[0] + "。" if future_text else ""
-        data["titles"]["future"] = "今後の展開"
-        # お相手の気持ちと今後の展開が一続きで出力された場合、2つに分割
-        if "。" in future_text:
-            data["texts"]["future"] = future_text.split("。", 1)[1].strip()
-        else:
-            data["texts"]["future"] = future_text
-    else:
-        data["titles"]["compatibility"] = "性格・恋愛傾向"
-        data["texts"]["compatibility"] = comp_text
-        data["titles"]["love_summary"] = "理想の相手と出会いのチャンス"
-        data["texts"]["love_summary"] = future_text
-
-    # PDF生成（A4/B4, レイアウトはshincom準拠）
-    output_file = f"renai_fortune_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    create_pdf_unified(output_file, data, mode="renai", size=size, include_yearly=include_yearly)
-
-
-    # 🔁 ここで data を返すように変更
-# 末尾の戻り値部分のみ修正（compatibility_textは共通）
 
     return {
-        "compatibility_text": data["texts"].get("compatibility", ""),
-        "overall_love_fortune": "" if partner_birth else data["texts"].get("love_summary", ""),
-        "topic_fortunes": data.get("themes", []),
-        "lucky_info": data.get("lucky_info", []),
-        "lucky_direction": data.get("lucky_direction", ""),
-        "yearly_love_fortunes": data.get("yearly_fortunes", {})
+        "compatibility_text": comp_text,
+        "overall_love_fortune": "" if partner_birth else future_text,
+        "topic_fortunes": topic_sections,
+        "lucky_info": lucky_info,
+        "lucky_direction": lucky_direction,
+        "yearly_love_fortunes": yearly_fortunes
     }
-
-

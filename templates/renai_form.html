@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -30,20 +29,9 @@
       box-sizing: border-box;
       margin-top: 5px;
     }
-    .topics {
-      margin-top: 10px;
-    }
-    .topics label {
-      font-weight: normal;
-    }
     .submit-area {
       margin-top: 20px;
       text-align: center;
-    }
-    .checkbox-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
     }
   </style>
 </head>
@@ -55,16 +43,6 @@
 
     <label for="partner_birth">お相手の生年月日</label>
     <input type="date" id="partner_birth" name="partner_birth">
-
-    <label>相談したい内容を選んでください（複数選択可）</label>
-    <div class="checkbox-group">
-      <label><input type="checkbox" name="topics" value="相性"> 相性を知りたい</label>
-      <label><input type="checkbox" name="topics" value="進展"> 今後進展があるか</label>
-      <label><input type="checkbox" name="topics" value="復縁"> 復縁の可能性</label>
-      <label><input type="checkbox" name="topics" value="出会い"> 出会いのタイミング</label>
-      <label><input type="checkbox" name="topics" value="結婚"> 結婚の可能性</label>
-      <label><input type="checkbox" name="topics" value="注意点"> 注意すべき点</label>
-    </div>
 
     <label>
       <input type="checkbox" name="include_yearly" value="yes">
