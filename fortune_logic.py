@@ -136,12 +136,15 @@ def generate_fortune(image_data, birthdate, kyusei_text):
 
 
 
+
 def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = 'a4') -> dict:
     from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+    import openai
     from lucky_utils import generate_lucky_info, generate_lucky_direction
     from yearly_love_fortune_utils import generate_yearly_love_fortune
     from nicchu_utils import get_nicchu_eto
-    import openai
+    from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 
     user_eto = get_nicchu_eto(user_birth)
     partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
@@ -204,6 +207,58 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         except Exception as e:
             topic_sections.append({"title": topic, "content": f"（この項目の取得エラー: {e}）"})
 
+    # 通変星付きの今年・今月・来月の恋愛運
+    try:
+        today = datetime.today()
+        this_year = today.year
+        this_month = today.month
+        next_month_date = today.replace(day=15) + relativedelta(months=1)
+        next_month = next_month_date.month
+        next_year = next_month_date.year
+
+        tsuhen_year = get_tsuhensei_for_year(user_birth, this_year)
+        tsuhen_month = get_tsuhensei_for_date(user_birth, this_year, this_month)
+        tsuhen_next = get_tsuhensei_for_date(user_birth, next_year, next_month)
+
+        # プロンプト構成（四柱推命＋通変星あり）
+        prompt_year = f"""あなたは四柱推命の専門家です。
+- 日柱: {user_eto}
+- 年の通変星: {tsuhen_year}
+- 月の通変星: {tsuhen_month}
+今年（{this_year}年）の恋愛運について、出会いや進展、距離の縮まり方などに触れて200文字でやさしく教えてください。主語は「あなた」。"""
+
+        prompt_month = f"""あなたは四柱推命の専門家です。
+- 日柱: {user_eto}
+- 年の通変星: {tsuhen_year}
+- 月の通変星: {tsuhen_month}
+今月（{this_month}月）の恋愛運を150文字でやさしく教えてください。"""
+
+        prompt_next = f"""あなたは四柱推命の専門家です。
+- 日柱: {user_eto}
+- 年の通変星: {tsuhen_year}
+- 月の通変星: {tsuhen_next}
+来月（{next_month}月）の恋愛運を150文字でやさしく教えてください。"""
+
+        year_love = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt_year}],
+            max_tokens=400
+        ).choices[0].message.content.strip()
+
+        month_love = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt_month}],
+            max_tokens=350
+        ).choices[0].message.content.strip()
+
+        next_month_love = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt_next}],
+            max_tokens=350
+        ).choices[0].message.content.strip()
+    except Exception as e:
+        year_love = month_love = next_month_love = f"（恋愛運取得エラー: {e}）"
+
     yearly_love_fortunes = {}
     if include_yearly:
         try:
@@ -226,6 +281,9 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         "compatibility_text": comp_text,
         "overall_love_fortune": "" if partner_birth else future_text,
         "topic_fortunes": topic_sections,
+        "year_love": year_love,
+        "month_love": month_love,
+        "next_month_love": next_month_love,
         "lucky_info": lucky_info,
         "lucky_direction": lucky_direction,
         "yearly_love_fortunes": yearly_love_fortunes
