@@ -244,7 +244,6 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             if y < 30 * mm:
                 c.showPage()
                 y = height - margin
-                # ❌ draw_header はここでは呼ばない（1ページ目のみ表示）
                 c.setFont(FONT_NAME, 10)
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
@@ -258,7 +257,6 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     if data.get("themes"):
         c.showPage()
         y = height - margin
-        # ❌ ヘッダーは出さない（2ページ目以降）
         c.setFont(FONT_NAME, 12)
         for section in data["themes"]:
             c.drawString(margin, y, f"◆ {section['title']}")
@@ -277,11 +275,12 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     # -----------------------
     # 年運ページ（3〜4ページ目）
     # -----------------------
-     if include_yearly and data.get("yearly_love_fortunes"):
+    if include_yearly and data.get("yearly_love_fortunes"):
         if size == "a4":
             draw_yearly_pages_renai_a4(c, data["yearly_love_fortunes"])
         else:
             draw_yearly_pages_renai_b4(c, data["yearly_love_fortunes"])
+
 
 
 
