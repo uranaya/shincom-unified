@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 from kyusei_utils import get_honmeisei, get_directions
 
 
-MAX_CHAR = 300  # 月運 300 文字以内
+MAX_CHAR = 150  # 月運 150 文字以内
 
 def _ask_openai(prompt: str) -> str:
     response = openai.ChatCompletion.create(
@@ -26,10 +26,10 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
     honmeisei = get_honmeisei(born.year, born.month, born.day)
 
     # 今年の運勢
-    prompt_year = f"""あなたは恋愛占いのプロの占い師です。以下の情報をもとに、恋愛運について300文字以内で現実的かつ温かいアドバイスをください。
+    prompt_year = f"""あなたは恋愛占いのプロの占い師です。以下の情報をもとに、恋愛運について150文字以内で現実的かつ温かいアドバイスをください。
 - 相談者の日柱: {nicchu}
 - 今年: {now.year} 年
-- 300 文字以内、主語を『あなた』で統一、ポジティブ寄り
+- 150 文字以内、主語を『あなた』で統一、ポジティブ寄り
 """
     year_fortune = _ask_openai(prompt_year)
 
@@ -45,7 +45,7 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
 - 年月: {y}年{m}月
 
 条件:
-- 恋愛面に焦点を当てて、200文字程度で自然な日本語で書いてください
+- 恋愛面に焦点を当てて、150文字程度で自然な日本語で書いてください
 - 運気の流れに加え、出会い、進展、気持ちの変化、相性の傾向、距離の縮まり方などを中心に書いてください
 - 具体的な恋愛シーンを想像できるように、現実味あるアドバイスを含めてください
 - 主語は「あなた」で統一し、肯定的でやや温かみのある口調で語ってください

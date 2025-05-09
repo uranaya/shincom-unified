@@ -218,67 +218,71 @@ def draw_shincom_b4(c, data, include_yearly=False):
 def draw_renai_pdf(c, data, size, include_yearly=False):
     width, height = A4 if size == 'a4' else B4
     margin = 20 * mm
-
-    # ヘッダー描画（各ページ共通）と（存在すれば）手相画像描画
+    wrap_len = 40 if size == 'a4' else 45
     y = height - margin
-    y = draw_header(c, width, margin, y)
-    if data.get("palm_image"):
-        y = draw_palm_image(c, data["palm_image"], width, y)
 
-    # 1ページ目：メイン占い結果（2～3項目）
-    c.setFont(FONT_NAME, 12)
+    # -----------------------
+    # ページ1（ヘッダーあり）
+    # -----------------------
+    y = draw_header(c, width, margin, y)
+
     if 'feelings' in data['titles'] and 'future' in data['titles']:
-        # お相手ありの場合（相性・気持ち・今後）
         main_keys = ['compatibility', 'feelings', 'future']
     else:
-        # お相手なしの場合（性格・恋愛傾向、理想の相手と出会い）
-        main_keys = ['compatibility', 'love_summary']
-    for key in main_keys:
-        c.drawString(margin, y, f"◆ {data['titles'][key]}")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
-        # テキストを適宜折り返して描画
-        wrap_len = 40 if size == 'a4' else 45
-        for line in wrap(data['texts'][key] or "", wrap_len):
-            c.drawString(margin, y, line)
-            y -= 6 * mm
-            if y < 30 * mm:  # ページ下部に達したら改ページ
-                c.showPage()
-                y = height - margin
-                y = draw_header(c, width, margin, y)
-                c.setFont(FONT_NAME, 10)
-        y -= 3 * mm
-        c.setFont(FONT_NAME, 12)
+        main_keys = ['compatibility']
+        if data["texts"].get("love_summary"):
+            main_keys.append('love_summary')  # ← 総合恋愛運は partner_birth がない時のみ出力
 
-    # ラッキー情報・吉方位（1ページ目末尾）
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
-
-    # 2ページ目：トピック別占い結果
-    c.showPage()
-    y = height - margin
-    y = draw_header(c, width, margin, y)
     c.setFont(FONT_NAME, 12)
-    for section in data['themes']:
-        c.drawString(margin, y, f"◆ {section['title']}")
+    for key in main_keys:
+        c.drawString(margin, y, f"◆ {data['titles'].get(key, key)}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        for line in wrap(section['content'] or "", wrap_len):
+        for line in wrap(data['texts'].get(key, ""), wrap_len):
             c.drawString(margin, y, line)
             y -= 6 * mm
-            if y < 30 * mm:  # ページ末尾で改ページ
+            if y < 30 * mm:
                 c.showPage()
                 y = height - margin
-                y = draw_header(c, width, margin, y)
+                # ❌ draw_header はここでは呼ばない（1ページ目のみ表示）
                 c.setFont(FONT_NAME, 10)
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
-    # 年運＋月運（オプション：include_yearly=True の場合、3～4ページ目に出力）
-    if include_yearly and data.get('yearly_fortunes'):
-        if size == 'a4':
-            draw_yearly_pages_renai_a4(c, data['yearly_fortunes'])
+    # ラッキー情報と吉方位
+    y = draw_lucky_section(c, width, margin, y, data.get('lucky_info', []), data.get('lucky_direction', ''))
+
+    # -----------------------
+    # ページ2：トピック占い
+    # -----------------------
+    if data.get("themes"):
+        c.showPage()
+        y = height - margin
+        # ❌ ヘッダーは出さない（2ページ目以降）
+        c.setFont(FONT_NAME, 12)
+        for section in data["themes"]:
+            c.drawString(margin, y, f"◆ {section['title']}")
+            y -= 6 * mm
+            c.setFont(FONT_NAME, 10)
+            for line in wrap(section['content'], wrap_len):
+                c.drawString(margin, y, line)
+                y -= 6 * mm
+                if y < 30 * mm:
+                    c.showPage()
+                    y = height - margin
+                    c.setFont(FONT_NAME, 10)
+            y -= 3 * mm
+            c.setFont(FONT_NAME, 12)
+
+    # -----------------------
+    # 年運ページ（3〜4ページ目）
+    # -----------------------
+    if include_yearly and data.get("yearly_fortunes"):
+        if size == "a4":
+            draw_yearly_pages_renai_a4(c, data["yearly_fortunes"])
         else:
-            draw_yearly_pages_renai_b4(c, data['yearly_fortunes'])
+            draw_yearly_pages_renai_b4(c, data["yearly_fortunes"])
+
 
 
 def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
