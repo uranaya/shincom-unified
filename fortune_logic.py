@@ -157,7 +157,6 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None,
     from datetime import datetime
     from lucky_utils import generate_lucky_info, generate_lucky_direction
     from yearly_love_fortune_utils import generate_yearly_love_fortune
-    from hayami_table_full_complete import get_nicchu_eto
 
     user_eto = get_nicchu_eto(user_birth)
     partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
