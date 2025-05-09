@@ -1,29 +1,12 @@
 import openai
 import os
 from datetime import datetime
-from hayami_table_full_complete import hayami_table
 from dateutil.relativedelta import relativedelta
+from nicchu_utils import get_nicchu_eto
 from lucky_utils import generate_lucky_info, generate_lucky_direction
 from yearly_love_fortune_utils import generate_yearly_love_fortune
 from pdf_generator_unified import create_pdf_unified
 
-stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
-branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
-
-def get_nicchu_eto(birthdate):
-    try:
-        date_obj = datetime.strptime(birthdate, "%Y-%m-%d")
-        year, month, day = date_obj.year, date_obj.month, date_obj.day
-        if year in hayami_table and 1 <= month <= 12:
-            base = hayami_table[year][month - 1]
-            index = base + day - 1
-            while index >= 60:
-                index -= 60
-            return stems[index % 10] + branches[index % 12]
-        return "不明"
-    except Exception as e:
-        print("❌ 日柱計算エラー:", e)
-        return "不明"
 
 def get_shichu_fortune(birthdate):
     eto = get_nicchu_eto(birthdate)

@@ -1,5 +1,4 @@
-
-from fortune_logic import get_nicchu_eto
+from nicchu_utils import get_nicchu_eto
 from tsuhensei_utils import get_tsuhensei
 from kyusei_utils import get_honmeisei, get_directions
 from datetime import datetime
