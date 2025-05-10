@@ -6,30 +6,65 @@ from nicchu_utils import get_nicchu_eto
 from lucky_utils import generate_lucky_info, generate_lucky_direction
 from yearly_love_fortune_utils import generate_yearly_love_fortune
 from pdf_generator_unified import create_pdf_unified
+from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 
 
 def get_shichu_fortune(birthdate):
     eto = get_nicchu_eto(birthdate)
-    prompt = f"""あなたはプロの四柱推命鑑定士です。
-以下の干支（日柱）が「{eto}」の人に対して、以下の3つの項目で現実的な鑑定をしてください。
+    try:
+        today = datetime.today()
+        this_year = today.year
+        this_month = today.month
+        next_month_date = today.replace(day=15) + relativedelta(months=1)
+        next_year = next_month_date.year
+        next_month = next_month_date.month
+
+        tsuhen_year = get_tsuhensei_for_year(birthdate, this_year)
+        tsuhen_month = get_tsuhensei_for_date(birthdate, this_year, this_month)
+        tsuhen_next = get_tsuhensei_for_date(birthdate, next_year, next_month)
+
+        prompt = f"""あなたは四柱推命の専門家です。
+- 日柱: {eto}
+- 年の通変星: {tsuhen_year}
+- 今月の通変星: {tsuhen_month}
+- 来月の通変星: {tsuhen_next}
+
+以下の3つの項目について、それぞれ300文字以内で現実的に鑑定してください。
+本文中に干支名や通変星の名前は書かず、内容に反映させてください。
 
 ■ 性格
 ■ 今月の運勢
 ■ 来月の運勢
 
-・それぞれ300文字以内。
-・項目ごとに明確に区切ってください。
-・干支名は本文に含めないでください。"""
-    try:
+・優しい語り口で自然な文章にしてください。
+・各項目はタイトルと本文を明確に区切ってください。
+・読んでいて前向きになれるような文面にしてください。
+"""
+
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=1000
+            max_tokens=1000,
+            temperature=0.8
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
         print("❌ 四柱推命取得失敗:", e)
         return "■ 性格\n取得できませんでした\n■ 今月の運勢\n取得できませんでした\n■ 来月の運勢\n取得できませんでした"
+
+
+def get_iching_advice():
+    try:
+        prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print("❌ 易占い取得失敗:", e)
+        return "現在、易占いの結果が取得できませんでした。"
 
 
 def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
