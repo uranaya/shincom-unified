@@ -216,7 +216,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     topic_sections = []
     iching_result = get_iching_advice()
 
-    for topic in ["不倫・三角関係", "復縁", "結婚"]:
+    for topic in ["恋愛の障害と乗り越え方", "相手との距離感・深め方", "結婚"]:
         try:
             topic_prompt = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}"""

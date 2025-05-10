@@ -302,17 +302,36 @@ def get_eto():
     honmeisei = get_honmeisei(y, m, d)
     return jsonify({"eto": eto, "honmeisei": honmeisei})
 
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    next_url = request.args.get("next", "ten")
     if request.method == "POST":
         password = request.form.get("password")
-        next_url_post = request.form.get("next_url", "ten")
+        next_url_post = request.form.get("next_url", "tenmob")  # デフォルトは安全な方に
+
+        # 安全なエンドポイント名のみ許可
+        if next_url_post not in ["ten", "tenmob", "renai", "renaimob"]:
+            next_url_post = "tenmob"
+
         if password == os.getenv("LOGIN_PASSWORD", "pass"):
             session["logged_in"] = True
             return redirect(url_for(next_url_post))
-        return render_template("login.html", next_url=next_url)
+
+    # GET時: Referer から次の遷移先を決める
+    referer = request.referrer or ""
+    if "/tenmob" in referer:
+        next_url = "tenmob"
+    elif "/ten" in referer:
+        next_url = "ten"
+    elif "/renaimob" in referer:
+        next_url = "renaimob"
+    elif "/renai" in referer:
+        next_url = "renai"
+    else:
+        next_url = "tenmob"  # フォールバック
+
     return render_template("login.html", next_url=next_url)
+
 
 @app.route("/logout")
 def logout():
