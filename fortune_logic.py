@@ -213,24 +213,32 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         comp_text = f"（相性・性格占い取得エラー: {e}）"
         future_text = ""
 
-    topic_sections = []
-    for topic in ["注意点", "復縁", "結婚"]:
-        try:
-            topic_prompt = f"あなたは恋愛占いの専門家です。\n- あなたの日柱: {user_eto}\n"
-            if partner_eto:
-                topic_prompt += f"- お相手の日柱: {partner_eto}\n"
-            topic_prompt += f"{topic}について200文字で教えてください。"
 
-            topic_text = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": topic_prompt}],
-                max_tokens=600,
-                temperature=0.9
-            ).choices[0].message.content.strip()
+iching_result = get_iching_advice()  # ← 最初に取得
 
-            topic_sections.append({"title": topic, "content": topic_text})
-        except Exception as e:
-            topic_sections.append({"title": topic, "content": f"（この項目の取得エラー: {e}）"})
+for topic in ["不倫・三角関係", "復縁", "結婚"]:
+    try:
+        topic_prompt = f"""あなたは恋愛占いの専門家です。
+- あなたの日柱: {user_eto}"""
+        if partner_eto:
+            topic_prompt += f"\n- お相手の日柱: {partner_eto}"
+        topic_prompt += f"""
+- 易占いからの示唆：{iching_result}
+
+「{topic}」に関して、200文字で現実的かつ前向きなアドバイスをください。
+"""
+
+        topic_text = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": topic_prompt}],
+            max_tokens=600,
+            temperature=0.9
+        ).choices[0].message.content.strip()
+
+        topic_sections.append({"title": topic, "content": topic_text})
+    except Exception as e:
+        topic_sections.append({"title": topic, "content": f"（この項目の取得エラー: {e}）"})
+
 
     # 通変星付きの今年・今月・来月の恋愛運
     try:
