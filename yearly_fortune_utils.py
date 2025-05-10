@@ -8,17 +8,26 @@ import os
 
 MAX_CHAR = 120
 
-def _ask_openai(prompt: str) -> str:
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        max_tokens=850,
-        temperature=0.7,
-        messages=[
-            {"role": "system", "content": "あなたは四柱推命のプロの占い師です。"},
-            {"role": "user", "content": prompt}
-        ]
-    )
-    return response.choices[0].message.content.strip()
+import time
+
+def _ask_openai(prompt: str, retries=3, delay=2) -> str:
+    for attempt in range(retries):
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                max_tokens=2000,
+                temperature=0.7,
+                messages=[
+                    {"role": "system", "content": "あなたは四柱推命のプロの占い師です。"},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response.choices[0].message.content.strip()
+        except openai.error.APIError as e:
+            print(f"❌ OpenAI APIエラー（{attempt+1}回目）:", e)
+            time.sleep(delay)
+    return "取得に失敗しました（OpenAI APIエラー）"
+
 
 
 def generate_yearly_fortune(user_birth: str, now: datetime):
