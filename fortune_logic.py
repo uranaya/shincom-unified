@@ -213,34 +213,32 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         comp_text = f"（相性・性格占い取得エラー: {e}）"
         future_text = ""
 
+    topic_sections = []
+    iching_result = get_iching_advice()  # ← 最初に取得
 
-iching_result = get_iching_advice()  # ← 最初に取得
-
-for topic in ["不倫・三角関係", "復縁", "結婚"]:
-    try:
-        topic_prompt = f"""あなたは恋愛占いの専門家です。
+    for topic in ["不倫・三角関係", "復縁", "結婚"]:
+        try:
+            topic_prompt = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}"""
-        if partner_eto:
-            topic_prompt += f"\n- お相手の日柱: {partner_eto}"
-        topic_prompt += f"""
+            if partner_eto:
+                topic_prompt += f"\n- お相手の日柱: {partner_eto}"
+            topic_prompt += f"""
 - 易占いからの示唆：{iching_result}
 
 「{topic}」に関して、200文字で現実的かつ前向きなアドバイスをください。
 """
 
-        topic_text = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": topic_prompt}],
-            max_tokens=600,
-            temperature=0.9
-        ).choices[0].message.content.strip()
+            topic_text = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": topic_prompt}],
+                max_tokens=600,
+                temperature=0.9
+            ).choices[0].message.content.strip()
 
-        topic_sections.append({"title": topic, "content": topic_text})
-    except Exception as e:
-        topic_sections.append({"title": topic, "content": f"（この項目の取得エラー: {e}）"})
+            topic_sections.append({"title": topic, "content": topic_text})
+        except Exception as e:
+            topic_sections.append({"title": topic, "content": f"（この項目の取得エラー: {e}）"})
 
-
-    # 通変星付きの今年・今月・来月の恋愛運
     try:
         today = datetime.today()
         this_year = today.year
@@ -253,7 +251,6 @@ for topic in ["不倫・三角関係", "復縁", "結婚"]:
         tsuhen_month = get_tsuhensei_for_date(user_birth, this_year, this_month)
         tsuhen_next = get_tsuhensei_for_date(user_birth, next_year, next_month)
 
-        # プロンプト構成（四柱推命＋通変星あり）
         prompt_year = f"""あなたは四柱推命の専門家です。
 - 日柱: {user_eto}
 - 年の通変星: {tsuhen_year}
