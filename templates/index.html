@@ -45,10 +45,13 @@
   <input type="date" id="birthdate" required oninput="fetchEto()">
   <div id="eto-display"></div>
 
-<div style="margin: 10px 0; display: flex; align-items: center; gap: 8px;">
-  <input type="checkbox" id="full_year" name="full_year" value="yes">
-  <label for="full_year">1年分の運勢を出す（＋2ページ）</label>
+<div style="margin: 10px 0;">
+  <label for="full_year" style="display: inline-flex; align-items: center; gap: 8px; flex-wrap: nowrap;">
+    <input type="checkbox" id="full_year" name="full_year" value="yes">
+    1年分の運勢を出す（＋2ページ）
+  </label>
 </div>
+
 
 
   <button onclick="submitForm()">送信してPDF生成</button>
