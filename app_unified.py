@@ -21,8 +21,8 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-@app.route("/ten", methods=["GET", "POST"])
-@app.route("/tenmob", methods=["GET", "POST"])
+@app.route("/ten", methods=["GET", "POST"], endpoint="ten")
+@app.route("/tenmob", methods=["GET", "POST"], endpoint="tenmob")
 def ten_shincom():
     if "logged_in" not in session:
         return redirect(url_for("login"))
