@@ -90,7 +90,7 @@ def ten_shincom():
                 lucky_lines = list(lucky_info)
             # PDF生成用データ構築
             result_data = {
-                "palm_titles": ["生命線", "知能線", "感情線", "運命線", "太陽線"],
+                "palm_titles": ["生命線", "運命線", "金運線", "特殊線1", "特殊線2"],
                 "palm_texts": palm_texts,
                 "titles": {
                     "palm_summary": "手相の総合アドバイス",
@@ -241,7 +241,7 @@ def selfmob_index():
 
             # PDF出力用データ
             result_data = {
-                "palm_titles": ["生命線", "知能線", "感情線", "運命線", "太陽線"],
+                "palm_titles": ["生命線", "運命線", "金運線", "特殊線1", "特殊線2"],
                 "palm_texts": palm_texts,
                 "titles": {
                     "palm_summary": "手相の総合アドバイス",
