@@ -214,7 +214,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         future_text = ""
 
     topic_sections = []
-    iching_result = get_iching_advice()  # ← 最初に取得
+    iching_result = get_iching_advice()
 
     for topic in ["不倫・三角関係", "復縁", "結婚"]:
         try:
@@ -225,7 +225,12 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
             topic_prompt += f"""
 - 易占いからの示唆：{iching_result}
 
-「{topic}」に関して、200文字で現実的かつ前向きなアドバイスをください。
+以下の条件で「{topic}」についてアドバイスしてください：
+
+・相談者の傾向（日柱）と、易の示唆を元にした、個別性の高い具体的な鑑定にする  
+・200文字以内  
+・現実的で誠実だが希望が持てる言葉で  
+・一般論や抽象的な助言ではなく、読み手に刺さるような内容にする
 """
 
             topic_text = openai.ChatCompletion.create(
