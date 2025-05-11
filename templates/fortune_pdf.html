@@ -27,13 +27,21 @@
   </style>
 </head>
 <body>
-  <div class="back">
-    {% if 'renai' in referer %}
-      <a href="{{ url_for('renai') }}">🔙 恋愛鑑定に戻る</a>
-    {% else %}
-      <a href="{{ url_for('ten_shincom') }}">🔙 占い画面に戻る</a>
-    {% endif %}
-  </div>
+
+<div class="back">
+  {% if '/renai' in referer %}
+    <a href="{{ url_for('renai') }}">🔙 恋愛鑑定に戻る</a>
+  {% elif '/renaib4' in referer %}
+    <a href="{{ url_for('renai') }}">🔙 恋愛鑑定に戻る</a>
+  {% elif '/tenmob' in referer %}
+    <a href="{{ url_for('tenmob') }}">🔙 占い画面に戻る</a>
+  {% elif '/ten' in referer %}
+    <a href="{{ url_for('ten') }}">🔙 占い画面に戻る</a>
+  {% else %}
+    <a href="{{ url_for('home') }}">🔙 トップに戻る</a>
+  {% endif %}
+</div>
+
   <iframe src="{{ url_for('view_pdf', filename=filename) }}"></iframe>
 </body>
 </html>
