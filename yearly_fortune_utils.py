@@ -57,10 +57,10 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
 
     year_fortune = _ask_openai(prompt_year)
 
-    # 月運（1〜12月）
+    # 月運（今月から12ヶ月分）
     month_fortunes = []
-    for m in range(1, 13):
-        target = datetime(target_year, m, 15)
+    for i in range(12):
+        target = now.replace(day=15) + relativedelta(months=i)
         y, m = target.year, target.month
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
         dirs = get_directions(y, m, honmeisei)

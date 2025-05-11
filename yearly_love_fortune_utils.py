@@ -51,15 +51,14 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
         temperature=0.8
     ).choices[0].message.content.strip()
 
-    # 月運生成（対象年の1月〜12月）
+    # 月運（今月から12ヶ月分）
     month_fortunes = []
-    for m in range(1, 13):
-        target = datetime(target_year, m, 15)
+    for i in range(12):
+        target = now.replace(day=15) + relativedelta(months=i)
         y, m = target.year, target.month
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
         dirs = get_directions(y, m, honmeisei)
 
-        # 月運プロンプト（改良）
         prompt_month = f"""
 あなたは恋愛占いの専門家です。
 以下の情報をもとに、その月の恋愛運を100文字以内で自然な日本語で表現してください。
