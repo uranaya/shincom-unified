@@ -29,10 +29,11 @@ def get_shichu_fortune(birthdate):
 - {target1.month}月の通変星: {tsuhen_month1}
 - {target2.month}月の通変星: {tsuhen_month2}
 
-以下の3つの項目について、それぞれ300文字以内で現実的に鑑定してください。
+以下の4つの項目について、それぞれ300文字以内で現実的に鑑定してください。
 本文中に干支名や通変星の名前は書かず、内容に反映させてください。
 
 ■ 性格
+■ 今年の運勢
 ■ {target1.month}月の運勢
 ■ {target2.month}月の運勢
 
@@ -44,13 +45,58 @@ def get_shichu_fortune(birthdate):
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=1000,
+            max_tokens=1200,
             temperature=0.8
         )
-        return response.choices[0].message.content.strip()
+
+        content = response.choices[0].message.content.strip()
+
+        # 結果を構造化
+        parts = content.split("■ ")
+        results = {
+            "titles": {
+                "personality": "■ 性格",
+                "year_fortune": "■ 今年の運勢",
+                "month_fortune": f"■ {target1.month}月の運勢",
+                "next_month_fortune": f"■ {target2.month}月の運勢"
+            },
+            "texts": {
+                "personality": "",
+                "year_fortune": "",
+                "month_fortune": "",
+                "next_month_fortune": ""
+            }
+        }
+
+        for part in parts:
+            if part.startswith("性格"):
+                results["texts"]["personality"] = part.replace("性格", "").strip()
+            elif part.startswith("今年の運勢"):
+                results["texts"]["year_fortune"] = part.replace("今年の運勢", "").strip()
+            elif part.startswith(f"{target1.month}月の運勢"):
+                results["texts"]["month_fortune"] = part.replace(f"{target1.month}月の運勢", "").strip()
+            elif part.startswith(f"{target2.month}月の運勢"):
+                results["texts"]["next_month_fortune"] = part.replace(f"{target2.month}月の運勢", "").strip()
+
+        return results
+
     except Exception as e:
         print("❌ 四柱推命取得失敗:", e)
-        return f"■ 性格\n取得できませんでした\n■ {target1.month}月の運勢\n取得できませんでした\n■ {target2.month}月の運勢\n取得できませんでした"
+        return {
+            "titles": {
+                "personality": "■ 性格",
+                "year_fortune": "■ 今年の運勢",
+                "month_fortune": f"■ {target1.month}月の運勢",
+                "next_month_fortune": f"■ {target2.month}月の運勢"
+            },
+            "texts": {
+                "personality": "取得できませんでした",
+                "year_fortune": "取得できませんでした",
+                "month_fortune": "取得できませんでした",
+                "next_month_fortune": "取得できませんでした"
+            }
+        }
+
 
 
 
