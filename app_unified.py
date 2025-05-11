@@ -349,9 +349,9 @@ def get_eto():
 def login():
     if request.method == "POST":
         password = request.form.get("password")
-        next_url_post = request.form.get("next_url", "tenmob")  # デフォルトは安全な方に
+        next_url_post = request.form.get("next_url", "tenmob")
 
-        # 安全なエンドポイント名のみ許可
+        # 安全性チェック
         if next_url_post not in ["ten", "tenmob", "renai", "renaimob"]:
             next_url_post = "tenmob"
 
@@ -359,18 +359,22 @@ def login():
             session["logged_in"] = True
             return redirect(url_for(next_url_post))
 
-    # GET時: Referer から次の遷移先を決める
-    referer = request.referrer or ""
-    if "/tenmob" in referer:
-        next_url = "tenmob"
-    elif "/ten" in referer:
-        next_url = "ten"
-    elif "/renaimob" in referer:
-        next_url = "renaimob"
-    elif "/renai" in referer:
-        next_url = "renai"
+    # ✅ GET時: ?next=xxx を優先、なければ Referer 推定
+    next_url = request.args.get("next")
+    if next_url in ["ten", "tenmob", "renai", "renaimob"]:
+        pass  # OK
     else:
-        next_url = "tenmob"  # フォールバック
+        referer = request.referrer or ""
+        if "/tenmob" in referer:
+            next_url = "tenmob"
+        elif "/ten" in referer:
+            next_url = "ten"
+        elif "/renaimob" in referer:
+            next_url = "renaimob"
+        elif "/renai" in referer:
+            next_url = "renai"
+        else:
+            next_url = "tenmob"
 
     return render_template("login.html", next_url=next_url)
 
