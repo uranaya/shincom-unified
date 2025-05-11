@@ -317,8 +317,6 @@ def draw_yearly_pages_renai_b4(c, yearly):
         draw_text_block(month["label"], month["text"])
 
 
-
-
 def draw_renai_pdf(c, data, size, include_yearly=False):
     from reportlab.lib.pagesizes import A4, B4
     from reportlab.lib.units import mm
@@ -354,7 +352,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             y -= 3 * mm
             c.setFont(FONT_NAME, 12)
 
-    # 年・月・来月の恋愛運（追加）
+    # 年・月・来月の恋愛運（タイトルを titles から取得）
     for key in ["year_love", "month_love", "next_month_love"]:
         if key in data["texts"] and data["texts"][key].strip():
             c.drawString(margin, y, f"◆ {data['titles'].get(key, key)}")
@@ -365,7 +363,6 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
                 y -= 6 * mm
             y -= 3 * mm
             c.setFont(FONT_NAME, 12)
-
 
     c.showPage()
     y = height - margin
