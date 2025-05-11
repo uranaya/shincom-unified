@@ -345,12 +345,21 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         kyusei_text = ""
 
     return {
-        "compatibility_text": comp_text,
-        "overall_love_fortune": "" if partner_birth else future_text,
-        "topic_fortunes": topic_sections,
-        "year_love": year_love,
-        "month_love": month_love,
-        "next_month_love": next_month_love,
+        "texts": {
+            "compatibility": comp_text,
+            "overall_love_fortune": "" if partner_birth else future_text,
+            "year_love": year_love,
+            "month_love": month_love,
+            "next_month_love": next_month_love,
+        },
+        "titles": {
+            "compatibility": "相性診断",
+            "overall_love_fortune": "相手の気持ちと今後の展開" if partner_birth else "理想の相手像と出会いのチャンス",
+            "year_love": f"{this_year}年の恋愛運",
+            "month_love": f"{this_month}月の恋愛運",
+            "next_month_love": f"{next_month}月の恋愛運",
+        },
+        "themes": topic_sections,
         "lucky_info": lucky_info,
         "lucky_direction": kyusei_text,
         "yearly_love_fortunes": yearly_love_fortunes
