@@ -25,12 +25,14 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
 
-    tsuhen_year = get_tsuhensei_for_year(user_birth, now.year)
+    # 12月なら来年を対象とする
+    target_year = now.year + 1 if now.month == 12 else now.year
+    tsuhen_year = get_tsuhensei_for_year(user_birth, target_year)
 
     # 年運プロンプト（改良）
     prompt_year = f"""
 あなたは恋愛占いの専門家です。
-以下の情報をもとに、{now.year}年の恋愛傾向を100文字以内で表現してください。
+以下の情報をもとに、{target_year}年の恋愛傾向を100文字以内で表現してください。
 
 - 日柱: {nicchu}
 - 年の通変星: {tsuhen_year}
@@ -49,10 +51,10 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
         temperature=0.8
     ).choices[0].message.content.strip()
 
-    # 月運生成（12ヶ月分）
+    # 月運生成（対象年の1月〜12月）
     month_fortunes = []
-    for i in range(12):
-        target = (now.replace(day=15) + relativedelta(months=i))
+    for m in range(1, 13):
+        target = datetime(target_year, m, 15)
         y, m = target.year, target.month
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
         dirs = get_directions(y, m, honmeisei)
@@ -87,7 +89,7 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
         })
 
     return {
-        "year_label": f"{now.year}年の総合運",
+        "year_label": f"{target_year}年の総合運",
         "year_text": year_fortune,
         "months": month_fortunes
     }

@@ -35,42 +35,59 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
 
-    # 年運（通変星あり）
-    tsuhen_year = get_tsuhensei_for_year(user_birth, now.year)  # ← 修正
-    prompt_year = f"""あなたは占いの専門家です。以下の情報をもとに、性格や考え方を踏まえた現実的な開運アドバイスをください。
+    # 12月は翌年を対象にする
+    target_year = now.year + 1 if now.month == 12 else now.year
+
+    # 年運プロンプト（改良）
+    tsuhen_year = get_tsuhensei_for_year(user_birth, target_year)
+    prompt_year = f"""
+あなたは開運アドバイザーです。
+以下の情報をもとに、{target_year}年における「あなた」の全体運を自然な日本語で表現してください。
 
 - 日柱: {nicchu}
-- 今年の通変星: {tsuhen_year}
-- 対象年: {now.year} 年
+- 通変星: {tsuhen_year}
 
-120文字以内で、運気の流れや注意点、やると良いことなど前向きにまとめてください。"""
+条件：
+- 占い用語（例：比肩、印綬など）や干支名は使わず、
+  意味に沿ってやさしい言葉に置き換えてください
+- 約120文字以内
+- 前向きで、行動や考え方の指針になるように
+- 読んだ人が「なるほど」と感じるように
+""".strip()
+
     year_fortune = _ask_openai(prompt_year)
 
-    # 月運
+    # 月運（1〜12月）
     month_fortunes = []
-    for i in range(12):
-        target = (now.replace(day=15) + relativedelta(months=i))
+    for m in range(1, 13):
+        target = datetime(target_year, m, 15)
         y, m = target.year, target.month
-        tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)  # ← 修正
+        tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
         dirs = get_directions(y, m, honmeisei)
-        prompt_month = f"""あなたは占いの専門家です。以下の条件で対象月の総合運を占ってください。
+
+        prompt_month = f"""
+あなたは占いの専門家です。
+以下の情報をもとに、{y}年{m}月の運気を自然な日本語で約120文字以内にまとめてください。
 
 - 日柱: {nicchu}
-- 通変星: {tsuhen_month}
-- 年月: {y}年{m}月
+- 月の通変星: {tsuhen_month}
 
-条件:
-- 約120文字以内
-- 運気の流れや心がけ、やると良いことを具体的に
-- 前向きな語り口で、親しみやすく
-"""
+条件：
+- 占い専門用語は使わず意味をやさしく表現
+- 主語は「あなた」
+- 月ごとに変化を出す（行動・感情・周囲との関係など）
+- 現実的でポジティブな内容
+""".strip()
+
+        text = _ask_openai(prompt_month)
+
         month_fortunes.append({
             "label": f"{y}年{m}月の運勢",
-            "text": _ask_openai(prompt_month)
+            "text": text
         })
 
     return {
-        "year_label": f"{now.year}年の総合運",
+        "year_label": f"{target_year}年の総合運",
         "year_text": year_fortune,
         "months": month_fortunes
     }

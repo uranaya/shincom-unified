@@ -13,28 +13,27 @@ def get_shichu_fortune(birthdate):
     eto = get_nicchu_eto(birthdate)
     try:
         today = datetime.today()
-        this_year = today.year
-        this_month = today.month
-        next_month_date = today.replace(day=15) + relativedelta(months=1)
-        next_year = next_month_date.year
-        next_month = next_month_date.month
+        target1 = today.replace(day=15)
+        if today.day >= 20:
+            target1 += relativedelta(months=1)
+        target2 = target1 + relativedelta(months=1)
 
-        tsuhen_year = get_tsuhensei_for_year(birthdate, this_year)
-        tsuhen_month = get_tsuhensei_for_date(birthdate, this_year, this_month)
-        tsuhen_next = get_tsuhensei_for_date(birthdate, next_year, next_month)
+        tsuhen_year = get_tsuhensei_for_year(birthdate, today.year)
+        tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
+        tsuhen_month2 = get_tsuhensei_for_date(birthdate, target2.year, target2.month)
 
         prompt = f"""あなたは四柱推命の専門家です。
 - 日柱: {eto}
 - 年の通変星: {tsuhen_year}
-- 今月の通変星: {tsuhen_month}
-- 来月の通変星: {tsuhen_next}
+- {target1.month}月の通変星: {tsuhen_month1}
+- {target2.month}月の通変星: {tsuhen_month2}
 
 以下の3つの項目について、それぞれ300文字以内で現実的に鑑定してください。
 本文中に干支名や通変星の名前は書かず、内容に反映させてください。
 
 ■ 性格
-■ 今月の運勢
-■ 来月の運勢
+■ {target1.month}月の運勢
+■ {target2.month}月の運勢
 
 ・優しい語り口で自然な文章にしてください。
 ・各項目はタイトルと本文を明確に区切ってください。
@@ -50,88 +49,69 @@ def get_shichu_fortune(birthdate):
         return response.choices[0].message.content.strip()
     except Exception as e:
         print("❌ 四柱推命取得失敗:", e)
-        return "■ 性格\n取得できませんでした\n■ 今月の運勢\n取得できませんでした\n■ 来月の運勢\n取得できませんでした"
+        return f"■ 性格\n取得できませんでした\n■ {target1.month}月の運勢\n取得できませんでした\n■ {target2.month}月の運勢\n取得できませんでした"
 
 
-def get_iching_advice():
-    try:
-        prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=300
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print("❌ 易占い取得失敗:", e)
-        return "現在、易占いの結果が取得できませんでした。"
 
-
-def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
-    prompt = f"""あなたは占いの専門家です。
-相談者は現在{age}歳です。以下の3つの鑑定結果を参考にしてください。
-
-【手相】\n{palm_result}\n
-【四柱推命】\n{shichu_result}\n
-【九星気学の方位】\n{kyusei_text}
-
-この内容を元に、相談者にとって今最も運気を高めるための
-ラッキーアイテム・ラッキーカラー・ラッキーナンバー・ラッキーフード・ラッキーデー
-をそれぞれ1つずつ、以下の形式で提案してください：
-
-・ラッキーアイテム：〇〇
-・ラッキーカラー：〇〇
-・ラッキーナンバー：〇〇
-・ラッキーフード：〇〇
-・ラッキーデー：〇曜日
-
-自然で前向きな言葉で書いてください。"""
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
-        )
-        return response["choices"][0]["message"]["content"].splitlines()
-    except Exception as e:
-        print("❌ ラッキー情報取得失敗:", e)
-        return ["取得できませんでした。"]
-
+from tesou import tesou_names, tesou_descriptions
+from datetime import datetime
 
 def analyze_palm(image_data):
     try:
-        base64data = image_data.split(",", 1)[1]
+        # Data URL形式 or base64のみの両方に対応
+        if "," in image_data:
+            base64data = image_data.split(",", 1)[1]
+        else:
+            base64data = image_data
+
+        # 除外線（基本3本＋感情線・頭脳線）
+        excluded = {"生命線", "運命線", "金運線", "頭脳線", "感情線"}
+        special_line_candidates = [name for name in tesou_names if name not in excluded]
+        special_lines_text = "、".join(special_line_candidates)
+
+        # 線の意味説明文を整形
+        description_text = "\n".join(
+            f"{name}：{tesou_descriptions[name]}"
+            for name in tesou_names
+            if name in tesou_descriptions
+        )
+
+        # システムプロンプト（AIの注意点）
+        system_prompt = (
+            "あなたはプロの手相鑑定士です。以下の条件に従って、手相画像から5つの線・相を選び、"
+            "それぞれ意味と印象をわかりやすく説明してください。\n\n"
+            "【出力構成】\n"
+            "・1. 生命線、2. 運命線、3. 金運線は必ず含める\n"
+            "・4. 特殊線1、5. 特殊線2は以下の中から目立つものを優先：\n"
+            f"{special_lines_text}\n"
+            "・目立つ特殊線が無ければ感情線や頭脳線で自然に補完してください\n\n"
+            "【各線の意味ガイド】\n"
+            f"{description_text}\n\n"
+            "全体として、読み手が安心し前向きになれるよう、柔らかく肯定的な語り口でまとめてください。"
+        )
+
+        # ユーザープロンプト（出力フォーマット）
+        user_prompt = (
+            "以下の形式で出力してください：\n"
+            "### 1. 生命線\n（説明文）\n\n"
+            "### 2. 運命線\n（説明文）\n\n"
+            "### 3. 金運線\n（説明文）\n\n"
+            "### 4. 特殊線1\n（説明文）\n\n"
+            "### 5. 特殊線2\n（説明文）\n\n"
+            "### 総合的なアドバイス\n（全体のバランスを見たまとめ）\n\n"
+            "・各項目は200文字前後で自然な文体に\n"
+            "・“無い”と明記せず、手相全体の印象から前向きに解釈してください\n"
+            "・読んだ人が『占ってよかった』と思えるような締めくくりを心がけてください"
+        )
+
         response = openai.ChatCompletion.create(
             model="gpt-4-turbo",
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "あなたはプロの手相鑑定士です。以下の条件に従い、特殊線を優先的にピックアップし、金運に関する要素があれば優先的に言及し、なければ無理に言及しないようにしてください。全体として相談者の魅力を引き出す自然な文章で出力してください。"
-                    ),
-                },
+                {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "手相の写真を見て、以下の形式で出力してください：\n"
-                                "### 1. 生命線\n（説明文）\n\n"
-                                "### 2. 運命線\n（説明文）\n\n"
-                                "### 3. 金運線\n（説明文）\n\n"
-                                "### 4. 特殊線1\n（目立つ個性的な線があれば記載。なければ感情線などで補完）\n\n"
-                                "### 5. 特殊線2\n（さらに目立つ個性的な線があれば記載。なければ頭脳線などで補完）\n\n"
-                                "### 総合的なアドバイス\n（全体を踏まえたまとめ）\n\n"
-                                "・各項目は200文字前後で\n"
-                                "・読み手が楽しく前向きな気持ちになれるような、温かく優しい語り口で\n"
-                                "・改行や記号などで各項目が明確に区切られるようにしてください\n"
-                                "・特徴的な線が見られなかった場合でも“無い”とは書かず、全体の印象やバランスからポジティブな要素を自然に伝えてください\n"
-                                "・読み手に「占ってもらってよかった」と思ってもらえるように、1つでも印象に残るようなコメントを入れてください\n"
-                                "・もし金運に関連する良い線（財運線、太陽線、スター、覇王線、フィッシュなど）が見られた場合は、優先的に金運についてもポジティブなコメントを入れてください。\n"
-                                "・金運に特に特徴が見られない場合でも、そのことには一切触れず、全体の印象から前向きな鑑定結果にまとめてください。" 
-                            ),
-                        },
+                        {"type": "text", "text": user_prompt},
                         {
                             "type": "image_url",
                             "image_url": {
@@ -142,8 +122,10 @@ def analyze_palm(image_data):
                 },
             ],
             max_tokens=3000,
+            temperature=0.8,
         )
         return response.choices[0].message.content.strip()
+
     except Exception as e:
         print("❌ Vision APIエラー:", e)
         return "手相診断中にエラーが発生しました。"
