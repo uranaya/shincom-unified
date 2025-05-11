@@ -287,6 +287,7 @@ def preview(filename):
         return redirect(url_for("view_pdf", filename=filename))
     return render_template("fortune_pdf.html", filename=filename, referer=referer)
 
+
 @app.route("/view/<filename>")
 def view_pdf(filename):
     filepath = os.path.join("static", "uploads", filename)
@@ -294,13 +295,22 @@ def view_pdf(filename):
         return "ファイルが存在しません", 404
     return send_file(filepath, mimetype='application/pdf')
 
+
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
-    birthdate = request.json.get("birthdate")
-    eto = get_nicchu_eto(birthdate)
-    y, m, d = map(int, birthdate.split("-"))
-    honmeisei = get_honmeisei(y, m, d)
-    return jsonify({"eto": eto, "honmeisei": honmeisei})
+    try:
+        data = request.get_json()
+        birthdate = data.get("birthdate", "").strip()
+
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", birthdate):
+            return jsonify({"error": "日付の形式が正しくありません"}), 400
+
+        datetime.strptime(birthdate, "%Y-%m-%d")  # 存在しない日付を除外
+        eto = get_nicchu_eto(birthdate)
+        honmeisei = get_honmeisei(*map(int, birthdate.split("-")))
+        return jsonify({"eto": eto, "honmeisei": honmeisei})
+    except Exception as e:
+        return jsonify({"error": "サーバー内部エラー"}), 500
 
 
 @app.route("/login", methods=["GET", "POST"])

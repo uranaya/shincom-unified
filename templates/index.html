@@ -79,27 +79,41 @@
       alert("📷 撮影完了しました！");
     }
 
-    async function fetchEto() {
-      const birthdate = document.getElementById("birthdate").value;
-      const etoDisplay = document.getElementById("eto-display");
+  async function fetchEto() {
+    const birthdate = document.getElementById("birthdate").value;
+    const etoDisplay = document.getElementById("eto-display");
 
-      if (!birthdate) {
-        etoDisplay.textContent = "";
+    // 入力なしなら表示リセット
+    if (!birthdate) {
+      etoDisplay.textContent = "";
+      return;
+    }
+
+    try {
+      const response = await fetch("/get_eto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ birthdate })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // サーバーから明示的なエラーが返ってきた場合（例：400）
+        etoDisplay.textContent = `⚠️ エラー: ${data.error || '不明なエラー'}`;
         return;
       }
 
-      try {
-        const response = await fetch("/get_eto", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ birthdate })
-        });
-        const data = await response.json();
+      // 正常時
+      if (data.eto && data.honmeisei) {
         etoDisplay.textContent = `あなたの干支：${data.eto} ／ 本命星：${data.honmeisei}`;
-      } catch (error) {
-        etoDisplay.textContent = "干支と本命星の取得に失敗しました";
+      } else {
+        etoDisplay.textContent = "⚠️ 干支情報の取得に失敗しました";
       }
+    } catch (error) {
+      etoDisplay.textContent = "⚠️ 通信エラー: " + error.message;
     }
+  }
 
     async function submitForm() {
       const birthdate = document.getElementById("birthdate").value;
