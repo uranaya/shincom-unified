@@ -347,40 +347,50 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             y -= 6 * mm
             c.setFont(FONT_NAME, 10)
             for line in wrap(data["texts"][key], wrap_len):
+                if y < 30 * mm:
+                    c.showPage()
+                    y = height - margin
                 c.drawString(margin, y, line)
                 y -= 6 * mm
             y -= 3 * mm
             c.setFont(FONT_NAME, 12)
 
-    # 年・月・来月の恋愛運（タイトルを titles から取得）
+    # 2ページ目：年・月・来月の恋愛運
+    c.showPage()
+    y = height - margin
     for key in ["year_love", "month_love", "next_month_love"]:
         if key in data["texts"] and data["texts"][key].strip():
             c.drawString(margin, y, f"◆ {data['titles'].get(key, key)}")
             y -= 6 * mm
             c.setFont(FONT_NAME, 10)
             for line in wrap(data["texts"][key], wrap_len):
+                if y < 30 * mm:
+                    c.showPage()
+                    y = height - margin
                 c.drawString(margin, y, line)
                 y -= 6 * mm
             y -= 3 * mm
             c.setFont(FONT_NAME, 12)
 
-    c.showPage()
-    y = height - margin
-
-    # 2ページ目：トピック占い（注意点・復縁・結婚）
-    c.setFont(FONT_NAME, 12)
+    # トピック占い（注意点・復縁・結婚）
     if data.get("themes"):
         for section in data["themes"]:
+            if y < 30 * mm:
+                c.showPage()
+                y = height - margin
             c.drawString(margin, y, f"◆ {section['title']}")
             y -= 6 * mm
             c.setFont(FONT_NAME, 10)
             for line in wrap(section['content'], wrap_len):
+                if y < 30 * mm:
+                    c.showPage()
+                    y = height - margin
                 c.drawString(margin, y, line)
                 y -= 6 * mm
             y -= 3 * mm
             c.setFont(FONT_NAME, 12)
 
-    # ラッキー情報と吉方位（2ページ目の末尾）
+    # ラッキー情報と吉方位
     y = draw_lucky_section(
         c, width, margin, y,
         data.get("lucky_info", []),
@@ -393,6 +403,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             draw_yearly_pages_renai_a4(c, data["yearly_love_fortunes"])
         else:
             draw_yearly_pages_renai_b4(c, data["yearly_love_fortunes"])
+
 
 
 

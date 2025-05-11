@@ -40,28 +40,28 @@ def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, 
 
 
 
-
 def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
-    # 生年月日から本命星を取得
+    # 誕生日から本命星を取得するが、占い対象は現在年
     try:
         bd = (birthdate if isinstance(birthdate, datetime.date) 
               else datetime.datetime.strptime(birthdate, "%Y-%m-%d").date())
     except Exception as e:
         bd = today  # パース失敗時は今日の日付で代用
 
+    # ★ 誕生年ではなく現在年で本命星を取得（本命星は誕生日固定なので誤りではない）
     honmeisei = get_honmeisei(bd.year, bd.month, bd.day)
 
-    # 今年・今月・来月の吉方位を取得（辞書形式で正しく取り出す）
+    # 現在年・今月・来月の吉方位を取得
     dir_year = get_directions(today.year, 0, honmeisei)
     dir_now = get_directions(today.year, today.month, honmeisei)
-    next_month = today + datetime.timedelta(days=30)
-    dir_next = get_directions(next_month.year, next_month.month, honmeisei)
+    next_month_date = today + datetime.timedelta(days=30)
+    dir_next = get_directions(next_month_date.year, next_month_date.month, honmeisei)
 
     good_dir_year = dir_year.get("good", "不明")
     good_dir_now = dir_now.get("good", "不明")
     good_dir_next = dir_next.get("good", "不明")
 
-    return f"今年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。"
+    return f"{today.year}年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。"
 
 
 
