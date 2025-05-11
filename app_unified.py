@@ -148,6 +148,7 @@ def ten_shincom():
 def renai():
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
+
     size = "A4" if request.path == "/renai" else "B4"
 
     if request.method == "POST":
@@ -165,24 +166,25 @@ def renai():
         month_label = f"{target1.year}年{target1.month}月の恋愛運"
         next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
 
+        # 🎯 正しく texts/titles を含んだ構造で取得
         raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
 
         result_data = {
             "texts": {
-                "compatibility": raw_result.get("compatibility_text", ""),
-                "overall_love_fortune": raw_result.get("overall_love_fortune", ""),
-                "year_love": raw_result.get(year_label, ""),
-                "month_love": raw_result.get(month_label, ""),
-                "next_month_love": raw_result.get(next_month_label, "")
+                "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
+                "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),
+                "year_love": raw_result.get("texts", {}).get("year_love", ""),
+                "month_love": raw_result.get("texts", {}).get("month_love", ""),
+                "next_month_love": raw_result.get("texts", {}).get("next_month_love", "")
             },
             "titles": {
-                "compatibility": "相性診断" if partner_birth else "恋愛傾向と出会い",
-                "overall_love_fortune": "総合恋愛運",
-                "year_love": year_label,
-                "month_love": month_label,
-                "next_month_love": next_month_label
+                "compatibility": raw_result.get("titles", {}).get("compatibility", "相性診断" if partner_birth else "恋愛傾向と出会い"),
+                "overall_love_fortune": raw_result.get("titles", {}).get("overall_love_fortune", "総合恋愛運"),
+                "year_love": raw_result.get("titles", {}).get("year_love", year_label),
+                "month_love": raw_result.get("titles", {}).get("month_love", month_label),
+                "next_month_love": raw_result.get("titles", {}).get("next_month_love", next_month_label)
             },
-            "themes": raw_result.get("topic_fortunes", []),
+            "themes": raw_result.get("themes", []),
             "lucky_info": raw_result.get("lucky_info", []),
             "lucky_direction": raw_result.get("lucky_direction", ""),
             "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
@@ -194,8 +196,6 @@ def renai():
         return send_file(filepath, as_attachment=True)
 
     return render_template("renai_form.html")
-
-
 
 
 @app.route("/selfmob", methods=["GET"])
