@@ -299,18 +299,19 @@ def view_pdf(filename):
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
     try:
-        data = request.get_json()
-        birthdate = data.get("birthdate", "").strip()
+        birthdate = request.json.get("birthdate")
+        if not birthdate or not isinstance(birthdate, str):
+            return jsonify({"error": "無効な生年月日です"}), 400
 
-        if not re.match(r"^\d{4}-\d{2}-\d{2}$", birthdate):
-            return jsonify({"error": "日付の形式が正しくありません"}), 400
-
-        datetime.strptime(birthdate, "%Y-%m-%d")  # 存在しない日付を除外
+        y, m, d = map(int, birthdate.split("-"))
         eto = get_nicchu_eto(birthdate)
-        honmeisei = get_honmeisei(*map(int, birthdate.split("-")))
+        honmeisei = get_honmeisei(y, m, d)
+
         return jsonify({"eto": eto, "honmeisei": honmeisei})
     except Exception as e:
-        return jsonify({"error": "サーバー内部エラー"}), 500
+        print("❌ /get_eto エラー:", e)
+        return jsonify({"error": "干支または本命星の取得中にエラーが発生しました"}), 500
+
 
 
 @app.route("/login", methods=["GET", "POST"])
