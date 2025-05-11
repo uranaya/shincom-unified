@@ -132,22 +132,48 @@ def analyze_palm(image_data):
 import openai
 
 def get_iching_advice():
-    prompt = (
-        "あなたは熟練の易占い師です。"
-        "最近の傾向や悩みに対して、前向きになれるようなメッセージを200文字で伝えてください。"
-        "抽象的になりすぎず、日常に活かせるような助言として表現してください。"
-    )
     try:
+        prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=500,
-            temperature=0.9,
+            max_tokens=300
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        print("❌ 易占い生成エラー:", e)
-        return "（易占い結果の取得に失敗しました）"
+        print("❌ 易占い取得失敗:", e)
+        return "現在、易占いの結果が取得できませんでした。"
+
+
+def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
+    prompt = f"""あなたは占いの専門家です。
+相談者は現在{age}歳です。以下の3つの鑑定結果を参考にしてください。
+
+【手相】\n{palm_result}\n
+【四柱推命】\n{shichu_result}\n
+【九星気学の方位】\n{kyusei_text}
+
+この内容を元に、相談者にとって今最も運気を高めるための
+ラッキーアイテム・ラッキーカラー・ラッキーナンバー・ラッキーフード・ラッキーデー
+をそれぞれ1つずつ、以下の形式で提案してください：
+
+・ラッキーアイテム：〇〇
+・ラッキーカラー：〇〇
+・ラッキーナンバー：〇〇
+・ラッキーフード：〇〇
+・ラッキーデー：〇曜日
+
+自然で前向きな言葉で書いてください。"""
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        return response["choices"][0]["message"]["content"].splitlines()
+    except Exception as e:
+        print("❌ ラッキー情報取得失敗:", e)
+        return ["取得できませんでした。"]
 
 
 def generate_fortune(image_data, birthdate, kyusei_text):

@@ -8,28 +8,36 @@ import os
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-def generate_lucky_info(nicchu_eto: str, birthdate: str) -> list[str]:
-    prompt = f"""
-あなたは占いのプロです。
-以下の干支と生年月日から、ラッキー情報を「各項目1行、かつ1文のみ」で5行出力してください。
-※絶対に補足説明・助言・理由・比喩・励ましの言葉・文章の追加は禁止です。
+def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
+    prompt = f"""あなたは占いの専門家です。
+相談者は現在{age}歳です。以下の3つの鑑定結果を参考にしてください。
 
-- 干支（日柱）: {nicchu_eto}
-- 生年月日: {birthdate}
+【手相】\n{palm_result}\n
+【四柱推命】\n{shichu_result}\n
+【九星気学の方位】\n{kyusei_text}
 
-以下の形式で出力してください（1行につき1つの情報のみ）：
+この内容を元に、相談者にとって今最も運気を高めるための
+ラッキーアイテム・ラッキーカラー・ラッキーナンバー・ラッキーフード・ラッキーデー
+をそれぞれ1つずつ、以下の形式で提案してください：
+
 ・ラッキーアイテム：〇〇
 ・ラッキーカラー：〇〇
 ・ラッキーナンバー：〇〇
 ・ラッキーフード：〇〇
 ・ラッキーデー：〇曜日
-"""
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3
-    )
-    return response["choices"][0]["message"]["content"].splitlines()
+
+自然で前向きな言葉で書いてください。"""
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        return response["choices"][0]["message"]["content"].splitlines()
+    except Exception as e:
+        print("❌ ラッキー情報取得失敗:", e)
+        return ["取得できませんでした。"]
+
 
 
 
