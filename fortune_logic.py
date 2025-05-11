@@ -197,10 +197,10 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     from datetime import datetime
     from dateutil.relativedelta import relativedelta
     import openai
-    from lucky_utils import generate_lucky_info, generate_lucky_direction
-    from yearly_love_fortune_utils import generate_yearly_love_fortune
+    from lucky_utils import generate_lucky_renai_info, generate_lucky_direction
     from nicchu_utils import get_nicchu_eto
     from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
+    from yearly_love_fortune_utils import generate_yearly_love_fortune
 
     user_eto = get_nicchu_eto(user_birth)
     partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
@@ -333,15 +333,16 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         except Exception as e:
             print(f"❌ 年運取得失敗: {e}")
 
+    # 年齢・方位計算して恋愛用ラッキー情報生成
     try:
-        lucky_info = generate_lucky_info(user_eto, user_birth)
-    except:
+        birth_date_obj = datetime.strptime(user_birth, "%Y-%m-%d")
+        age = datetime.today().year - birth_date_obj.year - ((datetime.today().month, datetime.today().day) < (birth_date_obj.month, birth_date_obj.day))
+        kyusei_text = generate_lucky_direction(user_birth, datetime.today().date())
+        lucky_info = generate_lucky_renai_info(user_eto, user_birth, age, year_love, kyusei_text)
+    except Exception as e:
+        print("❌ 恋愛ラッキー情報取得失敗:", e)
         lucky_info = []
-
-    try:
-        lucky_direction = generate_lucky_direction(user_birth, datetime.now().date())
-    except:
-        lucky_direction = ""
+        kyusei_text = ""
 
     return {
         "compatibility_text": comp_text,
@@ -351,6 +352,6 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         "month_love": month_love,
         "next_month_love": next_month_love,
         "lucky_info": lucky_info,
-        "lucky_direction": lucky_direction,
+        "lucky_direction": kyusei_text,
         "yearly_love_fortunes": yearly_love_fortunes
     }
