@@ -29,12 +29,14 @@ def ten_shincom():
     mode = "shincom"
     size = "B4" if request.path == "/ten" else "A4"
     is_json = request.is_json
+
     if request.method == "POST":
         try:
             data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
+
             # 九星気学の吉方位テキストを取得
             try:
                 year, month, day = map(int, birthdate.split("-"))
@@ -42,9 +44,13 @@ def ten_shincom():
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
+
             # 占い結果を生成
             eto = get_nicchu_eto(birthdate)
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate, kyusei_text)
+            palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
+                image_data, birthdate, kyusei_text
+            )
+
             # palm_resultテキストを解析し各項目を抽出
             palm_sections = [sec for sec in palm_result.split("### ") if sec.strip()]
             palm_texts = []
@@ -65,15 +71,25 @@ def ten_shincom():
                     else:
                         summary_body = summary_section
                     summary_text = summary_body.strip()
-            # 四柱推命（性格・月運）結果を解析
+
+            # 四柱推命（性格・年運・月運）結果を解析
             shichu_texts = {}
-            shichu_parts = [part for part in shichu_result.split("■ ") if part.strip()]
-            for part in shichu_parts:
-                if "\n" in part:
-                    title, body = part.split("\n", 1)
-                else:
-                    title, body = part, ""
-                shichu_texts[title] = body.strip()
+            if isinstance(shichu_result, dict) and "texts" in shichu_result:
+                shichu_texts = {
+                    "性格": shichu_result["texts"].get("personality", ""),
+                    "今年の運勢": shichu_result["texts"].get("year_fortune", ""),
+                    "今月の運勢": shichu_result["texts"].get("month_fortune", ""),
+                    "来月の運勢": shichu_result["texts"].get("next_month_fortune", "")
+                }
+            else:
+                shichu_parts = [part for part in shichu_result.split("■ ") if part.strip()]
+                for part in shichu_parts:
+                    if "\n" in part:
+                        title, body = part.split("\n", 1)
+                    else:
+                        title, body = part, ""
+                    shichu_texts[title] = body.strip()
+
             # ラッキー情報をリスト化
             lucky_direction = kyusei_text
             lucky_lines = []
@@ -88,6 +104,7 @@ def ten_shincom():
                     lucky_lines.append(f"◆ {k}：{v}")
             else:
                 lucky_lines = list(lucky_info)
+
             # PDF生成用データ構築
             result_data = {
                 "palm_titles": ["生命線", "運命線", "金運線", "特殊線1", "特殊線2"],
@@ -95,12 +112,14 @@ def ten_shincom():
                 "titles": {
                     "palm_summary": "手相の総合アドバイス",
                     "personality": "性格診断",
+                    "year_fortune": "今年の運勢",
                     "month_fortune": "今月の運勢",
                     "next_month_fortune": "来月の運勢"
                 },
                 "texts": {
                     "palm_summary": summary_text,
                     "personality": shichu_texts.get("性格", ""),
+                    "year_fortune": shichu_texts.get("今年の運勢", ""),
                     "month_fortune": shichu_texts.get("今月の運勢", ""),
                     "next_month_fortune": shichu_texts.get("来月の運勢", "")
                 },
@@ -108,22 +127,28 @@ def ten_shincom():
                 "lucky_direction": lucky_direction,
                 "birthdate": birthdate,
                 "palm_result": "\n".join(palm_texts),
-                "shichu_result": shichu_result.replace("\r\n", "\n").replace("\r", "\n"),
+                "shichu_result": shichu_result if isinstance(shichu_result, str) else "",
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n")
             }
             result_data["palm_image"] = image_data
+
             if full_year:
                 now = datetime.now()
                 result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
+
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             create_pdf_unified(filepath, result_data, mode, size=size.lower(), include_yearly=full_year)
+
             redirect_url = url_for("preview", filename=filename)
             return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
+
         except Exception as e:
             traceback.print_exc()
             return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
+
     return render_template("index.html")
+
 
 @app.route("/renai", methods=["GET", "POST"])
 @app.route("/renaib4", methods=["GET", "POST"])
