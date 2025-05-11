@@ -145,53 +145,55 @@ def ten_shincom():
 @app.route("/renai", methods=["GET", "POST"])
 @app.route("/renaib4", methods=["GET", "POST"])
 def renai():
-
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
     size = "A4" if request.path == "/renai" else "B4"
 
     if request.method == "POST":
-    user_birth = request.form.get("user_birth")
-    partner_birth = request.form.get("partner_birth")
-    include_yearly = request.form.get("include_yearly") == "yes"
+        user_birth = request.form.get("user_birth")
+        partner_birth = request.form.get("partner_birth")
+        include_yearly = request.form.get("include_yearly") == "yes"
 
-    now = datetime.now()
-    target1 = now.replace(day=15)
-    if now.day >= 20:
-        target1 += relativedelta(months=1)
-    target2 = target1 + relativedelta(months=1)
+        now = datetime.now()
+        target1 = now.replace(day=15)
+        if now.day >= 20:
+            target1 += relativedelta(months=1)
+        target2 = target1 + relativedelta(months=1)
 
-    year_label = f"{now.year}年の恋愛運"
-    month_label = f"{target1.year}年{target1.month}月の恋愛運"
-    next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
+        year_label = f"{now.year}年の恋愛運"
+        month_label = f"{target1.year}年{target1.month}月の恋愛運"
+        next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
 
-    raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
+        raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
 
-    result_data = {
-        "texts": {
-            "compatibility": raw_result.get("compatibility_text", ""),
-            "overall_love_fortune": raw_result.get("overall_love_fortune", ""),
-            "year_love": raw_result.get(year_label, ""),
-            "month_love": raw_result.get(month_label, ""),
-            "next_month_love": raw_result.get(next_month_label, "")
-        },
-        "titles": {
-            "compatibility": "相性診断" if partner_birth else "恋愛傾向と出会い",
-            "overall_love_fortune": "総合恋愛運",
-            "year_love": year_label,
-            "month_love": month_label,
-            "next_month_love": next_month_label
-        },
-        "themes": raw_result.get("topic_fortunes", []),
-        "lucky_info": raw_result.get("lucky_info", []),
-        "lucky_direction": raw_result.get("lucky_direction", ""),
-        "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
-    }
+        result_data = {
+            "texts": {
+                "compatibility": raw_result.get("compatibility_text", ""),
+                "overall_love_fortune": raw_result.get("overall_love_fortune", ""),
+                "year_love": raw_result.get(year_label, ""),
+                "month_love": raw_result.get(month_label, ""),
+                "next_month_love": raw_result.get(next_month_label, "")
+            },
+            "titles": {
+                "compatibility": "相性診断" if partner_birth else "恋愛傾向と出会い",
+                "overall_love_fortune": "総合恋愛運",
+                "year_love": year_label,
+                "month_love": month_label,
+                "next_month_love": next_month_label
+            },
+            "themes": raw_result.get("topic_fortunes", []),
+            "lucky_info": raw_result.get("lucky_info", []),
+            "lucky_direction": raw_result.get("lucky_direction", ""),
+            "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
+        }
 
-    filename = f"renai_{uuid.uuid4()}.pdf"
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    create_pdf_unified(filepath, result_data, "renai", size=size.lower(), include_yearly=include_yearly)
-    return send_file(filepath, as_attachment=True)
+        filename = f"renai_{uuid.uuid4()}.pdf"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        create_pdf_unified(filepath, result_data, "renai", size=size.lower(), include_yearly=include_yearly)
+        return send_file(filepath, as_attachment=True)
+
+    return render_template("renai_form.html")
+
 
 
 
