@@ -187,7 +187,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
-    for key in ['palm_summary', 'personality', 'month_fortune', 'next_month_fortune']:
+    for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
         wrap_len = 36 if 'month' in key else 40
         c.drawString(margin, y, f"◆ {data['titles'][key]}")
         y -= 6 * mm
@@ -203,6 +203,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
+
 
 
 def draw_shincom_b4(c, data, include_yearly=False):
@@ -238,7 +239,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
-    for key in ['palm_summary', 'personality', 'month_fortune', 'next_month_fortune']:
+    for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
         wrap_len = 41 if 'month' in key else 45
         c.drawString(margin, y, f"◆ {data['titles'][key]}")
         y -= 6 * mm
