@@ -54,9 +54,6 @@ def get_shichu_fortune(birthdate):
 
 
 
-from tesou import tesou_names, tesou_descriptions
-from datetime import datetime
-
 def analyze_palm(image_data):
     try:
         # Data URL形式 or base64のみの両方に対応
@@ -132,6 +129,25 @@ def analyze_palm(image_data):
         return "手相診断中にエラーが発生しました。"
 
 
+import openai
+
+def get_iching_advice():
+    prompt = (
+        "あなたは熟練の易占い師です。"
+        "最近の傾向や悩みに対して、前向きになれるようなメッセージを200文字で伝えてください。"
+        "抽象的になりすぎず、日常に活かせるような助言として表現してください。"
+    )
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+            temperature=0.9,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print("❌ 易占い生成エラー:", e)
+        return "（易占い結果の取得に失敗しました）"
 
 
 def generate_fortune(image_data, birthdate, kyusei_text):
