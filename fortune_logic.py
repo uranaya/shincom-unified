@@ -14,28 +14,31 @@ def get_shichu_fortune(birthdate):
     eto = get_nicchu_eto(birthdate)
     try:
         today = datetime.today()
+        this_year = today.year
+
+        # 月の20日以降なら次月・再来月を占う
         target1 = today.replace(day=15)
         if today.day >= 20:
             target1 += relativedelta(months=1)
         target2 = target1 + relativedelta(months=1)
 
-        tsuhen_year = get_tsuhensei_for_year(birthdate, today.year)
+        tsuhen_year = get_tsuhensei_for_year(birthdate, this_year)
         tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
         tsuhen_month2 = get_tsuhensei_for_date(birthdate, target2.year, target2.month)
 
         prompt = f"""あなたは四柱推命の専門家です。
 - 日柱: {eto}
 - 年の通変星: {tsuhen_year}
-- {target1.month}月の通変星: {tsuhen_month1}
-- {target2.month}月の通変星: {tsuhen_month2}
+- {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
+- {target2.year}年{target2.month}月の通変星: {tsuhen_month2}
 
-以下の4つの項目について、それぞれ300文字以内で現実的に鑑定してください。
+以下の3つの項目について、それぞれ300文字以内で現実的に鑑定してください。
 本文中に干支名や通変星の名前は書かず、内容に反映させてください。
 
 ■ 性格
-■ 今年の運勢
-■ {target1.month}月の運勢
-■ {target2.month}月の運勢
+■ {this_year}年の運勢
+■ {target1.year}年{target1.month}月の運勢
+■ {target2.year}年{target2.month}月の運勢
 
 ・優しい語り口で自然な文章にしてください。
 ・各項目はタイトルと本文を明確に区切ってください。
@@ -48,54 +51,11 @@ def get_shichu_fortune(birthdate):
             max_tokens=1200,
             temperature=0.8
         )
-
-        content = response.choices[0].message.content.strip()
-
-        # 結果を構造化
-        parts = content.split("■ ")
-        results = {
-            "titles": {
-                "personality": "■ 性格",
-                "year_fortune": "■ 今年の運勢",
-                "month_fortune": f"■ {target1.month}月の運勢",
-                "next_month_fortune": f"■ {target2.month}月の運勢"
-            },
-            "texts": {
-                "personality": "",
-                "year_fortune": "",
-                "month_fortune": "",
-                "next_month_fortune": ""
-            }
-        }
-
-        for part in parts:
-            if part.startswith("性格"):
-                results["texts"]["personality"] = part.replace("性格", "").strip()
-            elif part.startswith("今年の運勢"):
-                results["texts"]["year_fortune"] = part.replace("今年の運勢", "").strip()
-            elif part.startswith(f"{target1.month}月の運勢"):
-                results["texts"]["month_fortune"] = part.replace(f"{target1.month}月の運勢", "").strip()
-            elif part.startswith(f"{target2.month}月の運勢"):
-                results["texts"]["next_month_fortune"] = part.replace(f"{target2.month}月の運勢", "").strip()
-
-        return results
+        return response.choices[0].message.content.strip()
 
     except Exception as e:
         print("❌ 四柱推命取得失敗:", e)
-        return {
-            "titles": {
-                "personality": "■ 性格",
-                "year_fortune": "■ 今年の運勢",
-                "month_fortune": f"■ {target1.month}月の運勢",
-                "next_month_fortune": f"■ {target2.month}月の運勢"
-            },
-            "texts": {
-                "personality": "取得できませんでした",
-                "year_fortune": "取得できませんでした",
-                "month_fortune": "取得できませんでした",
-                "next_month_fortune": "取得できませんでした"
-            }
-        }
+        return f"""■ 性格\n取得できませんでした\n■ {this_year}年の運勢\n取得できませんでした\n■ {target1.year}年{target1.month}月の運勢\n取得できませんでした\n■ {target2.year}年{target2.month}月の運勢\n取得できませんでした"""
 
 
 

@@ -26,6 +26,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def ten_shincom():
     if "logged_in" not in session:
         return redirect(url_for("login"))
+
     mode = "shincom"
     size = "B4" if request.path == "/ten" else "A4"
     is_json = request.is_json
@@ -37,7 +38,6 @@ def ten_shincom():
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
 
-            # 九星気学の吉方位テキストを取得
             try:
                 year, month, day = map(int, birthdate.split("-"))
                 kyusei_text = get_kyusei_fortune(year, month, day)
@@ -45,34 +45,23 @@ def ten_shincom():
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
 
-            # 占い結果を生成
             eto = get_nicchu_eto(birthdate)
             palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
                 image_data, birthdate, kyusei_text
             )
 
-            # palm_resultテキストを解析し各項目を抽出
             palm_sections = [sec for sec in palm_result.split("### ") if sec.strip()]
-            palm_texts = []
-            summary_text = ""
+            palm_texts, summary_text = [], ""
             if palm_sections:
                 *main_sections, summary_section = palm_sections
                 for sec in main_sections:
-                    if "\n" in sec:
-                        title_line, body = sec.split("\n", 1)
-                    else:
-                        title_line, body = sec, ""
+                    title_line, body = sec.split("\n", 1) if "\n" in sec else (sec, "")
                     body = body.strip()
                     if body:
                         palm_texts.append(body)
                 if summary_section:
-                    if "\n" in summary_section:
-                        _, summary_body = summary_section.split("\n", 1)
-                    else:
-                        summary_body = summary_section
-                    summary_text = summary_body.strip()
+                    summary_text = summary_section.split("\n", 1)[1].strip() if "\n" in summary_section else summary_section.strip()
 
-            # 四柱推命（性格・年運・月運）結果を解析
             shichu_texts = {}
             if isinstance(shichu_result, dict) and "texts" in shichu_result:
                 shichu_texts = {
@@ -84,59 +73,61 @@ def ten_shincom():
             else:
                 shichu_parts = [part for part in shichu_result.split("■ ") if part.strip()]
                 for part in shichu_parts:
-                    if "\n" in part:
-                        title, body = part.split("\n", 1)
-                    else:
-                        title, body = part, ""
+                    title, body = part.split("\n", 1) if "\n" in part else (part, "")
                     shichu_texts[title] = body.strip()
 
-            # ラッキー情報をリスト化
             lucky_direction = kyusei_text
             lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
                     line = line.strip()
                     if line:
-                        line = line.replace(":", "：", 1)
-                        lucky_lines.append(f"◆ {line}")
+                        lucky_lines.append(f"◆ {line.replace(':', '：', 1)}")
             elif isinstance(lucky_info, dict):
                 for k, v in lucky_info.items():
                     lucky_lines.append(f"◆ {k}：{v}")
             else:
                 lucky_lines = list(lucky_info)
 
-            # PDF生成用データ構築
+            now = datetime.now()
+            target1 = now.replace(day=15)
+            if now.day >= 20:
+                target1 += relativedelta(months=1)
+            target2 = target1 + relativedelta(months=1)
+            year_label = f"{now.year}年の運勢"
+            month_label = f"{target1.year}年{target1.month}月の運勢"
+            next_month_label = f"{target2.year}年{target2.month}月の運勢"
+
             result_data = {
                 "palm_titles": ["生命線", "運命線", "金運線", "特殊線1", "特殊線2"],
                 "palm_texts": palm_texts,
                 "titles": {
                     "palm_summary": "手相の総合アドバイス",
                     "personality": "性格診断",
-                    "year_fortune": "今年の運勢",
-                    "month_fortune": "今月の運勢",
-                    "next_month_fortune": "来月の運勢"
+                    "year_fortune": year_label,
+                    "month_fortune": month_label,
+                    "next_month_fortune": next_month_label
                 },
                 "texts": {
                     "palm_summary": summary_text,
                     "personality": shichu_texts.get("性格", ""),
-                    "year_fortune": shichu_texts.get("今年の運勢", ""),
-                    "month_fortune": shichu_texts.get("今月の運勢", ""),
-                    "next_month_fortune": shichu_texts.get("来月の運勢", "")
+                    "year_fortune": shichu_texts.get(year_label, ""),
+                    "month_fortune": shichu_texts.get(month_label, ""),
+                    "next_month_fortune": shichu_texts.get(next_month_label, "")
                 },
                 "lucky_info": lucky_lines,
                 "lucky_direction": lucky_direction,
                 "birthdate": birthdate,
                 "palm_result": "\n".join(palm_texts),
                 "shichu_result": shichu_result if isinstance(shichu_result, str) else "",
-                "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n")
+                "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
+                "palm_image": image_data
             }
-            result_data["palm_image"] = image_data
 
             if full_year:
-                now = datetime.now()
                 result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
 
-            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filename = f"result_{now.strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             create_pdf_unified(filepath, result_data, mode, size=size.lower(), include_yearly=full_year)
 
@@ -150,45 +141,57 @@ def ten_shincom():
     return render_template("index.html")
 
 
+
 @app.route("/renai", methods=["GET", "POST"])
 @app.route("/renaib4", methods=["GET", "POST"])
 def renai():
+
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
     size = "A4" if request.path == "/renai" else "B4"
+
     if request.method == "POST":
-        user_birth = request.form.get("user_birth")
-        partner_birth = request.form.get("partner_birth")
-        include_yearly = request.form.get("include_yearly") == "yes"
+    user_birth = request.form.get("user_birth")
+    partner_birth = request.form.get("partner_birth")
+    include_yearly = request.form.get("include_yearly") == "yes"
 
-        raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
+    now = datetime.now()
+    target1 = now.replace(day=15)
+    if now.day >= 20:
+        target1 += relativedelta(months=1)
+    target2 = target1 + relativedelta(months=1)
 
-        result_data = {
-            "texts": {
-                "compatibility": raw_result.get("compatibility_text", ""),
-                "overall_love_fortune": raw_result.get("overall_love_fortune", ""),
-                "year_love": raw_result.get("year_love", ""),
-                "month_love": raw_result.get("month_love", ""),
-                "next_month_love": raw_result.get("next_month_love", "")
-            },
-            "titles": {
-                "compatibility": "相性診断" if partner_birth else "恋愛傾向と出会い",
-                "overall_love_fortune": "総合恋愛運",
-                "year_love": "今年の恋愛運",
-                "month_love": "今月の恋愛運",
-                "next_month_love": "来月の恋愛運"
-            },
-            "themes": raw_result.get("topic_fortunes", []),
-            "lucky_info": raw_result.get("lucky_info", []),
-            "lucky_direction": raw_result.get("lucky_direction", ""),
-            "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
-        }
+    year_label = f"{now.year}年の恋愛運"
+    month_label = f"{target1.year}年{target1.month}月の恋愛運"
+    next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
 
-        filename = f"renai_{uuid.uuid4()}.pdf"
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        create_pdf_unified(filepath, result_data, "renai", size=size.lower(), include_yearly=include_yearly)
-        return send_file(filepath, as_attachment=True)
-    return render_template("renai_form.html")
+    raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
+
+    result_data = {
+        "texts": {
+            "compatibility": raw_result.get("compatibility_text", ""),
+            "overall_love_fortune": raw_result.get("overall_love_fortune", ""),
+            "year_love": raw_result.get(year_label, ""),
+            "month_love": raw_result.get(month_label, ""),
+            "next_month_love": raw_result.get(next_month_label, "")
+        },
+        "titles": {
+            "compatibility": "相性診断" if partner_birth else "恋愛傾向と出会い",
+            "overall_love_fortune": "総合恋愛運",
+            "year_love": year_label,
+            "month_love": month_label,
+            "next_month_love": next_month_label
+        },
+        "themes": raw_result.get("topic_fortunes", []),
+        "lucky_info": raw_result.get("lucky_info", []),
+        "lucky_direction": raw_result.get("lucky_direction", ""),
+        "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
+    }
+
+    filename = f"renai_{uuid.uuid4()}.pdf"
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    create_pdf_unified(filepath, result_data, "renai", size=size.lower(), include_yearly=include_yearly)
+    return send_file(filepath, as_attachment=True)
 
 
 
