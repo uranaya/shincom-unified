@@ -156,7 +156,7 @@ def generate_fortune(image_data, birthdate, kyusei_text):
     iching_result = get_iching_advice()
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
-    lucky_info = get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text)
+    lucky_info = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text)
     return palm_result, shichu_result, iching_result, lucky_info
 
 
