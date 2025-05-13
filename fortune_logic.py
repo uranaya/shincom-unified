@@ -159,24 +159,26 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 【四柱推命】\n{shichu_result}\n
 【九星気学の方位】\n{kyusei_text}
 
-この内容を元に、相談者にとって今最も運気を高めるための
-ラッキーアイテム・ラッキーカラー・ラッキーナンバー・ラッキーフード・ラッキーデー
-をそれぞれ1つずつ、以下の形式で提案してください：
+この情報をもとに、相談者にとって今、運気や恋愛運を高めるための
+以下の5つの項目を、それぞれ簡潔に1つずつ提案してください。
 
-・ラッキーアイテム：〇〇
-・ラッキーカラー：〇〇
-・ラッキーナンバー：〇〇
-・ラッキーフード：〇〇
+解説や理由は不要です。形式は以下に正確に従ってください：
+
+・ラッキーアイテム：〇〇  
+・ラッキーカラー：〇〇  
+・ラッキーナンバー：〇〇  
+・ラッキーフード：〇〇  
 ・ラッキーデー：〇曜日
 
-自然で前向きな言葉で書いてください。"""
+1行につき1項目で、わかりやすく、シンプルに記述してください。"""
+
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
-        return response["choices"][0]["message"]["content"].splitlines()
+        return response["choices"][0]["message"]["content"].strip().splitlines()
     except Exception as e:
         print("❌ ラッキー情報取得失敗:", e)
         return ["取得できませんでした。"]
