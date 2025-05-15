@@ -331,7 +331,7 @@ def generate_komoju_link():
     new_uuid = str(uuid.uuid4())
     # 🔄 Webhook方式ではこの時点ではused_orders.txtに書き込まない
     redirect_url = f"https://shincom-unified.onrender.com/selfmob/{new_uuid}"
-    komoju_url = f"https://komoju.com/pay/{KOMOJU_PUBLIC_LINK_ID}?external_order_num={new_uuid}&customer_redirect_url={redirect_url}"
+    komoju_url = f"https://komoju.com/payment_links/{KOMOJU_PUBLIC_LINK_ID}?external_order_num={new_uuid}&customer_redirect_url={redirect_url}"
     return redirect(komoju_url)
 
 @app.route("/webhook/selfmob", methods=["POST"])
