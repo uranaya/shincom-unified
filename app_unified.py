@@ -368,9 +368,12 @@ def webhook_selfmob():
         print("Webhook error:", e)
         return "", 400
 
+...
+# ✅ /selfmob/<uuid_str> 改修部分のみ抜粋
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
-    full_year = False
+    full_year = None
+    lines = []
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
@@ -378,8 +381,8 @@ def selfmob_uuid(uuid_str):
                 if uid == uuid_str:
                     full_year = (flag == "1")
                     break
-            else:
-                return "無効なリンクです", 400
+        if full_year is None:
+            return "無効なリンクです（UUID不一致）", 400
     except FileNotFoundError:
         return "使用履歴が確認できません", 400
 
@@ -389,7 +392,6 @@ def selfmob_uuid(uuid_str):
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
 
-            # 九星・干支などの前処理
             try:
                 year, month, day = map(int, birthdate.split("-"))
                 kyusei_text = get_kyusei_fortune(year, month, day)
@@ -402,7 +404,6 @@ def selfmob_uuid(uuid_str):
                 image_data, birthdate, kyusei_text
             )
 
-            # palmとshichuの整形
             palm_sections = [sec for sec in palm_result.split("### ") if sec.strip()]
             palm_texts, summary_text = [], ""
             if palm_sections:
@@ -411,8 +412,8 @@ def selfmob_uuid(uuid_str):
                     body = sec.split("\n", 1)[1] if "\n" in sec else sec
                     palm_texts.append(body.strip())
                 if summary_section:
-                    summary_body = summary_section.split("\n", 1)[1] if "\n" in summary_section else summary_section
-                    summary_text = summary_body.strip()
+                    summary_text = summary_section.split("\n", 1)[1] if "\n" in summary_section else summary_section
+                    summary_text = summary_text.strip()
 
             shichu_parts = [part for part in shichu_result.split("■ ") if part.strip()]
             shichu_texts = {
@@ -426,10 +427,9 @@ def selfmob_uuid(uuid_str):
                 for line in lucky_info.replace("\r\n", "\n").split("\n"):
                     line = line.strip()
                     if line:
-                        line = line.replace(":", "：", 1)
-                        lucky_lines.append(f"◆ {line}")
+                        lucky_lines.append(f"\u2605 {line.replace(':', '：', 1)}")
             elif isinstance(lucky_info, dict):
-                lucky_lines = [f"◆ {k}：{v}" for k, v in lucky_info.items()]
+                lucky_lines = [f"\u2605 {k}：{v}" for k, v in lucky_info.items()]
             else:
                 lucky_lines = list(lucky_info)
 
@@ -439,12 +439,14 @@ def selfmob_uuid(uuid_str):
                 "titles": {
                     "palm_summary": "手相の総合アドバイス",
                     "personality": "性格診断",
+                    "year_fortune": "",  # ← 初期化追加
                     "month_fortune": "今月の運勢",
                     "next_month_fortune": "来月の運勢"
                 },
                 "texts": {
                     "palm_summary": summary_text,
                     "personality": shichu_texts.get("性格", ""),
+                    "year_fortune": "",  # ← 初期化追加
                     "month_fortune": shichu_texts.get("今月の運勢", ""),
                     "next_month_fortune": shichu_texts.get("来月の運勢", "")
                 },
@@ -459,13 +461,16 @@ def selfmob_uuid(uuid_str):
 
             if full_year:
                 now = datetime.now()
-                result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
+                yearly_data = generate_yearly_fortune(birthdate, now)
+                result_data["yearly_fortunes"] = yearly_data
+                result_data["titles"]["year_fortune"] = yearly_data["year_label"]
+                result_data["texts"]["year_fortune"] = yearly_data["year_text"]
 
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             create_pdf_unified(filepath, result_data, "shincom", size="a4", include_yearly=full_year)
 
-            # UUID削除（1回限り用）
+            # UUID削除はここで実行
             with open(USED_UUID_FILE, "w") as f:
                 for uid, flag in lines:
                     if uid != uuid_str:
