@@ -330,19 +330,31 @@ def generate_link_full():
     return _generate_link(full_year=True)
 
 
+@app.route("/generate_link_full")
+def generate_link_full():
+    return _generate_link(full_year=True)
+
 def _generate_link(full_year=False):
     komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
     new_uuid = str(uuid.uuid4())
-    redirect_url = f"https://shincom-unified.onrender.com/selfmob/{new_uuid}"
-    encoded_redirect = quote(redirect_url, safe='')  # ✅ エンコード重要
+    redirect_url = f"https://shincom-unified.onrender.com/thanks?uuid={new_uuid}"
+    encoded_redirect = quote(redirect_url, safe='')
 
-    # UUIDとfull_yearを記録
     with open(USED_UUID_FILE, "a") as f:
         f.write(f"{new_uuid},{int(full_year)}\n")
 
     komoju_url = f"https://komoju.com/payment_links/{komoju_id}?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
     print("🔗 KOMOJU決済URL:", komoju_url)
     return redirect(komoju_url)
+
+
+
+@app.route("/thanks")
+def thanks():
+    uuid_str = request.args.get("uuid")
+    if not uuid_str:
+        return "UUIDが見つかりません", 400
+    return render_template("thanks.html", uuid_str=uuid_str)
 
 
 

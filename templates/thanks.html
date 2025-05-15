@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>決済完了 - 鑑定をはじめる</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: auto;
+      padding: 2em;
+      text-align: center;
+    }
+    .button {
+      display: inline-block;
+      background-color: #4CAF50;
+      color: white;
+      padding: 12px 24px;
+      text-decoration: none;
+      font-size: 16px;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+    .note {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 1em;
+    }
+  </style>
+</head>
+<body>
+  <h1>お支払いが完了しました</h1>
+  <p>ありがとうございました。以下のボタンを押して鑑定を開始してください。</p>
+
+  <a class="button" href="/selfmob/{{ uuid_str }}">▶ 鑑定をはじめる</a>
+
+  <div class="note">
+    ※ 通信環境によっては遷移に時間がかかることがあります。<br/>
+    ※ このページをブックマークしておくと、鑑定に再アクセスできます。
+  </div>
+</body>
+</html>
