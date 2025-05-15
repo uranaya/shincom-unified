@@ -377,8 +377,8 @@ def selfmob_uuid(uuid_str):
                 if uid == uuid_str:
                     full_year = (flag == "1")
                     break
-        else:
-            return "無効なリンクです", 400
+            else:
+                return "無効なリンクです", 400
     except FileNotFoundError:
         return "使用履歴が確認できません", 400
 
@@ -388,6 +388,7 @@ def selfmob_uuid(uuid_str):
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
 
+            # 九星・干支などの前処理
             try:
                 year, month, day = map(int, birthdate.split("-"))
                 kyusei_text = get_kyusei_fortune(year, month, day)
@@ -396,8 +397,11 @@ def selfmob_uuid(uuid_str):
                 kyusei_text = ""
 
             eto = get_nicchu_eto(birthdate)
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate, kyusei_text)
+            palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
+                image_data, birthdate, kyusei_text
+            )
 
+            # palmとshichuの整形
             palm_sections = [sec for sec in palm_result.split("### ") if sec.strip()]
             palm_texts, summary_text = [], ""
             if palm_sections:
@@ -410,7 +414,11 @@ def selfmob_uuid(uuid_str):
                     summary_text = summary_body.strip()
 
             shichu_parts = [part for part in shichu_result.split("■ ") if part.strip()]
-            shichu_texts = {title: body.strip() for part in shichu_parts if (title := part.split("\n", 1)[0]) and (body := part.split("\n", 1)[1] if "\n" in part else "")}
+            shichu_texts = {
+                title: body.strip()
+                for part in shichu_parts
+                if (title := part.split("\n", 1)[0]) and (body := part.split("\n", 1)[1] if "\n" in part else "")
+            }
 
             lucky_lines = []
             if isinstance(lucky_info, str):
@@ -456,6 +464,7 @@ def selfmob_uuid(uuid_str):
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             create_pdf_unified(filepath, result_data, "shincom", size="a4", include_yearly=full_year)
 
+            # UUID削除（1回限り用）
             with open(USED_UUID_FILE, "w") as f:
                 for uid, flag in lines:
                     if uid != uuid_str:
@@ -469,6 +478,7 @@ def selfmob_uuid(uuid_str):
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
 
     return render_template("index_selfmob.html", uuid_str=uuid_str)
+
 
 
 
