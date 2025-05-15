@@ -313,8 +313,6 @@ def selfmob_index():
 
 # ✅ WebhookベースのUUID有効化方式に強化した /selfmob/<uuid> & /generate_link & /webhook/selfmob 実装
 
-KOMOJU_PUBLIC_LINK_ID = os.getenv("KOMOJU_PUBLIC_LINK_ID")
-print("🔍 KOMOJU_PUBLIC_LINK_ID =", komoju_id)  # ★確認ログ
 USED_UUID_FILE = "used_orders.txt"
 UPLOAD_FOLDER = "static/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -327,6 +325,9 @@ if not os.path.exists(USED_UUID_FILE):
 
 @app.route("/generate_link")
 def generate_komoju_link():
+    
+    KOMOJU_PUBLIC_LINK_ID = os.getenv("KOMOJU_PUBLIC_LINK_ID")
+    print("🔍 KOMOJU_PUBLIC_LINK_ID =", komoju_id)  # ★確認ログ
     new_uuid = str(uuid.uuid4())
     # 🔄 Webhook方式ではこの時点ではused_orders.txtに書き込まない
     redirect_url = f"https://shincom-unified.onrender.com/selfmob/{new_uuid}"
