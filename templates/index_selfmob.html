@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>鑑定フォーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body>
+  <h1>シン・コンピューター占い</h1>
+
+  <input type="hidden" id="uuid_str" value="{{ uuid_str | default('') }}">
+
+  <form id="form" onsubmit="submitForm(event)">
+    生年月日: <input type="date" name="birthdate" id="birthdate" required /><br />
+    手相画像: <input type="file" accept="image/*" capture="environment" id="image" required /><br />
+    <button type="submit">鑑定開始</button>
+  </form>
+
+  <script>
+    async function submitForm(event) {
+      event.preventDefault();
+
+      let path = window.location.pathname;
+      const uuidInput = document.getElementById("uuid_str");
+      if (uuidInput && uuidInput.value) {
+        path = "/selfmob/" + uuidInput.value;
+      }
+
+      const form = document.getElementById("form");
+      const formData = new FormData(form);
+      const birthdate = formData.get("birthdate");
+      const file = document.getElementById("image").files[0];
+
+      if (!file) return alert("画像を選択してください");
+
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const image_data = reader.result;
+
+        const res = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_data, birthdate }),
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          window.location.href = result.redirect_url;
+        } else {
+          alert("送信エラーが発生しました");
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  </script>
+</body>
+</html>

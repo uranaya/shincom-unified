@@ -5,6 +5,7 @@ import json
 import requests
 import traceback
 from datetime import datetime
+from urllib.parse import quote
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
@@ -313,25 +314,44 @@ def selfmob_index():
 
 # ✅ WebhookベースのUUID有効化方式に強化した /selfmob/<uuid> & /generate_link & /webhook/selfmob 実装
 
-KOMOJU_PUBLIC_LINK_ID = os.getenv("KOMOJU_PUBLIC_LINK_ID")
-USED_UUID_FILE = "used_orders.txt"
+# ✅ 自動分岐構成：/generate_link /generate_link_full で full_year 制御、テンプレート共通化済み
+import os
+import uuid
+from urllib.parse import quote
+from datetime import datetime
+from flask import request, redirect, render_template, jsonify, url_for
+from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
+from kyusei_utils import get_kyusei_fortune
+from yearly_fortune_utils import generate_yearly_fortune
+from pdf_generator_unified import create_pdf_unified
+
 UPLOAD_FOLDER = "static/uploads"
+USED_UUID_FILE = "used_orders.txt"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-
-# UUID記録ファイルがなければ空で作成
 if not os.path.exists(USED_UUID_FILE):
     open(USED_UUID_FILE, "w").close()
 
-
 @app.route("/generate_link")
-def generate_komoju_link():
-    komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID")
-    print("🔍 KOMOJU_PUBLIC_LINK_ID =", komoju_id)  # ★確認ログ
+def generate_link_basic():
+    return _generate_link(full_year=False)
+
+@app.route("/generate_link_full")
+def generate_link_full():
+    return _generate_link(full_year=True)
+
+def _generate_link(full_year=False):
+    env_key = "KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID"
+    komoju_id = os.getenv(env_key)
+    print("🔍", env_key, "=", komoju_id)
+
     new_uuid = str(uuid.uuid4())
-    # 🔄 Webhook方式ではこの時点ではused_orders.txtに書き込まない
     redirect_url = f"https://shincom-unified.onrender.com/selfmob/{new_uuid}"
-    komoju_url = f"https://komoju.com/payment_links/{KOMOJU_PUBLIC_LINK_ID}?external_order_num={new_uuid}&customer_redirect_url={redirect_url}"
+    encoded_redirect = quote(redirect_url, safe='')
+
+    with open(USED_UUID_FILE, "a") as f:
+        f.write(f"{new_uuid},{int(full_year)}\n")
+
+    komoju_url = f"https://komoju.com/payment_links/{komoju_id}?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
     return redirect(komoju_url)
 
 @app.route("/webhook/selfmob", methods=["POST"])
@@ -341,8 +361,7 @@ def webhook_selfmob():
         if data.get("event") == "payment.captured":
             uuid_str = data["data"]["attributes"].get("external_order_num")
             if uuid_str:
-                with open(USED_UUID_FILE, "a") as f:
-                    f.write(uuid_str + "\n")
+                print("✅ Webhook captured:", uuid_str)
         return "", 200
     except Exception as e:
         print("Webhook error:", e)
@@ -350,21 +369,24 @@ def webhook_selfmob():
 
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
+    full_year = False
     try:
         with open(USED_UUID_FILE, "r") as f:
-            allowed_uuids = {line.strip() for line in f if line.strip()}
+            lines = [line.strip().split(",") for line in f if line.strip()]
+            for uid, flag in lines:
+                if uid == uuid_str:
+                    full_year = (flag == "1")
+                    break
+        else:
+            return "無効なリンクです", 400
     except FileNotFoundError:
-        allowed_uuids = set()
-
-    if uuid_str not in allowed_uuids:
-        return jsonify({"error": "無効なリンクです"}), 400 if request.is_json else "無効なリンクです"
+        return "使用履歴が確認できません", 400
 
     if request.method == "POST":
         try:
             data = request.get_json() if request.is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
-            full_year = data.get("full_year", False) if request.is_json else (data.get("full_year") == "yes")
 
             try:
                 year, month, day = map(int, birthdate.split("-"))
@@ -382,18 +404,13 @@ def selfmob_uuid(uuid_str):
                 *main_sections, summary_section = palm_sections
                 for sec in main_sections:
                     body = sec.split("\n", 1)[1] if "\n" in sec else sec
-                    body = body.strip()
-                    if body:
-                        palm_texts.append(body)
+                    palm_texts.append(body.strip())
                 if summary_section:
                     summary_body = summary_section.split("\n", 1)[1] if "\n" in summary_section else summary_section
                     summary_text = summary_body.strip()
 
             shichu_parts = [part for part in shichu_result.split("■ ") if part.strip()]
-            shichu_texts = {}
-            for part in shichu_parts:
-                title, body = part.split("\n", 1) if "\n" in part else (part, "")
-                shichu_texts[title] = body.strip()
+            shichu_texts = {title: body.strip() for part in shichu_parts if (title := part.split("\n", 1)[0]) and (body := part.split("\n", 1)[1] if "\n" in part else "")}
 
             lucky_lines = []
             if isinstance(lucky_info, str):
@@ -403,8 +420,7 @@ def selfmob_uuid(uuid_str):
                         line = line.replace(":", "：", 1)
                         lucky_lines.append(f"◆ {line}")
             elif isinstance(lucky_info, dict):
-                for k, v in lucky_info.items():
-                    lucky_lines.append(f"◆ {k}：{v}")
+                lucky_lines = [f"◆ {k}：{v}" for k, v in lucky_info.items()]
             else:
                 lucky_lines = list(lucky_info)
 
@@ -440,11 +456,10 @@ def selfmob_uuid(uuid_str):
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             create_pdf_unified(filepath, result_data, "shincom", size="a4", include_yearly=full_year)
 
-            # 使用済みUUIDを削除
-            allowed_uuids.discard(uuid_str)
             with open(USED_UUID_FILE, "w") as f:
-                for uid in allowed_uuids:
-                    f.write(uid + "\n")
+                for uid, flag in lines:
+                    if uid != uuid_str:
+                        f.write(f"{uid},{flag}\n")
 
             redirect_url = url_for("preview", filename=filename)
             return jsonify({"redirect_url": redirect_url}) if request.is_json else redirect(redirect_url)
@@ -453,7 +468,7 @@ def selfmob_uuid(uuid_str):
             print("処理エラー:", e)
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
 
-    return render_template("index.html")
+    return render_template("index_selfmob.html", uuid_str=uuid_str)
 
 
 
