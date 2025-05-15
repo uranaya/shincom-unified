@@ -333,7 +333,7 @@ def generate_link_full():
 def _generate_link(full_year=False):
     komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
     new_uuid = str(uuid.uuid4())
-    redirect_url = f"https://shincom-unified.onrender.com/thanks?uuid={new_uuid}"
+    redirect_url = f"https://shincom-unified.onrender.com/thanks"
     encoded_redirect = quote(redirect_url, safe='')
 
     with open(USED_UUID_FILE, "a") as f:
@@ -341,13 +341,14 @@ def _generate_link(full_year=False):
 
     komoju_url = f"https://komoju.com/payment_links/{komoju_id}?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
     print("🔗 KOMOJU決済URL:", komoju_url)
-    return redirect(komoju_url)
 
-
+    resp = make_response(redirect(komoju_url))
+    resp.set_cookie("uuid", new_uuid, max_age=600)  # 有効期限：10分
+    return resp
 
 @app.route("/thanks")
 def thanks():
-    uuid_str = request.args.get("uuid")
+    uuid_str = request.cookies.get("uuid")
     if not uuid_str:
         return "UUIDが見つかりません", 400
     return render_template("thanks.html", uuid_str=uuid_str)
