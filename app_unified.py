@@ -313,17 +313,7 @@ def selfmob_index():
 
 
 # ✅ WebhookベースのUUID有効化方式に強化した /selfmob/<uuid> & /generate_link & /webhook/selfmob 実装
-
 # ✅ 自動分岐構成：/generate_link /generate_link_full で full_year 制御、テンプレート共通化済み
-import os
-import uuid
-from urllib.parse import quote
-from datetime import datetime
-from flask import request, redirect, render_template, jsonify, url_for
-from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
-from kyusei_utils import get_kyusei_fortune
-from yearly_fortune_utils import generate_yearly_fortune
-from pdf_generator_unified import create_pdf_unified
 
 UPLOAD_FOLDER = "static/uploads"
 USED_UUID_FILE = "used_orders.txt"
@@ -339,20 +329,22 @@ def generate_link_basic():
 def generate_link_full():
     return _generate_link(full_year=True)
 
-def _generate_link(full_year=False):
-    env_key = "KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID"
-    komoju_id = os.getenv(env_key)
-    print("🔍", env_key, "=", komoju_id)
 
+def _generate_link(full_year=False):
+    komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
     new_uuid = str(uuid.uuid4())
     redirect_url = f"https://shincom-unified.onrender.com/selfmob/{new_uuid}"
-    encoded_redirect = quote(redirect_url, safe='')
+    encoded_redirect = quote(redirect_url, safe='')  # ✅ エンコード重要
 
+    # UUIDとfull_yearを記録
     with open(USED_UUID_FILE, "a") as f:
         f.write(f"{new_uuid},{int(full_year)}\n")
 
     komoju_url = f"https://komoju.com/payment_links/{komoju_id}?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
+    print("🔗 KOMOJU決済URL:", komoju_url)
     return redirect(komoju_url)
+
+
 
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
