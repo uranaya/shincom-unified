@@ -330,10 +330,6 @@ def generate_link_full():
     return _generate_link(full_year=True)
 
 
-@app.route("/generate_link_full")
-def generate_link_full():
-    return _generate_link(full_year=True)
-
 def _generate_link(full_year=False):
     komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
     new_uuid = str(uuid.uuid4())
