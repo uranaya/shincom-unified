@@ -311,6 +311,152 @@ def selfmob_index():
 
 
 
+# ✅ WebhookベースのUUID有効化方式に強化した /selfmob/<uuid> & /generate_link & /webhook/selfmob 実装
+
+KOMOJU_PUBLIC_LINK_ID = os.getenv("KOMOJU_PUBLIC_LINK_ID")
+USED_UUID_FILE = "used_orders.txt"
+UPLOAD_FOLDER = "static/uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+# UUID記録ファイルがなければ空で作成
+if not os.path.exists(USED_UUID_FILE):
+    open(USED_UUID_FILE, "w").close()
+
+
+@app.route("/generate_link")
+def generate_komoju_link():
+    new_uuid = str(uuid.uuid4())
+    # 🔄 Webhook方式ではこの時点ではused_orders.txtに書き込まない
+    redirect_url = f"https://shincom-unified.onrender.com/selfmob/{new_uuid}"
+    komoju_url = f"https://komoju.com/pay/{KOMOJU_PUBLIC_LINK_ID}?external_order_num={new_uuid}&customer_redirect_url={redirect_url}"
+    return redirect(komoju_url)
+
+@app.route("/webhook/selfmob", methods=["POST"])
+def webhook_selfmob():
+    try:
+        data = request.get_json()
+        if data.get("event") == "payment.captured":
+            uuid_str = data["data"]["attributes"].get("external_order_num")
+            if uuid_str:
+                with open(USED_UUID_FILE, "a") as f:
+                    f.write(uuid_str + "\n")
+        return "", 200
+    except Exception as e:
+        print("Webhook error:", e)
+        return "", 400
+
+@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
+def selfmob_uuid(uuid_str):
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            allowed_uuids = {line.strip() for line in f if line.strip()}
+    except FileNotFoundError:
+        allowed_uuids = set()
+
+    if uuid_str not in allowed_uuids:
+        return jsonify({"error": "無効なリンクです"}), 400 if request.is_json else "無効なリンクです"
+
+    if request.method == "POST":
+        try:
+            data = request.get_json() if request.is_json else request.form
+            image_data = data.get("image_data")
+            birthdate = data.get("birthdate")
+            full_year = data.get("full_year", False) if request.is_json else (data.get("full_year") == "yes")
+
+            try:
+                year, month, day = map(int, birthdate.split("-"))
+                kyusei_text = get_kyusei_fortune(year, month, day)
+            except Exception as e:
+                print("❌ lucky_direction 取得エラー:", e)
+                kyusei_text = ""
+
+            eto = get_nicchu_eto(birthdate)
+            palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate, kyusei_text)
+
+            palm_sections = [sec for sec in palm_result.split("### ") if sec.strip()]
+            palm_texts, summary_text = [], ""
+            if palm_sections:
+                *main_sections, summary_section = palm_sections
+                for sec in main_sections:
+                    body = sec.split("\n", 1)[1] if "\n" in sec else sec
+                    body = body.strip()
+                    if body:
+                        palm_texts.append(body)
+                if summary_section:
+                    summary_body = summary_section.split("\n", 1)[1] if "\n" in summary_section else summary_section
+                    summary_text = summary_body.strip()
+
+            shichu_parts = [part for part in shichu_result.split("■ ") if part.strip()]
+            shichu_texts = {}
+            for part in shichu_parts:
+                title, body = part.split("\n", 1) if "\n" in part else (part, "")
+                shichu_texts[title] = body.strip()
+
+            lucky_lines = []
+            if isinstance(lucky_info, str):
+                for line in lucky_info.replace("\r\n", "\n").split("\n"):
+                    line = line.strip()
+                    if line:
+                        line = line.replace(":", "：", 1)
+                        lucky_lines.append(f"◆ {line}")
+            elif isinstance(lucky_info, dict):
+                for k, v in lucky_info.items():
+                    lucky_lines.append(f"◆ {k}：{v}")
+            else:
+                lucky_lines = list(lucky_info)
+
+            result_data = {
+                "palm_titles": ["生命線", "運命線", "金運線", "特殊線1", "特殊線2"],
+                "palm_texts": palm_texts,
+                "titles": {
+                    "palm_summary": "手相の総合アドバイス",
+                    "personality": "性格診断",
+                    "month_fortune": "今月の運勢",
+                    "next_month_fortune": "来月の運勢"
+                },
+                "texts": {
+                    "palm_summary": summary_text,
+                    "personality": shichu_texts.get("性格", ""),
+                    "month_fortune": shichu_texts.get("今月の運勢", ""),
+                    "next_month_fortune": shichu_texts.get("来月の運勢", "")
+                },
+                "lucky_info": lucky_lines,
+                "lucky_direction": kyusei_text,
+                "birthdate": birthdate,
+                "palm_result": "\n".join(palm_texts),
+                "shichu_result": shichu_result,
+                "iching_result": iching_result,
+                "palm_image": image_data
+            }
+
+            if full_year:
+                now = datetime.now()
+                result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
+
+            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            create_pdf_unified(filepath, result_data, "shincom", size="a4", include_yearly=full_year)
+
+            # 使用済みUUIDを削除
+            allowed_uuids.discard(uuid_str)
+            with open(USED_UUID_FILE, "w") as f:
+                for uid in allowed_uuids:
+                    f.write(uid + "\n")
+
+            redirect_url = url_for("preview", filename=filename)
+            return jsonify({"redirect_url": redirect_url}) if request.is_json else redirect(redirect_url)
+
+        except Exception as e:
+            print("処理エラー:", e)
+            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
+
+    return render_template("index.html")
+
+
+
+
+
 @app.route("/preview/<filename>")
 def preview(filename):
     referer = request.referrer or ""
