@@ -6,12 +6,12 @@ from kyusei_utils import get_honmeisei, get_directions
 from nicchu_utils import get_nicchu_eto
 from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 
-MAX_CHAR = 120  # Limit for monthly love fortune text
+MAX_CHAR = 200  # Limit for monthly love fortune text
 
 def _ask_openai(prompt: str) -> str:
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
-        max_tokens=200,
+        max_tokens=300,
         temperature=0.7,
         messages=[{"role": "system", "content": "あなたは四柱推命のプロの占い師です。"},
                   {"role": "user",   "content": prompt}]
@@ -46,7 +46,7 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
     year_fortune = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt_year}],
-        max_tokens=150,
+        max_tokens=300,
         temperature=0.8
     ).choices[0].message.content.strip()
 
@@ -75,7 +75,7 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
         text = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_month}],
-            max_tokens=150,
+            max_tokens=300,
             temperature=0.9
         ).choices[0].message.content.strip()
         month_fortunes.append({
