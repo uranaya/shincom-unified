@@ -595,16 +595,16 @@ def login():
 
 
 
+
 @app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
-    # 決済によって記録されたフラグから full_year を判断
     full_year = None
     lines = []
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
-            for uid, flag in lines:
+            for uid, flag, mode in lines:
                 if uid == uuid_str:
                     full_year = (flag == "1")
                     break
@@ -617,7 +617,6 @@ def renaiselfmob_uuid(uuid_str):
         user_birth = request.form.get("user_birth")
         partner_birth = request.form.get("partner_birth")
 
-        # 安全チェック
         if not user_birth or not isinstance(user_birth, str):
             return "生年月日が不正です", 400
 
@@ -631,7 +630,6 @@ def renaiselfmob_uuid(uuid_str):
         month_label = f"{target1.year}年{target1.month}月の恋愛運"
         next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
 
-        # 占い実行
         raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
 
         result_data = {
@@ -661,13 +659,14 @@ def renaiselfmob_uuid(uuid_str):
 
         # 使用済みUUIDを削除
         with open(USED_UUID_FILE, "w") as f:
-            for uid, flag in lines:
+            for uid, flag, mode in lines:
                 if uid != uuid_str:
-                    f.write(f"{uid},{flag}\n")
+                    f.write(f"{uid},{flag},{mode}\n")
 
         return redirect(url_for("preview", filename=filename))
 
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str)
+
 
 
 
