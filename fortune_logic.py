@@ -188,15 +188,19 @@ def generate_fortune(image_data, birthdate, kyusei_text):
 
     # ✅ ラッキー情報整形（1行目から ◆で最大6項目）
     lucky_lines = []
-    if isinstance(raw_lucky_info, list):
-        raw_line = raw_lucky_info[0]
-    elif isinstance(raw_lucky_info, str):
-        raw_line = raw_lucky_info.strip().splitlines()[0]
-    else:
-        raw_line = ""
-    if "◆" in raw_line:
-        items = [item.strip() for item in raw_line.split("◆") if item.strip()]
-        lucky_lines = [f"◆ {item}" for item in items]
+    try:
+        if isinstance(raw_lucky_info, list):
+            raw_line = raw_lucky_info[0]
+        elif isinstance(raw_lucky_info, str):
+            raw_line = raw_lucky_info.strip().splitlines()[0]
+        else:
+            raw_line = ""
+        if "◆" in raw_line:
+            items = [item.strip() for item in raw_line.split("◆") if item.strip()]
+            lucky_lines = [f"◆ {item}" for item in items]
+    except Exception as e:
+        print("❌ ラッキー情報整形エラー:", e)
+        lucky_lines = []
 
     # ✅ 四柱推命の構造化（文字列から dict texts に変換）
     shichu_texts = {"personality": "", "year_fortune": "", "month_fortune": "", "next_month_fortune": ""}
@@ -208,14 +212,16 @@ def generate_fortune(image_data, birthdate, kyusei_text):
             if "\n" in part:
                 title, body = part.split("\n", 1)
                 title = title.strip()
+                body = body.strip()
                 if "性格" in title:
-                    shichu_texts["personality"] = body.strip()
-                elif "今年" in title:
-                    shichu_texts["year_fortune"] = body.strip()
-                elif "今月" in title:
-                    shichu_texts["month_fortune"] = body.strip()
-                elif "来月" in title:
-                    shichu_texts["next_month_fortune"] = body.strip()
+                    shichu_texts["personality"] = body
+                elif "の運勢" in title:
+                    if "年" in title:
+                        shichu_texts["year_fortune"] = body
+                    elif "来月" in title:
+                        shichu_texts["next_month_fortune"] = body
+                    elif "月" in title:
+                        shichu_texts["month_fortune"] = body
 
     # ✅ palm_result を構造化
     palm_titles = []
