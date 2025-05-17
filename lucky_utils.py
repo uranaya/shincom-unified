@@ -2,6 +2,8 @@ import datetime
 from kyusei_utils import get_honmeisei, get_directions
 import openai
 import os
+from reportlab.lib.units import mm
+
 
 # ✅ APIキーの指定（必須）
 openai.api_key = os.getenv("OPENAI_API_KEY")
