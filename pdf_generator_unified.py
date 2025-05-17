@@ -205,7 +205,6 @@ def draw_shincom_a4(c, data, include_yearly=False):
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
 
 
-
 def draw_shincom_b4(c, data, include_yearly=False):
     width, height = B4
     margin = 20 * mm
