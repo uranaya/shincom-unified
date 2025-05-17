@@ -31,14 +31,12 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
     c.setFont(FONT_NAME, 10)
 
     if lucky_info and isinstance(lucky_info, list):
-        # ✅ 「◆」が含まれる行のみを抽出
-        items = [line.strip() for line in lucky_info if "◆" in line]
-        items = [item for item in items if "：" in item]
+        items = [item.strip() for item in lucky_info if item.strip()]
         for i in range(0, min(6, len(items)), 2):
             left = items[i]
             right = items[i + 1] if i + 1 < len(items) else ""
             c.drawString(margin + 10, y, left)
-            c.drawString(margin + 150, y, right)
+            c.drawString(margin + 160, y, right)  # より中央寄せ
             y -= 6 * mm
     else:
         c.drawString(margin + 10, y, "情報が取得できませんでした。")

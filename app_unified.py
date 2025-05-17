@@ -26,7 +26,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 @app.route("/ten", methods=["GET", "POST"], endpoint="ten")
 @app.route("/tenmob", methods=["GET", "POST"], endpoint="tenmob")
 def ten_shincom():
-    # Login required for store usage
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
 
@@ -41,69 +40,25 @@ def ten_shincom():
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
 
-            # Parse birthdate
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
 
-            # Compute Nine-Star Ki lucky direction text (honmeisei and directions)
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
 
-            # Chinese zodiac (日柱の干支)
             eto = get_nicchu_eto(birthdate)
-
-            # ✅ 修正：5要素受け取り
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(
                 image_data, birthdate, kyusei_text
             )
 
-            # Process Four Pillars (Shichu) results into dictionary
-            shichu_texts = {}
-            if isinstance(shichu_result, dict) and "texts" in shichu_result:
-                shichu_texts = {
-                    "性格": shichu_result["texts"].get("personality", ""),
-                    "今年の運勢": shichu_result["texts"].get("year_fortune", ""),
-                    "今月の運勢": shichu_result["texts"].get("month_fortune", ""),
-                    "来月の運勢": shichu_result["texts"].get("next_month_fortune", "")
-                }
-            else:
-                parts = [part for part in str(shichu_result).split("■ ") if part.strip()]
-                for part in parts:
-                    if "\n" in part:
-                        title, body = part.split("\n", 1)
-                    else:
-                        title, body = part, ""
-                    shichu_texts[title.strip()] = body.strip()
-
-            lucky_direction = kyusei_text
-            lucky_lines = []
-            if isinstance(lucky_info, str):
-                for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-                    line = line.strip()
-                    if line:
-                        if line.startswith("・"):
-                            line = line[1:].strip()
-                        lucky_lines.append(f"◆ {line.replace(':', '：', 1)}")
-            elif isinstance(lucky_info, dict):
-                for k, v in lucky_info.items():
-                    line = f"{k}：{v}".strip()
-                    if line:
-                        if line.startswith("・"):
-                            line = line[1:].strip()
-                        lucky_lines.append(f"◆ {line}")
-            else:
-                for item in lucky_info:
-                    for line in str(item).replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-                        line = line.strip()
-                        if line:
-                            if line.startswith("・"):
-                                line = line[1:].strip()
-                            lucky_lines.append(f"◆ {line.replace(':', '：', 1)}")
+            summary_text = ""
+            if len(palm_texts) == 6:
+                summary_text = palm_texts.pop()
 
             now = datetime.now()
             target1 = now.replace(day=15)
@@ -125,17 +80,17 @@ def ten_shincom():
                     "next_month_fortune": next_month_label
                 },
                 "texts": {
-                    "palm_summary": palm_texts[5] if len(palm_texts) > 5 else "",
-                    "personality": shichu_texts.get("性格", ""),
-                    "year_fortune": shichu_texts.get(year_label, ""),
-                    "month_fortune": shichu_texts.get(month_label, ""),
-                    "next_month_fortune": shichu_texts.get(next_month_label, "")
+                    "palm_summary": summary_text,
+                    "personality": shichu_result.get("personality", ""),
+                    "year_fortune": shichu_result.get("year_fortune", ""),
+                    "month_fortune": shichu_result.get("month_fortune", ""),
+                    "next_month_fortune": shichu_result.get("next_month_fortune", "")
                 },
                 "lucky_info": lucky_lines,
-                "lucky_direction": lucky_direction,
+                "lucky_direction": kyusei_text,
                 "birthdate": birthdate,
                 "palm_result": "\n".join(palm_texts),
-                "shichu_result": shichu_result if isinstance(shichu_result, str) else "",
+                "shichu_result": shichu_result,
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "palm_image": image_data
             }
@@ -149,7 +104,6 @@ def ten_shincom():
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             create_pdf_unified(filepath, result_data, mode, size=size.lower(), include_yearly=full_year)
-
             return jsonify({"redirect_url": url_for("preview", filename=filename)}) if is_json else redirect(url_for("preview", filename=filename))
         except Exception as e:
             traceback.print_exc()
