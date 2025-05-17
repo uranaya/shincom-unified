@@ -322,37 +322,52 @@ if not os.path.exists(USED_UUID_FILE):
     open(USED_UUID_FILE, "w").close()
 
 @app.route("/generate_link")
-def generate_link_basic():
+def generate_link():
     return _generate_link(full_year=False)
 
 @app.route("/generate_link_full")
-def generate_link_full():
+def generate_link
+_full():
     return _generate_link(full_year=True)
-
 
 def _generate_link(full_year=False):
     komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
     new_uuid = str(uuid.uuid4())
-    redirect_url = f"https://shincom-unified.onrender.com/thanks"
+    redirect_url = "https://shincom-unified.onrender.com/thanks"
     encoded_redirect = quote(redirect_url, safe='')
 
+    # ✅ 通常版は "selfmob" を記録
     with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{new_uuid},{int(full_year)}\n")
+        f.write(f"{new_uuid},{int(full_year)},selfmob\n")
 
     komoju_url = f"https://komoju.com/payment_links/{komoju_id}?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
-    print("🔗 KOMOJU決済URL:", komoju_url)
+    print("🔗 決済URL:", komoju_url)
 
     resp = make_response(redirect(komoju_url))
-    resp.set_cookie("uuid", new_uuid, max_age=600)  # 有効期限：10分
+    resp.set_cookie("uuid", new_uuid, max_age=600)
     return resp
 
+
+
+# ✅ thanksルート修正版（selfmob/renaiselfmob を UUIDから判定）
 @app.route("/thanks")
 def thanks():
     uuid_str = request.cookies.get("uuid")
     if not uuid_str:
-        return "UUIDが見つかりません", 400
-    return render_template("thanks.html", uuid_str=uuid_str)
+        return render_template("thanks.html")
 
+    mode = "selfmob"  # fallback 初期値
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) >= 3 and parts[0] == uuid_str:
+                    mode = parts[2]  # 例: "selfmob" or "renaiselfmob"
+                    break
+    except:
+        pass
+
+    return redirect(f"/{mode}/{uuid_str}")
 
 
 @app.route("/webhook/selfmob", methods=["POST"])
@@ -656,6 +671,13 @@ def renaiselfmob_uuid(uuid_str):
 def generate_link_renai():
     return _generate_link_renai(full_year=False)
 
+
+
+# ✅ UUID記録フォーマット変更対応済 generate_link_renai
+@app.route("/generate_link_renai")
+def generate_link_renai():
+    return _generate_link_renai(full_year=False)
+
 @app.route("/generate_link_renai_full")
 def generate_link_renai_full():
     return _generate_link_renai(full_year=True)
@@ -666,15 +688,18 @@ def _generate_link_renai(full_year=False):
     redirect_url = "https://shincom-unified.onrender.com/thanks"
     encoded_redirect = quote(redirect_url, safe='')
 
+    # ✅ ここで mode を明示して保存
     with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{new_uuid},{int(full_year)}\n")
+        f.write(f"{new_uuid},{int(full_year)},renaiselfmob\n")
 
     komoju_url = f"https://komoju.com/payment_links/{komoju_id}?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
     print("🔗 RENAI決済URL:", komoju_url)
 
     resp = make_response(redirect(komoju_url))
-    resp.set_cookie("uuid", new_uuid, max_age=600)  # 10分
+    resp.set_cookie("uuid", new_uuid, max_age=600)  # cookie経由でUUID保持
     return resp
+
+
 
 
 
