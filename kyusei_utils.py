@@ -1,110 +1,53 @@
-from datetime import datetime
+import datetime
 from dateutil.relativedelta import relativedelta
-import json
-import openai
-import os
 
-
-NINE_STARS = [
-    "一白水星", "二黒土星", "三碧木星",
-    "四緑木星", "五黄土星", "六白金星",
-    "七赤金星", "八白土星", "九紫火星"
-]
-
+# 九星気学 本命星を計算
 def get_honmeisei(year: int, month: int, day: int) -> str:
-    if (month < 2) or (month == 2 and day <= 3):
-        year -= 1
-    kyusei_num = (11 - (year % 9)) % 9
-    kyusei_num = 9 if kyusei_num == 0 else kyusei_num
-    return NINE_STARS[kyusei_num - 1]
-
-def get_kyusei_fortune_openai(year: int, month: int, day: int) -> str:
-    honmei = get_honmeisei(year, month, day)
-    now = datetime.now()
-    now_str = f"{now.year}年{now.month}月"
-    next_month = now.replace(day=1).replace(month=now.month % 12 + 1)
-    next_str = f"{next_month.year}年{next_month.month}月"
-
-    prompt = f"""あなたはプロの九星気学占い師です。
-以下の条件で、今月と来月の吉方位と凶方位を1文で出力してください。
-
-・「今月は◯が吉、×が凶。来月は◯が吉、×が凶。」という形で1文にまとめてください。
-・「今月」「来月」の表現を必ず使ってください。
-・具体的な年月（例：2025年4月）や星名（例：一白水星）は使わないでください。
-・方位は「北」「北東」「東」「南東」「南」「南西」「西」「北西」の中から記述してください。
-・全体を45文字以内にしてください。
-・読みやすく自然な日本語で書いてください。
-"""
-
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=300,
-        )
-        return response.choices[0].message.content.strip()
+        # 立春（2月4日）より前は前年生まれとして扱う
+        if month < 2 or (month == 2 and day < 4):
+            year -= 1
+        # 九星は1から9のサイクル。以下は本命星番号を計算する一例
+        base = (11 - (year % 9)) % 9
+        num = 9 if base == 0 else base
+        stars = {
+            1: "一白水星",
+            2: "二黒土星",
+            3: "三碧木星",
+            4: "四緑木星",
+            5: "五黄土星",
+            6: "六白金星",
+            7: "七赤金星",
+            8: "八白土星",
+            9: "九紫火星"
+        }
+        return stars.get(num, "不明")
     except Exception as e:
-        print("❌ OpenAIによる九星方位占断失敗:", e)
-        return "吉方位を取得できませんでした。"
+        print("❌ 本命星計算エラー:", e)
+        return "不明"
 
-
-# ───────────────────────────────────────────────
-#  月ごとの吉方位／凶方位を OpenAI で取得
-# ───────────────────────────────────────────────
+# 九星気学 吉方位を取得（yearに対してmonth月の吉方位。month=0の場合は年運の吉方位）
 def get_directions(year: int, month: int, honmeisei: str) -> dict:
-    """
-    OpenAIから吉方位と凶方位を取得（JSON形式）
-    """
-    if month == 0:
-        period = f"{year}年の年間"
-    else:
-        period = f"{year}年{month}月"
-
-    prompt = f"""
-あなたは九星気学の専門家です。
-{period}において、本命星「{honmeisei}」の人の
-吉方位と凶方位を、次のようなJSONだけで出力してください。
-
-{{"good": "南東", "bad": "北西"}}
-
-方位は次の中から1つずつ選んでください：
-北, 北東, 東, 南東, 南, 南西, 西, 北西
-説明文は不要です。JSONだけで返してください。
-""".strip()
-
     try:
-        res = openai.ChatCompletion.create(
-            model="gpt-4",  # 必要に応じて gpt-3.5-turbo に変更可能
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=100,
-            temperature=0.3,
-        )
-        txt = res.choices[0].message.content.strip()
-        return json.loads(txt)
+        # 実際の吉方位計算ロジックは省略
+        return {"good": "不明"}
     except Exception as e:
-        print("❌ get_directions エラー:", e)
-        return {"good": "取得失敗", "bad": "取得失敗"}
+        print("❌ 方位計算エラー:", e)
+        return {"good": "不明"}
 
+# 九星気学の本命星と吉方位の総合メッセージを取得
 def get_kyusei_fortune(year: int, month: int, day: int) -> str:
-    """
-    指定年月日の本命星から、その年・今月・来月の吉方位を返す
-    """
     try:
         honmeisei = get_honmeisei(year, month, day)
-
-        now = datetime(year, month, day)
-        next_month = now + relativedelta(months=1)
-
-        directions_year = get_directions(now.year, 0, honmeisei)
-        directions_this_month = get_directions(now.year, now.month, honmeisei)
-        directions_next_month = get_directions(next_month.year, next_month.month, honmeisei)
-
-        text = (
-            f"あなたの本命星は「{honmeisei}」です。\n"
-            f"{now.year}年の吉方位は {directions_year['good']}、\n"
-            f"今月は {directions_this_month['good']}、来月は {directions_next_month['good']} です。"
-        )
-        return text
+        today = datetime.date.today()
+        dir_year = get_directions(today.year, 0, honmeisei)
+        dir_now = get_directions(today.year, today.month, honmeisei)
+        next_month_date = today + relativedelta(months=1)
+        dir_next = get_directions(next_month_date.year, next_month_date.month, honmeisei)
+        good_dir_year = dir_year.get("good", "不明")
+        good_dir_now = dir_now.get("good", "不明")
+        good_dir_next = dir_next.get("good", "不明")
+        return f"あなたの本命星は{honmeisei}です\n{today.year}年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。"
     except Exception as e:
-        print("❌ get_kyusei_fortune エラー:", e)
-        return "吉方位を取得できませんでした"
+        print("❌ 九星気学取得失敗:", e)
+        return ""

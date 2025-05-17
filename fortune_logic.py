@@ -6,9 +6,8 @@ from tesou import tesou_names, tesou_descriptions
 from nicchu_utils import get_nicchu_eto
 from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 from lucky_utils import generate_lucky_info, generate_lucky_direction
-from yearly_love_fortune_utils import generate_yearly_love_fortune
+from yearly_love_fortune_utils import generate_yearly_fortune
 from pdf_generator_unified import create_pdf_unified
-
 
 def get_shichu_fortune(birthdate):
     eto = get_nicchu_eto(birthdate)
@@ -32,7 +31,7 @@ def get_shichu_fortune(birthdate):
 - {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
 - {target2.year}年{target2.month}月の通変星: {tsuhen_month2}
 
-以下の3つの項目について、それぞれ200文字以内で現実的に鑑定してください。
+以下の3つの項目について、それぞれ300文字以内で現実的に鑑定してください。
 本文中に干支名や通変星の名前は書かず、内容に反映させてください。
 
 ■ 性格
@@ -44,7 +43,6 @@ def get_shichu_fortune(birthdate):
 ・各項目はタイトルと本文を明確に区切ってください。
 ・読んでいて前向きになれるような文面にしてください。
 """
-
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -56,9 +54,6 @@ def get_shichu_fortune(birthdate):
     except Exception as e:
         print("❌ 四柱推命取得失敗:", e)
         return f"""■ 性格\n取得できませんでした\n■ {this_year}年の運勢\n取得できませんでした\n■ {target1.year}年{target1.month}月の運勢\n取得できませんでした\n■ {target2.year}年{target2.month}月の運勢\n取得できませんでした"""
-
-
-
 
 def analyze_palm(image_data):
     try:
@@ -84,12 +79,12 @@ def analyze_palm(image_data):
         system_prompt = (
             "あなたはプロの手相鑑定士です。以下の条件に従って、手相画像から5つの線・相を選び、"
             "それぞれ意味と印象をわかりやすく説明してください。\n\n"
-            "【出力構成】\n"
+            "出力構成\n"
             "・1. 生命線、2. 運命線、3. 金運線は必ず含める\n"
             "・4. 特殊線1、5. 特殊線2は以下の中から目立つものを優先：\n"
             f"{special_lines_text}\n"
             "・目立つ特殊線が無ければ感情線や頭脳線で自然に補完してください\n\n"
-            "【各線の意味ガイド】\n"
+            "各線の意味ガイド\n"
             f"{description_text}\n\n"
             "全体として、読み手が安心し前向きになれるよう、柔らかく肯定的な語り口でまとめてください。"
         )
@@ -134,30 +129,18 @@ def analyze_palm(image_data):
         print("❌ Vision APIエラー:", e)
         return "手相診断中にエラーが発生しました。"
 
-
-
-def get_iching_advice():
-    try:
-        prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=300
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print("❌ 易占い取得失敗:", e)
-        return "現在、易占いの結果が取得できませんでした。"
-
-
-
 def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
     prompt = f"""あなたは占いの専門家です。
 相談者は現在{age}歳です。以下の3つの鑑定結果を参考にしてください。
 
-【手相】\n{palm_result}\n
-【四柱推命】\n{shichu_result}\n
-【九星気学の方位】\n{kyusei_text}
+手相
+{palm_result}
+
+四柱推命
+{shichu_result}
+
+九星気学の方位
+{kyusei_text}
 
 この情報をもとに、相談者にとって今、運気や恋愛運を高めるための
 以下の5つの項目を、それぞれ簡潔に1つずつ提案してください。
@@ -171,7 +154,6 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 ・ラッキーデー：〇曜日
 
 1行につき1項目で、わかりやすく、シンプルに記述してください。"""
-
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
@@ -183,19 +165,14 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
         print("❌ ラッキー情報取得失敗:", e)
         return ["取得できませんでした。"]
 
-
-
-
 def generate_fortune(image_data, birthdate, kyusei_text):
     palm_result = analyze_palm(image_data)
     shichu_result = get_shichu_fortune(birthdate)
-    iching_result = get_iching_advice()
+    iching_result = ""
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
     lucky_info = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text)
     return palm_result, shichu_result, iching_result, lucky_info
-
-
 
 def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = 'a4') -> dict:
     from datetime import datetime
@@ -249,8 +226,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         future_text = ""
 
     topic_sections = []
-    iching_result = get_iching_advice()
-
+    iching_result = ""
     for topic in ["恋愛の障害と乗り越え方", "相手との距離感・深め方", "結婚"]:
         try:
             topic_prompt = f"""あなたは恋愛占いの専門家です。
@@ -258,16 +234,13 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
             if partner_eto:
                 topic_prompt += f"\n- お相手の日柱: {partner_eto}"
             topic_prompt += f"""
-- 易占いからの示唆：{iching_result}
-
 以下の条件で「{topic}」についてアドバイスしてください：
 
-・相談者の傾向（日柱）と、易の示唆を元にした、個別性の高い具体的な鑑定にする  
+・相談者の傾向（日柱）と、個別性の高い具体的な鑑定にする  
 ・200文字以内  
 ・現実的で誠実だが希望が持てる言葉で  
 ・一般論や抽象的な助言ではなく、読み手に刺さるような内容にする
 """
-
             topic_text = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": topic_prompt}],
