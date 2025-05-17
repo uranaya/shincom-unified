@@ -32,7 +32,7 @@ def get_shichu_fortune(birthdate):
 - {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
 - {target2.year}年{target2.month}月の通変星: {tsuhen_month2}
 
-以下の3つの項目について、それぞれ300文字以内で現実的に鑑定してください。
+以下の3つの項目について、それぞれ200文字以内で現実的に鑑定してください。
 本文中に干支名や通変星の名前は書かず、内容に反映させてください。
 
 ■ 性格
