@@ -409,10 +409,25 @@ def view_pdf(filename):
     return send_file(filepath, mimetype='application/pdf')
 
 
+
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
     try:
-        birthdate = request.json.get("birthdate")@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
+        birthdate = request.json.get("birthdate")
+        if not birthdate or not isinstance(birthdate, str):
+            return jsonify({"error": "無効な生年月日です"}), 400
+
+        y, m, d = map(int, birthdate.split("-"))
+        eto = get_nicchu_eto(birthdate)
+        honmeisei = get_honmeisei(y, m, d)
+
+        return jsonify({"eto": eto, "honmeisei": honmeisei})
+    except Exception as e:
+        print("❌ /get_eto エラー:", e)
+        return jsonify({"error": "干支または本命星の取得中にエラーが発生しました"}), 500
+
+
+@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
     full_year = None
     lines = []
@@ -539,17 +554,6 @@ def selfmob_uuid(uuid_str):
 
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
 
-        if not birthdate or not isinstance(birthdate, str):
-            return jsonify({"error": "無効な生年月日です"}), 400
-
-        y, m, d = map(int, birthdate.split("-"))
-        eto = get_nicchu_eto(birthdate)
-        honmeisei = get_honmeisei(y, m, d)
-
-        return jsonify({"eto": eto, "honmeisei": honmeisei})
-    except Exception as e:
-        print("❌ /get_eto エラー:", e)
-        return jsonify({"error": "干支または本命星の取得中にエラーが発生しました"}), 500
 
 
 
