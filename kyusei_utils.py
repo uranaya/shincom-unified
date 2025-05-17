@@ -1,8 +1,9 @@
 from datetime import datetime
-from dateutil relativedelta import relativedelta
+from dateutil.relativedelta import relativedelta
 import json
 import openai
 import os
+
 
 
 NINE_STARS = [
