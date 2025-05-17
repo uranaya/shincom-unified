@@ -31,9 +31,9 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
     c.setFont(FONT_NAME, 10)
 
     if lucky_info and isinstance(lucky_info, list):
-        line = lucky_info[0].strip()
-        items = [item.strip() for item in line.split("◆") if item.strip()]
-        # 最大6項目（3行×2項目）
+        # 🔧 全行結合 → 1行にして分割
+        merged_line = " ".join(lucky_info).strip()
+        items = [item.strip() for item in merged_line.split("◆") if item.strip()]
         for i in range(0, min(6, len(items)), 2):
             left = f"◆ {items[i]}"
             right = f"◆ {items[i+1]}" if i+1 < len(items) else ""
