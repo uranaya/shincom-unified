@@ -321,14 +321,18 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 if not os.path.exists(USED_UUID_FILE):
     open(USED_UUID_FILE, "w").close()
 
+
+
 @app.route("/generate_link")
 def generate_link():
     return _generate_link(full_year=False)
 
 @app.route("/generate_link_full")
-def generate_link
-_full():
+def generate_link_full():
     return _generate_link(full_year=True)
+
+
+
 
 def _generate_link(full_year=False):
     komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
