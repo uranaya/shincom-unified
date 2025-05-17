@@ -135,8 +135,6 @@ def analyze_palm(image_data):
         return "手相診断中にエラーが発生しました。"
 
 
-import openai
-
 def get_iching_advice():
     try:
         prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
@@ -153,24 +151,19 @@ def get_iching_advice():
 
 def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
     prompt = f"""あなたは占いの専門家です。
-相談者は現在{age}歳です。以下の3つの鑑定結果を参考にしてください。
+相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
 
 【手相】\n{palm_result}\n
 【四柱推命】\n{shichu_result}\n
 【九星気学の方位】\n{kyusei_text}
 
-この情報をもとに、相談者にとって今、運気や恋愛運を高めるための
-以下の5つの項目を、それぞれ簡潔に1つずつ提案してください。
+以下5つの項目を、すべて1行にまとめて簡潔に出力してください：
 
-解説や理由は不要です。形式は以下に正確に従ってください：
+◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日
 
-・ラッキーアイテム：〇〇  
-・ラッキーカラー：〇〇  
-・ラッキーナンバー：〇〇  
-・ラッキーフード：〇〇  
-・ラッキーデー：〇曜日
-
-1行につき1項目で、わかりやすく、シンプルに記述してください。"""
+- 補足、理由、改行は一切禁止
+- 各項目は短く（単語～数語）
+"""
 
     try:
         response = openai.ChatCompletion.create(
@@ -178,10 +171,11 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
-        return response["choices"][0]["message"]["content"].strip().splitlines()
+        return [response["choices"][0]["message"]["content"].strip()]
     except Exception as e:
         print("❌ ラッキー情報取得失敗:", e)
-        return ["取得できませんでした。"]
+        return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
+
 
 
 def generate_fortune(image_data, birthdate, kyusei_text):

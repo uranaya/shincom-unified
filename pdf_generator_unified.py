@@ -25,28 +25,20 @@ def wrap(text, limit):
 
 
 def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
-    from reportlab.lib.units import mm
     c.setFont("IPAexGothic", 12)
     c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
     y -= 8 * mm
     c.setFont("IPAexGothic", 10)
 
-    if lucky_info:
-        for item in lucky_info:
-            if item and isinstance(item, str):
-                # 「：」で区切って右側を1文に制限（句点で区切る）
-                if '：' in item:
-                    title, content = item.split('：', 1)
-                    content_short = content.split('。')[0] + '。' if '。' in content else content
-                    text = f"{title}：{content_short.strip()}"
-                    c.drawString(margin + 10, y, text)
-                    y -= 6 * mm
+    if lucky_info and isinstance(lucky_info, list):
+        line = lucky_info[0] if len(lucky_info) == 1 else "　".join(lucky_info)
+        c.drawString(margin + 10, y, line.strip())
+        y -= 6 * mm
     else:
         c.drawString(margin + 10, y, "情報が取得できませんでした。")
         y -= 6 * mm
 
     y -= 4 * mm
-
     c.setFont("IPAexGothic", 12)
     if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
         c.drawString(margin, y, "■ 吉方位（九星気学より）")
@@ -60,6 +52,7 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
         y -= 6 * mm
 
     return y - 10 * mm
+
 
 
 def draw_palm_image(c, base64_image, width, y):
