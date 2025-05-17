@@ -1,5 +1,5 @@
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
+from dateutil relativedelta import relativedelta
 import json
 import openai
 import os
@@ -88,10 +88,8 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
 
 
 def get_kyusei_fortune(year, month, day, now=None):
-    from .kyusei_logic import get_honmeisei
-    from .kyusei_data import YEAR_GOOD_DIRECTIONS, MONTH_GOOD_DIRECTIONS
-    from datetime import datetime
-    from dateutil.relativedelta import relativedelta
+    from kyusei_logic import get_honmeisei
+    from kyusei_data import YEAR_GOOD_DIRECTIONS, MONTH_GOOD_DIRECTIONS
 
     honmeisei = get_honmeisei(year, month, day)
     lines = [f"あなたの本命星は「{honmeisei}」です。"]
