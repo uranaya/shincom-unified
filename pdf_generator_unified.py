@@ -31,12 +31,12 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
     c.setFont(FONT_NAME, 10)
 
     if lucky_info and isinstance(lucky_info, list):
-        # 🔧 全行結合 → 1行にして分割
-        merged_line = " ".join(lucky_info).strip()
-        items = [item.strip() for item in merged_line.split("◆") if item.strip()]
+        # ✅ 「◆」が含まれる行のみを抽出
+        items = [line.strip() for line in lucky_info if "◆" in line]
+        items = [item for item in items if "：" in item]
         for i in range(0, min(6, len(items)), 2):
-            left = f"◆ {items[i]}"
-            right = f"◆ {items[i+1]}" if i+1 < len(items) else ""
+            left = items[i]
+            right = items[i + 1] if i + 1 < len(items) else ""
             c.drawString(margin + 10, y, left)
             c.drawString(margin + 150, y, right)
             y -= 6 * mm
@@ -58,6 +58,7 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
         y -= 6 * mm
 
     return y - 10 * mm
+
 
 
 
