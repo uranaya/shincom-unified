@@ -1,14 +1,13 @@
 from nicchu_utils import get_nicchu_eto
-from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date  # ← 修正
+from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 from kyusei_utils import get_honmeisei, get_directions
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import openai
 import os
-
-MAX_CHAR = 120
-
 import time
+
+MAX_CHAR = 120  # Max characters for monthly fortune
 
 def _ask_openai(prompt: str, retries=3, delay=2) -> str:
     for attempt in range(retries):
@@ -28,17 +27,18 @@ def _ask_openai(prompt: str, retries=3, delay=2) -> str:
             time.sleep(delay)
     return "取得に失敗しました（OpenAI APIエラー）"
 
-
-
 def generate_yearly_fortune(user_birth: str, now: datetime):
+    """
+    Generate a detailed fortune for the year and each month (12 months starting this month) for normal fortune mode.
+    Returns a dict with a year fortune and a list of month fortunes.
+    """
     nicchu = get_nicchu_eto(user_birth)
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
-
-    # 12月は翌年を対象にする
+    # Determine target year (if current month is December, target next year for "year fortune")
     target_year = now.year + 1 if now.month == 12 else now.year
 
-    # 年運プロンプト（改良）
+    # Year fortune prompt
     tsuhen_year = get_tsuhensei_for_year(user_birth, target_year)
     prompt_year = f"""
 あなたは開運アドバイザーです。
@@ -54,17 +54,15 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
 - 前向きで、行動や考え方の指針になるように
 - 読んだ人が「なるほど」と感じるように
 """.strip()
-
     year_fortune = _ask_openai(prompt_year)
 
-    # 月運（今月から12ヶ月分）
+    # Monthly fortunes for 12 months starting current month
     month_fortunes = []
     for i in range(12):
         target = now.replace(day=15) + relativedelta(months=i)
         y, m = target.year, target.month
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
         dirs = get_directions(y, m, honmeisei)
-
         prompt_month = f"""
 あなたは占いの専門家です。
 以下の情報をもとに、{y}年{m}月の運気を自然な日本語で約120文字以内にまとめてください。
@@ -78,9 +76,7 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
 - 月ごとに変化を出す（行動・感情・周囲との関係など）
 - 現実的でポジティブな内容
 """.strip()
-
         text = _ask_openai(prompt_month)
-
         month_fortunes.append({
             "label": f"{y}年{m}月の運勢",
             "text": text

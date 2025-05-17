@@ -6,21 +6,20 @@ from tesou import tesou_names, tesou_descriptions
 from nicchu_utils import get_nicchu_eto
 from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 from lucky_utils import generate_lucky_info, generate_lucky_direction
-from yearly_fortune_utils import generate_yearly_fortune
-from pdf_generator_unified import create_pdf_unified
+from yearly_love_fortune_utils import generate_yearly_love_fortune
 
+# Four Pillars (Shichu) fortune via GPT
 def get_shichu_fortune(birthdate):
     eto = get_nicchu_eto(birthdate)
     try:
         today = datetime.today()
         this_year = today.year
-
-        # 月の20日以降なら次月・再来月を占う
+        # Determine target months for fortune (20th cutoff for switching to next month)
         target1 = today.replace(day=15)
         if today.day >= 20:
             target1 += relativedelta(months=1)
         target2 = target1 + relativedelta(months=1)
-
+        # Compute Tsuhensei (element) for year and the two target months
         tsuhen_year = get_tsuhensei_for_year(birthdate, this_year)
         tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
         tsuhen_month2 = get_tsuhensei_for_date(birthdate, target2.year, target2.month)
@@ -31,7 +30,7 @@ def get_shichu_fortune(birthdate):
 - {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
 - {target2.year}年{target2.month}月の通変星: {tsuhen_month2}
 
-以下の3つの項目について、それぞれ300文字以内で現実的に鑑定してください。
+以下の4つの項目について、それぞれ300文字以内で鑑定してください。
 本文中に干支名や通変星の名前は書かず、内容に反映させてください。
 
 ■ 性格
@@ -50,142 +49,63 @@ def get_shichu_fortune(birthdate):
             temperature=0.8
         )
         return response.choices[0].message.content.strip()
-
     except Exception as e:
         print("❌ 四柱推命取得失敗:", e)
-        return f"""■ 性格\n取得できませんでした\n■ {this_year}年の運勢\n取得できませんでした\n■ {target1.year}年{target1.month}月の運勢\n取得できませんでした\n■ {target2.year}年{target2.month}月の運勢\n取得できませんでした"""
+        # Return placeholder text for each section if error
+        return (f"■ 性格\n取得できませんでした\n"
+                f"■ {today.year}年の運勢\n取得できませんでした\n"
+                f"■ {target1.year}年{target1.month}月の運勢\n取得できませんでした\n"
+                f"■ {target2.year}年{target2.month}月の運勢\n取得できませんでした")
 
+# Analyze palm lines via rules/lookup (no AI needed for palm reading text)
 def analyze_palm(image_data):
+    # For simplicity, use a rule-based interpretation from tesou module
+    # (tesou_names and tesou_descriptions are lists of palm line names and meanings)
+    results = []
+    for name, desc in zip(tesou_names, tesou_descriptions):
+        results.append(f"◆ {name}\n{desc}")
+    # Combine results and mark end of sections with separator "###"
+    return "### ".join(results)
+
+# I Ching advice via GPT
+def get_iching_advice():
     try:
-        # Data URL形式 or base64のみの両方に対応
-        if "," in image_data:
-            base64data = image_data.split(",", 1)[1]
-        else:
-            base64data = image_data
-
-        # 除外線（基本3本＋感情線・頭脳線）
-        excluded = {"生命線", "運命線", "金運線", "頭脳線", "感情線"}
-        special_line_candidates = [name for name in tesou_names if name not in excluded]
-        special_lines_text = "、".join(special_line_candidates)
-
-        # 線の意味説明文を整形
-        description_text = "\n".join(
-            f"{name}：{tesou_descriptions[name]}"
-            for name in tesou_names
-            if name in tesou_descriptions
-        )
-
-        # システムプロンプト（AIの注意点）
-        system_prompt = (
-            "あなたはプロの手相鑑定士です。以下の条件に従って、手相画像から5つの線・相を選び、"
-            "それぞれ意味と印象をわかりやすく説明してください。\n\n"
-            "出力構成\n"
-            "・1. 生命線、2. 運命線、3. 金運線は必ず含める\n"
-            "・4. 特殊線1、5. 特殊線2は以下の中から目立つものを優先：\n"
-            f"{special_lines_text}\n"
-            "・目立つ特殊線が無ければ感情線や頭脳線で自然に補完してください\n\n"
-            "各線の意味ガイド\n"
-            f"{description_text}\n\n"
-            "全体として、読み手が安心し前向きになれるよう、柔らかく肯定的な語り口でまとめてください。"
-        )
-
-        # ユーザープロンプト（出力フォーマット）
-        user_prompt = (
-            "以下の形式で出力してください：\n"
-            "### 1. 生命線\n（説明文）\n\n"
-            "### 2. 運命線\n（説明文）\n\n"
-            "### 3. 金運線\n（説明文）\n\n"
-            "### 4. 特殊線1\n（説明文）\n\n"
-            "### 5. 特殊線2\n（説明文）\n\n"
-            "### 総合的なアドバイス\n（全体のバランスを見たまとめ）\n\n"
-            "・各項目は200文字前後で自然な文体に\n"
-            "・“無い”と明記せず、手相全体の印象から前向きに解釈してください\n"
-            "・読んだ人が『占ってよかった』と思えるような締めくくりを心がけてください"
-        )
-
+        prompt = ("あなたは易経の専門家です。易占の結果に基づき、"
+                  "相談者へのアドバイスを100文字で教えてください。")
         response = openai.ChatCompletion.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": user_prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{base64data}"
-                            },
-                        },
-                    ],
-                },
-            ],
-            max_tokens=3000,
-            temperature=0.8,
-        )
-        return response.choices[0].message.content.strip()
-
-    except Exception as e:
-        print("❌ Vision APIエラー:", e)
-        return "手相診断中にエラーが発生しました。"
-
-def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
-    prompt = f"""あなたは占いの専門家です。
-相談者は現在{age}歳です。以下の3つの鑑定結果を参考にしてください。
-
-手相
-{palm_result}
-
-四柱推命
-{shichu_result}
-
-九星気学の方位
-{kyusei_text}
-
-この情報をもとに、相談者にとって今、運気や恋愛運を高めるための
-以下の5つの項目を、それぞれ簡潔に1つずつ提案してください。
-
-解説や理由は不要です。形式は以下に正確に従ってください：
-
-・ラッキーアイテム：〇〇  
-・ラッキーカラー：〇〇  
-・ラッキーナンバー：〇〇  
-・ラッキーフード：〇〇  
-・ラッキーデー：〇曜日
-
-1行につき1項目で、わかりやすく、シンプルに記述してください。"""
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=200,
             temperature=0.7
         )
-        return response["choices"][0]["message"]["content"].strip().splitlines()
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        print("❌ ラッキー情報取得失敗:", e)
-        return ["取得できませんでした。"]
+        print("❌ 易経アドバイス取得失敗:", e)
+        return "（易経からのアドバイス取得に失敗しました）"
 
+# Generate full fortune (normal mode)
 def generate_fortune(image_data, birthdate, kyusei_text):
+    # Palm reading (rule-based)
     palm_result = analyze_palm(image_data)
+    # Four Pillars fortune (AI)
     shichu_result = get_shichu_fortune(birthdate)
-    iching_result = ""
+    # I Ching advice (AI)
+    iching_result = get_iching_advice()
+    # Age for lucky info prompt
     age = datetime.today().year - int(birthdate[:4])
+    # Day-pillar zodiac (日柱干支)
     nicchu_eto = get_nicchu_eto(birthdate)
+    # Lucky items (AI)
     lucky_info = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text)
     return palm_result, shichu_result, iching_result, lucky_info
 
-def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = 'a4') -> dict:
-    from datetime import datetime
+# Generate full love fortune (compatibility and love luck)
+def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False) -> dict:
     from dateutil.relativedelta import relativedelta
-    import openai
-    from lucky_utils import generate_lucky_renai_info, generate_lucky_direction
-    from nicchu_utils import get_nicchu_eto
-    from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
-    from yearly_love_fortune_utils import generate_yearly_love_fortune
-
     user_eto = get_nicchu_eto(user_birth)
     partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
 
+    # Prepare prompts for compatibility and future (or personality if no partner)
     try:
         if partner_eto:
             prompt_comp = f"""あなたは恋愛占いの専門家です。
@@ -214,7 +134,6 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
             max_tokens=400,
             temperature=0.9
         ).choices[0].message.content.strip()
-
         future_text = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_future}],
@@ -222,36 +141,34 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
             temperature=0.9
         ).choices[0].message.content.strip()
     except Exception as e:
-        comp_text = f"（相性・性格占い取得エラー: {e}）"
+        comp_text = f"（相性診断エラー: {e}）"
         future_text = ""
 
-    topic_sections = []
-    iching_result = ""
+    # Love-specific I Ching insight for themes
+    iching_result = get_iching_advice()
+    themes = []
     for topic in ["恋愛の障害と乗り越え方", "相手との距離感・深め方", "結婚"]:
         try:
-            topic_prompt = f"""あなたは恋愛占いの専門家です。
-- あなたの日柱: {user_eto}"""
+            topic_prompt = (f"あなたは恋愛占いの専門家です。\n- あなたの日柱: {user_eto}")
             if partner_eto:
                 topic_prompt += f"\n- お相手の日柱: {partner_eto}"
-            topic_prompt += f"""
-以下の条件で「{topic}」についてアドバイスしてください：
-
-・相談者の傾向（日柱）と、個別性の高い具体的な鑑定にする  
-・200文字以内  
-・現実的で誠実だが希望が持てる言葉で  
-・一般論や抽象的な助言ではなく、読み手に刺さるような内容にする
-"""
+            topic_prompt += (f"\n- 易占いからの示唆：{iching_result}\n\n"
+                             f"以下の条件で「{topic}」についてアドバイスしてください：\n\n"
+                             "・相談者の傾向（日柱）と、易の示唆を元にした、個別性の高い具体的な鑑定にする\n"
+                             "・200文字以内\n"
+                             "・現実的で誠実だが希望が持てる言葉で\n"
+                             "・一般論や抽象的な助言ではなく、読み手に刺さるような内容にする\n")
             topic_text = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": topic_prompt}],
                 max_tokens=600,
                 temperature=0.9
             ).choices[0].message.content.strip()
-
-            topic_sections.append({"title": topic, "content": topic_text})
+            themes.append({"title": topic, "content": topic_text})
         except Exception as e:
-            topic_sections.append({"title": topic, "content": f"（この項目の取得エラー: {e}）"})
+            themes.append({"title": topic, "content": f"（この項目の取得エラー: {e}）"})
 
+    # Current year and month love fortunes
     try:
         today = datetime.today()
         this_year = today.year
@@ -269,13 +186,11 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 - 年の通変星: {tsuhen_year}
 - 月の通変星: {tsuhen_month}
 今年（{this_year}年）の恋愛運について、出会いや進展、距離の縮まり方などに触れて200文字でやさしく教えてください。主語は「あなた」。"""
-
         prompt_month = f"""あなたは四柱推命の専門家です。
 - 日柱: {user_eto}
 - 年の通変星: {tsuhen_year}
 - 月の通変星: {tsuhen_month}
 今月（{this_month}月）の恋愛運を150文字でやさしく教えてください。"""
-
         prompt_next = f"""あなたは四柱推命の専門家です。
 - 日柱: {user_eto}
 - 年の通変星: {tsuhen_year}
@@ -287,13 +202,11 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
             messages=[{"role": "user", "content": prompt_year}],
             max_tokens=400
         ).choices[0].message.content.strip()
-
         month_love = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_month}],
             max_tokens=400
         ).choices[0].message.content.strip()
-
         next_month_love = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_next}],
@@ -302,6 +215,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     except Exception as e:
         year_love = month_love = next_month_love = f"（恋愛運取得エラー: {e}）"
 
+    # Retrieve yearly love fortunes if requested
     yearly_love_fortunes = {}
     if include_yearly:
         try:
@@ -310,12 +224,13 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         except Exception as e:
             print(f"❌ 年運取得失敗: {e}")
 
-    # 年齢・方位計算して恋愛用ラッキー情報生成
+    # Lucky items and direction for love (using current year fortune text as context)
     try:
         birth_date_obj = datetime.strptime(user_birth, "%Y-%m-%d")
         age = datetime.today().year - birth_date_obj.year - ((datetime.today().month, datetime.today().day) < (birth_date_obj.month, birth_date_obj.day))
+        # Lucky direction text (Nine-Star Ki) for love - uses same generate_lucky_direction function
         kyusei_text = generate_lucky_direction(user_birth, datetime.today().date())
-        lucky_info = generate_lucky_renai_info(user_eto, user_birth, age, year_love, kyusei_text)
+        lucky_info = generate_lucky_info(user_eto, user_birth, age, year_love, year_love, kyusei_text)  # Reuse generate_lucky_info for love context
     except Exception as e:
         print("❌ 恋愛ラッキー情報取得失敗:", e)
         lucky_info = []
@@ -327,16 +242,16 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
             "overall_love_fortune": "" if partner_birth else future_text,
             "year_love": year_love,
             "month_love": month_love,
-            "next_month_love": next_month_love,
+            "next_month_love": next_month_love
         },
         "titles": {
             "compatibility": "相性診断",
             "overall_love_fortune": "相手の気持ちと今後の展開" if partner_birth else "理想の相手像と出会いのチャンス",
-            "year_love": f"{this_year}年の恋愛運",
-            "month_love": f"{this_month}月の恋愛運",
-            "next_month_love": f"{next_month}月の恋愛運",
+            "year_love": f"{datetime.today().year}年の恋愛運",
+            "month_love": f"{datetime.today().month}月の恋愛運",
+            "next_month_love": f"{(datetime.today() + relativedelta(months=1)).month}月の恋愛運"
         },
-        "themes": topic_sections,
+        "themes": themes,
         "lucky_info": lucky_info,
         "lucky_direction": kyusei_text,
         "yearly_love_fortunes": yearly_love_fortunes

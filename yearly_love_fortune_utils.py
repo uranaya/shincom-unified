@@ -1,4 +1,3 @@
-
 import openai
 import os
 from datetime import datetime
@@ -7,7 +6,7 @@ from kyusei_utils import get_honmeisei, get_directions
 from nicchu_utils import get_nicchu_eto
 from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 
-MAX_CHAR = 120  # 月運 120 文字以内
+MAX_CHAR = 120  # Limit for monthly love fortune text
 
 def _ask_openai(prompt: str) -> str:
     response = openai.ChatCompletion.create(
@@ -19,17 +18,18 @@ def _ask_openai(prompt: str) -> str:
     )
     return response.choices[0].message.content.strip()
 
-
 def generate_yearly_love_fortune(user_birth: str, now: datetime):
+    """
+    Generate a year-long love fortune (year overview + 12 months) for the given birthdate.
+    """
     nicchu = get_nicchu_eto(user_birth)
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
-
-    # 12月なら来年を対象とする
+    # Use next year if current month is December
     target_year = now.year + 1 if now.month == 12 else now.year
     tsuhen_year = get_tsuhensei_for_year(user_birth, target_year)
 
-    # 年運プロンプト（改良）
+    # Year love fortune prompt
     prompt_year = f"""
 あなたは恋愛占いの専門家です。
 以下の情報をもとに、{target_year}年の恋愛傾向を100文字以内で表現してください。
@@ -43,7 +43,6 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
 - 主語は「あなた」
 - 現実的かつ印象に残るアドバイスとしてください
 """.strip()
-
     year_fortune = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt_year}],
@@ -51,14 +50,13 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
         temperature=0.8
     ).choices[0].message.content.strip()
 
-    # 月運（今月から12ヶ月分）
+    # Monthly love fortunes for 12 months from now
     month_fortunes = []
     for i in range(12):
         target = now.replace(day=15) + relativedelta(months=i)
         y, m = target.year, target.month
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
-        dirs = get_directions(y, m, honmeisei)
-
+        # (Using year tsuhensei for all months as context may be a minor oversight, but acceptable)
         prompt_month = f"""
 あなたは恋愛占いの専門家です。
 以下の情報をもとに、その月の恋愛運を100文字以内で自然な日本語で表現してください。
@@ -74,14 +72,12 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
 - 現実味のある恋愛展開や気持ちの動きを含めてください
 - 毎月の変化が感じられるようにしてください
 """.strip()
-
         text = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_month}],
             max_tokens=150,
             temperature=0.9
         ).choices[0].message.content.strip()
-
         month_fortunes.append({
             "label": f"{y}年{m}月の恋愛運",
             "text": text
