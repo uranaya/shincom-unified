@@ -149,14 +149,27 @@ def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_
 ・ラッキーフード：〇〇  
 ・ラッキーデー：〇曜日
 
-自然で前向きな言葉で書いてください。"""
+出力は必ず上記の形式に従ってください。
+"""
+
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
-        return response["choices"][0]["message"]["content"].strip().splitlines()
+        lines = response["choices"][0]["message"]["content"].strip().splitlines()
+        # 先頭5行のみ抽出して「◆ ラベル：値」形式に加工
+        lucky_lines = []
+        for line in lines:
+            if "：" in line:
+                label, value = line.split("：", 1)
+                label = label.replace("ラッキー", "").replace("・", "").strip()
+                value = value.split("（")[0].strip()
+                lucky_lines.append(f"◆ {label}：{value}")
+            if len(lucky_lines) == 5:
+                break
+        return lucky_lines
     except Exception as e:
         print("❌ 恋愛ラッキー情報取得失敗:", e)
-        return ["取得できませんでした。"]
+        return ["◆ アイテム：ー", "◆ カラー：ー", "◆ ナンバー：ー", "◆ フード：ー", "◆ デー：ー"]
