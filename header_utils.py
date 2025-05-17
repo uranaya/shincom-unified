@@ -34,3 +34,4 @@ def draw_header(c, width, margin, y_pos, font=FONT_NAME):
         c.drawText(ad_text)
         y_pos -= 50 * mm  # 必要に応じて微調整
     return y_pos
+

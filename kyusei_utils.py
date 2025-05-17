@@ -5,7 +5,6 @@ import openai
 import os
 
 
-
 NINE_STARS = [
     "一白水星", "二黒土星", "三碧木星",
     "四緑木星", "五黄土星", "六白金星",
@@ -86,35 +85,26 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
         print("❌ get_directions エラー:", e)
         return {"good": "取得失敗", "bad": "取得失敗"}
 
+def get_kyusei_fortune(year: int, month: int, day: int) -> str:
+    """
+    指定年月日の本命星から、その年・今月・来月の吉方位を返す
+    """
+    try:
+        honmeisei = get_honmeisei(year, month, day)
 
+        now = datetime(year, month, day)
+        next_month = now + relativedelta(months=1)
 
-def get_kyusei_fortune(year, month, day, now=None):
-    from kyusei_logic import get_honmeisei
-    from kyusei_data import YEAR_GOOD_DIRECTIONS, MONTH_GOOD_DIRECTIONS
+        directions_year = get_directions(now.year, 0, honmeisei)
+        directions_this_month = get_directions(now.year, now.month, honmeisei)
+        directions_next_month = get_directions(next_month.year, next_month.month, honmeisei)
 
-    honmeisei = get_honmeisei(year, month, day)
-    lines = [f"あなたの本命星は「{honmeisei}」です。"]
-
-    if now is None:
-        now = datetime.now()
-
-    this_year = now.year
-    target1 = now.replace(day=15)
-    if now.day >= 20:
-        target1 += relativedelta(months=1)
-    target2 = target1 + relativedelta(months=1)
-
-    dirs = []
-    y_key = str(this_year)
-    m1_key = f"{target1.year}-{target1.month}"
-    m2_key = f"{target2.year}-{target2.month}"
-
-    if y_key in YEAR_GOOD_DIRECTIONS.get(honmeisei, {}):
-        dirs.append(f"{this_year}年の吉方位：{YEAR_GOOD_DIRECTIONS[honmeisei][y_key]}")
-    if m1_key in MONTH_GOOD_DIRECTIONS.get(honmeisei, {}):
-        dirs.append(f"今月の吉方位：{MONTH_GOOD_DIRECTIONS[honmeisei][m1_key]}")
-    if m2_key in MONTH_GOOD_DIRECTIONS.get(honmeisei, {}):
-        dirs.append(f"来月の吉方位：{MONTH_GOOD_DIRECTIONS[honmeisei][m2_key]}")
-
-    lines.append("　　".join(dirs))
-    return "\n".join(lines)
+        text = (
+            f"あなたの本命星は「{honmeisei}」です。\n"
+            f"{now.year}年の吉方位は {directions_year['good']}、\n"
+            f"今月は {directions_this_month['good']}、来月は {directions_next_month['good']} です。"
+        )
+        return text
+    except Exception as e:
+        print("❌ get_kyusei_fortune エラー:", e)
+        return "吉方位を取得できませんでした"
