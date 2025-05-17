@@ -87,31 +87,35 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
 
 
 
-def get_kyusei_fortune(year: int, month: int, day: int) -> str:
-    """
-    現在の年・月に対して、生年月日から本命星を出して吉方位を算出する
-    """
-    try:
-        honmeisei = get_honmeisei(year, month, day)
+def get_kyusei_fortune(year, month, day, now=None):
+    from .kyusei_logic import get_honmeisei
+    from .kyusei_data import YEAR_GOOD_DIRECTIONS, MONTH_GOOD_DIRECTIONS
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
 
-        today = datetime.today()
-        next_month = today + relativedelta(months=1)
+    honmeisei = get_honmeisei(year, month, day)
+    lines = [f"あなたの本命星は「{honmeisei}」です。"]
 
-        directions_year = get_directions(today.year, 0, honmeisei)
-        directions_this_month = get_directions(today.year, today.month, honmeisei)
-        directions_next_month = get_directions(next_month.year, next_month.month, honmeisei)
+    if now is None:
+        now = datetime.now()
 
-        text = (
-            f"■ 吉方位（九星気学より）\n"
-            f"あなたの本命星は「{honmeisei}」です。\n"
-            f"{today.year}年の吉方位：{directions_year['good']}　"
-            f"凶方位：{directions_year['bad']}\n"
-            f"今月の吉方位：{directions_this_month['good']}　"
-            f"凶方位：{directions_this_month['bad']}\n"
-            f"来月の吉方位：{directions_next_month['good']}　"
-            f"凶方位：{directions_next_month['bad']}"
-        )
-        return text
-    except Exception as e:
-        print("❌ get_kyusei_fortune エラー:", e)
-        return "吉方位を取得できませんでした"
+    this_year = now.year
+    target1 = now.replace(day=15)
+    if now.day >= 20:
+        target1 += relativedelta(months=1)
+    target2 = target1 + relativedelta(months=1)
+
+    dirs = []
+    y_key = str(this_year)
+    m1_key = f"{target1.year}-{target1.month}"
+    m2_key = f"{target2.year}-{target2.month}"
+
+    if y_key in YEAR_GOOD_DIRECTIONS.get(honmeisei, {}):
+        dirs.append(f"{this_year}年の吉方位：{YEAR_GOOD_DIRECTIONS[honmeisei][y_key]}")
+    if m1_key in MONTH_GOOD_DIRECTIONS.get(honmeisei, {}):
+        dirs.append(f"今月の吉方位：{MONTH_GOOD_DIRECTIONS[honmeisei][m1_key]}")
+    if m2_key in MONTH_GOOD_DIRECTIONS.get(honmeisei, {}):
+        dirs.append(f"来月の吉方位：{MONTH_GOOD_DIRECTIONS[honmeisei][m2_key]}")
+
+    lines.append("　　".join(dirs))
+    return "\n".join(lines)

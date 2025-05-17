@@ -135,7 +135,6 @@ def analyze_palm(image_data):
         return "手相診断中にエラーが発生しました。"
 
 
-import openai
 
 def get_iching_advice():
     try:
@@ -149,6 +148,7 @@ def get_iching_advice():
     except Exception as e:
         print("❌ 易占い取得失敗:", e)
         return "現在、易占いの結果が取得できませんでした。"
+
 
 
 def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
@@ -182,6 +182,8 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
     except Exception as e:
         print("❌ ラッキー情報取得失敗:", e)
         return ["取得できませんでした。"]
+
+
 
 
 def generate_fortune(image_data, birthdate, kyusei_text):
