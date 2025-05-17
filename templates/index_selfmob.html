@@ -46,7 +46,7 @@
 
   <!-- チェックボックス削除済 -->
 
-  <button onclick="submitForm()">送信してPDF生成</button>
+  <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
 
   <form action="/logout"><button>ログアウト</button></form>
 
@@ -116,6 +116,10 @@
         alert("生年月日と手相画像の両方を入力してください。");
         return;
       }
+
+      const btn = document.getElementById("submitBtn");
+      btn.disabled = true;
+      btn.textContent = "鑑定中... 1分程度お待ちください";
 
       const payload = {
         image_data: imageData,

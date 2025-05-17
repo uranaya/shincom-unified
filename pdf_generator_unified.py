@@ -25,33 +25,37 @@ def wrap(text, limit):
 
 
 def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
-    from reportlab.lib.units import mm
-    c.setFont("IPAexGothic", 12)
+    c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
     y -= 8 * mm
-    c.setFont("IPAexGothic", 10)
+    c.setFont(FONT_NAME, 10)
 
     if lucky_info:
-        for item in lucky_info:
-            if item and isinstance(item, str):
-                # 「：」で区切って右側を1文に制限（句点で区切る）
-                if '：' in item:
-                    title, content = item.split('：', 1)
-                    content_short = content.split('。')[0] + '。' if '。' in content else content
-                    text = f"{title}：{content_short.strip()}"
-                    c.drawString(margin + 10, y, text)
-                    y -= 6 * mm
+        col_width = (width - 2 * margin) / 2
+        x1 = margin + 10
+        x2 = margin + 10 + col_width
+        col = 0
+        for i, item in enumerate(lucky_info):
+            if "：" in item:
+                item = item.replace("ラッキー", "")  # 冗長な「ラッキー」削除
+            x = x1 if col == 0 else x2
+            c.drawString(x, y, item)
+            if col == 1:
+                y -= 6 * mm
+            col = (col + 1) % 2
+        if col == 1:
+            y -= 6 * mm
     else:
         c.drawString(margin + 10, y, "情報が取得できませんでした。")
         y -= 6 * mm
 
     y -= 4 * mm
 
-    c.setFont("IPAexGothic", 12)
+    c.setFont(FONT_NAME, 12)
     if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
         c.drawString(margin, y, "■ 吉方位（九星気学より）")
         y -= 6 * mm
-        c.setFont("IPAexGothic", 10)
+        c.setFont(FONT_NAME, 10)
         for line in lucky_direction.strip().splitlines():
             c.drawString(margin + 10, y, line)
             y -= 6 * mm
@@ -60,7 +64,6 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
         y -= 6 * mm
 
     return y - 10 * mm
-
 
 def draw_palm_image(c, base64_image, width, y):
 

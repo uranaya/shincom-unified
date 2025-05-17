@@ -37,7 +37,7 @@
 </head>
 <body>
   <h2>💘 恋愛占いフォーム</h2>
-  <form method="POST">
+  <form method="POST" onsubmit="disableSubmitButton()">
     <label for="user_birth">あなたの生年月日</label>
     <input type="date" id="user_birth" name="user_birth" required>
 
@@ -53,5 +53,12 @@
       <button type="submit">🔮 鑑定スタート</button>
     </div>
   </form>
+<script>
+  function disableSubmitButton() {
+    const btn = document.querySelector("button[type='submit']");
+    btn.disabled = true;
+    btn.textContent = "鑑定中... 1分程度お待ちください";
+  }
+</script>
 </body>
 </html>
