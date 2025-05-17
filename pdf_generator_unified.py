@@ -24,39 +24,30 @@ def wrap(text, limit):
     return _wrap(text, limit)
 
 
-def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
+def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
-    y -= 8 * mm
+    y -= 6 * mm
     c.setFont(FONT_NAME, 10)
 
-    if lucky_info and isinstance(lucky_info, list):
-        items = [item.strip() for item in lucky_info if item.strip()]
-        for i in range(0, min(6, len(items)), 2):
-            left = items[i]
-            right = items[i + 1] if i + 1 < len(items) else ""
-            c.drawString(margin + 10, y, left)
-            c.drawString(margin + 160, y, right)  # より中央寄せ
-            y -= 6 * mm
-    else:
-        c.drawString(margin + 10, y, "情報が取得できませんでした。")
+    for i in range(0, len(lucky_lines), 2):
+        line1 = lucky_lines[i]
+        line2 = lucky_lines[i+1] if i+1 < len(lucky_lines) else ""
+        formatted = f"{line1:<38}    {line2}"  # ← ここでスペースインデント
+        c.drawString(margin, y, formatted)
         y -= 6 * mm
 
-    y -= 4 * mm
-    c.setFont(FONT_NAME, 12)
-    if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
+    if lucky_direction:
+        y -= 2 * mm
+        c.setFont(FONT_NAME, 12)
         c.drawString(margin, y, "■ 吉方位（九星気学より）")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         for line in lucky_direction.strip().splitlines():
-            c.drawString(margin + 10, y, line)
+            c.drawString(margin, y, line.strip())
             y -= 6 * mm
-    else:
-        c.drawString(margin, y, "■ 吉方位（九星気学より）情報未取得")
-        y -= 6 * mm
 
-    return y - 10 * mm
-
+    return y
 
 
 
