@@ -37,7 +37,6 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
         col = 0
         for i, item in enumerate(lucky_info):
             if "：" in item:
-                # ✅ ラベルから「ラッキー」という語を除去
                 label, value = item.split("：", 1)
                 label = label.replace("ラッキー", "").strip()
                 item = f"{label}：{value.strip()}"
@@ -54,20 +53,36 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
 
     y -= 4 * mm
 
-    # ✅ 吉方位の表示（九星）
-    c.setFont(FONT_NAME, 12)
-    c.drawString(margin, y, "■ 吉方位（九星気学より）")
-    y -= 6 * mm
-    c.setFont(FONT_NAME, 10)
+    # ✅ 吉方位表示（本命星あり、吉方位のみを1行にまとめて表示）
     if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
-        for line in lucky_direction.strip().splitlines():
-            c.drawString(margin + 10, y, line.strip())
+        try:
+            lines = lucky_direction.strip().splitlines()
+            if len(lines) >= 2:
+                # 1行目：本命星
+                c.setFont(FONT_NAME, 10)
+                c.drawString(margin, y, lines[0].strip())
+                y -= 6 * mm
+                # 2行目：今年／今月／来月の吉方位のみ
+                simplified = []
+                for text in lines[1:]:
+                    if "吉方位" in text:
+                        # 「吉方位：南東」 → 「南東」に変換
+                        parts = text.split("：")
+                        if len(parts) == 2:
+                            simplified.append(f"{parts[0].replace('の吉方位', '')}：{parts[1]}")
+                if simplified:
+                    c.drawString(margin, y, "　".join(simplified))
+                    y -= 6 * mm
+        except Exception as e:
+            print("❌ 吉方位整形失敗:", e)
+            c.drawString(margin + 10, y, "吉方位情報の取得に失敗しました")
             y -= 6 * mm
     else:
-        c.drawString(margin + 10, y, "情報未取得")
+        c.drawString(margin + 10, y, "■ 吉方位（九星気学より）情報未取得")
         y -= 6 * mm
 
     return y - 10 * mm
+
 
 
 
@@ -85,7 +100,7 @@ def draw_palm_image(c, base64_image, width, y, birthdate=None):
         c.drawImage(img, x_center, y, width=img_width, height=img_height)
         y -= 10 * mm
 
-        # ★ 生年月日表示を追加
+        # ✅ 生年月日をセンター表示
         if birthdate:
             c.setFont(FONT_NAME, 10)
             c.drawCentredString(width / 2, y, f"生年月日：{birthdate}")
