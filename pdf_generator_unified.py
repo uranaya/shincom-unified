@@ -80,7 +80,7 @@ def draw_yearly_pages_shincom_b4(c, yearly_data):
         c.drawString(margin, y, f"◆ {entry['label']}")
         y -= 8 * mm
         c.setFont(FONT_NAME, 12)
-        for line in wrap(entry["text"],  fifty=45):
+        for line in wrap(entry["text"], width=45):
             c.drawString(margin, y, line)
             y -= 7 * mm
 
