@@ -85,24 +85,31 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
         print("❌ get_directions エラー:", e)
         return {"good": "取得失敗", "bad": "取得失敗"}
 
+
+
 def get_kyusei_fortune(year: int, month: int, day: int) -> str:
     """
-    指定年月日の本命星から、その年・今月・来月の吉方位を返す
+    現在の年・月に対して、生年月日から本命星を出して吉方位を算出する
     """
     try:
         honmeisei = get_honmeisei(year, month, day)
 
-        now = datetime(year, month, day)
-        next_month = now + relativedelta(months=1)
+        today = datetime.today()
+        next_month = today + relativedelta(months=1)
 
-        directions_year = get_directions(now.year, 0, honmeisei)
-        directions_this_month = get_directions(now.year, now.month, honmeisei)
+        directions_year = get_directions(today.year, 0, honmeisei)
+        directions_this_month = get_directions(today.year, today.month, honmeisei)
         directions_next_month = get_directions(next_month.year, next_month.month, honmeisei)
 
         text = (
+            f"■ 吉方位（九星気学より）\n"
             f"あなたの本命星は「{honmeisei}」です。\n"
-            f"{now.year}年の吉方位は {directions_year['good']}、\n"
-            f"今月は {directions_this_month['good']}、来月は {directions_next_month['good']} です。"
+            f"{today.year}年の吉方位：{directions_year['good']}　"
+            f"凶方位：{directions_year['bad']}\n"
+            f"今月の吉方位：{directions_this_month['good']}　"
+            f"凶方位：{directions_this_month['bad']}\n"
+            f"来月の吉方位：{directions_next_month['good']}　"
+            f"凶方位：{directions_next_month['bad']}"
         )
         return text
     except Exception as e:

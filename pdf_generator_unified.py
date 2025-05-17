@@ -71,8 +71,8 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
 
 
 
-def draw_palm_image(c, base64_image, width, y):
 
+def draw_palm_image(c, base64_image, width, y, birthdate=None):
     try:
         image_data = base64.b64decode(base64_image.split(',')[1])
         img = ImageReader(io.BytesIO(image_data))
@@ -84,10 +84,17 @@ def draw_palm_image(c, base64_image, width, y):
         y -= img_height + 5 * mm
         c.drawImage(img, x_center, y, width=img_width, height=img_height)
         y -= 10 * mm
+
+        # ★ 生年月日表示を追加
+        if birthdate:
+            c.setFont(FONT_NAME, 10)
+            c.drawCentredString(width / 2, y, f"生年月日：{birthdate}")
+            y -= 8 * mm
     except Exception as e:
         print("Image decode error:", e)
 
     return y
+
 
 
 def draw_yearly_pages_shincom_a4(c, yearly):
