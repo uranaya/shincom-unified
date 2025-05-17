@@ -9,7 +9,6 @@ import base64
 import io
 import os
 from datetime import datetime
-
 from header_utils import draw_header
 from lucky_utils import draw_lucky_section
 
