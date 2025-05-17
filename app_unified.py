@@ -320,13 +320,12 @@ def webhook_renaiselfmob():
         print("Webhook error (renai):", e)
         return "", 400
 
+
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
-    # Handle the form after payment for normal fortune (with hand image)
     full_year = None
     lines = []
     try:
-        # Verify UUID against used_orders log
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
             for uid, flag, mode in lines:
@@ -343,41 +342,27 @@ def selfmob_uuid(uuid_str):
             data = request.get_json() if request.is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
-
-            # Validate birthdate format
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
 
-            # Compute Nine-Star Ki directions for user's birthdate
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
 
-            # Chinese zodiac (eto) for birthdate
             eto = get_nicchu_eto(birthdate)
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
+
+            # ✅ 修正：5項目で unpack
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
                 image_data, birthdate, kyusei_text
             )
 
-            # Split palm reading into sections (main lines and summary)
-            palm_sections = [sec for sec in palm_result.split("### ") if sec.strip()]
-            palm_texts = []
-            summary_text = ""
-            if palm_sections:
-                *main_sections, summary_section = palm_sections
-                for sec in main_sections:
-                    body = sec.split("\n", 1)[1] if "\n" in sec else sec
-                    if body.strip():
-                        palm_texts.append(body.strip())
-                if summary_section:
-                    summary_body = summary_section.split("\n", 1)[1] if "\n" in summary_section else summary_section
-                    summary_text = summary_body.strip()
+            palm_result = "\n".join(palm_texts)
+            summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
 
-            # Parse Four Pillars result into sections
             shichu_texts = {}
             parts = [part for part in str(shichu_result).split("■ ") if part.strip()]
             for part in parts:
@@ -387,7 +372,6 @@ def selfmob_uuid(uuid_str):
                     title, body = part, ""
                 shichu_texts[title.strip()] = body.strip()
 
-            # Prepare lucky info list with proper bullet and formatting
             lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
@@ -412,7 +396,6 @@ def selfmob_uuid(uuid_str):
                                 line = line[1:].strip()
                             lucky_lines.append(f"◆ {line.replace(':', '：', 1)}")
 
-            # Determine labels for fortunes based on current date
             today = datetime.today()
             target1 = today.replace(day=15)
             if today.day >= 20:
@@ -422,9 +405,8 @@ def selfmob_uuid(uuid_str):
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
 
-            # Assemble result data for PDF
             result_data = {
-                "palm_titles": ["生命線", "運命線", "金運線", "特殊線1", "特殊線2"],
+                "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
                     "palm_summary": "手相の総合アドバイス",
@@ -443,14 +425,13 @@ def selfmob_uuid(uuid_str):
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
                 "birthdate": birthdate,
-                "palm_result": "\n".join(palm_texts),
+                "palm_result": palm_result,
                 "shichu_result": shichu_result,
                 "iching_result": iching_result,
                 "palm_image": image_data
             }
 
             if full_year:
-                # Include yearly fortunes (normal mode)
                 yearly_data = generate_yearly_fortune(birthdate, today)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
@@ -460,21 +441,21 @@ def selfmob_uuid(uuid_str):
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             create_pdf_unified(filepath, result_data, "shincom", size="a4", include_yearly=full_year)
 
-            # Mark UUID as used and respond with preview link (for AJAX) or redirect
             with open(USED_UUID_FILE, "w") as f:
                 for uid, flag, mode in lines:
                     if uid != uuid_str:
                         f.write(f"{uid},{flag},{mode}\n")
                     else:
                         f.write(f"{uid},used,{mode}\n")
+
             redirect_url = url_for("preview", filename=filename)
             return jsonify({"redirect_url": redirect_url}) if request.is_json else redirect(redirect_url)
         except Exception as e:
             print("処理エラー:", e)
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
 
-    # Render the form (post-payment) for normal fortune input
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
+
 
 @app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
