@@ -110,6 +110,28 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction, font_na
                 from textwrap import wrap
                 for line in wrap(item.strip(), 40):
                     c.drawString(margin + 10, y, line)
+                    y -= 6 * mm
+    else:
+        c.drawString(margin + 10, y, "情報が取得できませんでした。")
+        y -= 6 * mm
+
+    y -= 4 * mm
+
+    if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
+        c.drawString(margin, y, "■ 吉方位（九星気学より）")
+        y -= 6 * mm
+        from textwrap import wrap
+        for line in wrap(lucky_direction.strip(), 42):
+            c.drawString(margin + 10, y, line)
+            y -= 6 * mm
+    else:
+        c.drawString(margin, y, "■ 吉方位（九星気学より）情報未取得")
+        y -= 6 * mm
+
+    return y - 10 * mm
+
+
+# 🆕 恋愛専用：手相なしの簡易版ラッキー情報
 def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_text):
     prompt = f"""あなたは占いの専門家です。
 相談者は現在{age}歳です。以下の2つの鑑定結果を参考にしてください。
@@ -153,25 +175,4 @@ def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_
         return lucky_lines
     except Exception as e:
         print("❌ 恋愛ラッキー情報取得失敗:", e)
-        return ["◆ アイテム：ー", "◆ カラー：ー", "◆ ナンバー：ー", "◆ フード：ー", "◆ デー：ー"]                    y -= 6 * mm
-    else:
-        c.drawString(margin + 10, y, "情報が取得できませんでした。")
-        y -= 6 * mm
-
-    y -= 4 * mm
-
-    if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
-        c.drawString(margin, y, "■ 吉方位（九星気学より）")
-        y -= 6 * mm
-        from textwrap import wrap
-        for line in wrap(lucky_direction.strip(), 42):
-            c.drawString(margin + 10, y, line)
-            y -= 6 * mm
-    else:
-        c.drawString(margin, y, "■ 吉方位（九星気学より）情報未取得")
-        y -= 6 * mm
-
-    return y - 10 * mm
-
-
-# 🆕 恋愛専用：手相なしの簡易版ラッキー情報
+        return ["◆ アイテム：ー", "◆ カラー：ー", "◆ ナンバー：ー", "◆ フード：ー", "◆ デー：ー"]
