@@ -105,12 +105,14 @@ def draw_yearly_pages_shincom_a4(c, yearly):
     c.showPage()
     y = height - 30 * mm
     draw_text_block(yearly["year_label"], yearly["year_text"])
-    draw_text_block("前半6か月の運勢", "\n\n".join(f"{m['label']}\n{m['text']}" for m in yearly["months"][:6]))
+    for month in yearly["months"][:6]:
+        draw_text_block(month["label"], month["text"])
 
     # ページ4：後半6か月
     c.showPage()
     y = height - 30 * mm
-    draw_text_block("後半6か月の運勢", "\n\n".join(f"{m['label']}\n{m['text']}" for m in yearly["months"][6:]))
+    for month in yearly["months"][6:]:
+        draw_text_block(month["label"], month["text"])
 
 
 def draw_yearly_pages_shincom_b4(c, yearly):
@@ -138,12 +140,14 @@ def draw_yearly_pages_shincom_b4(c, yearly):
     c.showPage()
     y = height - 30 * mm  # ← 必ず初期化
     draw_text_block(yearly["year_label"], yearly["year_text"])
-    draw_text_block("前半6か月の運勢", "\n\n".join(f"{m['label']}\n{m['text']}" for m in yearly["months"][:6]))
+    for month in yearly["months"][:6]:
+        draw_text_block(month["label"], month["text"])
 
     # ページ4：後半6か月
     c.showPage()
     y = height - 30 * mm
-    draw_text_block("後半6か月の運勢", "\n\n".join(f"{m['label']}\n{m['text']}" for m in yearly["months"][6:]))
+    for month in yearly["months"][6:]:
+        draw_text_block(month["label"], month["text"])
 
 
 
@@ -274,11 +278,13 @@ def draw_yearly_pages_renai_a4(c, yearly):
     c.showPage()
     y = height - 30 * mm
     draw_text_block(yearly["year_label"], yearly["year_text"])
-    draw_text_block("前半6か月の運勢", "\n\n".join(f"{m['label']}\n{m['text']}" for m in yearly["months"][:6]))
+    for month in yearly["months"][:6]:
+        draw_text_block(month["label"], month["text"])
 
     c.showPage()
     y = height - 30 * mm
-    draw_text_block("後半6か月の運勢", "\n\n".join(f"{m['label']}\n{m['text']}" for m in yearly["months"][6:]))
+    for month in yearly["months"][6:]:
+        draw_text_block(month["label"], month["text"])
 
 def draw_yearly_pages_renai_b4(c, yearly):
     width, height = B4
@@ -302,11 +308,13 @@ def draw_yearly_pages_renai_b4(c, yearly):
     c.showPage()
     y = height - 30 * mm
     draw_text_block(yearly["year_label"], yearly["year_text"])
-    draw_text_block("前半6か月の運勢", "\n\n".join(f"{m['label']}\n{m['text']}" for m in yearly["months"][:6]))
+    for month in yearly["months"][:6]:
+        draw_text_block(month["label"], month["text"])
 
     c.showPage()
     y = height - 30 * mm
-    draw_text_block("後半6か月の運勢", "\n\n".join(f"{m['label']}\n{m['text']}" for m in yearly["months"][6:]))
+    for month in yearly["months"][6:]:
+        draw_text_block(month["label"], month["text"])
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
