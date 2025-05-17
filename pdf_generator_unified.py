@@ -25,25 +25,31 @@ def wrap(text, limit):
 
 
 def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
-    c.setFont("IPAexGothic", 12)
+    c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
     y -= 8 * mm
-    c.setFont("IPAexGothic", 10)
+    c.setFont(FONT_NAME, 10)
 
     if lucky_info and isinstance(lucky_info, list):
-        line = lucky_info[0] if len(lucky_info) == 1 else "　".join(lucky_info)
-        c.drawString(margin + 10, y, line.strip())
-        y -= 6 * mm
+        line = lucky_info[0].strip()
+        items = [item.strip() for item in line.split("◆") if item.strip()]
+        # 最大6項目（3行×2項目）
+        for i in range(0, min(6, len(items)), 2):
+            left = f"◆ {items[i]}"
+            right = f"◆ {items[i+1]}" if i+1 < len(items) else ""
+            c.drawString(margin + 10, y, left)
+            c.drawString(margin + 150, y, right)
+            y -= 6 * mm
     else:
         c.drawString(margin + 10, y, "情報が取得できませんでした。")
         y -= 6 * mm
 
     y -= 4 * mm
-    c.setFont("IPAexGothic", 12)
+    c.setFont(FONT_NAME, 12)
     if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
         c.drawString(margin, y, "■ 吉方位（九星気学より）")
         y -= 6 * mm
-        c.setFont("IPAexGothic", 10)
+        c.setFont(FONT_NAME, 10)
         for line in lucky_direction.strip().splitlines():
             c.drawString(margin + 10, y, line)
             y -= 6 * mm
