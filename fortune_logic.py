@@ -186,7 +186,7 @@ def generate_fortune(image_data, birthdate, kyusei_text):
     nicchu_eto = get_nicchu_eto(birthdate)
     raw_lucky_info = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text)
 
-    # ✅ ラッキー情報整形（1行目から ◆で最大6項目）
+    # 整形済 lucky_lines（◆付きで最大6件）
     lucky_lines = []
     try:
         if isinstance(raw_lucky_info, list):
@@ -199,10 +199,19 @@ def generate_fortune(image_data, birthdate, kyusei_text):
             items = [item.strip() for item in raw_line.split("◆") if item.strip()]
             lucky_lines = [f"◆ {item}" for item in items]
     except Exception as e:
-        print("❌ ラッキー情報整形エラー:", e)
+        print("❌ lucky_info 整形失敗:", e)
         lucky_lines = []
 
-    # ✅ 四柱推命の構造化（文字列から dict texts に変換）
+    # 対象年月ラベル（正確な一致で抽出できるよう）
+    today = datetime.today()
+    target1 = today.replace(day=15)
+    if today.day >= 20:
+        target1 += relativedelta(months=1)
+    target2 = target1 + relativedelta(months=1)
+    month_label = f"{target1.year}年{target1.month}月の運勢"
+    next_month_label = f"{target2.year}年{target2.month}月の運勢"
+
+    # shichu 結果の整形
     shichu_texts = {"personality": "", "year_fortune": "", "month_fortune": "", "next_month_fortune": ""}
     if isinstance(shichu_result_raw, dict) and "texts" in shichu_result_raw:
         shichu_texts = shichu_result_raw["texts"]
@@ -215,15 +224,14 @@ def generate_fortune(image_data, birthdate, kyusei_text):
                 body = body.strip()
                 if "性格" in title:
                     shichu_texts["personality"] = body
-                elif "の運勢" in title:
-                    if "年" in title:
-                        shichu_texts["year_fortune"] = body
-                    elif "来月" in title:
-                        shichu_texts["next_month_fortune"] = body
-                    elif "月" in title:
-                        shichu_texts["month_fortune"] = body
+                elif title == month_label:
+                    shichu_texts["month_fortune"] = body
+                elif title == next_month_label:
+                    shichu_texts["next_month_fortune"] = body
+                elif "年" in title and "運勢" in title:
+                    shichu_texts["year_fortune"] = body
 
-    # ✅ palm_result を構造化
+    # 手相の構造化
     palm_titles = []
     palm_texts = []
     for part in palm_result.split("### "):
@@ -233,7 +241,6 @@ def generate_fortune(image_data, birthdate, kyusei_text):
             palm_texts.append(body[0].strip() if body else "")
 
     return palm_titles, palm_texts, shichu_texts, iching_result, lucky_lines
-
 
 
 def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = 'a4') -> dict:
