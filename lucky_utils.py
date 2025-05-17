@@ -11,33 +11,33 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
     prompt = f"""あなたは占いの専門家です。
-相談者は現在{age}歳です。以下の3つの鑑定結果を参考にしてください。
+相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
 
 【手相】\n{palm_result}\n
 【四柱推命】\n{shichu_result}\n
 【九星気学の方位】\n{kyusei_text}
 
-この内容を元に、相談者にとって今最も運気を高めるための
-ラッキーアイテム・ラッキーカラー・ラッキーナンバー・ラッキーフード・ラッキーデー
-をそれぞれ1つずつ、以下の形式で提案してください：
+以下5つの項目を、すべて1行にまとめて簡潔に出力してください：
 
-・ラッキーアイテム：〇〇
-・ラッキーカラー：〇〇
-・ラッキーナンバー：〇〇
-・ラッキーフード：〇〇
-・ラッキーデー：〇曜日
+◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日
 
-自然で前向きな言葉で書いてください。"""
+- 「◆」で始める
+- 出力は1行だけにする
+- 各項目は短く（単語～数語）
+- 補足説明・理由・語り・改行は一切禁止
+- 他の文や文章は禁止（この形式のみで返答すること）
+"""
+
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
+            temperature=0.6
         )
-        return response["choices"][0]["message"]["content"].strip().splitlines()
+        return [response["choices"][0]["message"]["content"].strip()]
     except Exception as e:
         print("❌ ラッキー情報取得失敗:", e)
-        return ["取得できませんでした。"]
+        return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
 
 
 def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
