@@ -607,3 +607,8 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+@app.route("/")
+def home():
+    return render_template("home.html")
+
