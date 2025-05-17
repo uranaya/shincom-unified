@@ -7,6 +7,7 @@ import traceback
 from datetime import datetime
 from urllib.parse import quote
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response
+from fortune_logic import generate_fortune
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
 from yearly_fortune_utils import generate_yearly_fortune
