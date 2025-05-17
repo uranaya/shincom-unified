@@ -612,3 +612,20 @@ def logout():
 def home():
     return render_template("home-unified.html")
 
+@app.route("/get_eto", methods=["POST"])
+def get_eto():
+    try:
+        birthdate = request.json.get("birthdate")
+        if not birthdate or not isinstance(birthdate, str):
+            return jsonify({"error": "無効な生年月日です"}), 400
+
+        y, m, d = map(int, birthdate.split("-"))
+        eto = get_nicchu_eto(birthdate)
+        honmeisei = get_honmeisei(y, m, d)
+
+        return jsonify({"eto": eto, "honmeisei": honmeisei})
+    except Exception as e:
+        print("❌ /get_eto エラー:", e)
+        return jsonify({"error": "干支または本命星の取得中にエラーが発生しました"}), 500
+
+
