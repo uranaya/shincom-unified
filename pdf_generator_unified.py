@@ -267,6 +267,9 @@ def draw_yearly_pages_renai_a4(c, yearly):
         y -= 5 * mm
         c.setFont(FONT_NAME, 10)
         for line in wrap(text or "", 46):
+            if y < 30 * mm:
+                c.showPage()
+                y = height - 30 * mm
             c.drawString(margin, y, line)
             y -= 5 * mm
             if y < 30 * mm:
@@ -297,6 +300,9 @@ def draw_yearly_pages_renai_b4(c, yearly):
         y -= 6 * mm
         c.setFont(FONT_NAME, 11)
         for line in wrap(text or "", 45):
+            if y < 30 * mm:
+                c.showPage()
+                y = height - 30 * mm
             c.drawString(margin, y, line)
             y -= 7 * mm
             if y < 30 * mm:
