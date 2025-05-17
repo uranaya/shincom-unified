@@ -6,7 +6,7 @@ from tesou import tesou_names, tesou_descriptions
 from nicchu_utils import get_nicchu_eto
 from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 from lucky_utils import generate_lucky_info, generate_lucky_direction
-from yearly_love_fortune_utils import generate_yearly_fortune
+from yearly_fortune_utils import generate_yearly_fortune
 from pdf_generator_unified import create_pdf_unified
 
 def get_shichu_fortune(birthdate):
