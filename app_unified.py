@@ -671,11 +671,6 @@ def renaiselfmob_uuid(uuid_str):
 
 
 
-@app.route("/generate_link_renai")
-def generate_link_renai():
-    return _generate_link_renai(full_year=False)
-
-
 
 # ✅ UUID記録フォーマット変更対応済 generate_link_renai
 @app.route("/generate_link_renai")
