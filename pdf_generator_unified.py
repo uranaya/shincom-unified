@@ -422,15 +422,139 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
 
 
 
-def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
-    size = size.lower()
-    c = canvas.Canvas(filepath, pagesize=A4 if size == 'a4' else B4)
-    c.setTitle('占い結果')
-    if mode == 'shincom':
-        if size == 'a4':
-            draw_shincom_a4(c, data, include_yearly)
-        else:
-            draw_shincom_b4(c, data, include_yearly)
-    else:
-        draw_renai_pdf(c, data, size, include_yearly)
+def create_pdf_unified(filepath, data, mode, size="a4", include_yearly=False):
+    from reportlab.lib.pagesizes import A4, B4
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.units import mm
+    from reportlab.lib.utils import ImageReader
+    from textwrap import wrap
+    from PIL import Image
+    import io
+    import base64
+
+    FONT_NAME = "IPAexGothic"
+    FONT_PATH = "ipaexg.ttf"
+
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
+
+    pagesize = A4 if size.lower() == "a4" else B4
+    c = canvas.Canvas(filepath, pagesize=pagesize)
+    width, height = pagesize
+    margin = 20 * mm
+    y = height - 30 * mm
+
+    def draw_title(title):
+        nonlocal y
+        c.setFont(FONT_NAME, 13)
+        c.drawString(margin, y, f"◆ {title}")
+        y -= 10 * mm
+        c.setFont(FONT_NAME, 11)
+
+    def draw_wrapped_text(text, limit=45):
+        nonlocal y
+        for line in wrap(text, limit):
+            c.drawString(margin, y, line)
+            y -= 6 * mm
+        y -= 4 * mm
+
+    # 1ページ目：手相画像＋項目（A4は3項目）
+    if "palm_image" in data and data["palm_image"]:
+        image_data = base64.b64decode(data["palm_image"].split(",")[1])
+        img = Image.open(io.BytesIO(image_data))
+        img.thumbnail((150 * mm, 100 * mm))
+        img_io = io.BytesIO()
+        img.save(img_io, format="PNG")
+        img_io.seek(0)
+        c.drawImage(ImageReader(img_io), width/2 - 75*mm, y - 100*mm, mask='auto')
+        y -= 105 * mm
+
+    # 生年月日
+    if "birthdate" in data:
+        c.setFont(FONT_NAME, 11)
+        c.drawCentredString(width / 2, y, f"生年月日：{data['birthdate']}")
+        y -= 10 * mm
+
+    # 手相3項目（前半）
+    c.setFont(FONT_NAME, 13)
+    for i in range(3):
+        draw_title(data["palm_titles"][i])
+        draw_wrapped_text(data["palm_texts"][i])
+
+    # ラッキー情報（前半）
+    if "lucky_info" in data and data["lucky_info"]:
+        draw_title("ラッキー情報（生年月日より）")
+        lines = data["lucky_info"]
+        for i in range(0, len(lines), 2):
+            line = lines[i]
+            line2 = lines[i+1] if i+1 < len(lines) else ""
+            combined = f"{line}　　{line2}" if line2 else line
+            c.drawString(margin, y, combined)
+            y -= 6 * mm
+        y -= 4 * mm
+
+    # 吉方位（九星気学）
+    if "lucky_direction" in data and isinstance(data["lucky_direction"], str) and "吉方位" in data["lucky_direction"]:
+        draw_title("吉方位（九星気学より）")
+        lines = data["lucky_direction"].split("\n")
+        for line in lines:
+            c.drawString(margin, y, line)
+            y -= 6 * mm
+
+    c.showPage()
+
+    # 2ページ目：手相後半＋総合アドバイス＋四柱推命＋イーチン
+    y = height - 30 * mm
+    text = c.beginText(margin, y)
+    text.setFont(FONT_NAME, 12)
+
+    # 残りの手相2項目
+    for i in range(3, 5):
+        text.textLine(f"- {data['palm_titles'][i]}")
+        text.setFont(FONT_NAME, 10)
+        for line in wrap(data["palm_texts"][i], 45):
+            text.textLine(line)
+        text.textLine("")
+        text.setFont(FONT_NAME, 12)
+
+    # 手相の総合
+    text.textLine("- " + data["titles"]["palm_summary"])
+    text.setFont(FONT_NAME, 10)
+    for line in wrap(data["texts"]["palm_summary"], 45):
+        text.textLine(line)
+    text.textLine("")
+    text.setFont(FONT_NAME, 12)
+
+    # 四柱推命
+    for key in ["personality", "month_fortune", "next_month_fortune"]:
+        text.textLine(f"- {data['titles'][key]}")
+        text.setFont(FONT_NAME, 10)
+        for line in wrap(data["texts"][key], 45):
+            text.textLine(line)
+        text.textLine("")
+        text.setFont(FONT_NAME, 12)
+
+    # イーチン
+    if "iching_result" in data:
+        text.textLine("■ 易占いアドバイス")
+        text.setFont(FONT_NAME, 10)
+        for line in wrap(data["iching_result"], 45):
+            text.textLine(line)
+        text.textLine("")
+
+    c.drawText(text)
+
+    # 3ページ目（年運）
+    if include_yearly and "yearly_fortunes" in data:
+        c.showPage()
+        y = height - 30 * mm
+        text = c.beginText(margin, y)
+        text.setFont(FONT_NAME, 12)
+        text.textLine(f"- {data['titles']['year_fortune']}")
+        text.setFont(FONT_NAME, 10)
+        for line in wrap(data["texts"]["year_fortune"], 45):
+            text.textLine(line)
+        c.drawText(text)
+
     c.save()
