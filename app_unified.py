@@ -389,15 +389,38 @@ def webhook_selfmob():
 
 
 
-@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
+
+
+
+
+@app.route("/preview/<filename>")
+def preview(filename):
+    referer = request.referrer or ""
+    if any(x in referer for x in ["/tenmob", "/selfmob", "/renai"]):
+        return redirect(url_for("view_pdf", filename=filename))
+    return render_template("fortune_pdf.html", filename=filename, referer=referer)
+
+
+@app.route("/view/<filename>")
+def view_pdf(filename):
+    filepath = os.path.join("static", "uploads", filename)
+    if not os.path.exists(filepath):
+        return "ファイルが存在しません", 404
+    return send_file(filepath, mimetype='application/pdf')
+
+
+@app.route("/get_eto", methods=["POST"])
+def get_eto():
+    try:
+        birthdate = request.json.get("birthdate")@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
     full_year = None
     lines = []
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
-            for uid, flag in lines:
-                if uid == uuid_str:
+            for uid, flag, mode in lines:
+                if uid == uuid_str and mode == "selfmob":
                     full_year = (flag == "1")
                     break
         if full_year is None:
@@ -411,15 +434,13 @@ def selfmob_uuid(uuid_str):
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
 
-            # 生年月日分解
             try:
                 year, month, day = map(int, birthdate.split("-"))
-            except Exception as e:
+            except Exception:
                 return "生年月日が不正です", 400
 
-            # 九星（吉方位）
+            now = datetime.now()
             try:
-                now = datetime.now()
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
@@ -430,7 +451,6 @@ def selfmob_uuid(uuid_str):
                 image_data, birthdate, kyusei_text
             )
 
-            # 手相分解
             palm_sections = [sec for sec in palm_result.split("### ") if sec.strip()]
             palm_texts, summary_text = [], ""
             if palm_sections:
@@ -442,7 +462,6 @@ def selfmob_uuid(uuid_str):
                     summary_body = summary_section.split("\n", 1)[1] if "\n" in summary_section else summary_section
                     summary_text = summary_body.strip()
 
-            # 四柱推命分解
             shichu_parts = [part for part in shichu_result.split("■ ") if part.strip()]
             shichu_texts = {
                 title: body.strip()
@@ -450,8 +469,6 @@ def selfmob_uuid(uuid_str):
                 if (title := part.split("\n", 1)[0]) and (body := part.split("\n", 1)[1] if "\n" in part else "")
             }
 
-            # 月ラベル生成
-            now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
                 target1 += relativedelta(months=1)
@@ -460,12 +477,10 @@ def selfmob_uuid(uuid_str):
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
 
-            # ラッキー情報整形
             lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").split("\n"):
-                    line = line.strip()
-                    if line:
+                    if (line := line.strip()):
                         lucky_lines.append(f"◆ {line.replace(':', '：', 1)}")
             elif isinstance(lucky_info, dict):
                 lucky_lines = [f"◆ {k}：{v}" for k, v in lucky_info.items()]
@@ -509,9 +524,11 @@ def selfmob_uuid(uuid_str):
             create_pdf_unified(filepath, result_data, "shincom", size="a4", include_yearly=full_year)
 
             with open(USED_UUID_FILE, "w") as f:
-                for uid, flag in lines:
+                for uid, flag, mode in lines:
                     if uid != uuid_str:
-                        f.write(f"{uid},{flag}\n")
+                        f.write(f"{uid},{flag},{mode}\n")
+                    else:
+                        f.write(f"{uid},used,{mode}\n")
 
             redirect_url = url_for("preview", filename=filename)
             return jsonify({"redirect_url": redirect_url}) if request.is_json else redirect(redirect_url)
@@ -520,32 +537,8 @@ def selfmob_uuid(uuid_str):
             print("処理エラー:", e)
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
 
-    return render_template("index_selfmob.html", uuid_str=uuid_str)
+    return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
 
-
-
-
-
-@app.route("/preview/<filename>")
-def preview(filename):
-    referer = request.referrer or ""
-    if any(x in referer for x in ["/tenmob", "/selfmob", "/renai"]):
-        return redirect(url_for("view_pdf", filename=filename))
-    return render_template("fortune_pdf.html", filename=filename, referer=referer)
-
-
-@app.route("/view/<filename>")
-def view_pdf(filename):
-    filepath = os.path.join("static", "uploads", filename)
-    if not os.path.exists(filepath):
-        return "ファイルが存在しません", 404
-    return send_file(filepath, mimetype='application/pdf')
-
-
-@app.route("/get_eto", methods=["POST"])
-def get_eto():
-    try:
-        birthdate = request.json.get("birthdate")
         if not birthdate or not isinstance(birthdate, str):
             return jsonify({"error": "無効な生年月日です"}), 400
 
