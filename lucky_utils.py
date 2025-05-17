@@ -110,7 +110,50 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction, font_na
                 from textwrap import wrap
                 for line in wrap(item.strip(), 40):
                     c.drawString(margin + 10, y, line)
-                    y -= 6 * mm
+def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_text):
+    prompt = f"""あなたは占いの専門家です。
+相談者は現在{age}歳です。以下の2つの鑑定結果を参考にしてください。
+
+【四柱推命】\n{shichu_result}\n
+【九星気学の方位】\n{kyusei_text}
+
+この内容を元に、相談者にとって今最も恋愛運を高めるための
+ラッキーアイテム・ラッキーカラー・ラッキーナンバー・ラッキーフード・ラッキーデー
+をそれぞれ1つずつ、以下の形式で簡潔に提案してください：
+
+・アイテム：〇〇  
+・カラー：〇〇  
+・ナンバー：〇〇  
+・フード：〇〇  
+・デー：〇曜日
+
+※以下の条件を厳守してください：
+- 各項目は1行で記述
+- 解説や補足、象徴、理由付けは禁止
+- 装飾語は不要（例：「共感力を象徴する」などはNG）
+- 出力は上記5行のみに限定
+"""
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        lines = response["choices"][0]["message"]["content"].strip().splitlines()
+        lucky_lines = []
+        for line in lines:
+            if "：" in line:
+                label, value = line.split("：", 1)
+                label = label.replace("・", "").strip()
+                value = value.strip().split("（")[0]  # 語尾の解説部分を除去
+                lucky_lines.append(f"◆ {label}：{value}")
+            if len(lucky_lines) == 5:
+                break
+        return lucky_lines
+    except Exception as e:
+        print("❌ 恋愛ラッキー情報取得失敗:", e)
+        return ["◆ アイテム：ー", "◆ カラー：ー", "◆ ナンバー：ー", "◆ フード：ー", "◆ デー：ー"]                    y -= 6 * mm
     else:
         c.drawString(margin + 10, y, "情報が取得できませんでした。")
         y -= 6 * mm
@@ -132,44 +175,3 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction, font_na
 
 
 # 🆕 恋愛専用：手相なしの簡易版ラッキー情報
-def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_text):
-    prompt = f"""あなたは占いの専門家です。
-相談者は現在{age}歳です。以下の2つの鑑定結果を参考にしてください。
-
-【四柱推命】\n{shichu_result}\n
-【九星気学の方位】\n{kyusei_text}
-
-この内容を元に、相談者にとって今最も恋愛運を高めるための
-ラッキーアイテム・ラッキーカラー・ラッキーナンバー・ラッキーフード・ラッキーデー
-をそれぞれ1つずつ、以下の形式で提案してください：
-
-・ラッキーアイテム：〇〇  
-・ラッキーカラー：〇〇  
-・ラッキーナンバー：〇〇  
-・ラッキーフード：〇〇  
-・ラッキーデー：〇曜日
-
-出力は必ず上記の形式に従ってください。
-"""
-
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
-        )
-        lines = response["choices"][0]["message"]["content"].strip().splitlines()
-        # 先頭5行のみ抽出して「◆ ラベル：値」形式に加工
-        lucky_lines = []
-        for line in lines:
-            if "：" in line:
-                label, value = line.split("：", 1)
-                label = label.replace("ラッキー", "").replace("・", "").strip()
-                value = value.split("（")[0].strip()
-                lucky_lines.append(f"◆ {label}：{value}")
-            if len(lucky_lines) == 5:
-                break
-        return lucky_lines
-    except Exception as e:
-        print("❌ 恋愛ラッキー情報取得失敗:", e)
-        return ["◆ アイテム：ー", "◆ カラー：ー", "◆ ナンバー：ー", "◆ フード：ー", "◆ デー：ー"]
