@@ -56,29 +56,15 @@ def ten_shincom():
 
             # Chinese zodiac (日柱の干支)
             eto = get_nicchu_eto(birthdate)
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
+
+            # ✅ 修正：5要素受け取り
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
                 image_data, birthdate, kyusei_text
             )
-
-            # Process palm reading results into sections
-            palm_sections = [sec for sec in palm_result.split("### ") if sec.strip()]
-            palm_texts = []
-            summary_text = ""
-            if palm_sections:
-                *main_sections, summary_section = palm_sections
-                for sec in main_sections:
-                    # Extract palm line description (skip title)
-                    body = sec.split("\n", 1)[1] if "\n" in sec else sec
-                    if body.strip():
-                        palm_texts.append(body.strip())
-                if summary_section:
-                    summary_body = summary_section.split("\n", 1)[1] if "\n" in summary_section else summary_section
-                    summary_text = summary_body.strip()
 
             # Process Four Pillars (Shichu) results into dictionary
             shichu_texts = {}
             if isinstance(shichu_result, dict) and "texts" in shichu_result:
-                # If already structured (with titles)
                 shichu_texts = {
                     "性格": shichu_result["texts"].get("personality", ""),
                     "今年の運勢": shichu_result["texts"].get("year_fortune", ""),
@@ -86,7 +72,6 @@ def ten_shincom():
                     "来月の運勢": shichu_result["texts"].get("next_month_fortune", "")
                 }
             else:
-                # Parse raw text response into sections by '■ ' markers
                 parts = [part for part in str(shichu_result).split("■ ") if part.strip()]
                 for part in parts:
                     if "\n" in part:
@@ -95,7 +80,6 @@ def ten_shincom():
                         title, body = part, ""
                     shichu_texts[title.strip()] = body.strip()
 
-            # Prepare lucky info lines (each item prefixed with "◆")
             lucky_direction = kyusei_text
             lucky_lines = []
             if isinstance(lucky_info, str):
@@ -121,7 +105,6 @@ def ten_shincom():
                                 line = line[1:].strip()
                             lucky_lines.append(f"◆ {line.replace(':', '：', 1)}")
 
-            # Labels for year/month fortunes (based on current date)
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
@@ -131,9 +114,8 @@ def ten_shincom():
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
 
-            # Assemble result data for PDF
             result_data = {
-                "palm_titles": ["生命線", "運命線", "金運線", "特殊線1", "特殊線2"],
+                "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
                     "palm_summary": "手相の総合アドバイス",
@@ -143,7 +125,7 @@ def ten_shincom():
                     "next_month_fortune": next_month_label
                 },
                 "texts": {
-                    "palm_summary": summary_text,
+                    "palm_summary": palm_texts[5] if len(palm_texts) > 5 else "",
                     "personality": shichu_texts.get("性格", ""),
                     "year_fortune": shichu_texts.get(year_label, ""),
                     "month_fortune": shichu_texts.get(month_label, ""),
@@ -159,23 +141,20 @@ def ten_shincom():
             }
 
             if full_year:
-                # Generate yearly fortunes for the full year (12 months) if requested
                 yearly_data = generate_yearly_fortune(birthdate, now)
                 result_data["yearly_fortunes"] = yearly_data
-                # Override the year fortune title/text with the detailed one
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
 
-            # Create PDF and respond
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             create_pdf_unified(filepath, result_data, mode, size=size.lower(), include_yearly=full_year)
+
             return jsonify({"redirect_url": url_for("preview", filename=filename)}) if is_json else redirect(url_for("preview", filename=filename))
         except Exception as e:
             traceback.print_exc()
             return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
 
-    # Render input form for store usage (normal fortune)
     return render_template("index.html")
 
 @app.route("/renai", methods=["GET", "POST"])
