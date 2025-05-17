@@ -1,96 +1,125 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>お支払い - シン・コンピューター占い</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body {
-            font-family: sans-serif;
-            padding: 1em;
-            max-width: 700px;
-            margin: auto;
-        }
-        .button {
-            display: inline-block;
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 24px;
-            text-align: center;
-            font-size: 16px;
-            margin: 10px;
-            text-decoration: none;
-            border-radius: 6px;
-        }
-        footer {
-            margin-top: 50px;
-            padding-top: 1em;
-            border-top: 1px solid #ccc;
-            font-size: 0.9em;
-            color: #555;
-            text-align: center;
-        }
-        footer a {
-            margin: 0 10px;
-            color: #333;
-            text-decoration: none;
-        }
-        footer a:hover {
-            text-decoration: underline;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>シン・コンピューター占い - 鑑定スタート</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      margin: 0;
+      font-family: "Helvetica Neue", sans-serif;
+      background: linear-gradient(to bottom, #2e004f, #0d001a);
+      color: #fffbe9;
+    }
+    header {
+      text-align: center;
+      padding: 2em 1em 1em;
+    }
+    header h1 {
+      font-size: 2em;
+      color: #ffcc00;
+    }
+    .visual {
+      text-align: center;
+      margin-top: 1em;
+    }
+    .visual img {
+      width: 200px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(255,255,255,0.3);
+    }
+    .section {
+      max-width: 700px;
+      margin: 2em auto;
+      background: rgba(255,255,255,0.1);
+      padding: 1.5em;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(255,255,255,0.1);
+    }
+    .section h2 {
+      font-size: 1.4em;
+      color: #ffd700;
+      border-bottom: 1px solid #ffd700;
+      padding-bottom: 0.3em;
+      margin-bottom: 0.8em;
+    }
+    .section p {
+      font-size: 1em;
+      line-height: 1.6em;
+    }
+    .button-area {
+      text-align: center;
+      margin-top: 2em;
+    }
+    .button {
+      display: inline-block;
+      background-color: #ff6600;
+      color: white;
+      padding: 12px 30px;
+      margin: 10px;
+      font-size: 1rem;
+      border-radius: 10px;
+      text-decoration: none;
+      box-shadow: 0 0 5px rgba(255,255,255,0.3);
+    }
+    .button:hover {
+      background-color: #ffaa33;
+    }
+    footer {
+      text-align: center;
+      font-size: 0.9em;
+      margin: 3em auto 2em;
+      color: #aaa;
+    }
+    footer a {
+      color: #ddd;
+      margin: 0 8px;
+      text-decoration: none;
+    }
+  </style>
 </head>
 <body>
+  <header>
+    <h1>AIと占い師が導く、あなたの運命鑑定</h1>
+    <p>〜 シン・コンピューター占い 〜</p>
+  </header>
 
-    <h1>鑑定のお支払いについて</h1>
+  <div class="visual">
+    <img src="/static/fortune_master.png" alt="鑑定士イメージ">
+  </div>
 
+  <div class="section">
+    <h2>鑑定でわかること</h2>
     <p>
-        このページでは、AIとプロの知識を融合した「シン・コンピューター占い」のご利用料金をお支払いいただきます。
+      あなたの手相と生年月日から、<br>
+      性格や運勢、ラッキー情報、吉方位まで<br>
+      詳細な鑑定書をPDFで即時作成します。<br>
+      スマホからそのまま印刷や保存もOK。
     </p>
+  </div>
 
-    <h2>サービス内容</h2>
-    <ul>
-        <li>手相画像をAIが解析し、5つの主要線の特徴を診断</li>
-        <li>生年月日による性格診断と今月・来月の運勢を鑑定</li>
-        <li>吉方位・ラッキー情報を含むPDFを即時で生成</li>
-        <li>PDFはスマホで確認・保存・印刷が可能</li>
-    </ul>
-
-    <h2>鑑定の流れ</h2>
-    <ol>
-        <li>以下のご希望のコースを選んで決済ページへ進みます</li>
-        <li>決済後、自動的に鑑定フォームに進みます</li>
-        <li>生年月日と手相画像を入力して送信</li>
-        <li>鑑定PDFが表示され、その場で保存・印刷可能です</li>
-    </ol>
-
-    <h2>お支払いオプション</h2>
-    <div style="text-align:center;">
-        <a href="/generate_link" class="button">通常版（500円）</a>
-        <a href="/generate_link_full" class="button">1年分の運勢付き（1000円）</a>
-        <a href="/generate_link_renai" class="button">恋愛版（500円）</a>
-        <a href="/generate_link_renai_full" class="button">恋愛＋1年運（1000円）</a>
+  <div class="section">
+    <h2>選べるメニュー</h2>
+    <div class="button-area">
+      <a href="/generate_link" class="button">通常版（500円）</a>
+      <a href="/generate_link_full" class="button">1年の運勢付き（1000円）</a><br/>
+      <a href="/generate_link_renai" class="button">恋愛版（500円）</a>
+      <a href="/generate_link_renai_full" class="button">恋愛＋1年運（1000円）</a>
     </div>
+  </div>
 
-    <h2>注意事項</h2>
-    <ul>
-        <li><strong>18歳以上推奨</strong>／未成年は保護者同意の上でご利用ください</li>
-        <li>占い結果はエンターテインメントとしてご活用ください</li>
-        <li>各コースとも、鑑定は1回限りのご利用となります</li>
-    </ul>
-
-    <footer>
-        <p>
-            お問い合わせ：<a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a> ／
-            TEL：<a href="tel:09075062065">090-7506-2065</a>
-        </p>
-        <p>
-            <a href="/tokutei">特定商取引法に基づく表記</a> |
-            <a href="/privacy">プライバシーポリシー</a> |
-            <a href="/terms">利用規約</a>
-        </p>
-        <p>© 2025 シン・コンピューター占い</p>
-    </footer>
-
+  <footer>
+    <p>
+      お問い合わせ：<a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a> ／
+      TEL：<a href="tel:09075062065">090-7506-2065</a>
+    </p>
+    <p>
+      <a href="/tokutei">特定商取引法</a> |
+      <a href="/privacy">プライバシーポリシー</a> |
+      <a href="/terms">利用規約</a>
+    </p>
+    <p>&copy; 2025 シン・コンピューター占い</p>
+  </footer>
 </body>
 </html>
