@@ -37,7 +37,10 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
         col = 0
         for i, item in enumerate(lucky_info):
             if "：" in item:
-                item = item.replace("ラッキー", "")  # 冗長な「ラッキー」削除
+                # ✅ ラベルから「ラッキー」という語を除去
+                label, value = item.split("：", 1)
+                label = label.replace("ラッキー", "").strip()
+                item = f"{label}：{value.strip()}"
             x = x1 if col == 0 else x2
             c.drawString(x, y, item)
             if col == 1:
@@ -51,19 +54,22 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction):
 
     y -= 4 * mm
 
+    # ✅ 吉方位の表示（九星）
     c.setFont(FONT_NAME, 12)
+    c.drawString(margin, y, "■ 吉方位（九星気学より）")
+    y -= 6 * mm
+    c.setFont(FONT_NAME, 10)
     if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
-        c.drawString(margin, y, "■ 吉方位（九星気学より）")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
         for line in lucky_direction.strip().splitlines():
-            c.drawString(margin + 10, y, line)
+            c.drawString(margin + 10, y, line.strip())
             y -= 6 * mm
     else:
-        c.drawString(margin, y, "■ 吉方位（九星気学より）情報未取得")
+        c.drawString(margin + 10, y, "情報未取得")
         y -= 6 * mm
 
     return y - 10 * mm
+
+
 
 def draw_palm_image(c, base64_image, width, y):
 
