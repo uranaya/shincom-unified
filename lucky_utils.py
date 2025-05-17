@@ -25,6 +25,7 @@ def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, 
 ・ラッキーフード：〇〇
 ・ラッキーデー：〇曜日
 
+各項目は1行10〜15文字以内で簡潔に書いてください。
 自然で前向きな言葉で書いてください。"""
     try:
         response = openai.ChatCompletion.create(
@@ -109,6 +110,7 @@ def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_
 ・ラッキーフード：〇〇  
 ・ラッキーデー：〇曜日
 
+各項目は1行10〜15文字以内で簡潔に書いてください。
 自然で前向きな言葉で書いてください。"""
     try:
         response = openai.ChatCompletion.create(
