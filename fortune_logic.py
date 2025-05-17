@@ -180,32 +180,53 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 def generate_fortune(image_data, birthdate, kyusei_text):
     palm_result = analyze_palm(image_data)
-    shichu_result = get_shichu_fortune(birthdate)
+    shichu_result_raw = get_shichu_fortune(birthdate)
     iching_result = get_iching_advice()
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
-    lucky_info_raw = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text)
+    raw_lucky_info = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text)
 
-    # ✅ ラッキー情報は1行目だけ使用し、2カラム用に分割
+    # ✅ ラッキー情報整形（1行目から ◆で最大6項目）
     lucky_lines = []
-    if lucky_info_raw and isinstance(lucky_info_raw, list):
-        first_line = lucky_info_raw[0]
-        items = [item.strip() for item in first_line.split("◆") if item.strip()]
-        formatted = [f"◆ {item}" for item in items]
-        lucky_lines = formatted
+    if isinstance(raw_lucky_info, list):
+        raw_line = raw_lucky_info[0]
+    elif isinstance(raw_lucky_info, str):
+        raw_line = raw_lucky_info.strip().splitlines()[0]
+    else:
+        raw_line = ""
+    if "◆" in raw_line:
+        items = [item.strip() for item in raw_line.split("◆") if item.strip()]
+        lucky_lines = [f"◆ {item}" for item in items]
 
-    # palm_result を構造化して titles/texts に分離
+    # ✅ 四柱推命の構造化（文字列から dict texts に変換）
+    shichu_texts = {"personality": "", "year_fortune": "", "month_fortune": "", "next_month_fortune": ""}
+    if isinstance(shichu_result_raw, dict) and "texts" in shichu_result_raw:
+        shichu_texts = shichu_result_raw["texts"]
+    else:
+        parts = [p for p in str(shichu_result_raw).split("■ ") if p.strip()]
+        for part in parts:
+            if "\n" in part:
+                title, body = part.split("\n", 1)
+                title = title.strip()
+                if "性格" in title:
+                    shichu_texts["personality"] = body.strip()
+                elif "今年" in title:
+                    shichu_texts["year_fortune"] = body.strip()
+                elif "今月" in title:
+                    shichu_texts["month_fortune"] = body.strip()
+                elif "来月" in title:
+                    shichu_texts["next_month_fortune"] = body.strip()
+
+    # ✅ palm_result を構造化
     palm_titles = []
     palm_texts = []
-    lines = palm_result.split("### ")
-    for part in lines:
+    for part in palm_result.split("### "):
         if part.strip():
             title, *body = part.strip().split("\n", 1)
             palm_titles.append(title.strip())
             palm_texts.append(body[0].strip() if body else "")
 
-    return palm_titles, palm_texts, shichu_result, iching_result, lucky_lines
-
+    return palm_titles, palm_texts, shichu_texts, iching_result, lucky_lines
 
 
 
