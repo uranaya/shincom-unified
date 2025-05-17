@@ -184,8 +184,16 @@ def generate_fortune(image_data, birthdate, kyusei_text):
     iching_result = get_iching_advice()
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
-    lucky_info = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text)
-    
+    lucky_info_raw = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text)
+
+    # ✅ ラッキー情報は1行目だけ使用し、2カラム用に分割
+    lucky_lines = []
+    if lucky_info_raw and isinstance(lucky_info_raw, list):
+        first_line = lucky_info_raw[0]
+        items = [item.strip() for item in first_line.split("◆") if item.strip()]
+        formatted = [f"◆ {item}" for item in items]
+        lucky_lines = formatted
+
     # palm_result を構造化して titles/texts に分離
     palm_titles = []
     palm_texts = []
@@ -196,7 +204,8 @@ def generate_fortune(image_data, birthdate, kyusei_text):
             palm_titles.append(title.strip())
             palm_texts.append(body[0].strip() if body else "")
 
-    return palm_titles, palm_texts, shichu_result, iching_result, lucky_info
+    return palm_titles, palm_texts, shichu_result, iching_result, lucky_lines
+
 
 
 
