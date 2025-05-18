@@ -137,14 +137,13 @@ def draw_yearly_pages_renai_b4(c, yearly):
 
 
 def draw_shincom_a4(c, data, include_yearly=False):
-    from reportlab.lib.utils import ImageReader
     width, height = A4
     margin = 20 * mm
     y = height - margin
     y = draw_header(c, width, margin, y)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
-
+    # 手相3項目（1ページ目）
     c.setFont(FONT_NAME, 12)
     for i in range(3):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
@@ -156,9 +155,9 @@ def draw_shincom_a4(c, data, include_yearly=False):
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
+    # 新ページ：手相残り2項目 + 鑑定結果
     c.showPage()
     y = height - margin
-    # ★ ヘッダーなし（2ページ目）
 
     c.setFont(FONT_NAME, 12)
     for i in range(3, 5):
@@ -171,14 +170,20 @@ def draw_shincom_a4(c, data, include_yearly=False):
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
+    # 四柱推命・まとめ等（タイトルのみでも出す）
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
         wrap_len = 36 if 'month' in key else 40
-        c.drawString(margin, y, f"◆ {data['titles'][key]}")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
-        for line in wrap(data['texts'][key], wrap_len):
-            c.drawString(margin, y, line)
+        title = data['titles'].get(key, "")
+        content = data['texts'].get(key, "")
+
+        if title:
+            c.drawString(margin, y, f"◆ {title}")
             y -= 6 * mm
+        c.setFont(FONT_NAME, 10)
+        if content:
+            for line in wrap(content, wrap_len):
+                c.drawString(margin, y, line)
+                y -= 6 * mm
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
@@ -189,6 +194,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
 
 
+
 def draw_shincom_b4(c, data, include_yearly=False):
     width, height = B4
     margin = 20 * mm
@@ -196,48 +202,50 @@ def draw_shincom_b4(c, data, include_yearly=False):
     y = draw_header(c, width, margin, y)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
-    c.setFont(FONT_NAME, 12)
+    c.setFont(FONT_NAME, 14)
     for i in range(3):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
+        y -= 7 * mm
+        c.setFont(FONT_NAME, 12)
         for line in wrap(data['palm_texts'][i], 45):
             c.drawString(margin, y, line)
-            y -= 6 * mm
-        y -= 3 * mm
-        c.setFont(FONT_NAME, 12)
+            y -= 7 * mm
+        y -= 4 * mm
+        c.setFont(FONT_NAME, 14)
 
     c.showPage()
     y = height - margin
-    # ★ ヘッダーなし（2ページ目）
-
-    c.setFont(FONT_NAME, 12)
+    c.setFont(FONT_NAME, 14)
     for i in range(3, 5):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
+        y -= 7 * mm
+        c.setFont(FONT_NAME, 12)
         for line in wrap(data['palm_texts'][i], 45):
             c.drawString(margin, y, line)
-            y -= 6 * mm
-        y -= 3 * mm
-        c.setFont(FONT_NAME, 12)
+            y -= 7 * mm
+        y -= 4 * mm
+        c.setFont(FONT_NAME, 14)
 
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
-        wrap_len = 41 if 'month' in key else 45
-        c.drawString(margin, y, f"◆ {data['titles'][key]}")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
-        for line in wrap(data['texts'][key], wrap_len):
-            c.drawString(margin, y, line)
-            y -= 6 * mm
-        y -= 3 * mm
+        wrap_len = 40 if 'month' in key else 45
+        title = data['titles'].get(key, "")
+        content = data['texts'].get(key, "")
+        if title:
+            c.drawString(margin, y, f"◆ {title}")
+            y -= 7 * mm
         c.setFont(FONT_NAME, 12)
+        if content:
+            for line in wrap(content, wrap_len):
+                c.drawString(margin, y, line)
+                y -= 7 * mm
+        y -= 4 * mm
+        c.setFont(FONT_NAME, 14)
 
-    # ラッキー情報を2ページ目末尾に移動
     y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])
+
 
 
 def draw_yearly_pages_shincom_a4(c, yearly):
@@ -303,68 +311,58 @@ def draw_yearly_pages_shincom_b4(c, yearly):
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
-    from reportlab.lib.pagesizes import A4, B4
-    from reportlab.lib.units import mm
-    from header_utils import draw_header
-    from pdf_generator_unified import draw_yearly_pages_renai_a4, draw_yearly_pages_renai_b4, draw_lucky_section, FONT_NAME
     from textwrap import wrap as wrap_text
-
-    def wrap(text, limit):
+    def wrap_lines(text, limit):
         lines = []
-        for line in text.splitlines():
-            lines.extend(wrap_text(line, limit))
+        for ln in text.splitlines():
+            lines.extend(wrap_text(ln, limit))
         return lines
 
     width, height = A4 if size == 'a4' else B4
     margin = 20 * mm
-    wrap_len = 40 if size == 'a4' else 45
-    y = draw_header(c, width, margin, height - margin)
+    wrap_main = 40 if size == 'a4' else 45
+    wrap_theme = 40 if size == 'a4' else 45
+    font_title = 12 if size == 'a4' else 14
+    font_text = 10 if size == 'a4' else 12
+    line_space = 6 * mm if size == 'a4' else 7 * mm
 
-    # 1ページ目：相性診断・恋愛運（年/月/来月）
-    main_keys = [
-        "compatibility",
-        "year_love",
-        "month_love",
-        "next_month_love",
-    ]
-    c.setFont(FONT_NAME, 12)
+    y = draw_header(c, width, margin, height - margin)
+    main_keys = ["compatibility", "year_love", "month_love", "next_month_love"]
+    c.setFont(FONT_NAME, font_title)
     for key in main_keys:
-        if key in data.get("texts", {}) and data["texts"][key].strip():
-            c.drawString(margin, y, f"◆ {data['titles'].get(key, key)}")
-            y -= 6 * mm
-            c.setFont(FONT_NAME, 10)
-            for line in wrap(data["texts"][key], wrap_len):
+        text = data["texts"].get(key, "").strip()
+        if text:
+            title = data["titles"].get(key, key)
+            c.drawString(margin, y, f"◆ {title}")
+            y -= line_space
+            c.setFont(FONT_NAME, font_text)
+            for line in wrap_lines(text, wrap_main):
                 c.drawString(margin, y, line)
-                y -= 6 * mm
+                y -= line_space
             y -= 4 * mm
-            c.setFont(FONT_NAME, 12)
+            c.setFont(FONT_NAME, font_title)
 
     c.showPage()
     y = height - margin
-
-    # 2ページ目：恋愛テーマ3項目（注意点・距離感・結婚）
     if data.get("themes"):
-        c.setFont(FONT_NAME, 12)
+        c.setFont(FONT_NAME, font_title)
         for section in data["themes"]:
-            c.drawString(margin, y, f"◆ {section['title']}")
-            y -= 6 * mm
-            c.setFont(FONT_NAME, 10)
-            for line in wrap(section["content"], wrap_len):
-                c.drawString(margin, y, line)
-                y -= 6 * mm
-            y -= 4 * mm
-            c.setFont(FONT_NAME, 12)
+            title = section.get("title", "")
+            content = section.get("content", "")
+            if title and content:
+                c.drawString(margin, y, f"◆ {title}")
+                y -= line_space
+                c.setFont(FONT_NAME, font_text)
+                for line in wrap_lines(content, wrap_theme):
+                    c.drawString(margin, y, line)
+                    y -= line_space
+                y -= 4 * mm
+                c.setFont(FONT_NAME, font_title)
 
-    # ラッキー情報・吉方位（2ページ目末尾）
-    y = draw_lucky_section(
-        c, width, margin, y,
-        data.get("lucky_info", []),
-        data.get("lucky_direction", "")
-    )
+    y = draw_lucky_section(c, width, margin, y, data.get("lucky_info", []), data.get("lucky_direction", ""))
 
-    # 年運（オプション）
     if include_yearly and data.get("yearly_love_fortunes"):
-        if size == "a4":
+        if size == 'a4':
             draw_yearly_pages_renai_a4(c, data["yearly_love_fortunes"])
         else:
             draw_yearly_pages_renai_b4(c, data["yearly_love_fortunes"])
