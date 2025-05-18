@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -13,27 +12,14 @@
       color: #fff8e1;
     }
     .hero {
+      padding: 0;
+      background: none;
       text-align: center;
-      padding: 2em 1em 1em;
-      background: linear-gradient(to bottom, #3d0070, #1e0033);
     }
-    .hero h1 {
-      font-size: 2em;
-      margin-bottom: 0.5em;
-      color: #ffe066;
-      text-shadow: 0 0 8px rgba(255,255,255,0.3);
-    }
-    .hero p {
-      font-size: 1em;
-      color: #f5e6b8;
-    }
-    .photo img {
-      width: 160px;
-      height: 160px;
-      border-radius: 50%;
-      border: 4px solid #fff3b0;
-      box-shadow: 0 0 15px rgba(255,255,255,0.4);
-      margin: 1em auto;
+    .hero img {
+      width: 100%;
+      height: auto;
+      display: block;
     }
     .section {
       max-width: 720px;
@@ -84,11 +70,7 @@
 </head>
 <body>
   <div class="hero">
-    <div class="photo">
-      <img src="/static/fortune_master_circle.png" alt="鑑定士イメージ" />
-    </div>
-    <h1>あなたの未来を、手のひらから読み解く</h1>
-    <p>AIと占い師の知恵が融合した、新時代の運命鑑定</p>
+    <img src="/static/banner_uranaya.png" alt="鑑定バナー">
   </div>
 
   <div class="section">
@@ -110,7 +92,6 @@
       <a href="/generate_link_renai" class="button">恋愛版（500円）</a>
       <a href="/generate_link_renai_full" class="button">恋愛＋1年運（1000円）</a>
     </div>
-  
   </div>
 
   <div class="section">
