@@ -678,3 +678,11 @@ def _generate_link_with_shopid(shop_id="default", full_year=False):
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", new_uuid, max_age=600)
     return resp
+
+@app.route("/view_shop_log")
+def view_shop_log():
+    with sqlite3.connect("shop_log.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT date, shop_id, count FROM shop_logs ORDER BY date DESC")
+        logs = cursor.fetchall()
+    return render_template("shop_log.html", logs=logs)
