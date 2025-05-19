@@ -617,9 +617,9 @@ def _generate_link_with_shopid(shop_id="default", full_year=False):
     )
     print(f"🔗 決済URL for shop {shop_id}:", komoju_url)
 
+    # UUID + フラグ + モードを記録
     with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{new_uuid},{int(full_year)},selfmob
-")
+        f.write(f"{new_uuid},{int(full_year)},selfmob\n")
 
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", new_uuid, max_age=600)
