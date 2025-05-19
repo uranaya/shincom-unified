@@ -1,0 +1,14 @@
+
+<!DOCTYPE html>
+<html>
+<head><title>店舗ログ</title></head>
+<body>
+<h2>店舗ごとの利用履歴</h2>
+<table border="1">
+<tr><th>日付</th><th>店舗ID</th><th>件数</th></tr>
+{% for date, shop_id, count in logs %}
+<tr><td>{{ date }}</td><td>{{ shop_id }}</td><td>{{ count }}</td></tr>
+{% endfor %}
+</table>
+</body>
+</html>

@@ -17,7 +17,13 @@ from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
 from fortune_logic import generate_renai_fortune
 
+import sqlite3
+from shop_db_utils import init_shop_db, update_shop_db
+
+init_shop_db()
+
 load_dotenv()
+
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "defaultsecretkey")
@@ -271,7 +277,7 @@ def webhook_selfmob():
             shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
             if uuid_str:
                 print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
-                update_shop_counter(shop_id)
+                update_shop_db(shop_id)
 
                 # UUID を used に更新
                 updated_lines = []
