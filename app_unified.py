@@ -365,10 +365,10 @@ def selfmob_uuid(uuid_str):
                 },
                 "texts": {
                     "palm_summary": summary_text,
-                    "personality": shichu_texts.get("性格", ""),
-                    "year_fortune": shichu_texts.get(year_label, ""),
-                    "month_fortune": shichu_texts.get(month_label, ""),
-                    "next_month_fortune": shichu_texts.get(next_month_label, "")
+                    "personality": shichu_texts.get("personality", ""),
+                    "year_fortune": shichu_texts.get("year_fortune", ""),
+                    "month_fortune": shichu_texts.get("month_fortune", ""),
+                    "next_month_fortune": shichu_texts.get("next_month_fortune", "")
                 },
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
