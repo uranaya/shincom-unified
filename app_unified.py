@@ -196,16 +196,13 @@ def generate_link_renai():
 def generate_link_renai_full():
     return _generate_link_renai(full_year=True)
 
+
 def _generate_link(full_year=False):
-        shop_id = session.get("shop_id", "default")
+    shop_id = session.get("shop_id", "default")
     komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
     new_uuid = str(uuid.uuid4())
     redirect_url = "https://shincom-unified.onrender.com/thanks"
     encoded_redirect = quote(redirect_url, safe='')
-
-    # Record new UUID with mode "selfmob"
-    with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{new_uuid},{int(full_year)},selfmob\n")
 
     metadata = json.dumps({"shop_id": shop_id})
     komoju_url = (
@@ -213,11 +210,15 @@ def _generate_link(full_year=False):
         f"?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
         f"&metadata={quote(metadata)}"
     )
-    print("🔗 決済URL:", komoju_url)
+
+    with open(USED_UUID_FILE, "a") as f:
+        f.write(f"{new_uuid},{int(full_year)},selfmob
+")
 
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", new_uuid, max_age=600)
     return resp
+
 
 def _generate_link_renai(full_year=False):
     komoju_id = os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_RENAI_PUBLIC_LINK_ID")
