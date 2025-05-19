@@ -12,7 +12,9 @@ from pdf_generator_unified import create_pdf_unified
 
 
 
+
 def get_shichu_fortune(birthdate):
+    import json
     eto = get_nicchu_eto(birthdate)
     try:
         today = datetime.today()
@@ -33,31 +35,48 @@ def get_shichu_fortune(birthdate):
 - {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
 - {target2.year}年{target2.month}月の通変星: {tsuhen_month2}
 
-以下の4項目について、それぞれ必ず「■ タイトル」「改行」「本文」の形式で出力してください（各タイトルは1行、次に改行して本文）。
-・性格
-・{this_year}年の運勢
-・{target1.year}年{target1.month}月の運勢
-・{target2.year}年{target2.month}月の運勢
+以下の4項目について、次のJSON形式で返答してください（出力はJSONのみ）：
 
-本文は300文字以内で、やさしく自然にまとめてください。
-以下の禁止事項を厳守してください：
-- 見出しだけで本文がない項目を作らないこと（必ず各項目に300文字前後の本文を入れる）
-- 専門用語・干支名・通変星名の使用を避ける
-- 「ありません」「わかりません」などの否定表現を使わない
-- 出力は日本語のみ
+{{
+  "personality": "性格について300文字以内で自然な本文",
+  "year_fortune": "{this_year}年の運勢（300文字以内）",
+  "month_fortune": "{target1.year}年{target1.month}月の運勢（300文字以内）",
+  "next_month_fortune": "{target2.year}年{target2.month}月の運勢（300文字以内）"
+}}
+
+出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。
 """
 
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=3000,
+            max_tokens=1500,
             temperature=0.8
         )
-        result = response.choices[0].message.content.strip()
 
-        if not result or "性格" not in result:
-            raise ValueError("応答に必要な内容が含まれていません")
-        return result
+        raw = response.choices[0].message.content.strip()
+        print("=== GPT四柱推命 JSONレスポンス ===")
+        print(raw)
+
+        try:
+            result = json.loads(raw)
+            print("=== 四柱推命内容 ===")
+            for k, v in result.items():
+                print(f"{k}: {v[:50]}{'...' if len(v) > 50 else ''}")
+            return result
+        except json.JSONDecodeError:
+            print("❌ GPTが正しいJSONを返しませんでした")
+            raise ValueError("四柱推命レスポンスがJSON形式ではありません")
+
+    except Exception as e:
+        print("❌ 四柱推命取得失敗:", e)
+        return {
+            "personality": "取得できませんでした",
+            "year_fortune": f"{this_year}年の運勢は取得できませんでした",
+            "month_fortune": f"{target1.year}年{target1.month}月の運勢は取得できませんでした",
+            "next_month_fortune": f"{target2.year}年{target2.month}月の運勢は取得できませんでした"
+        }
+
 
     except Exception as e:
         print("❌ 四柱推命取得失敗:", e)
