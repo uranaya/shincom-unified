@@ -11,6 +11,7 @@ from yearly_love_fortune_utils import generate_yearly_love_fortune
 from pdf_generator_unified import create_pdf_unified
 
 
+
 def get_shichu_fortune(birthdate):
     eto = get_nicchu_eto(birthdate)
     try:
@@ -32,13 +33,18 @@ def get_shichu_fortune(birthdate):
 - {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
 - {target2.year}年{target2.month}月の通変星: {tsuhen_month2}
 
-以下の4項目について、それぞれ「■ タイトル」「本文」の形式で出力してください。
+以下の4項目について、それぞれ必ず「■ タイトル」「改行」「本文」の形式で出力してください（各タイトルは1行、次に改行して本文）。
 ・性格
 ・{this_year}年の運勢
 ・{target1.year}年{target1.month}月の運勢
 ・{target2.year}年{target2.month}月の運勢
 
-本文は300文字以内でやさしく自然にまとめ、専門用語や干支・通変星の名前は書かず、前向きな助言にしてください。
+本文は300文字以内で、やさしく自然にまとめてください。
+以下の禁止事項を厳守してください：
+- 見出しだけで本文がない項目を作らないこと（必ず各項目に300文字前後の本文を入れる）
+- 専門用語・干支名・通変星名の使用を避ける
+- 「ありません」「わかりません」などの否定表現を使わない
+- 出力は日本語のみ
 """
 
         response = openai.ChatCompletion.create(
@@ -47,7 +53,23 @@ def get_shichu_fortune(birthdate):
             max_tokens=1200,
             temperature=0.8
         )
-        return response.choices[0].message.content.strip()
+        result = response.choices[0].message.content.strip()
+
+        if not result or "性格" not in result:
+            raise ValueError("応答に必要な内容が含まれていません")
+        return result
+
+    except Exception as e:
+        print("❌ 四柱推命取得失敗:", e)
+        return f"""■ 性格
+取得できませんでした
+■ {this_year}年の運勢
+取得できませんでした
+■ {target1.year}年{target1.month}月の運勢
+取得できませんでした
+■ {target2.year}年{target2.month}月の運勢
+取得できませんでした"""
+
 
     except Exception as e:
         print("❌ 四柱推命取得失敗:", e)
