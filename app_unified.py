@@ -281,7 +281,7 @@ def webhook_selfmob():
 
                 # UUID を used に更新
         updated_lines = []
-                found = False
+        found = False
                 with open(USED_UUID_FILE, "r") as f:
                     for line in f:
                         parts = line.strip().split(",")
@@ -317,7 +317,7 @@ def webhook_renaiselfmob():
 
                 # UUID を used に更新
         updated_lines = []
-                found = False
+        found = False
                 with open(USED_UUID_FILE, "r") as f:
                     for line in f:
                         parts = line.strip().split(",")
