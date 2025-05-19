@@ -311,7 +311,8 @@ def webhook_renaiselfmob():
         if data.get("event") == "payment.captured":
             uuid_str = data["data"]["attributes"].get("external_order_num")
             if uuid_str:                metadata = data["data"]["attributes"].get("metadata", {})
-            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"            print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
+            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
+                print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
             update_shop_db(shop_id)
 
                 # UUID を used に更新
