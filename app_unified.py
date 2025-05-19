@@ -18,12 +18,45 @@ from pdf_generator_unified import create_pdf_unified
 from fortune_logic import generate_renai_fortune
 
 import sqlite3
-from shop_db_utils import init_shop_db, update_shop_db
+
+def init_shop_db():
+    with sqlite3.connect("shop_log.db") as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS shop_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT,
+                shop_id TEXT,
+                count INTEGER DEFAULT 1
+            )
+        """)
+        conn.commit()
+    print("✅ shop_log.db initialized")
+
+def update_shop_db(shop_id):
+    today = datetime.now().strftime("%Y-%m-%d")
+    print(f"📝 update_shop_db called with shop_id = {shop_id}")
+    with sqlite3.connect("shop_log.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT count FROM shop_logs WHERE date = ? AND shop_id = ?",
+            (today, shop_id)
+        )
+        row = cursor.fetchone()
+        if row:
+            cursor.execute(
+                "UPDATE shop_logs SET count = count + 1 WHERE date = ? AND shop_id = ?",
+                (today, shop_id)
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO shop_logs (date, shop_id, count) VALUES (?, ?, 1)",
+                (today, shop_id)
+            )
+        conn.commit()
 
 init_shop_db()
 
 load_dotenv()
-
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "defaultsecretkey")
@@ -202,9 +235,9 @@ def generate_link_renai():
 def generate_link_renai_full():
     return _generate_link_renai(full_year=True)
 
-
 def _generate_link(full_year=False):
     shop_id = session.get("shop_id", "default")
+    komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC LINK_ID")  # Correction for K
     komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
     new_uuid = str(uuid.uuid4())
     redirect_url = "https://shincom-unified.onrender.com/thanks"
@@ -224,8 +257,8 @@ def _generate_link(full_year=False):
     resp.set_cookie("uuid", new_uuid, max_age=600)
     return resp
 
-
 def _generate_link_renai(full_year=False):
+    shop_id = session.get("shop_id", "default")
     komoju_id = os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_RENAI_PUBLIC_LINK_ID")
     new_uuid = str(uuid.uuid4())
     redirect_url = "https://shincom-unified.onrender.com/thanks"
@@ -280,8 +313,8 @@ def webhook_selfmob():
                 update_shop_db(shop_id)
 
                 # UUID を used に更新
-        updated_lines = []
-        found = False
+                updated_lines = []
+                found = False
                 with open(USED_UUID_FILE, "r") as f:
                     for line in f:
                         parts = line.strip().split(",")
@@ -297,12 +330,6 @@ def webhook_selfmob():
     except Exception as e:
         print("Webhook error:", e)
         return "", 400
-    except Exception as e:
-        print("Webhook error:", e)
-        return "", 400
-    except Exception as e:
-        print("Webhook error:", e)
-        return "", 400
 
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
@@ -310,14 +337,15 @@ def webhook_renaiselfmob():
         data = request.get_json()
         if data.get("event") == "payment.captured":
             uuid_str = data["data"]["attributes"].get("external_order_num")
-            if uuid_str:                metadata = data["data"]["attributes"].get("metadata", {})
+            metadata = data["data"]["attributes"].get("metadata", {})
             shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
-            print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
-            update_shop_db(shop_id)
+            if uuid_str:
+                print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
+                update_shop_db(shop_id)
 
                 # UUID を used に更新
-        updated_lines = []
-        found = False
+                updated_lines = []
+                found = False
                 with open(USED_UUID_FILE, "r") as f:
                     for line in f:
                         parts = line.strip().split(",")
@@ -333,10 +361,6 @@ def webhook_renaiselfmob():
     except Exception as e:
         print("Webhook error (renai):", e)
         return "", 400
-    except Exception as e:
-        print("Webhook error (renai):", e)
-        return "", 400
-
 
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
@@ -363,7 +387,6 @@ def selfmob_uuid(uuid_str):
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
-
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
@@ -466,8 +489,6 @@ def selfmob_uuid(uuid_str):
 
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
 
-
-
 @app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
@@ -540,8 +561,6 @@ def renaiselfmob_uuid(uuid_str):
     # Render the form (post-payment) for love fortune input
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str)
 
-
-
 @app.route("/preview/<filename>")
 def preview(filename):
     # If coming from an internal route, show PDF inline; otherwise show a static page with link
@@ -597,7 +616,6 @@ def privacy():
 def terms():
     return render_template("terms.html")
 
-
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
     try:
@@ -614,9 +632,6 @@ def get_eto():
         print("❌ /get_eto エラー:", e)
         return jsonify({"error": "干支または本命星の取得中にエラーが発生しました"}), 500
 
-
-
-
 @app.route("/download_shop_log")
 def download_shop_log():
     filepath = "shop_counter.csv"
@@ -624,7 +639,6 @@ def download_shop_log():
         with open(filepath, "w", encoding="utf-8") as f:
             f.write("date,shop_id,count\n")
     return send_file(filepath, as_attachment=True)
-
 
 def update_shop_counter(shop_id):
     today = datetime.now().strftime("%Y-%m-%d")
@@ -652,12 +666,10 @@ def update_shop_counter(shop_id):
         writer = csv.writer(f)
         writer.writerows(rows)
 
-
 @app.route("/selfmob-<shop_id>")
 def selfmob_shop_entry(shop_id):
     session["shop_id"] = shop_id
     return render_template("pay.html", shop_id=shop_id)
-
 
 def _generate_link_with_shopid(shop_id="default", full_year=False):
     komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
