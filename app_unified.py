@@ -619,7 +619,8 @@ def update_shop_counter(shop_id):
 
 @app.route("/selfmob-<shop_id>")
 def selfmob_shop_entry(shop_id):
-    return _generate_link_with_shopid(shop_id=shop_id, full_year=False)
+    session["shop_id"] = shop_id
+    return render_template("pay.html", shop_id=shop_id)
 
 
 def _generate_link_with_shopid(shop_id="default", full_year=False):
