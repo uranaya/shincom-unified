@@ -261,7 +261,26 @@ def webhook_selfmob():
             if uuid_str:
                 print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
                 update_shop_counter(shop_id)
+
+                # UUID を used に更新
+                updated_lines = []
+                found = False
+                with open(USED_UUID_FILE, "r") as f:
+                    for line in f:
+                        parts = line.strip().split(",")
+                        if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "selfmob":
+                            updated_lines.append(f"{uuid_str},used,selfmob
+")
+                            found = True
+                        else:
+                            updated_lines.append(line)
+                if found:
+                    with open(USED_UUID_FILE, "w") as f:
+                        f.writelines(updated_lines)
         return "", 200
+    except Exception as e:
+        print("Webhook error:", e)
+        return "", 400
     except Exception as e:
         print("Webhook error:", e)
         return "", 400
@@ -277,7 +296,26 @@ def webhook_renaiselfmob():
             uuid_str = data["data"]["attributes"].get("external_order_num")
             if uuid_str:
                 print("✅ RENAI Webhook captured:", uuid_str)
+
+                # UUID を used に更新
+                updated_lines = []
+                found = False
+                with open(USED_UUID_FILE, "r") as f:
+                    for line in f:
+                        parts = line.strip().split(",")
+                        if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "renaiselfmob":
+                            updated_lines.append(f"{uuid_str},used,renaiselfmob
+")
+                            found = True
+                        else:
+                            updated_lines.append(line)
+                if found:
+                    with open(USED_UUID_FILE, "w") as f:
+                        f.writelines(updated_lines)
         return "", 200
+    except Exception as e:
+        print("Webhook error (renai):", e)
+        return "", 400
     except Exception as e:
         print("Webhook error (renai):", e)
         return "", 400
@@ -285,25 +323,6 @@ def webhook_renaiselfmob():
 
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
-    full_year = None
-    used = False
-    lines = []
-    try:
-        with open(USED_UUID_FILE, "r") as f:
-            lines = [line.strip().split(",") for line in f if line.strip()]
-            for uid, flag, mode in lines:
-                if uid == uuid_str and mode == "selfmob":
-                    if flag == "used":
-                        used = True
-                    full_year = (flag == "1")
-                    break
-        if full_year is None:
-            return "無効なリンクです（UUID不一致）", 400
-        if not used:
-            return "このリンクはまだ使用できません（未決済の可能性があります）", 403
-    except FileNotFoundError:
-        return "使用履歴が確認できません", 400
-
     full_year = None
     lines = []
     try:
@@ -619,8 +638,7 @@ def update_shop_counter(shop_id):
 
 @app.route("/selfmob-<shop_id>")
 def selfmob_shop_entry(shop_id):
-    session["shop_id"] = shop_id
-    return render_template("pay.html", shop_id=shop_id)
+    return _generate_link_with_shopid(shop_id=shop_id, full_year=False)
 
 
 def _generate_link_with_shopid(shop_id="default", full_year=False):
