@@ -270,7 +270,7 @@ def generate_fortune(image_data, birthdate, kyusei_text):
             palm_titles.append(title.strip())
             palm_texts.append(body[0].strip() if body else "")
 
-    return palm_titles, palm_texts, shichu_texts, iching_result, lucky_lines
+    return palm_titles, palm_texts, shichu_result_raw, iching_result, lucky_lines
 
 
 def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = 'a4') -> dict:
