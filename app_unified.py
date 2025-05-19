@@ -212,8 +212,7 @@ def _generate_link(full_year=False):
     )
 
     with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{new_uuid},{int(full_year)},selfmob
-")
+        f.write(f"{new_uuid},{int(full_year)},selfmob\n")
 
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", new_uuid, max_age=600)
