@@ -33,12 +33,3 @@ def update_shop_db(shop_id):
                 (today, shop_id)
             )
         conn.commit()
-
-@app.route("/view_shop_log")
-def view_shop_log():
-    import sqlite3
-    with sqlite3.connect("shop_log.db") as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT date, shop_id, count FROM shop_logs ORDER BY date DESC")
-        logs = cursor.fetchall()
-    return render_template("shop_log.html", logs=logs)
