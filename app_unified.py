@@ -6,6 +6,7 @@ import requests
 import traceback
 from datetime import datetime
 from urllib.parse import quote
+import csv
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response
 from fortune_logic import generate_fortune
 from dotenv import load_dotenv
@@ -255,9 +256,15 @@ def webhook_selfmob():
         data = request.get_json()
         if data.get("event") == "payment.captured":
             uuid_str = data["data"]["attributes"].get("external_order_num")
+            metadata = data["data"]["attributes"].get("metadata", {})
+            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
             if uuid_str:
-                print("✅ Webhook captured:", uuid_str)
+                print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
+                update_shop_counter(shop_id)
         return "", 200
+    except Exception as e:
+        print("Webhook error:", e)
+        return "", 400
     except Exception as e:
         print("Webhook error:", e)
         return "", 400
@@ -553,3 +560,67 @@ def get_eto():
         return jsonify({"error": "干支または本命星の取得中にエラーが発生しました"}), 500
 
 
+
+
+@app.route("/download_shop_log")
+def download_shop_log():
+    filepath = "shop_counter.csv"
+    if not os.path.exists(filepath):
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write("date,shop_id,count\n")
+    return send_file(filepath, as_attachment=True)
+
+
+def update_shop_counter(shop_id):
+    today = datetime.now().strftime("%Y-%m-%d")
+    filepath = "shop_counter.csv"
+    rows = []
+    updated = False
+
+    try:
+        with open(filepath, newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            rows = list(reader)
+    except FileNotFoundError:
+        rows = [["date", "shop_id", "count"]]
+
+    for row in rows:
+        if len(row) == 3 and row[0] == today and row[1] == shop_id:
+            row[2] = str(int(row[2]) + 1)
+            updated = True
+            break
+
+    if not updated:
+        rows.append([today, shop_id, "1"])
+
+    with open(filepath, "w", newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerows(rows)
+
+
+@app.route("/selfmob-<shop_id>")
+def selfmob_shop_entry(shop_id):
+    return _generate_link_with_shopid(shop_id=shop_id, full_year=False)
+
+
+def _generate_link_with_shopid(shop_id="default", full_year=False):
+    komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
+    new_uuid = str(uuid.uuid4())
+    redirect_url = "https://shincom-unified.onrender.com/thanks"
+    encoded_redirect = quote(redirect_url, safe='')
+
+    metadata = json.dumps({"shop_id": shop_id})
+    komoju_url = (
+        f"https://komoju.com/payment_links/{komoju_id}"
+        f"?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
+        f"&metadata={quote(metadata)}"
+    )
+    print(f"🔗 決済URL for shop {shop_id}:", komoju_url)
+
+    with open(USED_UUID_FILE, "a") as f:
+        f.write(f"{new_uuid},{int(full_year)},selfmob
+")
+
+    resp = make_response(redirect(komoju_url))
+    resp.set_cookie("uuid", new_uuid, max_age=600)
+    return resp
