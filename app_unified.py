@@ -317,14 +317,7 @@ def selfmob_uuid(uuid_str):
             palm_result = "\n".join(palm_texts)
             summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
 
-            shichu_texts = {}
-            parts = [part for part in str(shichu_result).split("■ ") if part.strip()]
-            for part in parts:
-                if "\n" in part:
-                    title, body = part.split("\n", 1)
-                else:
-                    title, body = part, ""
-                shichu_texts[title.strip()] = body.strip()
+            shichu_texts = shichu_result
 
             # ✅ lucky_lines 修正（◆は付けない）
             lucky_lines = []
