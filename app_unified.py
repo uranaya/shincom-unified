@@ -269,8 +269,7 @@ def webhook_selfmob():
                     for line in f:
                         parts = line.strip().split(",")
                         if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "selfmob":
-                            updated_lines.append(f"{uuid_str},used,selfmob
-")
+                            updated_lines.append(f"{uuid_str},used,selfmob\n")
                             found = True
                         else:
                             updated_lines.append(line)
@@ -304,8 +303,7 @@ def webhook_renaiselfmob():
                     for line in f:
                         parts = line.strip().split(",")
                         if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "renaiselfmob":
-                            updated_lines.append(f"{uuid_str},used,renaiselfmob
-")
+                            updated_lines.append(f"{uuid_str},used,renaiselfmob\n")
                             found = True
                         else:
                             updated_lines.append(line)
