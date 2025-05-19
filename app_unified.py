@@ -485,6 +485,8 @@ def renaiselfmob_uuid(uuid_str):
     # Render the form (post-payment) for love fortune input
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str)
 
+
+
 @app.route("/preview/<filename>")
 def preview(filename):
     # If coming from an internal route, show PDF inline; otherwise show a static page with link
@@ -527,6 +529,19 @@ def logout():
 @app.route("/")
 def home():
     return render_template("home-unified.html")
+
+@app.route("/legal")
+def legal():
+    return render_template("legal.html")
+
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+@app.route("/terms")
+def terms():
+    return render_template("terms.html")
+
 
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
