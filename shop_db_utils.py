@@ -1,5 +1,6 @@
 
 import sqlite3
+from datetime import datetime
 
 def init_shop_db():
     with sqlite3.connect("shop_log.db") as conn:
@@ -11,10 +12,12 @@ def init_shop_db():
                 count INTEGER DEFAULT 1
             )
         """)
+        conn.commit()
+    print("✅ shop_log.db initialized")
 
 def update_shop_db(shop_id):
-    from datetime import datetime
     today = datetime.now().strftime("%Y-%m-%d")
+    print(f"📝 update_shop_db called with shop_id = {shop_id}")
     with sqlite3.connect("shop_log.db") as conn:
         cursor = conn.cursor()
         cursor.execute(
