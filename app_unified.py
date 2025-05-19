@@ -225,7 +225,7 @@ def _generate_link(full_year=False):
     return resp
 
 
-def _generate_link_renai\(full_year=False\):
+def _generate_link_renai(full_year=False):
     shop_id = session.get("shop_id", "default")
     komoju_id = os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_RENAI_PUBLIC_LINK_ID")
     new_uuid = str(uuid.uuid4())
