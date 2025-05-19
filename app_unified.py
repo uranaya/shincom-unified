@@ -310,7 +310,6 @@ def selfmob_uuid(uuid_str):
 
             eto = get_nicchu_eto(birthdate)
 
-            # ✅ 修正：5項目で unpack
             palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
                 image_data, birthdate, kyusei_text
             )
@@ -327,6 +326,7 @@ def selfmob_uuid(uuid_str):
                     title, body = part, ""
                 shichu_texts[title.strip()] = body.strip()
 
+            # ✅ lucky_lines 修正（◆は付けない）
             lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
@@ -334,14 +334,14 @@ def selfmob_uuid(uuid_str):
                     if line:
                         if line.startswith("・"):
                             line = line[1:].strip()
-                        lucky_lines.append(f"◆ {line.replace(':', '：', 1)}")
+                        lucky_lines.append(line.replace(":", "：", 1))
             elif isinstance(lucky_info, dict):
                 for k, v in lucky_info.items():
                     line = f"{k}：{v}".strip()
                     if line:
                         if line.startswith("・"):
                             line = line[1:].strip()
-                        lucky_lines.append(f"◆ {line}")
+                        lucky_lines.append(line)
             else:
                 for item in lucky_info:
                     for line in str(item).replace("\r\n", "\n").replace("\r", "\n").split("\n"):
@@ -349,7 +349,7 @@ def selfmob_uuid(uuid_str):
                         if line:
                             if line.startswith("・"):
                                 line = line[1:].strip()
-                            lucky_lines.append(f"◆ {line.replace(':', '：', 1)}")
+                            lucky_lines.append(line.replace(":", "：", 1))
 
             today = datetime.today()
             target1 = today.replace(day=15)
@@ -410,6 +410,7 @@ def selfmob_uuid(uuid_str):
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
 
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
+
 
 
 @app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])

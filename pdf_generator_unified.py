@@ -31,9 +31,9 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
     c.setFont(FONT_NAME, 10)
 
     for i in range(0, len(lucky_lines), 2):
-        line1 = lucky_lines[i]
-        line2 = lucky_lines[i+1] if i+1 < len(lucky_lines) else ""
-        formatted = f"{line1:<38}    {line2}"  # ← ここでスペースインデント
+        line1 = f"◆ {lucky_lines[i]}"
+        line2 = f"◆ {lucky_lines[i+1]}" if i+1 < len(lucky_lines) else ""
+        formatted = f"{line1:<38}    {line2}"
         c.drawString(margin, y, formatted)
         y -= 6 * mm
 
@@ -48,6 +48,7 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
             y -= 6 * mm
 
     return y
+
 
 
 

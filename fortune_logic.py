@@ -16,7 +16,6 @@ def get_shichu_fortune(birthdate):
         today = datetime.today()
         this_year = today.year
 
-        # 月の20日以降なら次月・再来月を占う
         target1 = today.replace(day=15)
         if today.day >= 20:
             target1 += relativedelta(months=1)
@@ -32,17 +31,13 @@ def get_shichu_fortune(birthdate):
 - {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
 - {target2.year}年{target2.month}月の通変星: {tsuhen_month2}
 
-以下の3つの項目について、それぞれ300文字以内で現実的に鑑定してください。
-本文中に干支名や通変星の名前は書かず、内容に反映させてください。
+以下の4項目について、それぞれ「■ タイトル」「本文」の形式で出力してください。
+・性格
+・{this_year}年の運勢
+・{target1.year}年{target1.month}月の運勢
+・{target2.year}年{target2.month}月の運勢
 
-■ 性格
-■ {this_year}年の運勢
-■ {target1.year}年{target1.month}月の運勢
-■ {target2.year}年{target2.month}月の運勢
-
-・優しい語り口で自然な文章にしてください。
-・各項目はタイトルと本文を明確に区切ってください。
-・読んでいて前向きになれるような文面にしてください。
+本文は300文字以内でやさしく自然にまとめ、専門用語や干支・通変星の名前は書かず、前向きな助言にしてください。
 """
 
         response = openai.ChatCompletion.create(
@@ -56,7 +51,6 @@ def get_shichu_fortune(birthdate):
     except Exception as e:
         print("❌ 四柱推命取得失敗:", e)
         return f"""■ 性格\n取得できませんでした\n■ {this_year}年の運勢\n取得できませんでした\n■ {target1.year}年{target1.month}月の運勢\n取得できませんでした\n■ {target2.year}年{target2.month}月の運勢\n取得できませんでした"""
-
 
 
 
