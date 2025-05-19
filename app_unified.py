@@ -530,9 +530,9 @@ def logout():
 def home():
     return render_template("home-unified.html")
 
-@app.route("/legal")
+@app.route("/tokutei")
 def legal():
-    return render_template("legal.html")
+    return render_template("tokutei.html")
 
 @app.route("/privacy")
 def privacy():

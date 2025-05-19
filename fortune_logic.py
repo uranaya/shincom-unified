@@ -1,5 +1,6 @@
 import openai
 import os
+import re
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from tesou import tesou_names, tesou_descriptions
@@ -172,7 +173,9 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 
 
+
 def generate_fortune(image_data, birthdate, kyusei_text):
+    import re
     palm_result = analyze_palm(image_data)
     shichu_result_raw = get_shichu_fortune(birthdate)
     iching_result = get_iching_advice()
@@ -180,7 +183,6 @@ def generate_fortune(image_data, birthdate, kyusei_text):
     nicchu_eto = get_nicchu_eto(birthdate)
     raw_lucky_info = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text)
 
-    # 整形済 lucky_lines（◆付きで最大6件）
     lucky_lines = []
     try:
         if isinstance(raw_lucky_info, list):
@@ -196,7 +198,6 @@ def generate_fortune(image_data, birthdate, kyusei_text):
         print("❌ lucky_info 整形失敗:", e)
         lucky_lines = []
 
-    # 対象年月ラベル（正確な一致で抽出できるよう）
     today = datetime.today()
     target1 = today.replace(day=15)
     if today.day >= 20:
@@ -205,27 +206,21 @@ def generate_fortune(image_data, birthdate, kyusei_text):
     month_label = f"{target1.year}年{target1.month}月の運勢"
     next_month_label = f"{target2.year}年{target2.month}月の運勢"
 
-    # shichu 結果の整形
     shichu_texts = {"personality": "", "year_fortune": "", "month_fortune": "", "next_month_fortune": ""}
-    if isinstance(shichu_result_raw, dict) and "texts" in shichu_result_raw:
-        shichu_texts = shichu_result_raw["texts"]
-    else:
-        parts = [p for p in str(shichu_result_raw).split("■ ") if p.strip()]
-        for part in parts:
-            if "\n" in part:
-                title, body = part.split("\n", 1)
-                title = title.strip()
-                body = body.strip()
-                if "性格" in title:
-                    shichu_texts["personality"] = body
-                elif title == month_label:
-                    shichu_texts["month_fortune"] = body
-                elif title == next_month_label:
-                    shichu_texts["next_month_fortune"] = body
-                elif "年" in title and "運勢" in title:
-                    shichu_texts["year_fortune"] = body
+    pattern = r"[■◆]\s*(性格|[0-9]{4}年の運勢|[0-9]{4}年[0-9]{1,2}月の運勢)(.*?)(?=[■◆]|$)"
+    matches = re.findall(pattern, str(shichu_result_raw), flags=re.DOTALL)
+    for title, body in matches:
+        title = title.strip()
+        body = body.strip()
+        if "性格" in title:
+            shichu_texts["personality"] = body
+        elif title == month_label:
+            shichu_texts["month_fortune"] = body
+        elif title == next_month_label:
+            shichu_texts["next_month_fortune"] = body
+        elif "年" in title and "運勢" in title:
+            shichu_texts["year_fortune"] = body
 
-    # 手相の構造化
     palm_titles = []
     palm_texts = []
     for part in palm_result.split("### "):
