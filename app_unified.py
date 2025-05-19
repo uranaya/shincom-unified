@@ -197,6 +197,7 @@ def generate_link_renai_full():
     return _generate_link_renai(full_year=True)
 
 def _generate_link(full_year=False):
+        shop_id = session.get("shop_id", "default")
     komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
     new_uuid = str(uuid.uuid4())
     redirect_url = "https://shincom-unified.onrender.com/thanks"
@@ -206,7 +207,12 @@ def _generate_link(full_year=False):
     with open(USED_UUID_FILE, "a") as f:
         f.write(f"{new_uuid},{int(full_year)},selfmob\n")
 
-    komoju_url = f"https://komoju.com/payment_links/{komoju_id}?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
+    metadata = json.dumps({"shop_id": shop_id})
+    komoju_url = (
+        f"https://komoju.com/payment_links/{komoju_id}"
+        f"?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
+        f"&metadata={quote(metadata)}"
+    )
     print("🔗 決済URL:", komoju_url)
 
     resp = make_response(redirect(komoju_url))
@@ -223,7 +229,12 @@ def _generate_link_renai(full_year=False):
     with open(USED_UUID_FILE, "a") as f:
         f.write(f"{new_uuid},{int(full_year)},renaiselfmob\n")
 
-    komoju_url = f"https://komoju.com/payment_links/{komoju_id}?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
+    metadata = json.dumps({"shop_id": shop_id})
+    komoju_url = (
+        f"https://komoju.com/payment_links/{komoju_id}"
+        f"?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
+        f"&metadata={quote(metadata)}"
+    )
     print("🔗 RENAI決済URL:", komoju_url)
 
     resp = make_response(redirect(komoju_url))
@@ -636,7 +647,8 @@ def update_shop_counter(shop_id):
 
 @app.route("/selfmob-<shop_id>")
 def selfmob_shop_entry(shop_id):
-    return _generate_link_with_shopid(shop_id=shop_id, full_year=False)
+    session["shop_id"] = shop_id
+    return render_template("pay.html", shop_id=shop_id)
 
 
 def _generate_link_with_shopid(shop_id="default", full_year=False):
