@@ -280,7 +280,7 @@ def webhook_selfmob():
                 update_shop_db(shop_id)
 
                 # UUID を used に更新
-                updated_lines = []
+        updated_lines = []
                 found = False
                 with open(USED_UUID_FILE, "r") as f:
                     for line in f:
@@ -316,7 +316,7 @@ def webhook_renaiselfmob():
             update_shop_db(shop_id)
 
                 # UUID を used に更新
-                updated_lines = []
+        updated_lines = []
                 found = False
                 with open(USED_UUID_FILE, "r") as f:
                     for line in f:
