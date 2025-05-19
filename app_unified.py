@@ -225,7 +225,8 @@ def _generate_link(full_year=False):
     return resp
 
 
-def _generate_link_renai(full_year=False):
+def _generate_link_renai\(full_year=False\):
+    shop_id = session.get("shop_id", "default")
     komoju_id = os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_RENAI_PUBLIC_LINK_ID")
     new_uuid = str(uuid.uuid4())
     redirect_url = "https://shincom-unified.onrender.com/thanks"
@@ -327,6 +328,8 @@ def webhook_renaiselfmob():
                 if found:
                     with open(USED_UUID_FILE, "w") as f:
                         f.writelines(updated_lines)
+                print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
+        update_shop_db(shop_id)
         return "", 200
     except Exception as e:
         print("Webhook error (renai):", e)
@@ -615,17 +618,12 @@ def get_eto():
 
 
 
-@app.route("/download_shop_log")
-def download_shop_log():
-    filepath = "shop_counter.csv"
     if not os.path.exists(filepath):
         with open(filepath, "w", encoding="utf-8") as f:
             f.write("date,shop_id,count\n")
     return send_file(filepath, as_attachment=True)
 
 
-def update_shop_counter(shop_id):
-    today = datetime.now().strftime("%Y-%m-%d")
     filepath = "shop_counter.csv"
     rows = []
     updated = False
