@@ -286,6 +286,25 @@ def webhook_renaiselfmob():
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
     full_year = None
+    used = False
+    lines = []
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            lines = [line.strip().split(",") for line in f if line.strip()]
+            for uid, flag, mode in lines:
+                if uid == uuid_str and mode == "selfmob":
+                    if flag == "used":
+                        used = True
+                    full_year = (flag == "1")
+                    break
+        if full_year is None:
+            return "無効なリンクです（UUID不一致）", 400
+        if not used:
+            return "このリンクはまだ使用できません（未決済の可能性があります）", 403
+    except FileNotFoundError:
+        return "使用履歴が確認できません", 400
+
+    full_year = None
     lines = []
     try:
         with open(USED_UUID_FILE, "r") as f:
