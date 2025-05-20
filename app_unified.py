@@ -16,11 +16,30 @@ from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicc
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
 from fortune_logic import generate_renai_fortune
-
 import sqlite3
+import threading
 
+# Initialize logging and upload directories
+UPLOAD_FOLDER = 'static/uploads'
+USED_UUID_FILE = 'used_orders.txt'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+if not os.path.exists(USED_UUID_FILE):
+    open(USED_UUID_FILE, "w").close()
+
+# Initialize Flask app and configuration
+app = Flask(__name__)
+load_dotenv()
+app.secret_key = os.getenv("SECRET_KEY", "defaultsecretkey")
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
+BASE_URL = os.getenv("BASE_URL", "https://shincom-unified.onrender.com")
+
+# Initialize locks for thread-safe operations
+used_file_lock = threading.Lock()
+
+# Initialize shop logs database tables
 def init_shop_db():
     with sqlite3.connect("shop_log.db") as conn:
+        # Table for daily aggregated counts per shop per date
         conn.execute("""
             CREATE TABLE IF NOT EXISTS shop_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,87 +48,162 @@ def init_shop_db():
                 count INTEGER DEFAULT 1
             )
         """)
+        # Table for raw logs (each usage event)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS logs (
+                shop_id TEXT,
+                timestamp TEXT
+            )
+        """)
         conn.commit()
     print("✅ shop_log.db initialized")
 
+def update_shop_counter(shop_id):
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    count_file = "shop_counter.csv"
+    # Load existing counts
+    rows = {}
+    if os.path.exists(count_file):
+        with open(count_file, newline="", encoding="utf-8") as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                if not row or row[0] == "date":
+                    # skip header or empty lines
+                    continue
+                if len(row) == 3:
+                    try:
+                        cnt = int(row[2])
+                    except:
+                        # skip invalid rows if any
+                        continue
+                    key = (row[0], row[1])
+                    rows[key] = cnt
+    # Increment count for this shop and date
+    key = (shop_id, date_str)
+    rows[key] = rows.get(key, 0) + 1
+    # Write updated counts back to CSV (with header)
+    with open(count_file, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["date", "shop_id", "count"])
+        for (sid, date), count in sorted(rows.items()):
+            writer.writerow([sid, date, count])
+
 def update_shop_db(shop_id):
-    today = datetime.now().strftime("%Y-%m-%d")
-    print(f"📝 update_shop_db called with shop_id = {shop_id}")
-    with sqlite3.connect("shop_log.db") as conn:
+    # Record usage to SQLite and CSV
+    try:
+        now_iso = datetime.now().isoformat()
+        conn = sqlite3.connect("shop_log.db")
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT count FROM shop_logs WHERE date = ? AND shop_id = ?",
-            (today, shop_id)
-        )
+        # Ensure tables exist (in case init was not called)
+        cursor.execute("CREATE TABLE IF NOT EXISTS shop_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, shop_id TEXT, count INTEGER DEFAULT 1)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS logs (shop_id TEXT, timestamp TEXT)")
+        # Update daily count in shop_logs
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        cursor.execute("SELECT count FROM shop_logs WHERE date = ? AND shop_id = ?", (today_str, shop_id))
         row = cursor.fetchone()
         if row:
-            cursor.execute(
-                "UPDATE shop_logs SET count = count + 1 WHERE date = ? AND shop_id = ?",
-                (today, shop_id)
-            )
+            cursor.execute("UPDATE shop_logs SET count = count + 1 WHERE date = ? AND shop_id = ?", (today_str, shop_id))
         else:
-            cursor.execute(
-                "INSERT INTO shop_logs (date, shop_id, count) VALUES (?, ?, 1)",
-                (today, shop_id)
-            )
+            cursor.execute("INSERT INTO shop_logs (date, shop_id, count) VALUES (?, ?, ?)", (today_str, shop_id, 1))
+        # Insert raw log entry
+        cursor.execute("INSERT INTO logs (shop_id, timestamp) VALUES (?, ?)", (shop_id, now_iso))
         conn.commit()
+    except Exception as e:
+        print("❌ Error updating shop_log.db:", e)
+        traceback.print_exc()
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
+    # Update CSV counter
+    try:
+        update_shop_counter(shop_id)
+    except Exception as e:
+        print("❌ Error updating shop_counter.csv:", e)
+        traceback.print_exc()
 
+# Run initialization
 init_shop_db()
 
-load_dotenv()
-
-BASE_URL = os.getenv("BASE_URL", "https://shincom-unified.onrender.com")
-
-
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "defaultsecretkey")
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
-UPLOAD_FOLDER = 'static/uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-
+# Background thread task to generate PDF and handle post-processing
+def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
+    try:
+        create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
+    except Exception as e:
+        print(f"❌ PDF generation error (mode={pdf_mode}, uuid={uuid_str}):", e)
+        traceback.print_exc()
+        return
+    # Mark UUID as used if applicable
+    if uuid_str:
+        try:
+            with used_file_lock:
+                lines_content = []
+                if os.path.exists(USED_UUID_FILE):
+                    with open(USED_UUID_FILE, "r") as f:
+                        lines_content = [line.strip() for line in f if line.strip()]
+                updated_lines = []
+                for line in lines_content:
+                    parts = line.split(",")
+                    if len(parts) >= 3:
+                        uid, flag, mode = parts[0], parts[1], parts[2]
+                        if uid == uuid_str:
+                            updated_lines.append(f"{uid},used,{mode}")
+                        else:
+                            updated_lines.append(line)
+                with open(USED_UUID_FILE, "w") as f:
+                    for line in updated_lines:
+                        f.write(line + "\n")
+        except Exception as e:
+            print(f"❌ Error updating {USED_UUID_FILE} for {uuid_str}:", e)
+            traceback.print_exc()
+    # Write to access_log.txt if applicable
+    if shop_id and uuid_str:
+        try:
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with open("access_log.txt", "a", encoding="utf-8") as f:
+                f.write(f"{now_str},{shop_id},{uuid_str}\n")
+        except Exception as e:
+            print(f"❌ Error writing access_log for {uuid_str}:", e)
+            traceback.print_exc()
 
 @app.route("/ten", methods=["GET", "POST"], endpoint="ten")
 @app.route("/tenmob", methods=["GET", "POST"], endpoint="tenmob")
 def ten_shincom():
+    # Login required for store mode
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
-
     mode = "shincom"
     size = "B4" if request.path == "/ten" else "A4"
-    is_json = request.is_json
-
     if request.method == "POST":
+        is_json = request.is_json
         try:
-            pass
             data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
-
+            # Validate birthdate format
             try:
-                pass
                 year, month, day = map(int, birthdate.split("-"))
-                except Exception:
+            except Exception:
                 return "生年月日が不正です", 400
-
+            # Get lucky direction text (九星気学), with fallback on error
             try:
-                pass
                 kyusei_text = get_kyusei_fortune(year, month, day)
-                except Exception as e:
-        print("❌ lucky_direction 取得エラー:", e)
+            except Exception as e:
+                print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
-
             eto = get_nicchu_eto(birthdate)
+            # Generate fortune results
             palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(
                 image_data, birthdate, kyusei_text
             )
-
             summary_text = ""
             if len(palm_texts) == 6:
+                # If palm_texts has a summary element, separate it
                 summary_text = palm_texts.pop()
-
-        now = datetime.now()
+            # Prepare labels for year and month sections
+            now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
                 target1 += relativedelta(months=1)
@@ -117,7 +211,7 @@ def ten_shincom():
             year_label = f"{now.year}年の運勢"
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
-
+            # Compile result data for PDF template
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
@@ -143,56 +237,45 @@ def ten_shincom():
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "palm_image": image_data
             }
-
+            # Include full-year fortunes if requested
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, now)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
-
+            # Generate PDF asynchronously to avoid blocking
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
-            create_pdf_unified(filepath, result_data, mode, size=size.lower(), include_yearly=full_year)
-            return jsonify({"redirect_url": url_for("preview", filename=filename)}) if is_json else redirect(url_for("preview", filename=filename))
-                    # ✅ access_log.txt への書き込み
-                    try:
-        pass
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open("access_log.txt", "a", encoding="utf-8") as f:
-        f.write(f"{now},{shop_id},{uuid_str}\n")
-                        except Exception as e:
-        print("❌ テキストログ書き込み失敗:", e)
-            except Exception as e:
+            threading.Thread(
+                target=background_generate_pdf,
+                args=(filepath, result_data, mode, size.lower(), full_year)
+            ).start()
+            # Return a redirect to the preview page (or JSON link if API call)
+            redirect_url = url_for("preview", filename=filename)
+            if is_json:
+                return jsonify({"redirect_url": redirect_url})
+            else:
+                return redirect(redirect_url)
+        except Exception as e:
             traceback.print_exc()
-            return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
-                    # ✅ access_log.txt への書き込み
-                    try:
-        pass
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open("access_log.txt", "a", encoding="utf-8") as f:
-        f.write(f"{now},{shop_id},{uuid_str}\n")
-                        except Exception as e:
-        print("❌ テキストログ書き込み失敗:", e)
-
+            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
+    # GET request: render input form
     return render_template("index.html")
-
-
-
 
 @app.route("/renai", methods=["GET", "POST"])
 @app.route("/renaib4", methods=["GET", "POST"])
 def renai():
-    # Login required for store usage (love fortune)
+    # Login required for store mode (love fortune)
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
-
     size = "A4" if request.path == "/renai" else "B4"
-
     if request.method == "POST":
         user_birth = request.form.get("user_birth")
         partner_birth = request.form.get("partner_birth")
         include_yearly = request.form.get("include_yearly") == "yes"
-
+        # Validate user birthdate
+        if not user_birth or not isinstance(user_birth, str):
+            return "生年月日が不正です", 400
         # Prepare labels for love fortune sections
         now = datetime.now()
         target1 = now.replace(day=15)
@@ -202,8 +285,7 @@ def renai():
         year_label = f"{now.year}年の恋愛運"
         month_label = f"{target1.year}年{target1.month}月の恋愛運"
         next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
-
-        # Generate love fortune results (with optional yearly data)
+        # Generate love fortune results (including yearly if selected)
         raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
         result_data = {
             "texts": {
@@ -225,38 +307,28 @@ def renai():
             "lucky_direction": raw_result.get("lucky_direction", ""),
             "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
         }
-
+        # Generate PDF asynchronously (filename includes a random UUID for uniqueness)
         filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
-        create_pdf_unified(filepath, result_data, "renai", size=size.lower(), include_yearly=include_yearly)
-        return send_file(filepath, as_attachment=True)
-
-    # Render input form for love fortune (two birthdates)
+        threading.Thread(
+            target=background_generate_pdf,
+            args=(filepath, result_data, "renai", size.lower(), include_yearly)
+        ).start()
+        # Redirect to preview page to view/download the PDF
+        return redirect(url_for("preview", filename=filename))
+    # GET: render input form for love fortune
     return render_template("renai_form.html")
-
-
 
 @app.route("/selfmob", methods=["GET"])
 def selfmob_start():
     # Payment start page (offers normal or love purchase options)
     return render_template("pay.html")
 
-# Enhanced UUID flow for selfmob (normal) and renaiselfmob (love)
-UPLOAD_FOLDER = "static/uploads"
-USED_UUID_FILE = "used_orders.txt"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-if not os.path.exists(USED_UUID_FILE):
-    open(USED_UUID_FILE, "w").close()
-
-
-
-
 @app.route("/generate_link/<shop_id>")
 def generate_link(shop_id):
     uuid_str = str(uuid.uuid4())
     redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
     metadata = json.dumps({"shop_id": shop_id})
-
     komoju_url = create_payment_link(
         price=500,
         uuid_str=uuid_str,
@@ -266,23 +338,17 @@ def generate_link(shop_id):
         mode="selfmob"
     )
     print("🔗 通常決済URL:", komoju_url)
-
     with open(USED_UUID_FILE, "a") as f:
         f.write(f"{uuid_str},0,selfmob\n")
-
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
-
-
-
 
 @app.route("/generate_link_full/<shop_id>")
 def generate_link_full(shop_id):
     uuid_str = str(uuid.uuid4())
     redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
     metadata = json.dumps({"shop_id": shop_id})
-
     komoju_url = create_payment_link(
         price=1000,
         uuid_str=uuid_str,
@@ -292,23 +358,17 @@ def generate_link_full(shop_id):
         mode="selfmob"
     )
     print("🔗 FULL通常決済URL:", komoju_url)
-
     with open(USED_UUID_FILE, "a") as f:
         f.write(f"{uuid_str},1,selfmob\n")
-
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
-
-
-
 
 @app.route("/generate_link_renai/<shop_id>")
 def generate_link_renai(shop_id):
     uuid_str = str(uuid.uuid4())
     redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
     metadata = json.dumps({"shop_id": shop_id})
-
     komoju_url = create_payment_link(
         price=500,
         uuid_str=uuid_str,
@@ -318,23 +378,17 @@ def generate_link_renai(shop_id):
         mode="renaiselfmob"
     )
     print("🔗 恋愛通常決済URL:", komoju_url)
-
     with open(USED_UUID_FILE, "a") as f:
         f.write(f"{uuid_str},0,renaiselfmob\n")
-
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
-
-
-
 
 @app.route("/generate_link_renai_full/<shop_id>")
 def generate_link_renai_full_with_shopid(shop_id):
     uuid_str = str(uuid.uuid4())
     redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
     metadata = json.dumps({"shop_id": shop_id})
-
     komoju_url = create_payment_link(
         price=1000,
         uuid_str=uuid_str,
@@ -344,168 +398,148 @@ def generate_link_renai_full_with_shopid(shop_id):
         mode="renaiselfmob"
     )
     print("🔗 FULL恋愛決済URL:", komoju_url)
-
     with open(USED_UUID_FILE, "a") as f:
         f.write(f"{uuid_str},1,renaiselfmob\n")
-
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
-
-
-
 
 @app.route("/thanks")
 def thanks():
     uuid_str = request.cookies.get("uuid") or request.args.get("uuid")
     if not uuid_str:
         return render_template("thanks.html")
-
     mode = "selfmob"
     try:
-        pass
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
                 if len(parts) >= 3 and parts[0] == uuid_str:
                     mode = parts[2]
                     break
-        except:
+    except FileNotFoundError:
+        # If the tracking file doesn't exist (should not normally happen), default to "selfmob"
         pass
-
     return redirect(f"/{mode}/{uuid_str}")
-
-
-
-
-
 
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
     try:
-        pass
         data = request.get_json()
         if data.get("event") == "payment.captured":
             uuid_str = data["data"]["attributes"].get("external_order_num")
             metadata = data["data"]["attributes"].get("metadata", {})
             shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
-
             if uuid_str:
                 print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
-
-                # ✅ 店舗ログ（DB＋CSV）に記録
+                # Log shop usage in DB and CSV
                 update_shop_db(shop_id)
-
-                # ✅ UUID を used に更新
-                updated_lines = []
-                found = False
+                # Mark UUID as used in used_orders file
                 if os.path.exists(USED_UUID_FILE):
-        with open(USED_UUID_FILE, "r") as f:
-                        for line in f:
-                            parts = line.strip().split(",")
-                            if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "selfmob":
-                                updated_lines.append(f"{uuid_str},used,selfmob\n")
-                                found = True
-                            else:
-                                updated_lines.append(line)
-                    if found:
-        with open(USED_UUID_FILE, "w") as f:
-                            f.writelines(updated_lines)
-        return "", 200
-        except Exception as e:
+                    try:
+                        with used_file_lock:
+                            lines = []
+                            with open(USED_UUID_FILE, "r") as f:
+                                lines = f.readlines()
+                            updated_lines = []
+                            found = False
+                            for line in lines:
+                                parts = line.strip().split(",")
+                                if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "selfmob":
+                                    updated_lines.append(f"{uuid_str},used,selfmob\n")
+                                    found = True
+                                else:
+                                    updated_lines.append(line)
+                            if found:
+                                with open(USED_UUID_FILE, "w") as f:
+                                    f.writelines(updated_lines)
+                    except Exception as e:
+                        print("❌ Error updating used_orders in webhook (selfmob):", e)
+                return "", 200
+    except Exception as e:
         print("❌ Webhook error (selfmob):", e)
-        return "", 400
-
-
+    return "", 400
 
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
     try:
-        pass
         data = request.get_json()
         if data.get("event") == "payment.captured":
             uuid_str = data["data"]["attributes"].get("external_order_num")
             metadata = data["data"]["attributes"].get("metadata", {})
             shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
-
             if uuid_str:
                 print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
-
-                # ✅ 店舗ログ（DB＋CSV）に記録
+                # Log shop usage in DB and CSV
                 update_shop_db(shop_id)
-
-                # ✅ UUID を used に更新
-                updated_lines = []
-                found = False
+                # Mark UUID as used in used_orders file
                 if os.path.exists(USED_UUID_FILE):
-        with open(USED_UUID_FILE, "r") as f:
-                        for line in f:
-                            parts = line.strip().split(",")
-                            if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "renaiselfmob":
-                                updated_lines.append(f"{uuid_str},used,renaiselfmob\n")
-                                found = True
-                            else:
-                                updated_lines.append(line)
-                    if found:
-        with open(USED_UUID_FILE, "w") as f:
-                            f.writelines(updated_lines)
-        return "", 200
-        except Exception as e:
+                    try:
+                        with used_file_lock:
+                            lines = []
+                            with open(USED_UUID_FILE, "r") as f:
+                                lines = f.readlines()
+                            updated_lines = []
+                            found = False
+                            for line in lines:
+                                parts = line.strip().split(",")
+                                if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "renaiselfmob":
+                                    updated_lines.append(f"{uuid_str},used,renaiselfmob\n")
+                                    found = True
+                                else:
+                                    updated_lines.append(line)
+                            if found:
+                                with open(USED_UUID_FILE, "w") as f:
+                                    f.writelines(updated_lines)
+                    except Exception as e:
+                        print("❌ Error updating used_orders in webhook (renai):", e)
+                return "", 200
+    except Exception as e:
         print("❌ Webhook error (renai):", e)
-        return "", 400
-
-
-
-
-
-
+    return "", 400
 
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
     full_year = None
     lines = []
+    # Verify UUID existence and get full_year flag from used_orders.txt
     try:
-        pass
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
-            for uid, flag, mode in lines:
-                if uid == uuid_str and mode == "selfmob":
-                    full_year = (flag == "1")
-                    break
+        for uid, flag, mode in lines:
+            if uid == uuid_str and mode == "selfmob":
+                full_year = (flag == "1")
+                break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
-        except FileNotFoundError:
+    except FileNotFoundError:
         return "使用履歴が確認できません", 400
-
+    # Handle fortune generation after payment
     if request.method == "POST":
+        is_json = request.is_json
         try:
-            pass
-            data = request.get_json() if request.is_json else request.form
+            data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
-
+            # Validate birthdate
             try:
-                pass
                 year, month, day = map(int, birthdate.split("-"))
-                except Exception:
+            except Exception:
                 return "生年月日が不正です", 400
-
+            # Get lucky direction (with error handling)
             try:
-                pass
                 kyusei_text = get_kyusei_fortune(year, month, day)
-                except Exception as e:
-        print("❌ lucky_direction 取得エラー:", e)
+            except Exception as e:
+                print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
-
             eto = get_nicchu_eto(birthdate)
-
+            # Generate results using shincom fortune logic
             palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
                 image_data, birthdate, kyusei_text
             )
-
             palm_result = "\n".join(palm_texts)
             summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
-
+            # Convert lucky_info to a list of lines (string or list/dict)
             lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
@@ -529,7 +563,7 @@ def selfmob_uuid(uuid_str):
                             if line.startswith("・"):
                                 line = line[1:].strip()
                             lucky_lines.append(line.replace(":", "：", 1))
-
+            # Prepare titles for output sections
             today = datetime.today()
             target1 = today.replace(day=15)
             if today.day >= 20:
@@ -538,7 +572,6 @@ def selfmob_uuid(uuid_str):
             year_label = f"{today.year}年の運勢"
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
-
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
@@ -564,51 +597,29 @@ def selfmob_uuid(uuid_str):
                 "iching_result": iching_result,
                 "palm_image": image_data
             }
-
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, today)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
-
+            # Generate PDF in background thread and mark usage
             filename = f"result_{uuid_str}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
-            create_pdf_unified(filepath, result_data, "shincom", size="a4", include_yearly=full_year)
-
-        with open(USED_UUID_FILE, "w") as f:
-                for uid, flag, mode in lines:
-                    if uid != uuid_str:
-        f.write(f"{uid},{flag},{mode}\n")
-                    else:
-        f.write(f"{uid},used,{mode}\n")
-
+            shop_id = session.get("shop_id", "default")
+            threading.Thread(
+                target=background_generate_pdf,
+                args=(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id)
+            ).start()
             redirect_url = url_for("preview", filename=filename)
-            return jsonify({"redirect_url": redirect_url}) if request.is_json else redirect(redirect_url)
-                    # ✅ access_log.txt への書き込み
-                    try:
-        pass
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open("access_log.txt", "a", encoding="utf-8") as f:
-        f.write(f"{now},{shop_id},{uuid_str}\n")
-                        except Exception as e:
-        print("❌ テキストログ書き込み失敗:", e)
-
-            except Exception as e:
+            if is_json:
+                return jsonify({"redirect_url": redirect_url})
+            else:
+                return redirect(redirect_url)
+        except Exception as e:
             print("処理エラー:", e)
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
-                    # ✅ access_log.txt への書き込み
-                    try:
-        pass
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open("access_log.txt", "a", encoding="utf-8") as f:
-        f.write(f"{now},{shop_id},{uuid_str}\n")
-                        except Exception as e:
-        print("❌ テキストログ書き込み失敗:", e)
-
+    # GET: render the input page for paid user
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
-
-
-
 
 @app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
@@ -616,39 +627,32 @@ def renaiselfmob_uuid(uuid_str):
     full_year = None
     lines = []
     try:
-        pass
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
-            for uid, flag, mode in lines:
-                if uid == uuid_str:
-                    full_year = (flag == "1")
-                    break
+        for uid, flag, mode in lines:
+            if uid == uuid_str:
+                full_year = (flag == "1")
+                break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
-        except FileNotFoundError:
+    except FileNotFoundError:
         return "使用履歴が確認できません", 400
-
     if request.method == "POST":
         try:
-            pass
             user_birth = request.form.get("user_birth")
             partner_birth = request.form.get("partner_birth")
-
             if not user_birth or not isinstance(user_birth, str):
                 return "生年月日が不正です", 400
-
-        now = datetime.now()
+            # Prepare labels for the love fortune output
+            now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
-
             year_label = f"{now.year}年の恋愛運"
             month_label = f"{target1.year}年{target1.month}月の恋愛運"
             next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
-
             raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
-
             result_data = {
                 "texts": {
                     "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
@@ -669,38 +673,23 @@ def renaiselfmob_uuid(uuid_str):
                 "lucky_direction": raw_result.get("lucky_direction", ""),
                 "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
             }
-
             filename = f"renai_{uuid_str}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
-            create_pdf_unified(filepath, result_data, "renai", size="a4", include_yearly=full_year)
-
-        with open(USED_UUID_FILE, "w") as f:
-                for uid, flag, mode in lines:
-                    if uid != uuid_str:
-        f.write(f"{uid},{flag},{mode}\n")
-                    else:
-        f.write(f"{uid},used,{mode}\n")
-
+            shop_id = session.get("shop_id", "default")
+            threading.Thread(
+                target=background_generate_pdf,
+                args=(filepath, result_data, "renai", "a4", full_year, uuid_str, shop_id)
+            ).start()
             return redirect(url_for("preview", filename=filename))
-                    # ✅ access_log.txt への書き込み
-                    try:
-        pass
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open("access_log.txt", "a", encoding="utf-8") as f:
-        f.write(f"{now},{shop_id},{uuid_str}\n")
-                        except Exception as e:
-        print("❌ テキストログ書き込み失敗:", e)
-
-            except Exception as e:
+        except Exception as e:
             print("処理エラー:", e)
             return "処理中にエラーが発生しました", 500
-
+    # GET: render the input page for love fortune (after payment)
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
-
 
 @app.route("/preview/<filename>")
 def preview(filename):
-    # If coming from an internal route, show PDF inline; otherwise show a static page with link
+    # If coming from an internal route, show PDF inline; otherwise show a static page with a link
     referer = request.referrer or ""
     if any(x in referer for x in ["/tenmob", "/selfmob", "/renai"]):
         return redirect(url_for("view_pdf", filename=filename))
@@ -708,14 +697,11 @@ def preview(filename):
 
 @app.route("/view/<filename>")
 def view_pdf(filename):
-    # Serve the generated PDF file
+    # Serve the generated PDF file if it exists
     filepath = os.path.join("static", "uploads", filename)
     if not os.path.exists(filepath):
         return "ファイルが存在しません", 404
     return send_file(filepath, mimetype='application/pdf')
-
-
-
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -724,19 +710,16 @@ def login():
         password = request.form.get("password")
         next_url_post = request.form.get("next_url", "tenmob")
         # Allow only known endpoints
-        if next_url_post not in ["ten", "tenmob", "renai", "renaimob", "renaib4"]:
+        if next_url_post not in ["ten", "tenmob", "renai", "renaib4"]:
             next_url_post = "tenmob"
         if password == os.getenv("LOGIN_PASSWORD", "pass"):
             session["logged_in"] = True
             return redirect(url_for(next_url_post))
         else:
             return render_template("login.html", next_url=next_url_post)
-    # GET request: show login form
+    # GET: show login form
     next_url = request.args.get("next", "tenmob")
     return render_template("login.html", next_url=next_url)
-
-
-
 
 @app.route("/logout")
 def logout():
@@ -761,114 +744,39 @@ def terms():
 
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
+    # AJAX endpoint to get Chinese zodiac (eto) and honmeisei from birthdate
     try:
-        pass
         birthdate = request.json.get("birthdate")
-        if not birthdate or not isinstance(birthdate, str):
-            return jsonify({"error": "無効な生年月日です"}), 400
-                    # ✅ access_log.txt への書き込み
-                    try:
-        pass
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open("access_log.txt", "a", encoding="utf-8") as f:
-        f.write(f"{now},{shop_id},{uuid_str}\n")
-                        except Exception as e:
-        print("❌ テキストログ書き込み失敗:", e)
-
+    except Exception:
+        return jsonify({"error": "無効な生年月日です"}), 400
+    if not birthdate or not isinstance(birthdate, str):
+        return jsonify({"error": "無効な生年月日です"}), 400
+    try:
         y, m, d = map(int, birthdate.split("-"))
-        eto = get_nicchu_eto(birthdate)
-        honmeisei = get_honmeisei(y, m, d)
-
-        return jsonify({"eto": eto, "honmeisei": honmeisei})
-                # ✅ access_log.txt への書き込み
-                try:
-        pass
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open("access_log.txt", "a", encoding="utf-8") as f:
-        f.write(f"{now},{shop_id},{uuid_str}\n")
-                    except Exception as e:
-        print("❌ テキストログ書き込み失敗:", e)
-        except Exception as e:
-        print("❌ /get_eto エラー:", e)
-        return jsonify({"error": "干支または本命星の取得中にエラーが発生しました"}), 500
-                # ✅ access_log.txt への書き込み
-                try:
-        pass
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open("access_log.txt", "a", encoding="utf-8") as f:
-        f.write(f"{now},{shop_id},{uuid_str}\n")
-                    except Exception as e:
-        print("❌ テキストログ書き込み失敗:", e)
-
-
+    except Exception:
+        return jsonify({"error": "無効な生年月日です"}), 400
+    eto = get_nicchu_eto(birthdate)
+    honmeisei = get_honmeisei(y, m, d)
+    return jsonify({"eto": eto, "honmeisei": honmeisei})
 
 @app.route("/download_shop_log")
 def download_shop_log():
     filepath = "shop_counter.csv"
     if not os.path.exists(filepath):
+        # Create file with header if it doesn't exist
         with open(filepath, "w", encoding="utf-8") as f:
-        f.write("date,shop_id,count\n")
+            f.write("date,shop_id,count\n")
     return send_file(filepath, as_attachment=True)
-
-
-
-def update_shop_db(shop_id):
-    now = datetime.now().isoformat()
-
-    # ✅ DBへの記録
-    conn = sqlite3.connect("shop_log.db")
-    cursor = conn.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS logs (shop_id TEXT, timestamp TEXT)")
-    cursor.execute("INSERT INTO logs (shop_id, timestamp) VALUES (?, ?)", (shop_id, now))
-    conn.commit()
-    conn.close()
-
-    # ✅ CSVファイルへのカウント追記
-    update_shop_counter(shop_id)
-
-
-
-def update_shop_counter(shop_id):
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    count_file = "shop_log.csv"
-
-    # ✅ 既存データ読み込み
-    rows = {}
-    if os.path.exists(count_file):
-        with open(count_file, newline="", encoding="utf-8") as csvfile:
-            reader = csv.reader(csvfile)
-            for row in reader:
-                if len(row) == 3:
-                    key = (row[0], row[1])
-                    rows[key] = int(row[2])
-
-    # ✅ 該当キーをカウントアップ
-    key = (shop_id, date_str)
-    rows[key] = rows.get(key, 0) + 1
-
-    # ✅ ファイルに再出力
-    with open(count_file, "w", newline="", encoding="utf-8") as csvfile:
-        writer = csv.writer(csvfile)
-        for (sid, date), count in sorted(rows.items()):
-            writer.writerow([sid, date, count])
-
-
-
-
-
 
 @app.route("/selfmob-<shop_id>")
 def selfmob_shop_entry(shop_id):
     session["shop_id"] = shop_id
     return render_template("pay.html", shop_id=shop_id)
 
-
-
 def _generate_link_with_shopid(shop_id, full_year=False):
     uuid_str = str(uuid.uuid4())
     redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
     metadata = json.dumps({"shop_id": shop_id})
-
     komoju_url = create_payment_link(
         price=1000 if full_year else 500,
         uuid_str=uuid_str,
@@ -878,16 +786,11 @@ def _generate_link_with_shopid(shop_id, full_year=False):
         mode="selfmob"
     )
     print("🔗 補助リンク生成:", komoju_url)
-
     with open(USED_UUID_FILE, "a") as f:
         f.write(f"{uuid_str},{int(full_year)},selfmob\n")
-
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
-
-
-
 
 @app.route("/view_shop_log")
 def view_shop_log():
@@ -897,18 +800,9 @@ def view_shop_log():
         logs = cursor.fetchall()
     return render_template("shop_log.html", logs=logs)
 
-
 def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False, mode="selfmob"):
     """
     KOMOJU決済リンク生成（通常・恋愛／年運オプション対応）
-    
-    Parameters:
-        - price: 決済金額
-        - uuid_str: 一意の外部ID
-        - redirect_url: 決済完了後の遷移先URL
-        - metadata: JSON文字列（例：{"shop_id": "01"}）
-        - full_year: Trueの場合は年運付き（Public Link IDが異なる）
-        - mode: "selfmob" or "renaiselfmob"
     """
     if mode == "renaiselfmob":
         komoju_id = os.getenv(
@@ -918,19 +812,15 @@ def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False
         komoju_id = os.getenv(
             "KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID"
         )
-
     if not komoju_id:
         raise ValueError("KOMOJUのPublic Link IDが未設定です。環境変数を確認してください。")
-
     encoded_redirect = quote(redirect_url, safe='')
     encoded_metadata = quote(metadata)
-
     komoju_url = (
         f"https://komoju.com/payment_links/{komoju_id}"
         f"?external_order_num={uuid_str}"
         f"&customer_redirect_url={encoded_redirect}"
         f"&metadata={encoded_metadata}"
     )
-
     print(f"🔗 決済URL [{mode}] (full={full_year}):", komoju_url)
     return komoju_url
