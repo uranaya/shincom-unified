@@ -302,8 +302,7 @@ def generate_link_renai_full_with_shopid(shop_id):
 
 @app.route("/thanks")
 def thanks():
-    # After payment, redirect to the appropriate UUID page
-    uuid_str = request.cookies.get("uuid")
+    uuid_str = request.cookies.get("uuid") or request.args.get("uuid")
     if not uuid_str:
         return render_template("thanks.html")
 
@@ -313,12 +312,13 @@ def thanks():
             for line in f:
                 parts = line.strip().split(",")
                 if len(parts) >= 3 and parts[0] == uuid_str:
-                    mode = parts[2]  # e.g. "selfmob" or "renaiselfmob"
+                    mode = parts[2]
                     break
     except:
         pass
 
     return redirect(f"/{mode}/{uuid_str}")
+
 
 
 
