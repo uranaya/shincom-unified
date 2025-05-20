@@ -735,31 +735,48 @@ def download_shop_log():
 
 
 
+def update_shop_db(shop_id):
+    now = datetime.now().isoformat()
+
+    # ✅ DBへの記録
+    conn = sqlite3.connect("shop_log.db")
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS logs (shop_id TEXT, timestamp TEXT)")
+    cursor.execute("INSERT INTO logs (shop_id, timestamp) VALUES (?, ?)", (shop_id, now))
+    conn.commit()
+    conn.close()
+
+    # ✅ CSVファイルへのカウント追記
+    update_shop_counter(shop_id)
+
+
+
 def update_shop_counter(shop_id):
-    today = datetime.now().strftime("%Y-%m-%d")
-    filepath = "shop_counter.csv"
-    rows = []
-    updated = False
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    count_file = "shop_log.csv"
 
-    try:
-        with open(filepath, newline='', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            rows = list(reader)
-    except FileNotFoundError:
-        rows = [["date", "shop_id", "count"]]
+    # ✅ 既存データ読み込み
+    rows = {}
+    if os.path.exists(count_file):
+        with open(count_file, newline="", encoding="utf-8") as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                if len(row) == 3:
+                    key = (row[0], row[1])
+                    rows[key] = int(row[2])
 
-    for row in rows:
-        if len(row) == 3 and row[0] == today and row[1] == shop_id:
-            row[2] = str(int(row[2]) + 1)
-            updated = True
-            break
+    # ✅ 該当キーをカウントアップ
+    key = (shop_id, date_str)
+    rows[key] = rows.get(key, 0) + 1
 
-    if not updated:
-        rows.append([today, shop_id, "1"])
+    # ✅ ファイルに再出力
+    with open(count_file, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        for (sid, date), count in sorted(rows.items()):
+            writer.writerow([sid, date, count])
 
-    with open(filepath, "w", newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        writer.writerows(rows)
+
+
 
 
 
