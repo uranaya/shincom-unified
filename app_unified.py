@@ -81,17 +81,20 @@ def ten_shincom():
 
     if request.method == "POST":
         try:
+            pass
             data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
 
             try:
+                pass
                 year, month, day = map(int, birthdate.split("-"))
                 except Exception:
                 return "生年月日が不正です", 400
 
             try:
+                pass
                 kyusei_text = get_kyusei_fortune(year, month, day)
                 except Exception as e:
         print("❌ lucky_direction 取得エラー:", e)
@@ -153,6 +156,7 @@ def ten_shincom():
             return jsonify({"redirect_url": url_for("preview", filename=filename)}) if is_json else redirect(url_for("preview", filename=filename))
                     # ✅ access_log.txt への書き込み
                     try:
+        pass
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
@@ -163,6 +167,7 @@ def ten_shincom():
             return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
                     # ✅ access_log.txt への書き込み
                     try:
+        pass
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
@@ -358,6 +363,7 @@ def thanks():
 
     mode = "selfmob"
     try:
+        pass
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
@@ -377,6 +383,7 @@ def thanks():
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
     try:
+        pass
         data = request.get_json()
         if data.get("event") == "payment.captured":
             uuid_str = data["data"]["attributes"].get("external_order_num")
@@ -414,6 +421,7 @@ def webhook_selfmob():
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
     try:
+        pass
         data = request.get_json()
         if data.get("event") == "payment.captured":
             uuid_str = data["data"]["attributes"].get("external_order_num")
@@ -457,6 +465,7 @@ def selfmob_uuid(uuid_str):
     full_year = None
     lines = []
     try:
+        pass
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
             for uid, flag, mode in lines:
@@ -470,16 +479,19 @@ def selfmob_uuid(uuid_str):
 
     if request.method == "POST":
         try:
+            pass
             data = request.get_json() if request.is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
 
             try:
+                pass
                 year, month, day = map(int, birthdate.split("-"))
                 except Exception:
                 return "生年月日が不正です", 400
 
             try:
+                pass
                 kyusei_text = get_kyusei_fortune(year, month, day)
                 except Exception as e:
         print("❌ lucky_direction 取得エラー:", e)
@@ -574,6 +586,7 @@ def selfmob_uuid(uuid_str):
             return jsonify({"redirect_url": redirect_url}) if request.is_json else redirect(redirect_url)
                     # ✅ access_log.txt への書き込み
                     try:
+        pass
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
@@ -585,6 +598,7 @@ def selfmob_uuid(uuid_str):
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
                     # ✅ access_log.txt への書き込み
                     try:
+        pass
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
@@ -602,6 +616,7 @@ def renaiselfmob_uuid(uuid_str):
     full_year = None
     lines = []
     try:
+        pass
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
             for uid, flag, mode in lines:
@@ -615,6 +630,7 @@ def renaiselfmob_uuid(uuid_str):
 
     if request.method == "POST":
         try:
+            pass
             user_birth = request.form.get("user_birth")
             partner_birth = request.form.get("partner_birth")
 
@@ -668,6 +684,7 @@ def renaiselfmob_uuid(uuid_str):
             return redirect(url_for("preview", filename=filename))
                     # ✅ access_log.txt への書き込み
                     try:
+        pass
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
@@ -745,11 +762,13 @@ def terms():
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
     try:
+        pass
         birthdate = request.json.get("birthdate")
         if not birthdate or not isinstance(birthdate, str):
             return jsonify({"error": "無効な生年月日です"}), 400
                     # ✅ access_log.txt への書き込み
                     try:
+        pass
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
@@ -763,6 +782,7 @@ def get_eto():
         return jsonify({"eto": eto, "honmeisei": honmeisei})
                 # ✅ access_log.txt への書き込み
                 try:
+        pass
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
@@ -773,6 +793,7 @@ def get_eto():
         return jsonify({"error": "干支または本命星の取得中にエラーが発生しました"}), 500
                 # ✅ access_log.txt への書き込み
                 try:
+        pass
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
