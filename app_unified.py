@@ -235,17 +235,25 @@ if not os.path.exists(USED_UUID_FILE):
 @app.route("/generate_link/<shop_id>")
 def generate_link(shop_id):
     uuid_str = str(uuid.uuid4())
-    redirect_url = f"{BASE_URL}/selfmob/{uuid_str}"
+    redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
     metadata = json.dumps({"shop_id": shop_id})
 
     komoju_url = create_payment_link(
         price=500,
         uuid_str=uuid_str,
         redirect_url=redirect_url,
-        metadata=metadata
+        metadata=metadata,
+        full_year=False,
+        mode="selfmob"
     )
     print("🔗 通常決済URL:", komoju_url)
-    return redirect(komoju_url)
+
+    with open(USED_UUID_FILE, "a") as f:
+        f.write(f"{uuid_str},0,selfmob\n")
+
+    resp = make_response(redirect(komoju_url))
+    resp.set_cookie("uuid", uuid_str, max_age=600)
+    return resp
 
 
 
@@ -253,19 +261,19 @@ def generate_link(shop_id):
 @app.route("/generate_link_full/<shop_id>")
 def generate_link_full(shop_id):
     uuid_str = str(uuid.uuid4())
-    redirect_url = f"{BASE_URL}/selfmob/{uuid_str}"
+    redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
     metadata = json.dumps({"shop_id": shop_id})
-    
+
     komoju_url = create_payment_link(
         price=1000,
         uuid_str=uuid_str,
         redirect_url=redirect_url,
         metadata=metadata,
-        full_year=True
+        full_year=True,
+        mode="selfmob"
     )
     print("🔗 FULL通常決済URL:", komoju_url)
-    
-    # UUID + フラグ + モードを記録
+
     with open(USED_UUID_FILE, "a") as f:
         f.write(f"{uuid_str},1,selfmob\n")
 
@@ -276,10 +284,11 @@ def generate_link_full(shop_id):
 
 
 
+
 @app.route("/generate_link_renai_full/<shop_id>")
 def generate_link_renai_full_with_shopid(shop_id):
     uuid_str = str(uuid.uuid4())
-    redirect_url = f"{BASE_URL}/renaiselfmob/{uuid_str}"
+    redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
     metadata = json.dumps({"shop_id": shop_id})
 
     komoju_url = create_payment_link(
@@ -287,7 +296,8 @@ def generate_link_renai_full_with_shopid(shop_id):
         uuid_str=uuid_str,
         redirect_url=redirect_url,
         metadata=metadata,
-        full_year=True
+        full_year=True,
+        mode="renaiselfmob"
     )
     print("🔗 FULL恋愛決済URL:", komoju_url)
 
@@ -297,6 +307,7 @@ def generate_link_renai_full_with_shopid(shop_id):
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
+
 
 
 
@@ -318,6 +329,7 @@ def thanks():
         pass
 
     return redirect(f"/{mode}/{uuid_str}")
+
 
 
 
@@ -617,6 +629,9 @@ def view_pdf(filename):
         return "ファイルが存在しません", 404
     return send_file(filepath, mimetype='application/pdf')
 
+
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     # Simple password login for store mode
@@ -634,6 +649,9 @@ def login():
     # GET request: show login form
     next_url = request.args.get("next", "tenmob")
     return render_template("login.html", next_url=next_url)
+
+
+
 
 @app.route("/logout")
 def logout():
@@ -672,6 +690,8 @@ def get_eto():
         print("❌ /get_eto エラー:", e)
         return jsonify({"error": "干支または本命星の取得中にエラーが発生しました"}), 500
 
+
+
 @app.route("/download_shop_log")
 def download_shop_log():
     filepath = "shop_counter.csv"
@@ -679,6 +699,8 @@ def download_shop_log():
         with open(filepath, "w", encoding="utf-8") as f:
             f.write("date,shop_id,count\n")
     return send_file(filepath, as_attachment=True)
+
+
 
 def update_shop_counter(shop_id):
     today = datetime.now().strftime("%Y-%m-%d")
@@ -706,32 +728,39 @@ def update_shop_counter(shop_id):
         writer = csv.writer(f)
         writer.writerows(rows)
 
+
+
 @app.route("/selfmob-<shop_id>")
 def selfmob_shop_entry(shop_id):
     session["shop_id"] = shop_id
     return render_template("pay.html", shop_id=shop_id)
 
-def _generate_link_with_shopid(shop_id="default", full_year=False):
-    komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
-    new_uuid = str(uuid.uuid4())
-    redirect_url = "https://shincom-unified.onrender.com/thanks"
-    encoded_redirect = quote(redirect_url, safe='')
 
+
+def _generate_link_with_shopid(shop_id, full_year=False):
+    uuid_str = str(uuid.uuid4())
+    redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
     metadata = json.dumps({"shop_id": shop_id})
-    komoju_url = (
-        f"https://komoju.com/payment_links/{komoju_id}"
-        f"?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
-        f"&metadata={quote(metadata)}"
-    )
-    print(f"🔗 決済URL for shop {shop_id}:", komoju_url)
 
-    # UUID + フラグ + モードを記録
+    komoju_url = create_payment_link(
+        price=1000 if full_year else 500,
+        uuid_str=uuid_str,
+        redirect_url=redirect_url,
+        metadata=metadata,
+        full_year=full_year,
+        mode="selfmob"
+    )
+    print("🔗 補助リンク生成:", komoju_url)
+
     with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{new_uuid},{int(full_year)},selfmob\n")
+        f.write(f"{uuid_str},{int(full_year)},selfmob\n")
 
     resp = make_response(redirect(komoju_url))
-    resp.set_cookie("uuid", new_uuid, max_age=600)
+    resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
+
+
+
 
 @app.route("/view_shop_log")
 def view_shop_log():
