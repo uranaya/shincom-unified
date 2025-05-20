@@ -7,3 +7,4 @@ reportlab
 qrcode
 requests
 sqlalchemy>=1.4
+psycopg2-binary
