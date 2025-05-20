@@ -4,29 +4,37 @@ import uuid
 import json
 import requests
 import traceback
+import csv
+import sqlite3
 from datetime import datetime
 from urllib.parse import quote
-import csv
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response
-from fortune_logic import generate_fortune
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
-from yearly_fortune_utils import generate_yearly_fortune
-from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
-from kyusei_utils import get_honmeisei, get_kyusei_fortune
-from pdf_generator_unified import create_pdf_unified
-from fortune_logic import generate_renai_fortune
 from threading import Thread
 
+# モジュール（ユーザー定義）
+from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto, generate_renai_fortune
+from yearly_fortune_utils import generate_yearly_fortune
+from kyusei_utils import get_honmeisei, get_kyusei_fortune
+from pdf_generator_unified import create_pdf_unified
+
+# === 環境・定数 ===
 load_dotenv()
 BASE_URL = os.getenv("BASE_URL", "https://shincom-unified.onrender.com")
+
+UPLOAD_FOLDER = "static/uploads"
+USED_UUID_FILE = "used_orders.txt"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+if not os.path.exists(USED_UUID_FILE):
+    open(USED_UUID_FILE, "w").close()
+
+# === Flaskアプリ定義 ===
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "defaultsecretkey")
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-init_shop_db()
 
-
+# === データベース初期化 ===
 def init_shop_db():
     with sqlite3.connect("shop_log.db") as conn:
         conn.execute("""
@@ -40,6 +48,9 @@ def init_shop_db():
         conn.commit()
     print("✅ shop_log.db initialized")
 
+init_shop_db()
+
+# === カウント保存ロジック ===
 def update_shop_db(shop_id):
     today = datetime.now().strftime("%Y-%m-%d")
     print(f"📝 update_shop_db called with shop_id = {shop_id}")
@@ -97,17 +108,10 @@ def update_shop_counter(shop_id):
         writer = csv.writer(f)
         writer.writerows(rows)
 
-# Payment start page (offers normal or love purchase options)
+# === 最初のルート ===
 @app.route("/selfmob")
 def selfmob_start():
     return render_template("pay.html")
-
-# Enhanced UUID flow for selfmob (normal) and renaiselfmob (love)
-UPLOAD_FOLDER = "static/uploads"
-USED_UUID_FILE = "used_orders.txt"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-if not os.path.exists(USED_UUID_FILE):
-    open(USED_UUID_FILE, "w").close()
 
 def generate_pdf_async(filepath, data, mode, size, include_yearly=False, uuid_str=None, lines=None):
     """Perform PDF creation and optional UUID file update in background."""
