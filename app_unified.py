@@ -80,7 +80,7 @@ def ten_shincom():
     is_json = request.is_json
 
     if request.method == "POST":
-    try:
+        try:
             data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
@@ -469,7 +469,7 @@ def selfmob_uuid(uuid_str):
         return "使用履歴が確認できません", 400
 
     if request.method == "POST":
-    try:
+        try:
             data = request.get_json() if request.is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
@@ -614,7 +614,7 @@ def renaiselfmob_uuid(uuid_str):
         return "使用履歴が確認できません", 400
 
     if request.method == "POST":
-    try:
+        try:
             user_birth = request.form.get("user_birth")
             partner_birth = request.form.get("partner_birth")
 
