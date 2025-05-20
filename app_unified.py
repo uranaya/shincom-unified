@@ -80,7 +80,7 @@ def ten_shincom():
     is_json = request.is_json
 
     if request.method == "POST":
-        try:
+    try:
             data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
@@ -88,13 +88,13 @@ def ten_shincom():
 
             try:
                 year, month, day = map(int, birthdate.split("-"))
-            except Exception:
+        except Exception:
                 return "生年月日が不正です", 400
 
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
-            except Exception as e:
-                print("❌ lucky_direction 取得エラー:", e)
+        except Exception as e:
+        print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
 
             eto = get_nicchu_eto(birthdate)
@@ -106,7 +106,7 @@ def ten_shincom():
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()
 
-            now = datetime.now()
+        now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
                 target1 += relativedelta(months=1)
@@ -153,21 +153,21 @@ def ten_shincom():
             return jsonify({"redirect_url": url_for("preview", filename=filename)}) if is_json else redirect(url_for("preview", filename=filename))
                     # ✅ access_log.txt への書き込み
                     try:
-                        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        with open("access_log.txt", "a", encoding="utf-8") as f:
-                            f.write(f"{now},{shop_id},{uuid_str}\n")
-                    except Exception as e:
-                        print("❌ テキストログ書き込み失敗:", e)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open("access_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"{now},{shop_id},{uuid_str}\n")
+        except Exception as e:
+        print("❌ テキストログ書き込み失敗:", e)
         except Exception as e:
             traceback.print_exc()
             return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
                     # ✅ access_log.txt への書き込み
                     try:
-                        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        with open("access_log.txt", "a", encoding="utf-8") as f:
-                            f.write(f"{now},{shop_id},{uuid_str}\n")
-                    except Exception as e:
-                        print("❌ テキストログ書き込み失敗:", e)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open("access_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"{now},{shop_id},{uuid_str}\n")
+        except Exception as e:
+        print("❌ テキストログ書き込み失敗:", e)
 
     return render_template("index.html")
 
@@ -393,7 +393,7 @@ def webhook_selfmob():
                 updated_lines = []
                 found = False
                 if os.path.exists(USED_UUID_FILE):
-                    with open(USED_UUID_FILE, "r") as f:
+        with open(USED_UUID_FILE, "r") as f:
                         for line in f:
                             parts = line.strip().split(",")
                             if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "selfmob":
@@ -402,7 +402,7 @@ def webhook_selfmob():
                             else:
                                 updated_lines.append(line)
                     if found:
-                        with open(USED_UUID_FILE, "w") as f:
+        with open(USED_UUID_FILE, "w") as f:
                             f.writelines(updated_lines)
         return "", 200
     except Exception as e:
@@ -430,7 +430,7 @@ def webhook_renaiselfmob():
                 updated_lines = []
                 found = False
                 if os.path.exists(USED_UUID_FILE):
-                    with open(USED_UUID_FILE, "r") as f:
+        with open(USED_UUID_FILE, "r") as f:
                         for line in f:
                             parts = line.strip().split(",")
                             if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "renaiselfmob":
@@ -439,7 +439,7 @@ def webhook_renaiselfmob():
                             else:
                                 updated_lines.append(line)
                     if found:
-                        with open(USED_UUID_FILE, "w") as f:
+        with open(USED_UUID_FILE, "w") as f:
                             f.writelines(updated_lines)
         return "", 200
     except Exception as e:
@@ -469,20 +469,20 @@ def selfmob_uuid(uuid_str):
         return "使用履歴が確認できません", 400
 
     if request.method == "POST":
-        try:
+    try:
             data = request.get_json() if request.is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
 
             try:
                 year, month, day = map(int, birthdate.split("-"))
-            except Exception:
+        except Exception:
                 return "生年月日が不正です", 400
 
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
-            except Exception as e:
-                print("❌ lucky_direction 取得エラー:", e)
+        except Exception as e:
+        print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
 
             eto = get_nicchu_eto(birthdate)
@@ -563,33 +563,33 @@ def selfmob_uuid(uuid_str):
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             create_pdf_unified(filepath, result_data, "shincom", size="a4", include_yearly=full_year)
 
-            with open(USED_UUID_FILE, "w") as f:
+        with open(USED_UUID_FILE, "w") as f:
                 for uid, flag, mode in lines:
                     if uid != uuid_str:
-                        f.write(f"{uid},{flag},{mode}\n")
+        f.write(f"{uid},{flag},{mode}\n")
                     else:
-                        f.write(f"{uid},used,{mode}\n")
+        f.write(f"{uid},used,{mode}\n")
 
             redirect_url = url_for("preview", filename=filename)
             return jsonify({"redirect_url": redirect_url}) if request.is_json else redirect(redirect_url)
                     # ✅ access_log.txt への書き込み
                     try:
-                        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        with open("access_log.txt", "a", encoding="utf-8") as f:
-                            f.write(f"{now},{shop_id},{uuid_str}\n")
-                    except Exception as e:
-                        print("❌ テキストログ書き込み失敗:", e)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open("access_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"{now},{shop_id},{uuid_str}\n")
+        except Exception as e:
+        print("❌ テキストログ書き込み失敗:", e)
 
         except Exception as e:
             print("処理エラー:", e)
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
                     # ✅ access_log.txt への書き込み
                     try:
-                        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        with open("access_log.txt", "a", encoding="utf-8") as f:
-                            f.write(f"{now},{shop_id},{uuid_str}\n")
-                    except Exception as e:
-                        print("❌ テキストログ書き込み失敗:", e)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open("access_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"{now},{shop_id},{uuid_str}\n")
+        except Exception as e:
+        print("❌ テキストログ書き込み失敗:", e)
 
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
 
@@ -614,14 +614,14 @@ def renaiselfmob_uuid(uuid_str):
         return "使用履歴が確認できません", 400
 
     if request.method == "POST":
-        try:
+    try:
             user_birth = request.form.get("user_birth")
             partner_birth = request.form.get("partner_birth")
 
             if not user_birth or not isinstance(user_birth, str):
                 return "生年月日が不正です", 400
 
-            now = datetime.now()
+        now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
                 target1 += relativedelta(months=1)
@@ -658,21 +658,21 @@ def renaiselfmob_uuid(uuid_str):
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             create_pdf_unified(filepath, result_data, "renai", size="a4", include_yearly=full_year)
 
-            with open(USED_UUID_FILE, "w") as f:
+        with open(USED_UUID_FILE, "w") as f:
                 for uid, flag, mode in lines:
                     if uid != uuid_str:
-                        f.write(f"{uid},{flag},{mode}\n")
+        f.write(f"{uid},{flag},{mode}\n")
                     else:
-                        f.write(f"{uid},used,{mode}\n")
+        f.write(f"{uid},used,{mode}\n")
 
             return redirect(url_for("preview", filename=filename))
                     # ✅ access_log.txt への書き込み
                     try:
-                        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        with open("access_log.txt", "a", encoding="utf-8") as f:
-                            f.write(f"{now},{shop_id},{uuid_str}\n")
-                    except Exception as e:
-                        print("❌ テキストログ書き込み失敗:", e)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open("access_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"{now},{shop_id},{uuid_str}\n")
+        except Exception as e:
+        print("❌ テキストログ書き込み失敗:", e)
 
         except Exception as e:
             print("処理エラー:", e)
@@ -750,11 +750,11 @@ def get_eto():
             return jsonify({"error": "無効な生年月日です"}), 400
                     # ✅ access_log.txt への書き込み
                     try:
-                        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        with open("access_log.txt", "a", encoding="utf-8") as f:
-                            f.write(f"{now},{shop_id},{uuid_str}\n")
-                    except Exception as e:
-                        print("❌ テキストログ書き込み失敗:", e)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open("access_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"{now},{shop_id},{uuid_str}\n")
+        except Exception as e:
+        print("❌ テキストログ書き込み失敗:", e)
 
         y, m, d = map(int, birthdate.split("-"))
         eto = get_nicchu_eto(birthdate)
@@ -763,21 +763,21 @@ def get_eto():
         return jsonify({"eto": eto, "honmeisei": honmeisei})
                 # ✅ access_log.txt への書き込み
                 try:
-                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    with open("access_log.txt", "a", encoding="utf-8") as f:
-                        f.write(f"{now},{shop_id},{uuid_str}\n")
-                except Exception as e:
-                    print("❌ テキストログ書き込み失敗:", e)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open("access_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"{now},{shop_id},{uuid_str}\n")
+        except Exception as e:
+        print("❌ テキストログ書き込み失敗:", e)
     except Exception as e:
         print("❌ /get_eto エラー:", e)
         return jsonify({"error": "干支または本命星の取得中にエラーが発生しました"}), 500
                 # ✅ access_log.txt への書き込み
                 try:
-                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    with open("access_log.txt", "a", encoding="utf-8") as f:
-                        f.write(f"{now},{shop_id},{uuid_str}\n")
-                except Exception as e:
-                    print("❌ テキストログ書き込み失敗:", e)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open("access_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"{now},{shop_id},{uuid_str}\n")
+        except Exception as e:
+        print("❌ テキストログ書き込み失敗:", e)
 
 
 
@@ -786,7 +786,7 @@ def download_shop_log():
     filepath = "shop_counter.csv"
     if not os.path.exists(filepath):
         with open(filepath, "w", encoding="utf-8") as f:
-            f.write("date,shop_id,count\n")
+        f.write("date,shop_id,count\n")
     return send_file(filepath, as_attachment=True)
 
 
