@@ -18,6 +18,15 @@ from pdf_generator_unified import create_pdf_unified
 from fortune_logic import generate_renai_fortune
 from threading import Thread
 
+load_dotenv()
+BASE_URL = os.getenv("BASE_URL", "https://shincom-unified.onrender.com")
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "defaultsecretkey")
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+init_shop_db()
+
+
 def init_shop_db():
     with sqlite3.connect("shop_log.db") as conn:
         conn.execute("""
@@ -568,11 +577,3 @@ def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False
     )
     print(f"🔗 決済URL [{mode}] (full={full_year}):", komoju_url)
     return komoju_url
-
-load_dotenv()
-BASE_URL = os.getenv("BASE_URL", "https://shincom-unified.onrender.com")
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "defaultsecretkey")
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-init_shop_db()
