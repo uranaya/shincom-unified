@@ -42,6 +42,8 @@ used_file_lock = threading.Lock()
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 
+
+# ✅ このPostgreSQL版だけ残す
 def init_shop_db():
     with engine.begin() as conn:
         conn.execute(text("""
@@ -55,28 +57,6 @@ def init_shop_db():
     print("✅ PostgreSQL shop_logs テーブル作成完了")
 
 
-
-# Initialize shop logs database tables
-def init_shop_db():
-    with sqlite3.connect("shop_log.db") as conn:
-        # Table for daily aggregated counts per shop per date
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS shop_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date TEXT,
-                shop_id TEXT,
-                count INTEGER DEFAULT 1
-            )
-        """)
-        # Table for raw logs (each usage event)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS logs (
-                shop_id TEXT,
-                timestamp TEXT
-            )
-        """)
-        conn.commit()
-    print("✅ shop_log.db initialized")
 
 def update_shop_counter(shop_id):
     date_str = datetime.now().strftime("%Y-%m-%d")
