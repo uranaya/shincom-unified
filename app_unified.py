@@ -6,6 +6,7 @@ import requests
 import traceback
 from datetime import datetime
 from urllib.parse import quote
+from sqlalchemy import create_engine, text
 import csv
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response
 from fortune_logic import generate_fortune
@@ -35,6 +36,25 @@ BASE_URL = os.getenv("BASE_URL", "https://shincom-unified.onrender.com")
 
 # Initialize locks for thread-safe operations
 used_file_lock = threading.Lock()
+
+
+# 環境変数からPostgreSQL接続URLを取得
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL)
+
+def init_shop_db():
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS shop_logs (
+                id SERIAL PRIMARY KEY,
+                date TEXT NOT NULL,
+                shop_id TEXT NOT NULL,
+                count INTEGER DEFAULT 1
+            );
+        """))
+    print("✅ PostgreSQL shop_logs テーブル作成完了")
+
+
 
 # Initialize shop logs database tables
 def init_shop_db():
@@ -89,83 +109,29 @@ def update_shop_counter(shop_id):
             writer.writerow([sid, date, count])
 
 def update_shop_db(shop_id):
-    # Record usage to SQLite and CSV
-    try:
-        now_iso = datetime.now().isoformat()
-        conn = sqlite3.connect("shop_log.db")
-        cursor = conn.cursor()
-        # Ensure tables exist (in case init was not called)
-        cursor.execute("CREATE TABLE IF NOT EXISTS shop_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, shop_id TEXT, count INTEGER DEFAULT 1)")
-        cursor.execute("CREATE TABLE IF NOT EXISTS logs (shop_id TEXT, timestamp TEXT)")
-        # Update daily count in shop_logs
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        cursor.execute("SELECT count FROM shop_logs WHERE date = ? AND shop_id = ?", (today_str, shop_id))
-        row = cursor.fetchone()
-        if row:
-            cursor.execute("UPDATE shop_logs SET count = count + 1 WHERE date = ? AND shop_id = ?", (today_str, shop_id))
-        else:
-            cursor.execute("INSERT INTO shop_logs (date, shop_id, count) VALUES (?, ?, ?)", (today_str, shop_id, 1))
-        # Insert raw log entry
-        cursor.execute("INSERT INTO logs (shop_id, timestamp) VALUES (?, ?)", (shop_id, now_iso))
-        conn.commit()
-    except Exception as e:
-        print("❌ Error updating shop_log.db:", e)
-        traceback.print_exc()
-    finally:
-        try:
-            conn.close()
-        except:
-            pass
-    # Update CSV counter
-    try:
-        update_shop_counter(shop_id)
-    except Exception as e:
-        print("❌ Error updating shop_counter.csv:", e)
-        traceback.print_exc()
+    today = datetime.now().strftime("%Y-%m-%d")
+    print(f"📝 PostgreSQLへ記録: {shop_id} / {today}")
 
-# Run initialization
-init_shop_db()
-
-# Background thread task to generate PDF and handle post-processing
-def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
     try:
-        create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
+        with engine.begin() as conn:
+            result = conn.execute(
+                text("SELECT count FROM shop_logs WHERE date = :date AND shop_id = :shop_id"),
+                {"date": today, "shop_id": shop_id}
+            ).fetchone()
+
+            if result:
+                conn.execute(
+                    text("UPDATE shop_logs SET count = count + 1 WHERE date = :date AND shop_id = :shop_id"),
+                    {"date": today, "shop_id": shop_id}
+                )
+            else:
+                conn.execute(
+                    text("INSERT INTO shop_logs (date, shop_id, count) VALUES (:date, :shop_id, 1)"),
+                    {"date": today, "shop_id": shop_id}
+                )
     except Exception as e:
-        print(f"❌ PDF generation error (mode={pdf_mode}, uuid={uuid_str}):", e)
-        traceback.print_exc()
-        return
-    # Mark UUID as used if applicable
-    if uuid_str:
-        try:
-            with used_file_lock:
-                lines_content = []
-                if os.path.exists(USED_UUID_FILE):
-                    with open(USED_UUID_FILE, "r") as f:
-                        lines_content = [line.strip() for line in f if line.strip()]
-                updated_lines = []
-                for line in lines_content:
-                    parts = line.split(",")
-                    if len(parts) >= 3:
-                        uid, flag, mode = parts[0], parts[1], parts[2]
-                        if uid == uuid_str:
-                            updated_lines.append(f"{uid},used,{mode}")
-                        else:
-                            updated_lines.append(line)
-                with open(USED_UUID_FILE, "w") as f:
-                    for line in updated_lines:
-                        f.write(line + "\n")
-        except Exception as e:
-            print(f"❌ Error updating {USED_UUID_FILE} for {uuid_str}:", e)
-            traceback.print_exc()
-    # Write to access_log.txt if applicable
-    if shop_id and uuid_str:
-        try:
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            with open("access_log.txt", "a", encoding="utf-8") as f:
-                f.write(f"{now_str},{shop_id},{uuid_str}\n")
-        except Exception as e:
-            print(f"❌ Error writing access_log for {uuid_str}:", e)
-            traceback.print_exc()
+        print("❌ PostgreSQLへの保存失敗:", e)
+
 
 @app.route("/ten", methods=["GET", "POST"], endpoint="ten")
 @app.route("/tenmob", methods=["GET", "POST"], endpoint="tenmob")
@@ -792,13 +758,18 @@ def _generate_link_with_shopid(shop_id, full_year=False):
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
 
+
+
 @app.route("/view_shop_log")
 def view_shop_log():
-    with sqlite3.connect("shop_log.db") as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT date, shop_id, count FROM shop_logs ORDER BY date DESC")
-        logs = cursor.fetchall()
-    return render_template("shop_log.html", logs=logs)
+    try:
+        with engine.begin() as conn:
+            rows = conn.execute(text("SELECT date, shop_id, count FROM shop_logs ORDER BY date DESC")).fetchall()
+        return render_template("shop_log.html", logs=rows)
+    except Exception as e:
+        return f"エラー: {e}"
+
+
 
 def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False, mode="selfmob"):
     """
