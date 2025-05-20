@@ -740,3 +740,41 @@ def view_shop_log():
         cursor.execute("SELECT date, shop_id, count FROM shop_logs ORDER BY date DESC")
         logs = cursor.fetchall()
     return render_template("shop_log.html", logs=logs)
+
+
+def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False, mode="selfmob"):
+    """
+    KOMOJU決済リンク生成（通常・恋愛／年運オプション対応）
+    
+    Parameters:
+        - price: 決済金額
+        - uuid_str: 一意の外部ID
+        - redirect_url: 決済完了後の遷移先URL
+        - metadata: JSON文字列（例：{"shop_id": "01"}）
+        - full_year: Trueの場合は年運付き（Public Link IDが異なる）
+        - mode: "selfmob" or "renaiselfmob"
+    """
+    if mode == "renaiselfmob":
+        komoju_id = os.getenv(
+            "KOMOJU_RENAI_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_RENAI_PUBLIC_LINK_ID"
+        )
+    else:
+        komoju_id = os.getenv(
+            "KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID"
+        )
+
+    if not komoju_id:
+        raise ValueError("KOMOJUのPublic Link IDが未設定です。環境変数を確認してください。")
+
+    encoded_redirect = quote(redirect_url, safe='')
+    encoded_metadata = quote(metadata)
+
+    komoju_url = (
+        f"https://komoju.com/payment_links/{komoju_id}"
+        f"?external_order_num={uuid_str}"
+        f"&customer_redirect_url={encoded_redirect}"
+        f"&metadata={encoded_metadata}"
+    )
+
+    print(f"🔗 決済URL [{mode}] (full={full_year}):", komoju_url)
+    return komoju_url
