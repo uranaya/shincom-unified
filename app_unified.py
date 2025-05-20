@@ -349,11 +349,13 @@ def generate_link_renai_full_with_shopid(shop_id):
 
 @app.route("/thanks")
 def thanks():
-    uuid_str = request.cookies.get("uuid") or request.args.get("uuid")
+    uuid_str = request.args.get("uuid") or request.cookies.get("uuid")
     if not uuid_str:
         return render_template("thanks.html")
 
+    # 🔍 UUIDからモード・shop_idを確認
     mode = "selfmob"
+    shop_id = "default"
     try:
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
@@ -361,11 +363,13 @@ def thanks():
                 if len(parts) >= 3 and parts[0] == uuid_str:
                     mode = parts[2]
                     break
-    except:
-        pass
+        # shop_id は metadataに保存されてない場合はcookie等で補完してもよい
+        shop_id = request.args.get("shop_id", "default")
+        update_shop_db(shop_id)  # ✅ ログ記録ここで確実に
+    except Exception as e:
+        print("❌ thanksログ更新エラー:", e)
 
     return redirect(f"/{mode}/{uuid_str}")
-
 
 
 
