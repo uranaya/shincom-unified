@@ -88,12 +88,12 @@ def ten_shincom():
 
             try:
                 year, month, day = map(int, birthdate.split("-"))
-        except Exception:
+                except Exception:
                 return "生年月日が不正です", 400
 
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
-        except Exception as e:
+                except Exception as e:
         print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
 
@@ -156,9 +156,9 @@ def ten_shincom():
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
-        except Exception as e:
+                        except Exception as e:
         print("❌ テキストログ書き込み失敗:", e)
-        except Exception as e:
+            except Exception as e:
             traceback.print_exc()
             return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
                     # ✅ access_log.txt への書き込み
@@ -166,7 +166,7 @@ def ten_shincom():
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
-        except Exception as e:
+                        except Exception as e:
         print("❌ テキストログ書き込み失敗:", e)
 
     return render_template("index.html")
@@ -364,7 +364,7 @@ def thanks():
                 if len(parts) >= 3 and parts[0] == uuid_str:
                     mode = parts[2]
                     break
-    except:
+        except:
         pass
 
     return redirect(f"/{mode}/{uuid_str}")
@@ -405,7 +405,7 @@ def webhook_selfmob():
         with open(USED_UUID_FILE, "w") as f:
                             f.writelines(updated_lines)
         return "", 200
-    except Exception as e:
+        except Exception as e:
         print("❌ Webhook error (selfmob):", e)
         return "", 400
 
@@ -442,7 +442,7 @@ def webhook_renaiselfmob():
         with open(USED_UUID_FILE, "w") as f:
                             f.writelines(updated_lines)
         return "", 200
-    except Exception as e:
+        except Exception as e:
         print("❌ Webhook error (renai):", e)
         return "", 400
 
@@ -465,7 +465,7 @@ def selfmob_uuid(uuid_str):
                     break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
-    except FileNotFoundError:
+        except FileNotFoundError:
         return "使用履歴が確認できません", 400
 
     if request.method == "POST":
@@ -476,12 +476,12 @@ def selfmob_uuid(uuid_str):
 
             try:
                 year, month, day = map(int, birthdate.split("-"))
-        except Exception:
+                except Exception:
                 return "生年月日が不正です", 400
 
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
-        except Exception as e:
+                except Exception as e:
         print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
 
@@ -577,10 +577,10 @@ def selfmob_uuid(uuid_str):
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
-        except Exception as e:
+                        except Exception as e:
         print("❌ テキストログ書き込み失敗:", e)
 
-        except Exception as e:
+            except Exception as e:
             print("処理エラー:", e)
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
                     # ✅ access_log.txt への書き込み
@@ -588,7 +588,7 @@ def selfmob_uuid(uuid_str):
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
-        except Exception as e:
+                        except Exception as e:
         print("❌ テキストログ書き込み失敗:", e)
 
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
@@ -610,7 +610,7 @@ def renaiselfmob_uuid(uuid_str):
                     break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
-    except FileNotFoundError:
+        except FileNotFoundError:
         return "使用履歴が確認できません", 400
 
     if request.method == "POST":
@@ -671,10 +671,10 @@ def renaiselfmob_uuid(uuid_str):
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
-        except Exception as e:
+                        except Exception as e:
         print("❌ テキストログ書き込み失敗:", e)
 
-        except Exception as e:
+            except Exception as e:
             print("処理エラー:", e)
             return "処理中にエラーが発生しました", 500
 
@@ -753,7 +753,7 @@ def get_eto():
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
-        except Exception as e:
+                        except Exception as e:
         print("❌ テキストログ書き込み失敗:", e)
 
         y, m, d = map(int, birthdate.split("-"))
@@ -766,9 +766,9 @@ def get_eto():
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
-        except Exception as e:
+                    except Exception as e:
         print("❌ テキストログ書き込み失敗:", e)
-    except Exception as e:
+        except Exception as e:
         print("❌ /get_eto エラー:", e)
         return jsonify({"error": "干支または本命星の取得中にエラーが発生しました"}), 500
                 # ✅ access_log.txt への書き込み
@@ -776,7 +776,7 @@ def get_eto():
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("access_log.txt", "a", encoding="utf-8") as f:
         f.write(f"{now},{shop_id},{uuid_str}\n")
-        except Exception as e:
+                    except Exception as e:
         print("❌ テキストログ書き込み失敗:", e)
 
 
