@@ -284,6 +284,31 @@ def generate_link_full(shop_id):
 
 
 
+@app.route("/generate_link_renai/<shop_id>")
+def generate_link_renai(shop_id):
+    uuid_str = str(uuid.uuid4())
+    redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
+    metadata = json.dumps({"shop_id": shop_id})
+
+    komoju_url = create_payment_link(
+        price=500,
+        uuid_str=uuid_str,
+        redirect_url=redirect_url,
+        metadata=metadata,
+        full_year=False,
+        mode="renaiselfmob"
+    )
+    print("🔗 恋愛通常決済URL:", komoju_url)
+
+    with open(USED_UUID_FILE, "a") as f:
+        f.write(f"{uuid_str},0,renaiselfmob\n")
+
+    resp = make_response(redirect(komoju_url))
+    resp.set_cookie("uuid", uuid_str, max_age=600)
+    return resp
+
+
+
 
 @app.route("/generate_link_renai_full/<shop_id>")
 def generate_link_renai_full_with_shopid(shop_id):
