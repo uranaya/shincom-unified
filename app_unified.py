@@ -343,30 +343,32 @@ def webhook_selfmob():
             uuid_str = data["data"]["attributes"].get("external_order_num")
             metadata = data["data"]["attributes"].get("metadata", {})
             shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
+
             if uuid_str:
                 print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
+
+                # ✅ 店舗ログ（DB＋CSV）に記録
                 update_shop_db(shop_id)
 
-                # UUID を used に更新
+                # ✅ UUID を used に更新
                 updated_lines = []
                 found = False
-                with open(USED_UUID_FILE, "r") as f:
-                    for line in f:
-                        parts = line.strip().split(",")
-                        if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "selfmob":
-                            updated_lines.append(f"{uuid_str},used,selfmob\n")
-                            found = True
-                        else:
-                            updated_lines.append(line)
-                if found:
-                    with open(USED_UUID_FILE, "w") as f:
-                        f.writelines(updated_lines)
+                if os.path.exists(USED_UUID_FILE):
+                    with open(USED_UUID_FILE, "r") as f:
+                        for line in f:
+                            parts = line.strip().split(",")
+                            if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "selfmob":
+                                updated_lines.append(f"{uuid_str},used,selfmob\n")
+                                found = True
+                            else:
+                                updated_lines.append(line)
+                    if found:
+                        with open(USED_UUID_FILE, "w") as f:
+                            f.writelines(updated_lines)
         return "", 200
     except Exception as e:
-        print("Webhook error:", e)
+        print("❌ Webhook error (selfmob):", e)
         return "", 400
-
-
 
 
 
@@ -378,28 +380,34 @@ def webhook_renaiselfmob():
             uuid_str = data["data"]["attributes"].get("external_order_num")
             metadata = data["data"]["attributes"].get("metadata", {})
             shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
+
             if uuid_str:
                 print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
+
+                # ✅ 店舗ログ（DB＋CSV）に記録
                 update_shop_db(shop_id)
 
-                # UUID を used に更新
+                # ✅ UUID を used に更新
                 updated_lines = []
                 found = False
-                with open(USED_UUID_FILE, "r") as f:
-                    for line in f:
-                        parts = line.strip().split(",")
-                        if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "renaiselfmob":
-                            updated_lines.append(f"{uuid_str},used,renaiselfmob\n")
-                            found = True
-                        else:
-                            updated_lines.append(line)
-                if found:
-                    with open(USED_UUID_FILE, "w") as f:
-                        f.writelines(updated_lines)
+                if os.path.exists(USED_UUID_FILE):
+                    with open(USED_UUID_FILE, "r") as f:
+                        for line in f:
+                            parts = line.strip().split(",")
+                            if len(parts) == 3 and parts[0] == uuid_str and parts[2] == "renaiselfmob":
+                                updated_lines.append(f"{uuid_str},used,renaiselfmob\n")
+                                found = True
+                            else:
+                                updated_lines.append(line)
+                    if found:
+                        with open(USED_UUID_FILE, "w") as f:
+                            f.writelines(updated_lines)
         return "", 200
     except Exception as e:
-        print("Webhook error (renai):", e)
+        print("❌ Webhook error (renai):", e)
         return "", 400
+
+
 
 
 
