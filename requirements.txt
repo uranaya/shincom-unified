@@ -6,3 +6,4 @@ python-dotenv
 reportlab
 qrcode
 requests
+sqlalchemy>=1.4
