@@ -64,6 +64,8 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+
+
 @app.route("/ten", methods=["GET", "POST"], endpoint="ten")
 @app.route("/tenmob", methods=["GET", "POST"], endpoint="tenmob")
 def ten_shincom():
@@ -152,6 +154,9 @@ def ten_shincom():
 
     return render_template("index.html")
 
+
+
+
 @app.route("/renai", methods=["GET", "POST"])
 @app.route("/renaib4", methods=["GET", "POST"])
 def renai():
@@ -207,6 +212,8 @@ def renai():
     # Render input form for love fortune (two birthdates)
     return render_template("renai_form.html")
 
+
+
 @app.route("/selfmob", methods=["GET"])
 def selfmob_start():
     # Payment start page (offers normal or love purchase options)
@@ -219,66 +226,104 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 if not os.path.exists(USED_UUID_FILE):
     open(USED_UUID_FILE, "w").close()
 
-@app.route("/generate_link")
-def generate_link():
-    return _generate_link(full_year=False)
 
-@app.route("/generate_link_full")
-def generate_link_full():
-    return _generate_link(full_year=True)
 
-@app.route("/generate_link_renai")
-def generate_link_renai():
-    return _generate_link_renai(full_year=False)
 
-@app.route("/generate_link_renai_full")
-def generate_link_renai_full():
-    return _generate_link_renai(full_year=True)
-
-def _generate_link(full_year=False):
-    shop_id = session.get("shop_id", "default")
-    komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC LINK_ID")  # Correction for K
-    komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_PUBLIC_LINK_ID")
-    new_uuid = str(uuid.uuid4())
-    redirect_url = "https://shincom-unified.onrender.com/thanks"
-    encoded_redirect = quote(redirect_url, safe='')
-
+@app.route("/generate_link/<shop_id>")
+def generate_link(shop_id):
+    uuid_str = str(uuid.uuid4())
+    redirect_url = f"{BASE_URL}/selfmob/{uuid_str}"
     metadata = json.dumps({"shop_id": shop_id})
-    komoju_url = (
-        f"https://komoju.com/payment_links/{komoju_id}"
-        f"?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
-        f"&metadata={quote(metadata)}"
+
+    komoju_url = create_payment_link(
+        price=500,
+        uuid_str=uuid_str,
+        redirect_url=redirect_url,
+        metadata=metadata
     )
+    print("🔗 通常決済URL:", komoju_url)
+    return redirect(komoju_url)
+
+
+
+
+
+
+@app.route("/generate_link_renai_full/<shop_id>")
+def generate_link_renai_full_with_shopid(shop_id):
+    uuid_str = str(uuid.uuid4())
+    redirect_url = f"{BASE_URL}/renaiselfmob/{uuid_str}"
+    metadata = json.dumps({"shop_id": shop_id})
+
+    komoju_url = create_payment_link(
+        price=1000,
+        uuid_str=uuid_str,
+        redirect_url=redirect_url,
+        metadata=metadata,
+        full_year=True
+    )
+    print("🔗 FULL恋愛決済URL:", komoju_url)
 
     with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{new_uuid},{int(full_year)},selfmob\n")
+        f.write(f"{uuid_str},1,renaiselfmob\n")
 
     resp = make_response(redirect(komoju_url))
-    resp.set_cookie("uuid", new_uuid, max_age=600)
+    resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
 
-def _generate_link_renai(full_year=False):
-    shop_id = session.get("shop_id", "default")
-    komoju_id = os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_RENAI_PUBLIC_LINK_ID")
-    new_uuid = str(uuid.uuid4())
-    redirect_url = "https://shincom-unified.onrender.com/thanks"
-    encoded_redirect = quote(redirect_url, safe='')
 
-    # Record new UUID with mode "renaiselfmob"
-    with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{new_uuid},{int(full_year)},renaiselfmob\n")
 
+
+
+@app.route("/generate_link_full/<shop_id>")
+def generate_link_full(shop_id):
+    uuid_str = str(uuid.uuid4())
+    redirect_url = f"{BASE_URL}/selfmob/{uuid_str}"
     metadata = json.dumps({"shop_id": shop_id})
-    komoju_url = (
-        f"https://komoju.com/payment_links/{komoju_id}"
-        f"?external_order_num={new_uuid}&customer_redirect_url={encoded_redirect}"
-        f"&metadata={quote(metadata)}"
+    
+    komoju_url = create_payment_link(
+        price=1000,
+        uuid_str=uuid_str,
+        redirect_url=redirect_url,
+        metadata=metadata,
+        full_year=True
     )
-    print("🔗 RENAI決済URL:", komoju_url)
+    print("🔗 FULL通常決済URL:", komoju_url)
+    
+    # UUID + フラグ + モードを記録
+    with open(USED_UUID_FILE, "a") as f:
+        f.write(f"{uuid_str},1,selfmob\n")
 
     resp = make_response(redirect(komoju_url))
-    resp.set_cookie("uuid", new_uuid, max_age=600)
+    resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
+
+
+
+
+@app.route("/generate_link_renai_full/<shop_id>")
+def generate_link_renai_full_with_shopid(shop_id):
+    uuid_str = str(uuid.uuid4())
+    redirect_url = f"{BASE_URL}/renaiselfmob/{uuid_str}"
+    metadata = json.dumps({"shop_id": shop_id})
+
+    komoju_url = create_payment_link(
+        price=1000,
+        uuid_str=uuid_str,
+        redirect_url=redirect_url,
+        metadata=metadata,
+        full_year=True
+    )
+    print("🔗 FULL恋愛決済URL:", komoju_url)
+
+    with open(USED_UUID_FILE, "a") as f:
+        f.write(f"{uuid_str},1,renaiselfmob\n")
+
+    resp = make_response(redirect(komoju_url))
+    resp.set_cookie("uuid", uuid_str, max_age=600)
+    return resp
+
+
 
 @app.route("/thanks")
 def thanks():
@@ -299,6 +344,9 @@ def thanks():
         pass
 
     return redirect(f"/{mode}/{uuid_str}")
+
+
+
 
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
@@ -331,6 +379,10 @@ def webhook_selfmob():
         print("Webhook error:", e)
         return "", 400
 
+
+
+
+
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
     try:
@@ -362,6 +414,10 @@ def webhook_renaiselfmob():
         print("Webhook error (renai):", e)
         return "", 400
 
+
+
+
+
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
     full_year = None
@@ -383,10 +439,12 @@ def selfmob_uuid(uuid_str):
             data = request.get_json() if request.is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
+
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
+
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
@@ -402,9 +460,6 @@ def selfmob_uuid(uuid_str):
             palm_result = "\n".join(palm_texts)
             summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
 
-            shichu_texts = shichu_result
-
-            # ✅ lucky_lines 修正（◆は付けない）
             lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
@@ -450,10 +505,10 @@ def selfmob_uuid(uuid_str):
                 },
                 "texts": {
                     "palm_summary": summary_text,
-                    "personality": shichu_texts.get("personality", ""),
-                    "year_fortune": shichu_texts.get("year_fortune", ""),
-                    "month_fortune": shichu_texts.get("month_fortune", ""),
-                    "next_month_fortune": shichu_texts.get("next_month_fortune", "")
+                    "personality": shichu_result.get("personality", ""),
+                    "year_fortune": shichu_result.get("year_fortune", ""),
+                    "month_fortune": shichu_result.get("month_fortune", ""),
+                    "next_month_fortune": shichu_result.get("next_month_fortune", "")
                 },
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
@@ -470,7 +525,7 @@ def selfmob_uuid(uuid_str):
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
 
-            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filename = f"result_{uuid_str}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             create_pdf_unified(filepath, result_data, "shincom", size="a4", include_yearly=full_year)
 
@@ -483,20 +538,22 @@ def selfmob_uuid(uuid_str):
 
             redirect_url = url_for("preview", filename=filename)
             return jsonify({"redirect_url": redirect_url}) if request.is_json else redirect(redirect_url)
+
         except Exception as e:
             print("処理エラー:", e)
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
 
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
 
+
+
+
 @app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
-    # Handle the form after payment for love fortune
     full_year = None
     lines = []
     try:
-        # Verify UUID from used_orders log
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
             for uid, flag, mode in lines:
@@ -509,57 +566,65 @@ def renaiselfmob_uuid(uuid_str):
         return "使用履歴が確認できません", 400
 
     if request.method == "POST":
-        user_birth = request.form.get("user_birth")
-        partner_birth = request.form.get("partner_birth")
-        if not user_birth or not isinstance(user_birth, str):
-            return "生年月日が不正です", 400
+        try:
+            user_birth = request.form.get("user_birth")
+            partner_birth = request.form.get("partner_birth")
 
-        # Determine labels for love fortune sections (relative months)
-        now = datetime.now()
-        target1 = now.replace(day=15)
-        if now.day >= 20:
-            target1 += relativedelta(months=1)
-        target2 = target1 + relativedelta(months=1)
-        year_label = f"{now.year}年の恋愛運"
-        month_label = f"{target1.year}年{target1.month}月の恋愛運"
-        next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
+            if not user_birth or not isinstance(user_birth, str):
+                return "生年月日が不正です", 400
 
-        # Generate love fortune (with include_yearly flag)
-        raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
-        result_data = {
-            "texts": {
-                "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
-                "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),
-                "year_love": raw_result.get("texts", {}).get("year_love", ""),
-                "month_love": raw_result.get("texts", {}).get("month_love", ""),
-                "next_month_love": raw_result.get("texts", {}).get("next_month_love", "")
-            },
-            "titles": {
-                "compatibility": raw_result.get("titles", {}).get("compatibility", "相性診断" if partner_birth else "恋愛傾向と出会い"),
-                "overall_love_fortune": raw_result.get("titles", {}).get("overall_love_fortune", "総合恋愛運"),
-                "year_love": raw_result.get("titles", {}).get("year_love", year_label),
-                "month_love": raw_result.get("titles", {}).get("month_love", month_label),
-                "next_month_love": raw_result.get("titles", {}).get("next_month_love", next_month_label)
-            },
-            "themes": raw_result.get("themes", []),
-            "lucky_info": raw_result.get("lucky_info", []),
-            "lucky_direction": raw_result.get("lucky_direction", ""),
-            "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
-        }
+            now = datetime.now()
+            target1 = now.replace(day=15)
+            if now.day >= 20:
+                target1 += relativedelta(months=1)
+            target2 = target1 + relativedelta(months=1)
 
-        filename = f"renai_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        create_pdf_unified(filepath, result_data, "renai", size="a4", include_yearly=full_year)
+            year_label = f"{now.year}年の恋愛運"
+            month_label = f"{target1.year}年{target1.month}月の恋愛運"
+            next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
 
-        # Mark UUID as used (remove from file)
-        with open(USED_UUID_FILE, "w") as f:
-            for uid, flag, mode in lines:
-                if uid != uuid_str:
-                    f.write(f"{uid},{flag},{mode}\n")
-        return redirect(url_for("preview", filename=filename))
+            raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
 
-    # Render the form (post-payment) for love fortune input
-    return render_template("index_renaiselfmob.html", uuid_str=uuid_str)
+            result_data = {
+                "texts": {
+                    "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
+                    "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),
+                    "year_love": raw_result.get("texts", {}).get("year_love", ""),
+                    "month_love": raw_result.get("texts", {}).get("month_love", ""),
+                    "next_month_love": raw_result.get("texts", {}).get("next_month_love", "")
+                },
+                "titles": {
+                    "compatibility": raw_result.get("titles", {}).get("compatibility", "相性診断" if partner_birth else "恋愛傾向と出会い"),
+                    "overall_love_fortune": raw_result.get("titles", {}).get("overall_love_fortune", "総合恋愛運"),
+                    "year_love": raw_result.get("titles", {}).get("year_love", year_label),
+                    "month_love": raw_result.get("titles", {}).get("month_love", month_label),
+                    "next_month_love": raw_result.get("titles", {}).get("next_month_love", next_month_label)
+                },
+                "themes": raw_result.get("themes", []),
+                "lucky_info": raw_result.get("lucky_info", []),
+                "lucky_direction": raw_result.get("lucky_direction", ""),
+                "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
+            }
+
+            filename = f"renai_{uuid_str}.pdf"
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            create_pdf_unified(filepath, result_data, "renai", size="a4", include_yearly=full_year)
+
+            with open(USED_UUID_FILE, "w") as f:
+                for uid, flag, mode in lines:
+                    if uid != uuid_str:
+                        f.write(f"{uid},{flag},{mode}\n")
+                    else:
+                        f.write(f"{uid},used,{mode}\n")
+
+            return redirect(url_for("preview", filename=filename))
+
+        except Exception as e:
+            print("処理エラー:", e)
+            return "処理中にエラーが発生しました", 500
+
+    return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
+
 
 @app.route("/preview/<filename>")
 def preview(filename):
