@@ -58,6 +58,9 @@ init_shop_db()
 
 load_dotenv()
 
+BASE_URL = os.getenv("BASE_URL", "https://shincom-unified.onrender.com")
+
+
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "defaultsecretkey")
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
