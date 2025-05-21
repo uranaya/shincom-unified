@@ -57,7 +57,6 @@ def init_shop_db():
     print("✅ PostgreSQL shop_logs テーブル作成完了")
 
 
-
 def update_shop_counter(shop_id):
     date_str = datetime.now().strftime("%Y-%m-%d")
     count_file = "shop_counter.csv"
@@ -88,26 +87,27 @@ def update_shop_counter(shop_id):
         for (sid, date), count in sorted(rows.items()):
             writer.writerow([sid, date, count])
 
-def update_shop_db(shop_id):
+
+def update_shop_db(shop_id, service="unknown"):
     today = datetime.now().strftime("%Y-%m-%d")
-    print(f"📝 PostgreSQLへ記録: {shop_id} / {today}")
+    print(f"📝 PostgreSQLへ記録: {shop_id} / {today} / {service}")
 
     try:
         with engine.begin() as conn:
             result = conn.execute(
-                text("SELECT count FROM shop_logs WHERE date = :date AND shop_id = :shop_id"),
-                {"date": today, "shop_id": shop_id}
+                text("SELECT count FROM shop_logs WHERE date = :date AND shop_id = :shop_id AND service = :service"),
+                {"date": today, "shop_id": shop_id, "service": service}
             ).fetchone()
 
             if result:
                 conn.execute(
-                    text("UPDATE shop_logs SET count = count + 1 WHERE date = :date AND shop_id = :shop_id"),
-                    {"date": today, "shop_id": shop_id}
+                    text("UPDATE shop_logs SET count = count + 1 WHERE date = :date AND shop_id = :shop_id AND service = :service"),
+                    {"date": today, "shop_id": shop_id, "service": service}
                 )
             else:
                 conn.execute(
-                    text("INSERT INTO shop_logs (date, shop_id, count) VALUES (:date, :shop_id, 1)"),
-                    {"date": today, "shop_id": shop_id}
+                    text("INSERT INTO shop_logs (date, shop_id, count, service) VALUES (:date, :shop_id, 1, :service)"),
+                    {"date": today, "shop_id": shop_id, "service": service}
                 )
     except Exception as e:
         print("❌ PostgreSQLへの保存失敗:", e)
@@ -673,7 +673,7 @@ def _generate_link_with_shopid(shop_id, full_year=False):
 def view_shop_log():
     try:
         with engine.begin() as conn:
-            rows = conn.execute(text("SELECT date, shop_id, count FROM shop_logs ORDER BY date DESC")).fetchall()
+            rows = conn.execute(text("SELECT date, shop_id, service, count FROM shop_logs ORDER BY date DESC")).fetchall()
         return render_template("shop_log.html", logs=rows)
     except Exception as e:
         return f"エラー: {e}"
@@ -707,6 +707,7 @@ def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False
 
 
 
+
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
     try:
@@ -723,7 +724,7 @@ def webhook_selfmob():
 
             if uuid_str:
                 print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
-                update_shop_db(shop_id)
+                update_shop_db(shop_id, service="selfmob")
                 return "", 200
         else:
             print("⚠️ イベントが想定と異なる:", data.get("type"))
@@ -749,7 +750,7 @@ def webhook_renaiselfmob():
 
             if uuid_str:
                 print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
-                update_shop_db(shop_id)
+                update_shop_db(shop_id, service="renaiselfmob")
                 return "", 200
         else:
             print("⚠️ イベントが想定と異なる:", data.get("type"))
@@ -757,3 +758,4 @@ def webhook_renaiselfmob():
         print("❌ Webhook error (renaiselfmob):", e)
 
     return "", 400
+

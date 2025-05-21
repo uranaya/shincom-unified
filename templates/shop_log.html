@@ -4,10 +4,21 @@
 <body>
 <h2>店舗ごとの利用履歴</h2>
 <table border="1">
-<tr><th>日付</th><th>店舗ID</th><th>件数</th></tr>
-{% for date, shop_id, count in logs %}
-<tr><td>{{ date }}</td><td>{{ shop_id }}</td><td>{{ count }}</td></tr>
-{% endfor %}
+    <tr>
+        <th>日付</th>
+        <th>店舗ID</th>
+        <th>サービス</th>
+        <th>件数</th>
+    </tr>
+    {% for row in logs %}
+    <tr>
+        <td>{{ row.date }}</td>
+        <td>{{ row.shop_id }}</td>
+        <td>{{ row.service }}</td>
+        <td>{{ row.count }}</td>
+    </tr>
+    {% endfor %}
 </table>
+
 </body>
 </html>
