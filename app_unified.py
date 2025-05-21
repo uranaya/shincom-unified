@@ -57,54 +57,6 @@ def init_shop_db():
     print("✅ PostgreSQL shop_logs テーブル作成完了")
 
 
-def update_shop_counter(shop_id):
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    count_file = "shop_counter.csv"
-    # Load existing counts
-    rows = {}
-    if os.path.exists(count_file):
-        with open(count_file, newline="", encoding="utf-8") as csvfile:
-            reader = csv.reader(csvfile)
-            for row in reader:
-                if not row or row[0] == "date":
-                    # skip header or empty lines
-                    continue
-                if len(row) == 3:
-                    try:
-                        cnt = int(row[2])
-                    except:
-                        # skip invalid rows if any
-                        continue
-                    key = (row[0], row[1])
-                    rows[key] = cnt
-    # Increment count for this shop and date
-    key = (shop_id, date_str)
-    rows[key] = rows.get(key, 0) + 1
-    # Write updated counts back to CSV (with header)
-    with open(count_file, "w", newline="", encoding="utf-8") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["date", "shop_id", "count"])
-        for (sid, date), count in sorted(rows.items()):
-            writer.writerow([sid, date, count])
-
-
-def update_shop_db(shop_id, service):
-    today = datetime.now().strftime("%Y-%m-%d")
-    uuid_str = uuid.uuid4().hex  # 念のためユニーク識別子
-    try:
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO webhook_events (uuid, shop_id, service, date)
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (uuid) DO NOTHING;
-                """, (uuid_str, shop_id, service, today))
-                print(f"📝 PostgreSQLへ記録: {shop_id} / {today} / {service}")
-    except Exception as e:
-        print("❌ PostgreSQLへの保存失敗:", e)
-
-
-
 
 @app.route("/ten", methods=["GET", "POST"], endpoint="ten")
 @app.route("/tenmob", methods=["GET", "POST"], endpoint="tenmob")
@@ -631,19 +583,15 @@ def get_eto():
     honmeisei = get_honmeisei(y, m, d)
     return jsonify({"eto": eto, "honmeisei": honmeisei})
 
-@app.route("/download_shop_log")
-def download_shop_log():
-    filepath = "shop_counter.csv"
-    if not os.path.exists(filepath):
-        # Create file with header if it doesn't exist
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write("date,shop_id,count\n")
-    return send_file(filepath, as_attachment=True)
+
 
 @app.route("/selfmob-<shop_id>")
 def selfmob_shop_entry(shop_id):
     session["shop_id"] = shop_id
     return render_template("pay.html", shop_id=shop_id)
+
+
+
 
 def _generate_link_with_shopid(shop_id, full_year=False):
     uuid_str = str(uuid.uuid4())
@@ -678,9 +626,6 @@ def view_shop_log():
 
 
 def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False, mode="selfmob"):
-    """
-    KOMOJU決済リンク生成（通常・恋愛／年運オプション対応）
-    """
     if mode == "renaiselfmob":
         komoju_id = os.getenv(
             "KOMOJU_RENAI_PUBLIC_LINK_ID_FULL" if full_year else "KOMOJU_RENAI_PUBLIC_LINK_ID"
@@ -691,6 +636,7 @@ def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False
         )
     if not komoju_id:
         raise ValueError("KOMOJUのPublic Link IDが未設定です。環境変数を確認してください。")
+
     encoded_redirect = quote(redirect_url, safe='')
     encoded_metadata = quote(metadata)
     komoju_url = (
@@ -704,20 +650,58 @@ def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False
 
 
 
+
+# UUID → shop_id 抽出補助
+def get_shop_id_from_log(uuid_str):
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) >= 4:
+                    uid, _, _, shop_id = parts[:4]
+                    if uid == uuid_str:
+                        return shop_id
+    except Exception as e:
+        print("⚠️ shop_id読み取り失敗:", e)
+    return "default"
+
+
+# PostgreSQL登録処理
+
+def update_shop_db(shop_id, service):
+    uuid_str = request.get_json()["data"].get("external_order_num") or request.get_json()["data"].get("session")
+    today = datetime.now().strftime("%Y-%m-%d")
+    try:
+        conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO webhook_events (uuid, shop_id, service, date)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (uuid) DO NOTHING
+        """, (uuid_str, shop_id, service, today))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("📝 PostgreSQLへ記録:", shop_id, "/", today, "/", service)
+    except Exception as e:
+        print("❌ PostgreSQLへの保存失敗:", e)
+
+
+
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
     try:
         data = request.get_json()
         print("📩 Webhook 受信データ:", json.dumps(data, indent=2, ensure_ascii=False))
-
         if data.get("type") == "payment.captured":
             uuid_str = data["data"].get("external_order_num") or data["data"].get("session")
+            metadata = data["data"].get("metadata", {})
+            shop_id = metadata.get("shop_id") or get_shop_id_from_log(uuid_str)
             service = "selfmob"
-            shop_id = get_shop_id_from_log(uuid_str) or "default"
-
             print("📌 使用するUUID:", uuid_str)
             print("🏪 shop_id:", shop_id)
-
             if uuid_str:
                 print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
                 update_shop_db(shop_id, service)
@@ -726,24 +710,31 @@ def webhook_selfmob():
             print("⚠️ イベントが想定と異なる:", data.get("type"))
     except Exception as e:
         print("❌ Webhook error (selfmob):", e)
+    return "", 400
 
+# Webhook Renai
+
+@app.route("/webhook/renaiselfmob", methods=["POST"])
+def webhook_renaiselfmob():
+    try:
+        data = request.get_json()
+        print("📩 Webhook 受信データ:", json.dumps(data, indent=2, ensure_ascii=False))
+        if data.get("type") == "payment.captured":
+            uuid_str = data["data"].get("external_order_num") or data["data"].get("session")
+            metadata = data["data"].get("metadata", {})
+            shop_id = metadata.get("shop_id") or get_shop_id_from_log(uuid_str)
+            service = "renaiselfmob"
+            print("📌 使用するUUID:", uuid_str)
+            print("🏪 shop_id:", shop_id)
+            if uuid_str:
+                print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
+                update_shop_db(shop_id, service)
+                return "", 200
+        else:
+            print("⚠️ イベントが想定と異なる:", data.get("type"))
+    except Exception as e:
+        print("❌ Webhook error (renaiselfmob):", e)
     return "", 400
 
 
 
-
-
-
-
-
-
-def get_shop_id_from_log(uuid_str):
-    try:
-        with open(USED_UUID_FILE, "r", encoding="utf-8") as f:
-            for line in f:
-                parts = line.strip().split(",")
-                if len(parts) >= 4 and parts[0] == uuid_str:
-                    return parts[3]  # shop_id
-    except Exception as e:
-        print("❌ get_shop_id_from_log error:", e)
-    return None
