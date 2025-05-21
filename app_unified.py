@@ -88,56 +88,21 @@ def update_shop_counter(shop_id):
             writer.writerow([sid, date, count])
 
 
-def update_shop_db(shop_id, service="unknown", uuid_str=None):
+def update_shop_db(shop_id, service):
     today = datetime.now().strftime("%Y-%m-%d")
-    print(f"📝 PostgreSQLへ記録: {shop_id} / {today} / {service}")
-
+    uuid_str = uuid.uuid4().hex  # 念のためユニーク識別子
     try:
-        with engine.begin() as conn:
-            # UUIDログテーブルがなければ作成
-            conn.execute(text('''
-                CREATE TABLE IF NOT EXISTS webhook_events (
-                    uuid TEXT PRIMARY KEY,
-                    shop_id TEXT,
-                    service TEXT,
-                    date TEXT
-                );
-            '''))
-
-            # UUIDがすでに存在していれば記録スキップ
-            result = conn.execute(
-                text("SELECT 1 FROM webhook_events WHERE uuid = :uuid"),
-                {"uuid": uuid_str}
-            ).fetchone()
-
-            if result:
-                print("⚠️ UUID重複のため記録スキップ:", uuid_str)
-                return
-
-            # UUID記録
-            conn.execute(
-                text("INSERT INTO webhook_events (uuid, shop_id, service, date) VALUES (:uuid, :shop_id, :service, :date)"),
-                {"uuid": uuid_str, "shop_id": shop_id, "service": service, "date": today}
-            )
-
-            # 通常のカウント更新処理
-            result = conn.execute(
-                text("SELECT count FROM shop_logs WHERE date = :date AND shop_id = :shop_id AND service = :service"),
-                {"date": today, "shop_id": shop_id, "service": service}
-            ).fetchone()
-
-            if result:
-                conn.execute(
-                    text("UPDATE shop_logs SET count = count + 1 WHERE date = :date AND shop_id = :shop_id AND service = :service"),
-                    {"date": today, "shop_id": shop_id, "service": service}
-                )
-            else:
-                conn.execute(
-                    text("INSERT INTO shop_logs (date, shop_id, count, service) VALUES (:date, :shop_id, 1, :service)"),
-                    {"date": today, "shop_id": shop_id, "service": service}
-                )
+        with psycopg2.connect(DATABASE_URL) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO webhook_events (uuid, shop_id, service, date)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (uuid) DO NOTHING;
+                """, (uuid_str, shop_id, service, today))
+                print(f"📝 PostgreSQLへ記録: {shop_id} / {today} / {service}")
     except Exception as e:
         print("❌ PostgreSQLへの保存失敗:", e)
+
 
 
 
@@ -735,8 +700,6 @@ def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False
 
 
 
-
-
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
     try:
@@ -745,25 +708,27 @@ def webhook_selfmob():
 
         if data.get("type") == "payment.captured":
             uuid_str = data["data"].get("external_order_num") or data["data"].get("session")
-            metadata = data["data"].get("metadata", {})
-            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
+            shop_id = "default"
+            service = "selfmob"
+
+            if uuid_str and "-" in uuid_str:
+                suffix = uuid_str.split("-")[-1]
+                if suffix.isdigit():
+                    shop_id = suffix
 
             print("📌 使用するUUID:", uuid_str)
             print("🏪 shop_id:", shop_id)
 
             if uuid_str:
                 print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
-                update_shop_db(shop_id, service="selfmob", uuid_str=uuid_str)
+                update_shop_db(shop_id, service)
                 return "", 200
-            else:
-                print("⚠️ UUIDが取得できなかったため記録をスキップ")
         else:
             print("⚠️ イベントが想定と異なる:", data.get("type"))
     except Exception as e:
         print("❌ Webhook error (selfmob):", e)
 
     return "", 400
-
 
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
@@ -773,21 +738,27 @@ def webhook_renaiselfmob():
 
         if data.get("type") == "payment.captured":
             uuid_str = data["data"].get("external_order_num") or data["data"].get("session")
-            metadata = data["data"].get("metadata", {})
-            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
+            shop_id = "default"
+            service = "renaiselfmob"
+
+            if uuid_str and "-" in uuid_str:
+                suffix = uuid_str.split("-")[-1]
+                if suffix.isdigit():
+                    shop_id = suffix
 
             print("📌 使用するUUID:", uuid_str)
             print("🏪 shop_id:", shop_id)
 
             if uuid_str:
                 print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
-                update_shop_db(shop_id, service="renaiselfmob", uuid_str=uuid_str)
+                update_shop_db(shop_id, service)
                 return "", 200
-            else:
-                print("⚠️ UUIDが取得できなかったため記録をスキップ")
         else:
             print("⚠️ イベントが想定と異なる:", data.get("type"))
     except Exception as e:
         print("❌ Webhook error (renaiselfmob):", e)
 
     return "", 400
+
+
+
