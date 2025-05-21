@@ -708,6 +708,7 @@ def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False
 
 # ✅ 修正済み：Webhook event → type に変更済み app_unified.py 抜粋部分
 
+
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
     try:
@@ -715,8 +716,8 @@ def webhook_selfmob():
         print("📩 Webhook 受信データ:", json.dumps(data, indent=2, ensure_ascii=False))
 
         if data.get("type") == "payment.captured":
-            uuid_str = data["data"]["attributes"].get("external_order_num")
-            metadata = data["data"]["attributes"].get("metadata", {})
+            uuid_str = data["data"].get("external_order_num")
+            metadata = data["data"].get("metadata", {})
             shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
 
             print("📌 external_order_num:", uuid_str)
@@ -741,8 +742,8 @@ def webhook_renaiselfmob():
         print("📩 Webhook 受信データ:", json.dumps(data, indent=2, ensure_ascii=False))
 
         if data.get("type") == "payment.captured":
-            uuid_str = data["data"]["attributes"].get("external_order_num")
-            metadata = data["data"]["attributes"].get("metadata", {})
+            uuid_str = data["data"].get("external_order_num")
+            metadata = data["data"].get("metadata", {})
             shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
 
             print("📌 external_order_num:", uuid_str)
