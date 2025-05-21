@@ -708,13 +708,9 @@ def webhook_selfmob():
 
         if data.get("type") == "payment.captured":
             uuid_str = data["data"].get("external_order_num") or data["data"].get("session")
-            shop_id = "default"
+            metadata = data["data"].get("metadata", {})
+            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
             service = "selfmob"
-
-            if uuid_str and "-" in uuid_str:
-                suffix = uuid_str.split("-")[-1]
-                if suffix.isdigit():
-                    shop_id = suffix
 
             print("📌 使用するUUID:", uuid_str)
             print("🏪 shop_id:", shop_id)
@@ -730,6 +726,7 @@ def webhook_selfmob():
 
     return "", 400
 
+
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
     try:
@@ -738,13 +735,9 @@ def webhook_renaiselfmob():
 
         if data.get("type") == "payment.captured":
             uuid_str = data["data"].get("external_order_num") or data["data"].get("session")
-            shop_id = "default"
+            metadata = data["data"].get("metadata", {})
+            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
             service = "renaiselfmob"
-
-            if uuid_str and "-" in uuid_str:
-                suffix = uuid_str.split("-")[-1]
-                if suffix.isdigit():
-                    shop_id = suffix
 
             print("📌 使用するUUID:", uuid_str)
             print("🏪 shop_id:", shop_id)
