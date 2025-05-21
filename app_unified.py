@@ -278,7 +278,7 @@ def generate_link(shop_id):
     )
     print("🔗 通常決済URL:", komoju_url)
     with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{uuid_str},0,selfmob\n")
+        f.write(f"{uuid_str},0,selfmob,{shop_id}\n")
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
@@ -298,7 +298,7 @@ def generate_link_full(shop_id):
     )
     print("🔗 FULL通常決済URL:", komoju_url)
     with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{uuid_str},1,selfmob\n")
+        f.write(f"{uuid_str},1,selfmob,{shop_id}\n")
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
@@ -318,7 +318,7 @@ def generate_link_renai(shop_id):
     )
     print("🔗 恋愛通常決済URL:", komoju_url)
     with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{uuid_str},0,renaiselfmob\n")
+        f.write(f"{uuid_str},0,renaiselfmob,{shop_id}\n")
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
@@ -338,7 +338,7 @@ def generate_link_renai_full_with_shopid(shop_id):
     )
     print("🔗 FULL恋愛決済URL:", komoju_url)
     with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{uuid_str},1,renaiselfmob\n")
+        f.write(f"{uuid_str},1,renaiselfmob,{shop_id}\n")
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
@@ -738,8 +738,8 @@ def get_shop_id_from_log(uuid_str):
         with open(USED_UUID_FILE, "r", encoding="utf-8") as f:
             for line in f:
                 parts = line.strip().split(",")
-                if len(parts) == 3 and parts[0] == uuid_str:
-                    return parts[2]  # shop_id
+                if len(parts) >= 4 and parts[0] == uuid_str:
+                    return parts[3]  # shop_id
     except Exception as e:
         print("❌ get_shop_id_from_log error:", e)
     return None
