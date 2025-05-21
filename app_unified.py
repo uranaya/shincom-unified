@@ -45,20 +45,6 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 
 
-# ✅ このPostgreSQL版だけ残す
-def init_shop_db():
-    with engine.begin() as conn:
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS shop_logs (
-                id SERIAL PRIMARY KEY,
-                date TEXT NOT NULL,
-                shop_id TEXT NOT NULL,
-                count INTEGER DEFAULT 1
-            );
-        """))
-    print("✅ PostgreSQL shop_logs テーブル作成完了")
-
-
 
 @app.route("/ten", methods=["GET", "POST"], endpoint="ten")
 @app.route("/tenmob", methods=["GET", "POST"], endpoint="tenmob")
@@ -664,7 +650,6 @@ def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False
 
 
 
-# UUID → shop_id 抽出補助
 def get_shop_id_from_log(uuid_str):
     try:
         with open(USED_UUID_FILE, "r") as f:
@@ -674,9 +659,12 @@ def get_shop_id_from_log(uuid_str):
                     uid, _, _, shop_id = parts[:4]
                     if uid == uuid_str:
                         return shop_id
+        # セッション形式のUUID（external_order_numがnullだったとき）も探す
+        print("⚠️ UUID not found in used_orders.txt:", uuid_str)
     except Exception as e:
         print("⚠️ shop_id読み取り失敗:", e)
     return "default"
+
 
 
 # PostgreSQL登録処理
