@@ -88,12 +88,39 @@ def update_shop_counter(shop_id):
             writer.writerow([sid, date, count])
 
 
-def update_shop_db(shop_id, service="unknown"):
+def update_shop_db(shop_id, service="unknown", uuid_str=None):
     today = datetime.now().strftime("%Y-%m-%d")
     print(f"📝 PostgreSQLへ記録: {shop_id} / {today} / {service}")
 
     try:
         with engine.begin() as conn:
+            # UUIDログテーブルがなければ作成
+            conn.execute(text('''
+                CREATE TABLE IF NOT EXISTS webhook_events (
+                    uuid TEXT PRIMARY KEY,
+                    shop_id TEXT,
+                    service TEXT,
+                    date TEXT
+                );
+            '''))
+
+            # UUIDがすでに存在していれば記録スキップ
+            result = conn.execute(
+                text("SELECT 1 FROM webhook_events WHERE uuid = :uuid"),
+                {"uuid": uuid_str}
+            ).fetchone()
+
+            if result:
+                print("⚠️ UUID重複のため記録スキップ:", uuid_str)
+                return
+
+            # UUID記録
+            conn.execute(
+                text("INSERT INTO webhook_events (uuid, shop_id, service, date) VALUES (:uuid, :shop_id, :service, :date)"),
+                {"uuid": uuid_str, "shop_id": shop_id, "service": service, "date": today}
+            )
+
+            # 通常のカウント更新処理
             result = conn.execute(
                 text("SELECT count FROM shop_logs WHERE date = :date AND shop_id = :shop_id AND service = :service"),
                 {"date": today, "shop_id": shop_id, "service": service}
@@ -111,6 +138,7 @@ def update_shop_db(shop_id, service="unknown"):
                 )
     except Exception as e:
         print("❌ PostgreSQLへの保存失敗:", e)
+
 
 
 @app.route("/ten", methods=["GET", "POST"], endpoint="ten")
