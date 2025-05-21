@@ -736,6 +736,7 @@ def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False
 
 
 
+
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
     try:
@@ -752,8 +753,10 @@ def webhook_selfmob():
 
             if uuid_str:
                 print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
-                update_shop_db(shop_id, service="selfmob")
+                update_shop_db(shop_id, service="selfmob", uuid_str=uuid_str)
                 return "", 200
+            else:
+                print("⚠️ UUIDが取得できなかったため記録をスキップ")
         else:
             print("⚠️ イベントが想定と異なる:", data.get("type"))
     except Exception as e:
@@ -778,12 +781,13 @@ def webhook_renaiselfmob():
 
             if uuid_str:
                 print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
-                update_shop_db(shop_id, service="renaiselfmob")
+                update_shop_db(shop_id, service="renaiselfmob", uuid_str=uuid_str)
                 return "", 200
+            else:
+                print("⚠️ UUIDが取得できなかったため記録をスキップ")
         else:
             print("⚠️ イベントが想定と異なる:", data.get("type"))
     except Exception as e:
         print("❌ Webhook error (renaiselfmob):", e)
 
     return "", 400
-
