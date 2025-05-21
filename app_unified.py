@@ -708,9 +708,8 @@ def webhook_selfmob():
 
         if data.get("type") == "payment.captured":
             uuid_str = data["data"].get("external_order_num") or data["data"].get("session")
-            metadata = data["data"].get("metadata", {})
-            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
             service = "selfmob"
+            shop_id = get_shop_id_from_log(uuid_str) or "default"
 
             print("📌 使用するUUID:", uuid_str)
             print("🏪 shop_id:", shop_id)
@@ -727,31 +726,20 @@ def webhook_selfmob():
     return "", 400
 
 
-@app.route("/webhook/renaiselfmob", methods=["POST"])
-def webhook_renaiselfmob():
+
+
+
+
+
+
+
+def get_shop_id_from_log(uuid_str):
     try:
-        data = request.get_json()
-        print("📩 Webhook 受信データ:", json.dumps(data, indent=2, ensure_ascii=False))
-
-        if data.get("type") == "payment.captured":
-            uuid_str = data["data"].get("external_order_num") or data["data"].get("session")
-            metadata = data["data"].get("metadata", {})
-            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
-            service = "renaiselfmob"
-
-            print("📌 使用するUUID:", uuid_str)
-            print("🏪 shop_id:", shop_id)
-
-            if uuid_str:
-                print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
-                update_shop_db(shop_id, service)
-                return "", 200
-        else:
-            print("⚠️ イベントが想定と異なる:", data.get("type"))
+        with open(USED_UUID_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) == 3 and parts[0] == uuid_str:
+                    return parts[2]  # shop_id
     except Exception as e:
-        print("❌ Webhook error (renaiselfmob):", e)
-
-    return "", 400
-
-
-
+        print("❌ get_shop_id_from_log error:", e)
+    return None
