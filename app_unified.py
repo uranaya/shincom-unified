@@ -396,58 +396,108 @@ def selfmob_uuid(uuid_str):
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             # Validate birthdate
-# ✅ 修正済み：Webhook event → type に変更済み app_unified.py 抜粋部分
+            try:
+                year, month, day = map(int, birthdate.split("-"))
+            except Exception:
+                return "生年月日が不正です", 400
+            # Get lucky direction (with error handling)
+            try:
+                kyusei_text = get_kyusei_fortune(year, month, day)
+            except Exception as e:
+                print("❌ lucky_direction 取得エラー:", e)
+                kyusei_text = ""
+            eto = get_nicchu_eto(birthdate)
+            # Generate results using shincom fortune logic
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
+                image_data, birthdate, kyusei_text
+            )
+            palm_result = "\n".join(palm_texts)
+            summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
+            # Convert lucky_info to a list of lines (string or list/dict)
+            lucky_lines = []
+            if isinstance(lucky_info, str):
+                for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+                    line = line.strip()
+                    if line:
+                        if line.startswith("・"):
+                            line = line[1:].strip()
+                        lucky_lines.append(line.replace(":", "：", 1))
+            elif isinstance(lucky_info, dict):
+                for k, v in lucky_info.items():
+                    line = f"{k}：{v}".strip()
+                    if line:
+                        if line.startswith("・"):
+                            line = line[1:].strip()
+                        lucky_lines.append(line)
+            else:
+                for item in lucky_info:
+                    for line in str(item).replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+                        line = line.strip()
+                        if line:
+                            if line.startswith("・"):
+                                line = line[1:].strip()
+                            lucky_lines.append(line.replace(":", "：", 1))
+            # Prepare titles for output sections
+            today = datetime.today()
+            target1 = today.replace(day=15)
+            if today.day >= 20:
+                target1 += relativedelta(months=1)
+            target2 = target1 + relativedelta(months=1)
+            year_label = f"{today.year}年の運勢"
+            month_label = f"{target1.year}年{target1.month}月の運勢"
+            next_month_label = f"{target2.year}年{target2.month}月の運勢"
+            result_data = {
+                "palm_titles": palm_titles,
+                "palm_texts": palm_texts,
+                "titles": {
+                    "palm_summary": "手相の総合アドバイス",
+                    "personality": "性格診断",
+                    "year_fortune": year_label,
+                    "month_fortune": month_label,
+                    "next_month_fortune": next_month_label
+                },
+                "texts": {
+                    "palm_summary": summary_text,
+                    "personality": shichu_result.get("personality", ""),
+                    "year_fortune": shichu_result.get("year_fortune", ""),
+                    "month_fortune": shichu_result.get("month_fortune", ""),
+                    "next_month_fortune": shichu_result.get("next_month_fortune", "")
+                },
+                "lucky_info": lucky_lines,
+                "lucky_direction": kyusei_text,
+                "birthdate": birthdate,
+                "palm_result": palm_result,
+                "shichu_result": shichu_result,
+                "iching_result": iching_result,
+                "palm_image": image_data
+            }
+            if full_year:
+                yearly_data = generate_yearly_fortune(birthdate, today)
+                result_data["yearly_fortunes"] = yearly_data
+                result_data["titles"]["year_fortune"] = yearly_data["year_label"]
+                result_data["texts"]["year_fortune"] = yearly_data["year_text"]
+            # Generate PDF in background thread and mark usage
+            filename = f"result_{uuid_str}.pdf"
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            shop_id = session.get("shop_id", "default")
+            threading.Thread(
+                target=background_generate_pdf,
+                args=(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id)
+            ).start()
+            redirect_url = url_for("preview", filename=filename)
+            if is_json:
+                return jsonify({"redirect_url": redirect_url})
+            else:
+                return redirect(redirect_url)
+        except Exception as e:
+            print("処理エラー:", e)
+            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
+    # GET: render the input page for paid user
+    return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
 
-@app.route("/webhook/selfmob", methods=["POST"])
-def webhook_selfmob():
-    try:
-        data = request.get_json()
-        print("📩 Webhook 受信データ:", json.dumps(data, indent=2, ensure_ascii=False))
-
-        if data.get("type") == "payment.captured":
-            uuid_str = data["data"]["attributes"].get("external_order_num")
-            metadata = data["data"]["attributes"].get("metadata", {})
-            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
-
-            print("📌 external_order_num:", uuid_str)
-            print("🏪 shop_id:", shop_id)
-
-            if uuid_str:
-                print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
-                update_shop_db(shop_id)
-                return "", 200
-        else:
-            print("⚠️ イベントが想定と異なる:", data.get("type"))
-    except Exception as e:
-        print("❌ Webhook error (selfmob):", e)
-
-    return "", 400
 
 
-@app.route("/webhook/renaiselfmob", methods=["POST"])
-def webhook_renaiselfmob():
-    try:
-        data = request.get_json()
-        print("📩 Webhook 受信データ:", json.dumps(data, indent=2, ensure_ascii=False))
 
-        if data.get("type") == "payment.captured":
-            uuid_str = data["data"]["attributes"].get("external_order_num")
-            metadata = data["data"]["attributes"].get("metadata", {})
-            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
-
-            print("📌 external_order_num:", uuid_str)
-            print("🏪 shop_id:", shop_id)
-
-            if uuid_str:
-                print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
-                update_shop_db(shop_id)
-                return "", 200
-        else:
-            print("⚠️ イベントが想定と異なる:", data.get("type"))
-    except Exception as e:
-        print("❌ Webhook error (renaiselfmob):", e)
-
-    return "", 400
 
 
 
@@ -782,3 +832,57 @@ def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False
     )
     print(f"🔗 決済URL [{mode}] (full={full_year}):", komoju_url)
     return komoju_url
+
+
+# ✅ 修正済み：Webhook event → type に変更済み app_unified.py 抜粋部分
+
+@app.route("/webhook/selfmob", methods=["POST"])
+def webhook_selfmob():
+    try:
+        data = request.get_json()
+        print("📩 Webhook 受信データ:", json.dumps(data, indent=2, ensure_ascii=False))
+
+        if data.get("type") == "payment.captured":
+            uuid_str = data["data"]["attributes"].get("external_order_num")
+            metadata = data["data"]["attributes"].get("metadata", {})
+            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
+
+            print("📌 external_order_num:", uuid_str)
+            print("🏪 shop_id:", shop_id)
+
+            if uuid_str:
+                print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
+                update_shop_db(shop_id)
+                return "", 200
+        else:
+            print("⚠️ イベントが想定と異なる:", data.get("type"))
+    except Exception as e:
+        print("❌ Webhook error (selfmob):", e)
+
+    return "", 400
+
+
+@app.route("/webhook/renaiselfmob", methods=["POST"])
+def webhook_renaiselfmob():
+    try:
+        data = request.get_json()
+        print("📩 Webhook 受信データ:", json.dumps(data, indent=2, ensure_ascii=False))
+
+        if data.get("type") == "payment.captured":
+            uuid_str = data["data"]["attributes"].get("external_order_num")
+            metadata = data["data"]["attributes"].get("metadata", {})
+            shop_id = metadata.get("shop_id", "default") if isinstance(metadata, dict) else "default"
+
+            print("📌 external_order_num:", uuid_str)
+            print("🏪 shop_id:", shop_id)
+
+            if uuid_str:
+                print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
+                update_shop_db(shop_id)
+                return "", 200
+        else:
+            print("⚠️ イベントが想定と異なる:", data.get("type"))
+    except Exception as e:
+        print("❌ Webhook error (renaiselfmob):", e)
+
+    return "", 400
