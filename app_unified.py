@@ -723,6 +723,7 @@ def webhook_selfmob():
         print("❌ Webhook error (selfmob):", e)
     return "", 400
 
+
 # Webhook Renai
 
 @app.route("/webhook/renaiselfmob", methods=["POST"])
@@ -730,22 +731,27 @@ def webhook_renaiselfmob():
     try:
         data = request.get_json()
         print("📩 Webhook 受信データ:", json.dumps(data, indent=2, ensure_ascii=False))
+
         if data.get("type") == "payment.captured":
+            # UUIDは external_order_num 優先。無い場合は session を使う
             uuid_str = data["data"].get("external_order_num") or data["data"].get("session")
             metadata = data["data"].get("metadata", {})
+
+            # shop_id は metadata に無ければ used_orders.txt から逆引き
             shop_id = metadata.get("shop_id") or get_shop_id_from_log(uuid_str)
             service = "renaiselfmob"
+
             print("📌 使用するUUID:", uuid_str)
             print("🏪 shop_id:", shop_id)
+
             if uuid_str:
                 print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
                 update_shop_db(shop_id, service)
                 return "", 200
         else:
             print("⚠️ イベントが想定と異なる:", data.get("type"))
+
     except Exception as e:
         print("❌ Webhook error (renaiselfmob):", e)
+
     return "", 400
-
-
-
