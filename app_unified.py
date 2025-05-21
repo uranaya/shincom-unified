@@ -688,18 +688,28 @@ def update_shop_db(shop_id, service):
         conn = psycopg2.connect(os.getenv("DATABASE_URL"))
         cur = conn.cursor()
 
+        # イベント保存（重複防止用）
         cur.execute("""
             INSERT INTO webhook_events (uuid, shop_id, service, date)
             VALUES (%s, %s, %s, %s)
             ON CONFLICT (uuid) DO NOTHING
         """, (uuid_str, shop_id, service, today))
 
+        # count を加算（あれば更新、なければ挿入）
+        cur.execute("""
+            INSERT INTO shop_logs (date, shop_id, service, count)
+            VALUES (%s, %s, %s, 1)
+            ON CONFLICT (date, shop_id, service)
+            DO UPDATE SET count = shop_logs.count + 1
+        """, (today, shop_id, service))
+
         conn.commit()
         cur.close()
         conn.close()
-        print("📝 PostgreSQLへ記録:", shop_id, "/", today, "/", service)
+        print("📝 PostgreSQL shop_logs に記録:", shop_id, "/", today, "/", service)
     except Exception as e:
         print("❌ PostgreSQLへの保存失敗:", e)
+
 
 
 
