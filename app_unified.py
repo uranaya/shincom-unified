@@ -19,6 +19,8 @@ from pdf_generator_unified import create_pdf_unified
 from fortune_logic import generate_renai_fortune
 import sqlite3
 import threading
+import psycopg2
+
 
 # Initialize logging and upload directories
 UPLOAD_FOLDER = 'static/uploads'
