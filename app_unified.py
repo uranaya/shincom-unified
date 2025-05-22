@@ -326,7 +326,7 @@ def thanks():
         conn.commit()
         cur.close()
         conn.close()
-        print("📝 thanksページでカウント:", shop_id, "/", today, "/", mode)
+        print("📝 PostgreSQL shop_logs に記録:", shop_id, "/", today, "/", mode)
     except Exception as e:
         print("❌ thanksでの保存失敗:", e)
 
