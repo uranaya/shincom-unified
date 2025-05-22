@@ -537,7 +537,6 @@ def get_eto():
     return jsonify({"eto": eto, "honmeisei": honmeisei})
 
 
-
 # ホームページ
 @app.route("/")
 @app.route("/home")
