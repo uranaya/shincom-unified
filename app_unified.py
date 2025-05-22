@@ -283,23 +283,53 @@ def generate_link_renai_full_with_shopid(shop_id):
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
 
+
+
 @app.route("/thanks")
 def thanks():
     uuid_str = request.cookies.get("uuid") or request.args.get("uuid")
     if not uuid_str:
         return render_template("thanks.html")
+
     mode = "selfmob"
+    shop_id = "default"
     try:
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
-                if len(parts) >= 3 and parts[0] == uuid_str:
-                    mode = parts[2]
+                if len(parts) >= 4 and parts[0] == uuid_str:
+                    _, _, mode, shop_id = parts[:4]
                     break
     except FileNotFoundError:
-        # If the tracking file doesn't exist (should not normally happen), default to "selfmob"
         pass
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    try:
+        conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO webhook_events (uuid, shop_id, service, date)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (uuid) DO NOTHING
+        """, (uuid_str, shop_id, f"{mode}_thanks", today))
+
+        cur.execute("""
+            INSERT INTO shop_logs (date, shop_id, service, count)
+            VALUES (%s, %s, %s, 1)
+            ON CONFLICT (date, shop_id, service)
+            DO UPDATE SET count = shop_logs.count + 1
+        """, (today, shop_id, mode))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("📝 thanksページでカウント:", shop_id, "/", today, "/", mode)
+    except Exception as e:
+        print("❌ thanksでの保存失敗:", e)
+
     return redirect(f"/{mode}/{uuid_str}")
+
 
 
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
