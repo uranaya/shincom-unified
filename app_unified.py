@@ -1,17 +1,25 @@
 import os
+import base64
 import uuid
 import json
-import threading
+import requests
+import traceback
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, make_response, send_file
-import psycopg2
 from urllib.parse import quote
-from fortune_logic import generate_fortune_shincom, get_nicchu_eto
-from kyusei_utils import get_kyusei_fortune
-from renai_fortune_utils import generate_renai_fortune
+from sqlalchemy import create_engine, text
+import csv
+from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response
+from fortune_logic import generate_fortune
+from dotenv import load_dotenv
+from dateutil.relativedelta import relativedelta
 from yearly_fortune_utils import generate_yearly_fortune
-from yearly_love_fortune_utils import generate_yearly_love_fortune
-from pdf_generator_unified import background_generate_pdf
+from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
+from kyusei_utils import get_honmeisei, get_kyusei_fortune
+from pdf_generator_unified import create_pdf_unified
+from fortune_logic import generate_renai_fortune
+import sqlite3
+import threading
+import psycopg2
 
 # --- 環境変数とパス ---
 DATABASE_URL = os.getenv("DATABASE_URL")
