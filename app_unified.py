@@ -331,6 +331,7 @@ def thanks():
 
 
 
+
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
     full_year = None
