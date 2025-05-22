@@ -696,19 +696,11 @@ def get_shop_id_from_log(uuid_str):
     return "default"
 
 
-
-# PostgreSQL登録処理
-
-
-        print("📝 PostgreSQL shop_logs に記録:", shop_id, "/", today, "/", service)
-    except Exception as e:
-        print("❌ PostgreSQLへの保存失敗:", e)
+# PostgreSQL登録処理（不要な関数は削除済）
 
 
+# Webhook Selfmob with session補完（使用しない構成に変更済）
 
 
+# Webhook Renai with session補完（使用しない構成に変更済）
 
-# Webhook Selfmob with session補完
-
-
-# Webhook Renai with session補完
