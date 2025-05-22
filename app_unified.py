@@ -307,14 +307,12 @@ def thanks():
     try:
         conn = psycopg2.connect(os.getenv("DATABASE_URL"))
         cur = conn.cursor()
-
         cur.execute(
             "INSERT INTO webhook_events (uuid, shop_id, service, date) "
             "VALUES (%s, %s, %s, %s) "
             "ON CONFLICT (uuid) DO NOTHING",
             (uuid_str, shop_id, f"{mode}_thanks", today)
         )
-
         cur.execute(
             "INSERT INTO shop_logs (date, shop_id, service, count) "
             "VALUES (%s, %s, %s, 1) "
@@ -322,7 +320,6 @@ def thanks():
             "DO UPDATE SET count = shop_logs.count + 1",
             (today, shop_id, mode)
         )
-
         conn.commit()
         cur.close()
         conn.close()
