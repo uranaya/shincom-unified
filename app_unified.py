@@ -308,18 +308,20 @@ def thanks():
         conn = psycopg2.connect(os.getenv("DATABASE_URL"))
         cur = conn.cursor()
 
-        cur.execute("""
-            INSERT INTO webhook_events (uuid, shop_id, service, date)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (uuid) DO NOTHING
-        """, (uuid_str, shop_id, f"{mode}_thanks", today))
+        cur.execute(
+            "INSERT INTO webhook_events (uuid, shop_id, service, date) "
+            "VALUES (%s, %s, %s, %s) "
+            "ON CONFLICT (uuid) DO NOTHING",
+            (uuid_str, shop_id, f"{mode}_thanks", today)
+        )
 
-        cur.execute("""
-            INSERT INTO shop_logs (date, shop_id, service, count)
-            VALUES (%s, %s, %s, 1)
-            ON CONFLICT (date, shop_id, service)
-            DO UPDATE SET count = shop_logs.count + 1
-        """, (today, shop_id, mode))
+        cur.execute(
+            "INSERT INTO shop_logs (date, shop_id, service, count) "
+            "VALUES (%s, %s, %s, 1) "
+            "ON CONFLICT (date, shop_id, service) "
+            "DO UPDATE SET count = shop_logs.count + 1",
+            (today, shop_id, mode)
+        )
 
         conn.commit()
         cur.close()
@@ -699,6 +701,13 @@ def get_shop_id_from_log(uuid_str):
 
 # PostgreSQL登録処理
 
+def update_shop_db(shop_id, service):
+    uuid_str = request.get_json()["data"].get("external_order_num") or request.get_json()["data"].get("session")
+    today = datetime.now().strftime("%Y-%m-%d")
+    try:
+        conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+        cur = conn.cursor()
+
         # イベント保存（重複防止用）
         cur.execute("""
             INSERT INTO webhook_events (uuid, shop_id, service, date)
@@ -726,6 +735,70 @@ def get_shop_id_from_log(uuid_str):
 
 
 # Webhook Selfmob with session補完
+@app.route("/webhook/selfmob", methods=["POST"])
+def webhook_selfmob():
+    try:
+        data = request.get_json()
+        print("📩 Webhook 受信データ:", json.dumps(data, indent=2, ensure_ascii=False))
+
+        if data.get("type") == "payment.captured":
+            uuid_str = data["data"].get("external_order_num") or data["data"].get("session")
+            session_id = data["data"].get("session")
+            metadata = data["data"].get("metadata", {})
+            shop_id = metadata.get("shop_id") or get_shop_id_from_log(uuid_str)
+            service = "selfmob"
+
+            if shop_id == "default" and session_id:
+                try:
+                    with open(USED_UUID_FILE, "a") as f:
+                        f.write(f"{session_id},0,{service},01\n")
+                    shop_id = "01"
+                    print("📌 shop_id 推定補正: 01")
+                except Exception as e:
+                    print("⚠️ shop_id補正失敗:", e)
+
+            print("📌 使用するUUID:", uuid_str)
+            print("🏪 shop_id:", shop_id)
+
+            if uuid_str:
+                print("✅ Webhook captured:", uuid_str, "from shop:", shop_id)
+                update_shop_db(shop_id, service)
+                return "", 200
+    except Exception as e:
+        print("❌ Webhook error (selfmob):", e)
+    return "", 400
 
 
 # Webhook Renai with session補完
+@app.route("/webhook/renaiselfmob", methods=["POST"])
+def webhook_renaiselfmob():
+    try:
+        data = request.get_json()
+        print("📩 Webhook 受信データ:", json.dumps(data, indent=2, ensure_ascii=False))
+
+        if data.get("type") == "payment.captured":
+            uuid_str = data["data"].get("external_order_num") or data["data"].get("session")
+            session_id = data["data"].get("session")
+            metadata = data["data"].get("metadata", {})
+            shop_id = metadata.get("shop_id") or get_shop_id_from_log(uuid_str)
+            service = "renaiselfmob"
+
+            if shop_id == "default" and session_id:
+                try:
+                    with open(USED_UUID_FILE, "a") as f:
+                        f.write(f"{session_id},0,{service},01\n")
+                    shop_id = "01"
+                    print("📌 shop_id 推定補正: 01")
+                except Exception as e:
+                    print("⚠️ shop_id補正失敗:", e)
+
+            print("📌 使用するUUID:", uuid_str)
+            print("🏪 shop_id:", shop_id)
+
+            if uuid_str:
+                print("✅ RENAI Webhook captured:", uuid_str, "from shop:", shop_id)
+                update_shop_db(shop_id, service)
+                return "", 200
+    except Exception as e:
+        print("❌ Webhook error (renaiselfmob):", e)
+    return "", 400
