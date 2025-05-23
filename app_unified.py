@@ -201,11 +201,6 @@ def generate_link_renai_full(shop_id):
     return _generate_link_with_shopid(shop_id, full_year=True, mode="renaiselfmob")
 
 
-@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
-def selfmob_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        return "未決済またはセッション切れです。再度決済してください。", 403
-
 
 def is_paid_uuid(uuid_str):
     try:
@@ -219,6 +214,8 @@ def is_paid_uuid(uuid_str):
     except Exception as e:
         print("❌ 決済確認エラー:", e)
         return False
+
+
 
 def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
@@ -259,6 +256,16 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     resp.set_cookie("uuid", uuid_str, max_age=600)  # 有効期限10分
     return resp
 
+
+
+
+@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
+def selfmob_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "未決済またはセッション切れです。再度決済してください。", 403
+
+    full_year = None
+    try:
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
@@ -307,6 +314,9 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     except Exception as e:
         print("❌ 通常占いエラー:", e)
         return "占い結果生成エラー", 500
+
+
+
 
 @app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
