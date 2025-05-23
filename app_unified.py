@@ -159,6 +159,9 @@ def thanks():
 
     return redirect(url_for(f"{mode}_uuid", uuid_str=uuid_str))
 
+
+
+
 def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False, mode="selfmob"):
     if mode == "renaiselfmob":
         komoju_id = os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID_FULL") if full_year else os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID")
@@ -201,6 +204,20 @@ def generate_link_renai_full(shop_id):
     return _generate_link_with_shopid(shop_id, full_year=True, mode="renaiselfmob")
 
 
+@app.route("/webhook/selfmob", methods=["POST"])
+def webhook_selfmob():
+    # とりあえずログ確認のため
+    data = request.get_json()
+    print("📩 Webhook受信: selfmob", data)
+    return "", 200
+
+@app.route("/webhook/renaiselfmob", methods=["POST"])
+def webhook_renaiselfmob():
+    data = request.get_json()
+    print("📩 Webhook受信: renaiselfmob", data)
+    return "", 200
+
+
 
 def is_paid_uuid(uuid_str):
     try:
@@ -210,10 +227,11 @@ def is_paid_uuid(uuid_str):
         result = cur.fetchone()
         cur.close()
         conn.close()
-        return result is not None
+        return result is not None  # ✅ ここだけで判定する
     except Exception as e:
         print("❌ 決済確認エラー:", e)
         return False
+
 
 
 
