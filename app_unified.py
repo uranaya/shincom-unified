@@ -175,6 +175,8 @@ def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False
     print(f"🔗 決済URL [{mode}] (full={full_year}): {url}")
     return url
 
+# ✅ 修正済み _generate_link_with_shopid 関数
+
 def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
@@ -194,7 +196,7 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     except Exception as e:
         print("⚠️ UUID書き込み失敗:", e)
 
-    # webhook_eventsに初回リンク生成イベントを記録
+    # ✅ 明示的な shop_id と mode を記録
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
@@ -203,7 +205,7 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
             INSERT INTO webhook_events (uuid, shop_id, service, date)
             VALUES (%s, %s, %s, %s)
             ON CONFLICT DO NOTHING;
-        """, (uuid_str, shop_id, request.path, today))
+        """, (uuid_str, shop_id, mode, today))
         conn.commit()
         cur.close()
         conn.close()
@@ -213,6 +215,7 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     resp = make_response(redirect(komoju_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)  # 有効期限10分
     return resp
+
 
 # 決済ページ入口（pay.html表示）とリンク生成用ルート
 @app.route("/selfmob-<shop_id>")
