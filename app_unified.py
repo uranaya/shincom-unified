@@ -175,7 +175,48 @@ def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False
     print(f"🔗 決済URL [{mode}] (full={full_year}): {url}")
     return url
 
-# ✅ 修正済み _generate_link_with_shopid 関数
+
+
+
+# 決済ページ入口（pay.html表示）とリンク生成用ルート
+@app.route("/selfmob-<shop_id>")
+def selfmob_shop_entry(shop_id):
+    session["shop_id"] = shop_id
+    return render_template("pay.html", shop_id=shop_id)
+
+@app.route("/generate_link/<shop_id>")
+def generate_link(shop_id):
+    return _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob")
+
+@app.route("/generate_link_full/<shop_id>")
+def generate_link_full(shop_id):
+    return _generate_link_with_shopid(shop_id, full_year=True, mode="selfmob")
+
+@app.route("/generate_link_renai/<shop_id>")
+def generate_link_renai(shop_id):
+    return _generate_link_with_shopid(shop_id, full_year=False, mode="renaiselfmob")
+
+@app.route("/generate_link_renai_full/<shop_id>")
+def generate_link_renai_full(shop_id):
+    return _generate_link_with_shopid(shop_id, full_year=True, mode="renaiselfmob")
+
+@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
+def selfmob_uuid(uuid_str):
+    full_year = None
+    try:# ✅ 修正済み _generate_link_with_shopid 関数 + UUID決済確認追加
+
+def is_paid_uuid(uuid_str):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM webhook_events WHERE uuid=%s AND service LIKE '%thanks'", (uuid_str,))
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        return result is not None
+    except Exception as e:
+        print("❌ 決済確認エラー:", e)
+        return False
 
 def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
@@ -216,33 +257,6 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     resp.set_cookie("uuid", uuid_str, max_age=600)  # 有効期限10分
     return resp
 
-
-# 決済ページ入口（pay.html表示）とリンク生成用ルート
-@app.route("/selfmob-<shop_id>")
-def selfmob_shop_entry(shop_id):
-    session["shop_id"] = shop_id
-    return render_template("pay.html", shop_id=shop_id)
-
-@app.route("/generate_link/<shop_id>")
-def generate_link(shop_id):
-    return _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob")
-
-@app.route("/generate_link_full/<shop_id>")
-def generate_link_full(shop_id):
-    return _generate_link_with_shopid(shop_id, full_year=True, mode="selfmob")
-
-@app.route("/generate_link_renai/<shop_id>")
-def generate_link_renai(shop_id):
-    return _generate_link_with_shopid(shop_id, full_year=False, mode="renaiselfmob")
-
-@app.route("/generate_link_renai_full/<shop_id>")
-def generate_link_renai_full(shop_id):
-    return _generate_link_with_shopid(shop_id, full_year=True, mode="renaiselfmob")
-
-@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
-def selfmob_uuid(uuid_str):
-    full_year = None
-    try:
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
@@ -549,10 +563,12 @@ def renai():
     # GET: render input form for love fortune
     return render_template("renai_form.html")
 
+
+
 @app.route("/selfmob", methods=["GET"])
 def selfmob_start():
-    # Payment start page (offers normal or love purchase options)
-    return render_template("pay.html")
+    return render_template("pay.html", shop_id="default")  # ✅ 明示的に shop_id を指定
+
 
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
