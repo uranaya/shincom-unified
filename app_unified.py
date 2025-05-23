@@ -200,10 +200,12 @@ def generate_link_renai(shop_id):
 def generate_link_renai_full(shop_id):
     return _generate_link_with_shopid(shop_id, full_year=True, mode="renaiselfmob")
 
+
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
-    full_year = None
-    try:# ✅ 修正済み _generate_link_with_shopid 関数 + UUID決済確認追加
+    if not is_paid_uuid(uuid_str):
+        return "未決済またはセッション切れです。再度決済してください。", 403
+
 
 def is_paid_uuid(uuid_str):
     try:
