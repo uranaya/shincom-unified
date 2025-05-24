@@ -292,6 +292,7 @@ def is_paid_uuid(uuid_str):
 
 
 
+
 def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
@@ -334,123 +335,81 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
 
 
 
-@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
-def selfmob_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        return "未決済またはセッション切れです。再度決済してください。", 403
-
-    full_year = None
+@app.route("/webhook/selfmob", methods=["POST"])
+def webhook_selfmob():
+    data = request.get_json()
+    print("📩 Webhook受信: selfmob", data)
+    session_id = data.get("data", {}).get("session")
+    matched_uuid, shop_id = None, "default"
     try:
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
-                if len(parts) >= 4 and parts[0] == uuid_str and parts[2] == "selfmob":
-                    full_year = (parts[1] == "1")
+                if len(parts) >= 4 and session_id in parts[0]:
+                    matched_uuid, shop_id = parts[0], parts[3]
                     break
-        if full_year is None:
-            return "無効なUUIDです", 400
     except Exception as e:
-        return f"UUID確認エラー: {e}", 500
+        print("⚠️ UUID逆照合失敗:", e)
 
-    if request.method == "GET":
-        return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
-
-    try:
-        data = request.get_json() if request.is_json else request.form
-        image_data = data.get("image_data")
-        birthdate = data.get("birthdate")
-        year, month, day = map(int, birthdate.split("-"))
-
-        kyusei_text = get_kyusei_fortune(year, month, day)
-        eto = get_nicchu_eto(birthdate)
-        palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(image_data, birthdate, kyusei_text)
-
-        result_data = {
-            "eto": eto,
-            "palm": {
-                "titles": palm_titles,
-                "result": "\n".join(palm_texts)
-            },
-            "shichu": shichu_result,
-            "iching": iching_result,
-            "lucky_info": lucky_info
-        }
-
-        filename = f"{uuid_str}.pdf"
-        filepath = os.path.join(".", filename)
-        shop_id = session.get("shop_id", "default")
-
-        threading.Thread(
-            target=background_generate_pdf,
-            args=(filepath, result_data, "selfmob", "a4", full_year, uuid_str, shop_id)
-        ).start()
-
-        return redirect(url_for("preview", filename=filename))
-    except Exception as e:
-        print("❌ 通常占いエラー:", e)
-        return "占い結果生成エラー", 500
+    if matched_uuid:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            today = datetime.now().strftime("%Y-%m-%d")
+            cur.execute("""
+                INSERT INTO webhook_events (uuid, shop_id, service, date)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT DO NOTHING;
+            """, (matched_uuid, shop_id, "selfmob_thanks", today))
+            conn.commit()
+            cur.close()
+            conn.close()
+            print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
+        except Exception as e:
+            print("❌ Webhook DBエラー:", e)
+    return "", 200
 
 
 
-
-@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
-def renaiselfmob_uuid(uuid_str):
-    full_year = None
+@app.route("/webhook/renaiselfmob", methods=["POST"])
+def webhook_renaiselfmob():
+    data = request.get_json()
+    print("📩 Webhook受信: renaiselfmob", data)
+    session_id = data.get("data", {}).get("session")
+    matched_uuid, shop_id = None, "default"
     try:
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
-                if len(parts) >= 4 and parts[0] == uuid_str and parts[2] == "renaiselfmob":
-                    full_year = (parts[1] == "1")
+                if len(parts) >= 4 and session_id in parts[0]:
+                    matched_uuid, shop_id = parts[0], parts[3]
                     break
-        if full_year is None:
-            return "無効なUUIDです", 400
     except Exception as e:
-        return f"UUID確認エラー: {e}", 500
+        print("⚠️ UUID逆照合失敗:", e)
 
-    if request.method == "GET":
-        return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
+    if matched_uuid:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            today = datetime.now().strftime("%Y-%m-%d")
+            cur.execute("""
+                INSERT INTO webhook_events (uuid, shop_id, service, date)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT DO NOTHING;
+            """, (matched_uuid, shop_id, "renaiselfmob_thanks", today))
+            conn.commit()
+            cur.close()
+            conn.close()
+            print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
+        except Exception as e:
+            print("❌ Webhook DBエラー:", e)
+    return "", 200
 
-    try:
-        user_birth = request.form.get("user_birth")
-        partner_birth = request.form.get("partner_birth")
 
-        raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
-        now = datetime.now()
-        from dateutil.relativedelta import relativedelta
-        target1 = now.replace(day=15)
-        if now.day >= 20:
-            target1 += relativedelta(months=1)
-        target2 = target1 + relativedelta(months=1)
 
-        result_data = {
-            "texts": {
-                "compatibility": raw_result["texts"].get("compatibility", ""),
-                "overall_love_fortune": raw_result["texts"].get("overall_love_fortune", ""),
-                "year_love": raw_result["texts"].get("year_love", ""),
-                "month_love": raw_result["texts"].get("month_love", ""),
-                "next_month_love": raw_result["texts"].get("next_month_love", "")
-            },
-            "titles": raw_result["titles"],
-            "themes": raw_result["themes"],
-            "lucky_info": raw_result["lucky_info"],
-            "lucky_direction": raw_result["lucky_direction"],
-            "yearly_love_fortunes": raw_result["yearly_love_fortunes"]
-        }
 
-        filename = f"renai_{uuid_str}.pdf"
-        filepath = os.path.join(".", filename)
-        shop_id = session.get("shop_id", "default")
 
-        threading.Thread(
-            target=background_generate_pdf,
-            args=(filepath, result_data, "renai", "a4", full_year, uuid_str, shop_id)
-        ).start()
 
-        return redirect(url_for("preview", filename=filename))
-    except Exception as e:
-        print("❌ 恋愛占いエラー:", e)
-        return "恋愛占い結果生成エラー", 500
 
 @app.route("/preview/<filename>")
 def preview(filename):
