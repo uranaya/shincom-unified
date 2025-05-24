@@ -73,7 +73,6 @@ def thanks():
     if not uuid_str:
         return render_template("thanks.html")
 
-    # UUIDに対応するデータをデータベースから取得
     mode = None
     shop_id = None
     if DATABASE_URL:
@@ -94,7 +93,6 @@ def thanks():
         except Exception as e:
             print("⚠️ DB検索エラー:", e)
 
-    # データベースに存在しない場合、used_orders.txtから照合
     if mode is None or shop_id is None:
         try:
             with open(USED_UUID_FILE, "r") as f:
@@ -157,7 +155,14 @@ def thanks():
     except Exception as e:
         print("❌ DB保存エラー:", e)
 
-    return redirect(url_for(f"{mode}_uuid", uuid_str=uuid_str))
+    # ✅ ここだけ修正済
+    endpoint_map = {
+        "selfmob": "selfmob_entry_uuid",
+        "renaiselfmob": "renaiselfmob_entry_uuid"
+    }
+    endpoint = endpoint_map.get(mode, "selfmob_entry_uuid")
+    return redirect(url_for(endpoint, uuid_str=uuid_str))
+
 
 
 
