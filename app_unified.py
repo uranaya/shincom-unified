@@ -550,6 +550,19 @@ def renai():
 def selfmob_start():
     return render_template("pay.html", shop_id="default")  # ✅ 明示的に shop_id を指定
 
+@app.route("/selfmob/<uuid_str>")
+def selfmob_entry_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このURLは有効ではありません（未決済）", 403
+    return render_template("form.html")
+
+@app.route("/renaiselfmob/<uuid_str>")
+def renaiselfmob_entry_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このURLは有効ではありません（未決済）", 403
+    return render_template("renai_form.html")
+
+
 
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
