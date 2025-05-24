@@ -204,18 +204,77 @@ def generate_link_renai_full(shop_id):
     return _generate_link_with_shopid(shop_id, full_year=True, mode="renaiselfmob")
 
 
+（略）
+
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
-    # とりあえずログ確認のため
     data = request.get_json()
     print("📩 Webhook受信: selfmob", data)
+    session_id = data.get("data", {}).get("session")
+    matched_uuid, shop_id = None, "default"
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) >= 4 and session_id in parts[0]:
+                    matched_uuid, shop_id = parts[0], parts[3]
+                    break
+    except Exception as e:
+        print("⚠️ UUID逆照合失敗:", e)
+
+    if matched_uuid:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            today = datetime.now().strftime("%Y-%m-%d")
+            cur.execute("""
+                INSERT INTO webhook_events (uuid, shop_id, service, date)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT DO NOTHING;
+            """, (matched_uuid, shop_id, "selfmob_thanks", today))
+            conn.commit()
+            cur.close()
+            conn.close()
+            print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
+        except Exception as e:
+            print("❌ Webhook DBエラー:", e)
     return "", 200
+
 
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
     data = request.get_json()
     print("📩 Webhook受信: renaiselfmob", data)
+    session_id = data.get("data", {}).get("session")
+    matched_uuid, shop_id = None, "default"
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) >= 4 and session_id in parts[0]:
+                    matched_uuid, shop_id = parts[0], parts[3]
+                    break
+    except Exception as e:
+        print("⚠️ UUID逆照合失敗:", e)
+
+    if matched_uuid:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            today = datetime.now().strftime("%Y-%m-%d")
+            cur.execute("""
+                INSERT INTO webhook_events (uuid, shop_id, service, date)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT DO NOTHING;
+            """, (matched_uuid, shop_id, "renaiselfmob_thanks", today))
+            conn.commit()
+            cur.close()
+            conn.close()
+            print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
+        except Exception as e:
+            print("❌ Webhook DBエラー:", e)
     return "", 200
+
 
 
 
