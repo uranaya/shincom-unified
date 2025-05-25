@@ -154,35 +154,43 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
     data = request.get_json()
-    print("📩 Webhook受信: selfmob", data)
+    print("📩 Webhook受信: selfmob")
+
+    # Webhook全体の中身を整形して表示
+    import json
+    try:
+        print("📦 Webhookデータ全文:")
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    except Exception as e:
+        print("⚠️ Webhookデータの整形表示に失敗:", e)
+
     session_id = data.get("data", {}).get("session")
+    print(f"🎯 session_id 抜き出し結果: {session_id}")
+
     matched_uuid, shop_id = None, "default"
-    # used_orders.txtからsession_idを逆照合しセッションIDを記録
+
+    # used_orders.txt の session_id と照合
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = f.readlines()
         for i, line in enumerate(lines):
             parts = line.strip().split(",")
-            # parts: uuid, session_id, mode, shop_id
             if len(parts) >= 4 and parts[1] == session_id:
                 matched_uuid, shop_id = parts[0], parts[3]
-                parts[1] = session_id
+                parts[1] = session_id  # session_id を更新
                 lines[i] = ",".join(parts) + "\n"
                 break
         if matched_uuid:
             with open(USED_UUID_FILE, "w") as f:
                 f.writelines(lines)
+            print(f"✅ matched_uuid: {matched_uuid} / shop_id: {shop_id}")
+        else:
+            print("⚠️ used_orders.txt に一致する session_id が見つかりませんでした")
     except Exception as e:
-        print("⚠️ UUID逆照合失敗:", e)
-    # session_idをwebhook_sessions.txtに記録
-    if session_id:
-        try:
-            with open(WEBHOOK_SESSION_FILE, "a") as f:
-                f.write(f"{session_id}\n")
-        except Exception as e:
-            print("⚠️ Webhookセッション記録失敗:", e)
-    # DBにも記録
-    if matched_uuid and DATABASE_URL:
+        print("⚠️ used_orders.txt 読み込み or 書き込みエラー:", e)
+
+    # webhook_events にも記録
+    if matched_uuid:
         try:
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
@@ -197,8 +205,10 @@ def webhook_selfmob():
             conn.close()
             print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
         except Exception as e:
-            print("❌ Webhook DBエラー:", e)
+            print("❌ Webhook DB保存エラー:", e)
+
     return "", 200
+
 
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
