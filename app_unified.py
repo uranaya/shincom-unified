@@ -551,15 +551,38 @@ def selfmob_start():
 @app.route("/selfmob/<uuid_str>")
 def selfmob_entry_uuid(uuid_str):
     if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
-    return render_template("index.html")  # ← 実際には鑑定ページへ遷移
+        # 初回アクセスならここで used_orders.txt に記録
+        try:
+            with open(USED_UUID_FILE, "a") as f:
+                # session_id は未使用のため空欄
+                f.write(f"{uuid_str},,selfmob,default\n")
+                print(f"✅ UUID {uuid_str} を used_orders.txt に記録")
+        except Exception as e:
+            print("⚠️ used_orders.txt 書き込み失敗:", e)
+
+        # 再度チェック（今度はTrueになるはず）
+        if not is_paid_uuid(uuid_str):
+            return "このUUIDは未決済です", 403
+
+    return render_template("index.html")
+
 
 
 @app.route("/renaiselfmob/<uuid_str>")
 def renaiselfmob_entry_uuid(uuid_str):
     if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
+        try:
+            with open(USED_UUID_FILE, "a") as f:
+                f.write(f"{uuid_str},,renaiselfmob,default\n")
+                print(f"✅ UUID {uuid_str} を used_orders.txt に記録 (恋愛版)")
+        except Exception as e:
+            print("⚠️ used_orders.txt 書き込み失敗 (恋愛版):", e)
+
+        if not is_paid_uuid(uuid_str):
+            return "このUUIDは未決済です", 403
+
     return render_template("renai_form.html")
+
 
 
 @app.route("/get_eto", methods=["POST"])
