@@ -201,28 +201,33 @@ def generate_link_renai_full(shop_id):
 
 
 def is_paid_uuid(uuid_str):
-    # Check used_orders.txt first
+    session_id = None
     try:
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
-                if len(parts) >= 1 and parts[0] == uuid_str:
-                    return True
+                if len(parts) >= 2 and parts[0] == uuid_str:
+                    session_id = parts[1]
+                    break
     except Exception as e:
-        print("⚠️ used_orders.txt 読み込みエラー(is_paid_uuid):", e)
-
-    # Then check webhook_events table
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
-        cur.execute("SELECT 1 FROM webhook_events WHERE uuid=%s AND service LIKE '%thanks'", (uuid_str,))
-        result = cur.fetchone()
-        cur.close()
-        conn.close()
-        return result is not None
-    except Exception as e:
-        print("❌ 決済確認エラー:", e)
+        print("❌ UUID読み込み失敗:", e)
         return False
+
+    if not session_id:
+        print("❌ session_id 不明")
+        return False
+
+    try:
+        with open(WEBHOOK_SESSION_FILE, "r") as f:
+            for line in f:
+                if line.strip() == session_id:
+                    return True
+        print("❌ Webhook未受信: session_id見つからず")
+        return False
+    except Exception as e:
+        print("❌ Webhookセッション照合失敗:", e)
+        return False
+
 
 
 
