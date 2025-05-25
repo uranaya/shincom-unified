@@ -36,6 +36,10 @@ os.makedirs(os.path.dirname(USED_UUID_FILE) or ".", exist_ok=True)
 if not os.path.exists(USED_UUID_FILE):
     open(USED_UUID_FILE, "w").close()
 
+# webhook_sessions.txt 存在チェック
+if not os.path.exists("webhook_sessions.txt"):
+    open("webhook_sessions.txt", "w").close()
+
 # --- データベース初期化 ---
 if DATABASE_URL:
     try:
@@ -66,117 +70,104 @@ if DATABASE_URL:
 else:
     print("⚠️ DATABASE_URL が未設定。ローカル実行ではDB非使用。")
 
-# --- thanksルート（カウント処理） ---
+# --- thanksルート ---
 @app.route("/thanks")
 def thanks():
     uuid_str = request.cookies.get("uuid") or request.args.get("uuid")
     if not uuid_str:
+        # UUID未指定の場合は通常のthanksページ
         return render_template("thanks.html", uuid_str="")
+    # UUIDあり: thanksページにuuidを渡す（カウント処理は /start へ移動）
+    return render_template("thanks.html", uuid_str=uuid_str)
 
+@app.route("/start/<uuid_str>")
+def start(uuid_str):
+    # used_orders.txt から UUID, session_id, mode, shop_id を取得
     mode = None
     shop_id = None
-    if DATABASE_URL:
-        try:
+    session_id = None
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) >= 4 and parts[0] == uuid_str:
+                    session_id = parts[1]
+                    mode = parts[2]
+                    shop_id = parts[3]
+                    break
+    except Exception as e:
+        print("⚠️ used_orders.txt 読み込みエラー:", e)
+    if mode is None or shop_id is None:
+        # UUIDがファイルになければアクセス禁止
+        return "Invalid UUID", 403
+    # session_id が未記録なら決済済みではない
+    if not session_id:
+        return "Session ID not found", 403
+    # webhook_sessions.txt に session_id が記録されているか確認
+    try:
+        with open("webhook_sessions.txt", "r") as f:
+            sessions = [line.strip() for line in f]
+    except Exception as e:
+        print("⚠️ webhook_sessions.txt 読み込みエラー:", e)
+        return "Server error", 500
+    if session_id not in sessions:
+        return "Payment not confirmed", 403
+
+    # DBに記録およびshop_logsカウント更新
+    today = datetime.now().strftime("%Y-%m-%d")
+    try:
+        if DATABASE_URL:
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
-            cur.execute("SELECT shop_id, service FROM webhook_events WHERE uuid=%s", (uuid_str,))
-            row = cur.fetchone()
-            cur.close()
-            conn.close()
-            if row:
-                shop_id_db, service_db = row
-                shop_id = shop_id_db
-                if service_db and "renai" in service_db:
-                    mode = "renaiselfmob"
-                else:
-                    mode = "selfmob"
-        except Exception as e:
-            print("⚠️ DB検索エラー:", e)
-
-    if mode is None or shop_id is None:
-        try:
-            with open(USED_UUID_FILE, "r") as f:
-                for line in f:
-                    parts = line.strip().split(",")
-                    # parts: uuid, session_id, mode, shop_id
-                    if len(parts) >= 4 and parts[0] == uuid_str:
-                        mode = parts[2]
-                        shop_id = parts[3]
-                        break
-        except Exception as e:
-            print("⚠️ used_orders.txt 読み込みエラー:", e)
-
-    if mode is None or shop_id is None:
-        print(f"⚠️ UUID見つからず: {uuid_str}")
-        if DATABASE_URL:
-            try:
-                conn = psycopg2.connect(DATABASE_URL)
-                cur = conn.cursor()
-                today = datetime.now().strftime("%Y-%m-%d")
+            final_service = f"{mode}_thanks"
+            cur.execute("""
+                UPDATE webhook_events SET shop_id=%s, service=%s, date=%s
+                WHERE uuid=%s AND service != %s;
+            """, (shop_id, final_service, today, uuid_str, final_service))
+            updated = cur.rowcount
+            if updated == 0:
                 cur.execute("""
                     INSERT INTO webhook_events (uuid, shop_id, service, date)
                     VALUES (%s, %s, %s, %s)
                     ON CONFLICT DO NOTHING;
-                """, (uuid_str, "default", "invalid_thanks", today))
-                conn.commit()
-                cur.close()
-                conn.close()
-            except Exception as e:
-                print("❌ DB記録失敗:", e)
-        return render_template("thanks.html", uuid_str="")
-
-    today = datetime.now().strftime("%Y-%m-%d")
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
-        final_service = f"{mode}_thanks"
-        cur.execute("""
-            UPDATE webhook_events SET shop_id=%s, service=%s, date=%s
-            WHERE uuid=%s AND service != %s;
-        """, (shop_id, final_service, today, uuid_str, final_service))
-        updated = cur.rowcount
-        if updated == 0:
-            cur.execute("""
-                INSERT INTO webhook_events (uuid, shop_id, service, date)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT DO NOTHING;
-            """, (uuid_str, shop_id, final_service, today))
-        if updated or cur.rowcount:
-            cur.execute("""
-                INSERT INTO shop_logs (date, shop_id, service, count)
-                VALUES (%s, %s, %s, 1)
-                ON CONFLICT (date, shop_id, service)
-                DO UPDATE SET count = shop_logs.count + 1;
-            """, (today, shop_id, mode))
-            print(f"📝 shop_logs カウント更新: {today} / {shop_id} / {mode}")
-        else:
-            print(f"ℹ️ UUID {uuid_str} は重複でカウントスキップ")
-        conn.commit()
-        cur.close()
-        conn.close()
+                """, (uuid_str, shop_id, final_service, today))
+            # shop_logs にカウント処理
+            if updated or cur.rowcount:
+                cur.execute("""
+                    INSERT INTO shop_logs (date, shop_id, service, count)
+                    VALUES (%s, %s, %s, 1)
+                    ON CONFLICT (date, shop_id, service)
+                    DO UPDATE SET count = shop_logs.count + 1;
+                """, (today, shop_id, mode))
+                print(f"📝 shop_logs カウント更新: {today} / {shop_id} / {mode}")
+            else:
+                print(f"ℹ️ UUID {uuid_str} は重複でカウントスキップ")
+            conn.commit()
+            cur.close()
+            conn.close()
     except Exception as e:
         print("❌ DB保存エラー:", e)
 
-    return render_template("thanks.html", uuid_str=uuid_str)
+    # 対象モードへリダイレクト (full_year はURLには不要)
+    target_mode = mode
+    if target_mode.endswith("_full"):
+        target_mode = target_mode.replace("_full", "")
+    return redirect(url_for(f"{target_mode}_uuid", uuid_str=uuid_str))
 
 def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False, mode="selfmob"):
     if mode == "renaiselfmob":
         komoju_id = os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID_FULL") if full_year else os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID")
     else:
         komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL") if full_year else os.getenv("KOMOJU_PUBLIC_LINK_ID")
-
     if not komoju_id:
         raise ValueError("KOMOJUリンクID未設定")
-
     encoded_redirect = quote(redirect_url, safe='')
     encoded_metadata = quote(metadata)
     url = f"https://komoju.com/payment_links/{komoju_id}?external_order_num={uuid_str}&customer_redirect_url={encoded_redirect}&metadata={encoded_metadata}"
-
     print(f"🔗 決済URL [{mode}] (full={full_year}): {url}")
     return url
 
-
-# 決済ページ入口（pay.html表示）とリンク生成用ルート
+# --- 決済リンク生成ルート ---
 @app.route("/selfmob-<shop_id>")
 def selfmob_shop_entry(shop_id):
     session["shop_id"] = shop_id
@@ -199,7 +190,7 @@ def generate_link_renai_full(shop_id):
     return _generate_link_with_shopid(shop_id, full_year=True, mode="renaiselfmob")
 
 def is_paid_uuid(uuid_str):
-    # Check used_orders.txt first
+    # used_orders.txt でUUID確認
     try:
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
@@ -208,11 +199,11 @@ def is_paid_uuid(uuid_str):
                     return True
     except Exception as e:
         print("⚠️ used_orders.txt 読み込みエラー(is_paid_uuid):", e)
-    # Then check webhook_events table
+    # DBのwebhook_eventsテーブルで確認
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
-        cur.execute("SELECT 1 FROM webhook_events WHERE uuid=%s AND service LIKE '%thanks'", (uuid_str,))
+        cur.execute("SELECT 1 FROM webhook_events WHERE uuid=%s AND service LIKE %s", (uuid_str, '%thanks'))
         result = cur.fetchone()
         cur.close()
         conn.close()
@@ -233,61 +224,18 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
         full_year=full_year,
         mode=mode
     )
-
+    # used_orders.txt に書き込むモード名 (full_year フラグで区別)
+    mode_str = mode
+    if full_year:
+        mode_str = f"{mode}_full"
     try:
         with open(USED_UUID_FILE, "a") as f:
-            # UUID, session_id (blank), mode, shop_id
-            f.write(f"{uuid_str},,{mode},{shop_id}\n")
+            f.write(f"{uuid_str},,{mode_str},{shop_id}\n")
     except Exception as e:
         print("⚠️ UUID書き込み失敗:", e)
-
-    # ✅ 明示的な shop_id と mode を記録
+    # DBにも仮記録
     try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
-        today = datetime.now().strftime("%Y-%m-%d")
-        cur.execute("""
-            INSERT INTO webhook_events (uuid, shop_id, service, date)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT DO NOTHING;
-        """, (uuid_str, shop_id, mode, today))
-        conn.commit()
-        cur.close()
-        conn.close()
-    except Exception as e:
-        print("❌ DB記録失敗 (generate_link):", e)
-
-    resp = make_response(redirect(komoju_url))
-    resp.set_cookie("uuid", uuid_str, max_age=600)  # 有効期限10分
-    return resp
-
-@app.route("/webhook/selfmob", methods=["POST"])
-def webhook_selfmob():
-    data = request.get_json()
-    print("📩 Webhook受信: selfmob", data)
-    session_id = data.get("data", {}).get("session")
-    matched_uuid, shop_id = None, "default"
-    try:
-        with open(USED_UUID_FILE, "r") as f:
-            lines = f.readlines()
-        for i, line in enumerate(lines):
-            parts = line.strip().split(",")
-            # parts: uuid, session_id, mode, shop_id
-            if len(parts) >= 4 and parts[1] == session_id:
-                matched_uuid, shop_id = parts[0], parts[3]
-                # Update the used_orders.txt to record the session_id
-                parts[1] = session_id
-                lines[i] = ",".join(parts) + "\n"
-                break
-        # write back file if matched
-        if matched_uuid:
-            with open(USED_UUID_FILE, "w") as f:
-                f.writelines(lines)
-    except Exception as e:
-        print("⚠️ UUID逆照合失敗:", e)
-
-    if matched_uuid:
-        try:
+        if DATABASE_URL:
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
             today = datetime.now().strftime("%Y-%m-%d")
@@ -295,11 +243,63 @@ def webhook_selfmob():
                 INSERT INTO webhook_events (uuid, shop_id, service, date)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT DO NOTHING;
-            """, (matched_uuid, shop_id, "selfmob_thanks", today))
+            """, (uuid_str, shop_id, mode_str, today))
             conn.commit()
             cur.close()
             conn.close()
-            print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
+    except Exception as e:
+        print("❌ DB記録失敗 (generate_link):", e)
+    resp = make_response(redirect(komoju_url))
+    resp.set_cookie("uuid", uuid_str, max_age=600)  # 有効期限10分
+    return resp
+
+# --- Komoju Webhook ルート ---
+@app.route("/webhook/selfmob", methods=["POST"])
+def webhook_selfmob():
+    data = request.get_json()
+    print("📩 Webhook受信: selfmob", data)
+    session_id = data.get("data", {}).get("session")
+    matched_uuid = None
+    shop_id = "default"
+    # session_id をログ用に記録
+    if session_id:
+        try:
+            with open("webhook_sessions.txt", "a") as f:
+                f.write(f"{session_id}\n")
+        except Exception as e:
+            print("⚠️ Webhookセッション記録失敗:", e)
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            lines = f.readlines()
+        for i, line in enumerate(lines):
+            parts = line.strip().split(",")
+            if len(parts) >= 4 and parts[1] == session_id:
+                matched_uuid = parts[0]
+                shop_id = parts[3]
+                # used_orders.txt に session_id を更新
+                parts[1] = session_id
+                lines[i] = ",".join(parts) + "\n"
+                break
+        if matched_uuid:
+            with open(USED_UUID_FILE, "w") as f:
+                f.writelines(lines)
+    except Exception as e:
+        print("⚠️ UUID逆照合失敗:", e)
+    if matched_uuid:
+        try:
+            if DATABASE_URL:
+                conn = psycopg2.connect(DATABASE_URL)
+                cur = conn.cursor()
+                today = datetime.now().strftime("%Y-%m-%d")
+                cur.execute("""
+                    INSERT INTO webhook_events (uuid, shop_id, service, date)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT DO NOTHING;
+                """, (matched_uuid, shop_id, "selfmob_thanks", today))
+                conn.commit()
+                cur.close()
+                conn.close()
+                print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
         except Exception as e:
             print("❌ Webhook DBエラー:", e)
     return "", 200
@@ -309,14 +309,24 @@ def webhook_renaiselfmob():
     data = request.get_json()
     print("📩 Webhook受信: renaiselfmob", data)
     session_id = data.get("data", {}).get("session")
-    matched_uuid, shop_id = None, "default"
+    matched_uuid = None
+    shop_id = "default"
+    # session_id をログ用に記録
+    if session_id:
+        try:
+            with open("webhook_sessions.txt", "a") as f:
+                f.write(f"{session_id}\n")
+        except Exception as e:
+            print("⚠️ Webhookセッション記録失敗:", e)
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = f.readlines()
         for i, line in enumerate(lines):
             parts = line.strip().split(",")
             if len(parts) >= 4 and parts[1] == session_id:
-                matched_uuid, shop_id = parts[0], parts[3]
+                matched_uuid = parts[0]
+                shop_id = parts[3]
+                # used_orders.txt に session_id を更新
                 parts[1] = session_id
                 lines[i] = ",".join(parts) + "\n"
                 break
@@ -325,21 +335,21 @@ def webhook_renaiselfmob():
                 f.writelines(lines)
     except Exception as e:
         print("⚠️ UUID逆照合失敗:", e)
-
     if matched_uuid:
         try:
-            conn = psycopg2.connect(DATABASE_URL)
-            cur = conn.cursor()
-            today = datetime.now().strftime("%Y-%m-%d")
-            cur.execute("""
-                INSERT INTO webhook_events (uuid, shop_id, service, date)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT DO NOTHING;
-            """, (matched_uuid, shop_id, "renaiselfmob_thanks", today))
-            conn.commit()
-            cur.close()
-            conn.close()
-            print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
+            if DATABASE_URL:
+                conn = psycopg2.connect(DATABASE_URL)
+                cur = conn.cursor()
+                today = datetime.now().strftime("%Y-%m-%d")
+                cur.execute("""
+                    INSERT INTO webhook_events (uuid, shop_id, service, date)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT DO NOTHING;
+                """, (matched_uuid, shop_id, "renaiselfmob_thanks", today))
+                conn.commit()
+                cur.close()
+                conn.close()
+                print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
         except Exception as e:
             print("❌ Webhook DBエラー:", e)
     return "", 200
@@ -393,7 +403,6 @@ def logout():
 @app.route("/ten", methods=["GET", "POST"], endpoint="ten")
 @app.route("/tenmob", methods=["GET", "POST"], endpoint="tenmob")
 def ten_shincom():
-    # Login required for store mode
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
     mode = "shincom"
@@ -405,27 +414,20 @@ def ten_shincom():
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
-            # Validate birthdate format
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
-            # Get lucky direction text (九星気学), with fallback on error
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
             eto = get_nicchu_eto(birthdate)
-            # Generate fortune results
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(
-                image_data, birthdate, kyusei_text
-            )
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text)
             summary_text = ""
             if len(palm_texts) == 6:
-                # If palm_texts has a summary element, separate it
                 summary_text = palm_texts.pop()
-            # Prepare labels for year and month sections
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
@@ -434,7 +436,6 @@ def ten_shincom():
             year_label = f"{now.year}年の運勢"
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
-            # Compile result data for PDF template
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
@@ -460,20 +461,14 @@ def ten_shincom():
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "palm_image": image_data
             }
-            # Include full-year fortunes if requested
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, now)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
-            # Generate PDF asynchronously to avoid blocking
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
-            threading.Thread(
-                target=background_generate_pdf,
-                args=(filepath, result_data, mode, size.lower(), full_year)
-            ).start()
-            # Return a redirect to the preview page (or JSON link if API call)
+            threading.Thread(target=background_generate_pdf, args=(filepath, result_data, mode, size.lower(), full_year)).start()
             redirect_url = url_for("preview", filename=filename)
             if is_json:
                 return jsonify({"redirect_url": redirect_url})
@@ -482,34 +477,24 @@ def ten_shincom():
         except Exception as e:
             traceback.print_exc()
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
-    # GET request: render input form
     return render_template("index.html")
 
 @app.route("/renai", methods=["GET", "POST"])
 @app.route("/renaib4", methods=["GET", "POST"])
 def renai():
-    # Login required for store mode (love fortune)
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
     size = "A4" if request.path == "/renai" else "B4"
     if request.method == "POST":
         user_birth = request.form.get("user_birth")
         partner_birth = request.form.get("partner_birth")
-        include_yearly = request.form.get("include_yearly") == "yes"
-        # Validate user birthdate
-        if not user_birth or not isinstance(user_birth, str):
-            return "生年月日が不正です", 400
-        # Prepare labels for love fortune sections
+        include_yearly = (request.form.get("full_year") == "yes")
+        raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly)
         now = datetime.now()
         target1 = now.replace(day=15)
         if now.day >= 20:
             target1 += relativedelta(months=1)
         target2 = target1 + relativedelta(months=1)
-        year_label = f"{now.year}年の恋愛運"
-        month_label = f"{target1.year}年{target1.month}月の恋愛運"
-        next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
-        # Generate love fortune results (including yearly if selected)
-        raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
         result_data = {
             "texts": {
                 "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
@@ -518,55 +503,34 @@ def renai():
                 "month_love": raw_result.get("texts", {}).get("month_love", ""),
                 "next_month_love": raw_result.get("texts", {}).get("next_month_love", "")
             },
-            "titles": {
-                "compatibility": raw_result.get("titles", {}).get("compatibility", "相性診断" if partner_birth else "恋愛傾向と出会い"),
-                "overall_love_fortune": raw_result.get("titles", {}).get("overall_love_fortune", "総合恋愛運"),
-                "year_love": raw_result.get("titles", {}).get("year_love", year_label),
-                "month_love": raw_result.get("titles", {}).get("month_love", month_label),
-                "next_month_love": raw_result.get("titles", {}).get("next_month_love", next_month_label)
-            },
+            "titles": raw_result.get("titles", {}),
             "themes": raw_result.get("themes", []),
             "lucky_info": raw_result.get("lucky_info", []),
             "lucky_direction": raw_result.get("lucky_direction", ""),
             "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
         }
-        # Generate PDF asynchronously (filename includes a random UUID for uniqueness)
-        filename = f"renai_{uuid.uuid4()}.pdf"
+        filename = f"renai_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
-        threading.Thread(
-            target=background_generate_pdf,
-            args=(filepath, result_data, "renai", size.lower(), include_yearly)
-        ).start()
-        # Redirect to preview page to view/download the PDF
+        threading.Thread(target=background_generate_pdf, args=(filepath, result_data, "renai", size.lower(), include_yearly)).start()
         return redirect(url_for("preview", filename=filename))
-    # GET: render input form for love fortune
     return render_template("renai_form.html")
-
 
 @app.route("/selfmob", methods=["GET"])
 def selfmob_start():
-    return render_template("pay.html", shop_id="default")  # ✅ 明示的に shop_id を指定
-
+    return render_template("pay.html", shop_id="default")
 
 @app.route("/selfmob/<uuid_str>")
 def selfmob_entry_uuid(uuid_str):
     if not is_paid_uuid(uuid_str):
-        # 初回アクセスならここで used_orders.txt に記録
         try:
             with open(USED_UUID_FILE, "a") as f:
-                # session_id は未使用のため空欄
                 f.write(f"{uuid_str},,selfmob,default\n")
                 print(f"✅ UUID {uuid_str} を used_orders.txt に記録")
         except Exception as e:
             print("⚠️ used_orders.txt 書き込み失敗:", e)
-
-        # 再度チェック（今度はTrueになるはず）
         if not is_paid_uuid(uuid_str):
             return "このUUIDは未決済です", 403
-
     return render_template("index.html")
-
-
 
 @app.route("/renaiselfmob/<uuid_str>")
 def renaiselfmob_entry_uuid(uuid_str):
@@ -577,38 +541,31 @@ def renaiselfmob_entry_uuid(uuid_str):
                 print(f"✅ UUID {uuid_str} を used_orders.txt に記録 (恋愛版)")
         except Exception as e:
             print("⚠️ used_orders.txt 書き込み失敗 (恋愛版):", e)
-
         if not is_paid_uuid(uuid_str):
             return "このUUIDは未決済です", 403
-
     return render_template("renai_form.html")
-
-
 
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
-    # AJAX endpoint to get Chinese zodiac (eto) and honmeisei from birthdate
     try:
         birthdate = request.json.get("birthdate")
-    except Exception:
+    except:
         return jsonify({"error": "無効な生年月日です"}), 400
     if not birthdate or not isinstance(birthdate, str):
         return jsonify({"error": "無効な生年月日です"}), 400
     try:
         y, m, d = map(int, birthdate.split("-"))
-    except Exception:
+    except:
         return jsonify({"error": "無効な生年月日です"}), 400
     eto = get_nicchu_eto(birthdate)
     honmeisei = get_honmeisei(y, m, d)
     return jsonify({"eto": eto, "honmeisei": honmeisei})
 
-# ホームページ
 @app.route("/")
 @app.route("/home")
 def home():
     return render_template("home-unified.html")
 
-# 特定商取引・プライバシーポリシーなど
 @app.route("/privacy")
 def privacy():
     return render_template("privacy.html")
