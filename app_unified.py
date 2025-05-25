@@ -543,8 +543,6 @@ def renai():
     return render_template("renai_form.html")
 
 
-
-
 @app.route("/selfmob", methods=["GET"])
 def selfmob_start():
     return render_template("pay.html", shop_id="default")  # ✅ 明示的に shop_id を指定
