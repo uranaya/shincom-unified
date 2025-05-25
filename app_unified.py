@@ -198,6 +198,8 @@ def generate_link_renai(shop_id):
 def generate_link_renai_full(shop_id):
     return _generate_link_with_shopid(shop_id, full_year=True, mode="renaiselfmob")
 
+
+
 def is_paid_uuid(uuid_str):
     # Check used_orders.txt first
     try:
@@ -208,6 +210,7 @@ def is_paid_uuid(uuid_str):
                     return True
     except Exception as e:
         print("⚠️ used_orders.txt 読み込みエラー(is_paid_uuid):", e)
+
     # Then check webhook_events table
     try:
         conn = psycopg2.connect(DATABASE_URL)
@@ -220,6 +223,8 @@ def is_paid_uuid(uuid_str):
     except Exception as e:
         print("❌ 決済確認エラー:", e)
         return False
+
+
 
 def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
@@ -267,19 +272,17 @@ def webhook_selfmob():
     print("📩 Webhook受信: selfmob", data)
     session_id = data.get("data", {}).get("session")
     matched_uuid, shop_id = None, "default"
+
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = f.readlines()
         for i, line in enumerate(lines):
             parts = line.strip().split(",")
-            # parts: uuid, session_id, mode, shop_id
             if len(parts) >= 4 and parts[1] == session_id:
                 matched_uuid, shop_id = parts[0], parts[3]
-                # Update the used_orders.txt to record the session_id
                 parts[1] = session_id
                 lines[i] = ",".join(parts) + "\n"
                 break
-        # write back file if matched
         if matched_uuid:
             with open(USED_UUID_FILE, "w") as f:
                 f.writelines(lines)
@@ -302,30 +305,42 @@ def webhook_selfmob():
             print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
         except Exception as e:
             print("❌ Webhook DBエラー:", e)
+
     return "", 200
 
+
+
+
+@app.route("/webhook/renaiselfmob", methods=["POST"])
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
     data = request.get_json()
     print("📩 Webhook受信: renaiselfmob", data)
+
     session_id = data.get("data", {}).get("session")
-    matched_uuid, shop_id = None, "default"
+    matched_uuid, shop_id, mode = None, "default", "renaiselfmob"
+
     try:
+        # used_orders.txt から session_id 逆照合
         with open(USED_UUID_FILE, "r") as f:
             lines = f.readlines()
         for i, line in enumerate(lines):
             parts = line.strip().split(",")
             if len(parts) >= 4 and parts[1] == session_id:
-                matched_uuid, shop_id = parts[0], parts[3]
-                parts[1] = session_id
-                lines[i] = ",".join(parts) + "\n"
+                matched_uuid, shop_id, mode = parts[0], parts[3], parts[2]
                 break
-        if matched_uuid:
-            with open(USED_UUID_FILE, "w") as f:
-                f.writelines(lines)
     except Exception as e:
         print("⚠️ UUID逆照合失敗:", e)
 
+    # session_id を webhook_sessions.txt に記録（UUIDがなくてもログ用途に）
+    if session_id:
+        try:
+            with open("webhook_sessions.txt", "a") as f:
+                f.write(f"{session_id}\n")
+        except Exception as e:
+            print("⚠️ Webhookセッション記録失敗:", e)
+
+    # DB記録（UUIDが逆照合できたときのみ）
     if matched_uuid:
         try:
             conn = psycopg2.connect(DATABASE_URL)
@@ -335,14 +350,16 @@ def webhook_renaiselfmob():
                 INSERT INTO webhook_events (uuid, shop_id, service, date)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT DO NOTHING;
-            """, (matched_uuid, shop_id, "renaiselfmob_thanks", today))
+            """, (matched_uuid, shop_id, f"{mode}_thanks", today))
             conn.commit()
             cur.close()
             conn.close()
             print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
         except Exception as e:
             print("❌ Webhook DBエラー:", e)
+
     return "", 200
+
 
 @app.route("/preview/<filename>")
 def preview(filename):
@@ -554,13 +571,12 @@ def selfmob_entry_uuid(uuid_str):
         # 初回アクセスならここで used_orders.txt に記録
         try:
             with open(USED_UUID_FILE, "a") as f:
-                # session_id は未使用のため空欄
                 f.write(f"{uuid_str},,selfmob,default\n")
                 print(f"✅ UUID {uuid_str} を used_orders.txt に記録")
         except Exception as e:
             print("⚠️ used_orders.txt 書き込み失敗:", e)
 
-        # 再度チェック（今度はTrueになるはず）
+        # 再度チェック
         if not is_paid_uuid(uuid_str):
             return "このUUIDは未決済です", 403
 
@@ -582,6 +598,7 @@ def renaiselfmob_entry_uuid(uuid_str):
             return "このUUIDは未決済です", 403
 
     return render_template("renai_form.html")
+
 
 
 
