@@ -153,32 +153,31 @@ def start(uuid_str):
 
 
 def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="selfmob"):
-    """KOMOJUセッションを作成し、支払い画面のURLを返す。"""
+    """KOMOJUのセッションAPIを使って支払い画面URLを生成する"""
     secret = os.getenv("KOMOJU_SECRET_KEY")
     if not secret:
         raise RuntimeError("KOMOJU_SECRET_KEY is not set")
 
-    # ✅ モードに応じて戻るボタンの行き先（キャンセル時など）
-    if mode == "renaiselfmob":
-        cancel_url = f"{BASE_URL}/renaiselfmob-{shop_id}"
-    else:
-        cancel_url = f"{BASE_URL}/selfmob-{shop_id}"
+    # ✅ キャンセル時も thanks.html に戻す（再決済に備える）
+    cancel_url = return_url_thanks
 
     payload = {
         "amount": amount,
         "currency": "JPY",
-        "return_url": cancel_url,  # 👈 戻るボタンの遷移先
-        "payment_data": { "external_order_num": uuid_str },
+        "return_url": cancel_url,  # ← 戻るボタンで使われるURL
+        "customer_redirect_url": return_url_thanks,  # ← 支払い完了時にリダイレクトされるURL
+        "payment_data": {
+            "external_order_num": uuid_str
+        },
         "metadata": {
             "external_order_num": uuid_str,
             "shop_id": shop_id
         },
         "payment_methods": [
-            { "type": "credit_card" },
-            { "type": "paypay" }
+            {"type": "credit_card"},
+            {"type": "paypay"}
         ],
-        "description": "シン・コンピューター占い",
-        "customer_redirect_url": return_url_thanks  # 👈 決済完了後の遷移先
+        "description": "シン・コンピューター占い"
     }
 
     response = requests.post(
@@ -187,11 +186,14 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
         json=payload
     )
     response.raise_for_status()
+
     session = response.json()
     session_url = session.get("session_url")
     if not session_url:
-        raise RuntimeError("KOMOJUからsession_urlが取得できません")
+        raise RuntimeError("KOMOJUセッションURLの取得に失敗しました")
     return session_url
+
+
 
 
 def create_payment_link(price, uuid_str, redirect_url, shop_id, full_year=False, mode="selfmob"):
