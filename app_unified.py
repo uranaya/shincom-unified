@@ -480,7 +480,7 @@ def selfmob_uuid(uuid_str):
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
-        for uid, flag, mode in lines:
+        for uid, flag, mode, shop_id in lines:
             if uid == uuid_str and mode == "selfmob":
                 full_year = (flag == "1")
                 break
@@ -603,7 +603,7 @@ def renaiselfmob_uuid(uuid_str):
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
-        for uid, flag, mode in lines:
+        for uid, flag, mode, shop_id in lines:
             if uid == uuid_str:
                 full_year = (flag == "1")
                 break
