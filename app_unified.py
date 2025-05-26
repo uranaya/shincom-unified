@@ -80,15 +80,14 @@ def thanks():
     # UUIDあり: thanksページにuuidを渡す（カウント処理は /start へ移動）
     return render_template("thanks.html", uuid_str=uuid_str)
 
-
-
+# --- 決済関連機能 ---
 def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="selfmob"):
-    """KOMOJUのセッションAPIを使って支払い画面URLを生成する（selfmob系ルート自動判定付き）"""
+    """KOMOJUのセッションAPIを使って支払い画面URLを生成する"""
     secret = os.getenv("KOMOJU_SECRET_KEY")
     if not secret:
         raise RuntimeError("KOMOJU_SECRET_KEY is not set")
 
-    # ✅ ルーティング判定：決済金額とモードに応じて自動で分岐
+    # ルーティング判定：決済金額とモードに応じて自動で分岐
     if mode == "renaiselfmob":
         redirect_path = "renaiselfmob_full" if amount >= 1000 else "renaiselfmob"
     else:
@@ -123,18 +122,11 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
     )
     response.raise_for_status()
 
-    session = response.json()
-    session_url = session.get("session_url")
+    session_data = response.json()
+    session_url = session_data.get("session_url")
     if not session_url:
         raise RuntimeError("KOMOJUセッションURLの取得に失敗しました")
     return session_url
-
-
-
-
-
-
-# カウント記録処理
 
 def record_shop_log_if_needed(uuid_str, mode):
     try:
@@ -150,7 +142,7 @@ def record_shop_log_if_needed(uuid_str, mode):
 
         today = datetime.now().strftime("%Y-%m-%d")
 
-        # ✅ DBにも記録（同日・同shop_id・同modeがあれば更新）
+        # DBにも記録（同日・同shop_id・同modeがあれば更新）
         if DATABASE_URL:
             try:
                 conn = psycopg2.connect(DATABASE_URL)
@@ -168,7 +160,7 @@ def record_shop_log_if_needed(uuid_str, mode):
             except Exception as e:
                 print("❌ DB記録失敗 (record_shop_log_if_needed):", e)
 
-        # ✅ CSVにもログ（参考用）
+        # CSVにもログ（参考用）
         log_line = f"{shop_id},{mode},{today}\n"
         with open("shop_logs.csv", "a") as log:
             log.write(log_line)
@@ -177,50 +169,11 @@ def record_shop_log_if_needed(uuid_str, mode):
     except Exception as e:
         print("⚠️ カウント記録エラー:", e)
 
-
-
-
-# --- 決済リンク生成ルート ---
-@app.route("/selfmob-<shop_id>")
-def selfmob_shop_entry(shop_id):
-    session["shop_id"] = shop_id
-    return render_template("pay.html", shop_id=shop_id)
-
-@app.route("/selfmob/<uuid_str>")
-def selfmob_entry_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
-    record_shop_log_if_needed(uuid_str, "selfmob")
-    return render_template("index_selfmob.html", full_year=False)
-
-@app.route("/selfmob_full/<uuid_str>")
-def selfmob_full_entry_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
-    record_shop_log_if_needed(uuid_str, "selfmob_full")
-    return render_template("index_selfmob.html", full_year=True)
-
-@app.route("/renaiselfmob/<uuid_str>")
-def renaiselfmob_entry_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
-    record_shop_log_if_needed(uuid_str, "renaiselfmob")
-    return render_template("index_renaiselfmob.html", full_year=False)
-
-@app.route("/renaiselfmob_full/<uuid_str>")
-def renaiselfmob_full_entry_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
-    record_shop_log_if_needed(uuid_str, "renaiselfmob_full")
-    return render_template("index_renaiselfmob.html", full_year=True)
-
-
-
 def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
 
-    # ✅ テスト中につき、金額をすべて1円に固定
+    # テスト中につき、金額をすべて1円に固定
     amount = 1
 
     session_url = create_payment_session(
@@ -258,30 +211,6 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
 
-
-
-
-@app.route("/generate_link/<shop_id>")
-def generate_link(shop_id):
-    return _generate_session_for_shop(shop_id, full_year=False, mode="selfmob")
-
-@app.route("/generate_link_full/<shop_id>")
-def generate_link_full(shop_id):
-    return _generate_session_for_shop(shop_id, full_year=True,  mode="selfmob")
-
-@app.route("/generate_link_renai/<shop_id>")
-def generate_link_renai(shop_id):
-    return _generate_session_for_shop(shop_id, full_year=False, mode="renaiselfmob")
-
-@app.route("/generate_link_renai_full/<shop_id>")
-def generate_link_renai_full(shop_id):
-    return _generate_session_for_shop(shop_id, full_year=True,  mode="renaiselfmob")
-
-
-
-
-# 決済済みか判定
-
 def is_paid_uuid(uuid_str):
     try:
         with open(USED_UUID_FILE, "r") as f:
@@ -302,9 +231,6 @@ def is_paid_uuid(uuid_str):
     except Exception as e:
         print("❌ 決済確認エラー:", e)
         return False
-
-
-
 
 def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
@@ -347,20 +273,68 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
 
+# --- 決済リンク生成ルート ---
+@app.route("/selfmob-<shop_id>")
+def selfmob_shop_entry(shop_id):
+    session["shop_id"] = shop_id
+    return render_template("pay.html", shop_id=shop_id)
 
+@app.route("/selfmob/<uuid_str>")
+def selfmob_entry_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "selfmob")
+    return render_template("index_selfmob.html", full_year=False)
+
+@app.route("/selfmob_full/<uuid_str>")
+def selfmob_full_entry_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "selfmob_full")
+    return render_template("index_selfmob.html", full_year=True)
+
+@app.route("/renaiselfmob/<uuid_str>")
+def renaiselfmob_entry_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "renaiselfmob")
+    return render_template("index_renaiselfmob.html", full_year=False)
+
+@app.route("/renaiselfmob_full/<uuid_str>")
+def renaiselfmob_full_entry_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "renaiselfmob_full")
+    return render_template("index_renaiselfmob.html", full_year=True)
+
+# --- 決済リンク生成ルート（管理用） ---
+@app.route("/generate_link/<shop_id>")
+def generate_link(shop_id):
+    return _generate_session_for_shop(shop_id, full_year=False, mode="selfmob")
+
+@app.route("/generate_link_full/<shop_id>")
+def generate_link_full(shop_id):
+    return _generate_session_for_shop(shop_id, full_year=True, mode="selfmob")
+
+@app.route("/generate_link_renai/<shop_id>")
+def generate_link_renai(shop_id):
+    return _generate_session_for_shop(shop_id, full_year=False, mode="renaiselfmob")
+
+@app.route("/generate_link_renai_full/<shop_id>")
+def generate_link_renai_full(shop_id):
+    return _generate_session_for_shop(shop_id, full_year=True, mode="renaiselfmob")
 
 # --- Komoju Webhook ルート ---
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
     data = request.get_json()
     print("📩 Webhook受信: selfmob", data)
-
     session_id = data.get("data", {}).get("session")
     metadata = data.get("data", {}).get("metadata", {})
     uuid_from_metadata = metadata.get("external_order_num")
+    shop_id = metadata.get("shop_id", "default")
 
     matched_uuid = None
-    shop_id = metadata.get("shop_id", "default")
 
     if session_id:
         try:
@@ -407,9 +381,6 @@ def webhook_selfmob():
 
     return "", 200
 
-
-
-
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
     data = request.get_json()
@@ -417,9 +388,9 @@ def webhook_renaiselfmob():
     session_id = data.get("data", {}).get("session")
     metadata = data.get("data", {}).get("metadata", {})
     uuid_from_metadata = metadata.get("external_order_num")
+    shop_id = metadata.get("shop_id", "default")
 
     matched_uuid = None
-    shop_id = metadata.get("shop_id", "default")
 
     if session_id:
         try:
@@ -466,24 +437,21 @@ def webhook_renaiselfmob():
 
     return "", 200
 
-
-
-# --- self系実占い部分  ---
-
-
-
+# --- self系実占いルート ---
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
     full_year = None
-    lines = []
     # Verify UUID existence and get full_year flag from used_orders.txt
     try:
         with open(USED_UUID_FILE, "r") as f:
-            lines = [line.strip().split(",") for line in f if line.strip()]
-        for uid, flag, mode in lines:
-            if uid == uuid_str and mode == "selfmob":
-                full_year = (flag == "1")
-                break
+            for line in f:
+                parts = line.strip().split(",")
+                if not parts or len(parts) < 3:
+                    continue
+                uid, flag, mode = parts[0], parts[1], parts[2]
+                if uid == uuid_str and mode == "selfmob":
+                    full_year = (flag == "1")
+                    break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
     except FileNotFoundError:
@@ -595,18 +563,21 @@ def selfmob_uuid(uuid_str):
     # GET: render the input page for paid user
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
 
+# --- renai系実占いルート ---
 @app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
     full_year = None
-    lines = []
     try:
         with open(USED_UUID_FILE, "r") as f:
-            lines = [line.strip().split(",") for line in f if line.strip()]
-        for uid, flag, mode in lines:
-            if uid == uuid_str:
-                full_year = (flag == "1")
-                break
+            for line in f:
+                parts = line.strip().split(",")
+                if not parts or len(parts) < 3:
+                    continue
+                uid, flag, mode = parts[0], parts[1], parts[2]
+                if uid == uuid_str:
+                    full_year = (flag == "1")
+                    break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
     except FileNotFoundError:
@@ -661,9 +632,7 @@ def renaiselfmob_uuid(uuid_str):
     # GET: render the input page for love fortune (after payment)
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
 
-
-
-
+# --- PDF出力関連 ---
 @app.route("/preview/<filename>")
 def preview(filename):
     """占い結果PDFのプレビュー画面表示"""
@@ -678,6 +647,7 @@ def view_file(filename):
     except Exception as e:
         return f"ファイルの送信エラー: {e}", 404
 
+# --- 管理用機能 ---
 @app.route("/view_shop_log")
 def view_shop_log():
     """shop_logsテーブルの内容を表示（管理用）"""
@@ -825,12 +795,7 @@ def renai():
         return redirect(url_for("preview", filename=filename))
     return render_template("renai_form.html")
 
-@app.route("/selfmob", methods=["GET"])
-def selfmob_start():
-    return render_template("pay.html", shop_id="default")
-
-
-
+# --- ユーティリティ ---
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
     try:
@@ -847,6 +812,7 @@ def get_eto():
     honmeisei = get_honmeisei(y, m, d)
     return jsonify({"eto": eto, "honmeisei": honmeisei})
 
+# --- 固定ページ ---
 @app.route("/")
 @app.route("/home")
 def home():
