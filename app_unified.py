@@ -156,6 +156,39 @@ def start(uuid_str):
 
 
 
+def create_payment_session(amount, uuid_str, return_url, shop_id):
+    """Create a Komoju payment session and return its URL."""
+    secret = os.getenv("KOMOJU_SECRET_KEY")
+    if not secret:
+        raise RuntimeError("KOMOJU_SECRET_KEY not set")
+
+    payload = {
+        "amount": amount,
+        "currency": "JPY",
+        "return_url": return_url,
+        "payment_data": { "external_order_num": uuid_str },
+        "metadata": { "external_order_num": uuid_str, "shop_id": shop_id },
+        "payment_methods": [
+            { "type": "credit_card" },
+            { "type": "paypay" }
+        ],
+        "description": "シン・コンピューター占い"
+    }
+
+    response = requests.post(
+        "https://komoju.com/api/v1/sessions",
+        auth=(secret, ""),
+        json=payload
+    )
+    response.raise_for_status()
+    session = response.json()
+    # Komoju returns 'session_url' and 'id'
+    session_url = session.get("session_url")
+    if not session_url:
+        raise RuntimeError("Failed to get session_url")
+    return session_url
+
+
 
 def create_payment_link(price, uuid_str, redirect_url, shop_id, full_year=False, mode="selfmob"):
     if mode == "renaiselfmob":
@@ -188,21 +221,46 @@ def selfmob_shop_entry(shop_id):
     session["shop_id"] = shop_id
     return render_template("pay.html", shop_id=shop_id)
 
+
+
+def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
+    # 1) Generate unique UUID
+    uuid_str = str(uuid.uuid4())
+    # 2) Define return URL to our thanks page with the UUID
+    return_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
+    # 3) Determine price and create the Komoju session
+    amount = 1000 if full_year else 500
+    session_url = create_payment_session(amount, uuid_str, return_url, shop_id)
+    # 4) Record the new order (uuid, blank session_id, mode, shop_id) in used_orders
+    mode_key = mode + ("_full" if full_year else "")
+    with open("used_orders.txt", "a") as f:
+        f.write(f"{uuid_str},,{mode_key},{shop_id}\n")
+    # 5) Redirect user to the payment page
+    resp = make_response(redirect(session_url))
+    # Store UUID in cookie (for /thanks page)
+    resp.set_cookie("uuid", uuid_str, max_age=600)
+    return resp
+
+
+
 @app.route("/generate_link/<shop_id>")
 def generate_link(shop_id):
-    return _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob")
+    return _generate_session_for_shop(shop_id, full_year=False, mode="selfmob")
 
 @app.route("/generate_link_full/<shop_id>")
 def generate_link_full(shop_id):
-    return _generate_link_with_shopid(shop_id, full_year=True, mode="selfmob")
+    return _generate_session_for_shop(shop_id, full_year=True,  mode="selfmob")
 
 @app.route("/generate_link_renai/<shop_id>")
 def generate_link_renai(shop_id):
-    return _generate_link_with_shopid(shop_id, full_year=False, mode="renaiselfmob")
+    return _generate_session_for_shop(shop_id, full_year=False, mode="renaiselfmob")
 
 @app.route("/generate_link_renai_full/<shop_id>")
 def generate_link_renai_full(shop_id):
-    return _generate_link_with_shopid(shop_id, full_year=True, mode="renaiselfmob")
+    return _generate_session_for_shop(shop_id, full_year=True,  mode="renaiselfmob")
+
+
+
 
 def is_paid_uuid(uuid_str):
     # used_orders.txt でUUID確認
