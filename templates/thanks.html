@@ -1,122 +1,64 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>鑑定開始のご案内｜シン・コンピューター占い</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body {
-      font-family: 'Helvetica Neue', sans-serif;
-      background: linear-gradient(to bottom, #1b0033, #000000);
-      color: #fffde6;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 700px;
-      margin: 3em auto;
-      background: rgba(255,255,255,0.08);
-      padding: 2em;
-      border-radius: 12px;
-      text-align: center;
-      box-shadow: 0 0 20px rgba(255,255,255,0.1);
-    }
-    h1 {
-      color: #ffd700;
-      font-size: 1.8em;
-      margin-bottom: 0.5em;
-    }
-    p {
-      font-size: 1.05em;
-      line-height: 1.7em;
-      margin: 0.5em 0;
-    }
-    .flow {
-      text-align: left;
-      background: rgba(255,255,255,0.1);
-      padding: 1em;
-      margin-top: 2em;
-      border-radius: 8px;
-    }
-    .flow h2 {
-      font-size: 1.2em;
-      color: #ffe45e;
-      margin-bottom: 0.5em;
-    }
-    .flow ol {
-      padding-left: 1.5em;
-    }
-    .flow li {
-      margin-bottom: 0.5em;
-    }
-    .button {
-      display: inline-block;
-      margin-top: 2em;
-      padding: 12px 30px;
-      background-color: #cc3300;
-      color: white;
-      font-size: 1rem;
-      border-radius: 8px;
-      text-decoration: none;
-      box-shadow: 0 0 10px rgba(255,255,255,0.2);
-    }
-    .button:hover {
-      background-color: #e94f0e;
-    }
-    .note {
-      margin-top: 1.5em;
-      font-size: 0.85em;
-      color: #ccc;
-    }
-    footer {
-      text-align: center;
-      font-size: 0.9em;
-      margin: 3em auto 1.5em;
-      color: #aaa;
-    }
-    footer a {
-      color: #ddd;
-      margin: 0 8px;
-      text-decoration: none;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>決済完了処理中｜シン・コンピューター占い</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            background-color: #111;
+            color: #fff;
+            font-family: sans-serif;
+            text-align: center;
+            padding: 80px 20px;
+        }
+        .loader {
+            border: 6px solid #333;
+            border-top: 6px solid #f90;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            animation: spin 1s linear infinite;
+            margin: 30px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .note {
+            font-size: 14px;
+            margin-top: 20px;
+            color: #ccc;
+        }
+    </style>
+    <script>
+        window.onload = function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const uuid = urlParams.get('uuid');
+            const session_id = urlParams.get('session_id');
+            if (uuid) {
+                let redirectUrl = `/start/${uuid}`;
+                if (session_id) {
+                    redirectUrl += `?session_id=${session_id}`;
+                }
+                setTimeout(function () {
+                    window.location.href = redirectUrl;
+                }, 2000);
+            }
+        }
+    </script>
 </head>
 <body>
-  <div class="container">
-    <h1>お支払いが完了しました</h1>
-    <p>あなたの運命をひもとく準備が整いました。</p>
-    <p>以下のステップで、鑑定フォームへ進んでください。</p>
-
-    <div class="flow">
-      <h2>ご利用の流れ</h2>
-      <ol>
-        <li>生年月日を入力</li>
-        <li>手相画像を撮影 or アップロード</li>
-        <li>送信ボタンを押す</li>
-        <li>鑑定PDFがスマホに表示されます</li>
-      </ol>
-    </div>
-
-    <a href="/start/{{ uuid_str }}" class="button">▶ 鑑定スタート</a>
-
+    <h1>決済完了処理中...</h1>
+    <div class="loader"></div>
     <div class="note">
-      ※ 通信状況により表示に1分程度かかる場合があります。<br>
-      ※ このページをブックマークしておくと再アクセス可能です。
+        ※ 通信状況により表示に1分程度かかる場合があります。<br>
+        ※ このページをブックマークしておくと再アクセス可能です。
     </div>
-  </div>
-
-  <footer>
-    <p>
-      お問い合わせ：<a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a> ／
-      TEL：<a href="tel:09075062065">090-7506-2065</a>
-    </p>
-    <p>
-      <a href="/tokutei">特定商取引法</a> |
-      <a href="/privacy">プライバシーポリシー</a> |
-      <a href="/terms">利用規約</a>
-    </p>
-    <p>&copy; 2025 シン・コンピューター占い</p>
-  </footer>
+    <div class="note" style="color: #ffb;">
+        ※「戻る」ボタンでこのページに戻られた方へ：<br>
+        再決済が必要な場合があります。<br>
+        エラーが出た場合は一度このページを再読み込みしてから進んでください。
+    </div>
 </body>
 </html>
