@@ -80,6 +80,8 @@ def thanks():
     # UUIDあり: thanksページにuuidを渡す（カウント処理は /start へ移動）
     return render_template("thanks.html", uuid_str=uuid_str)
 
+
+
 @app.route("/start/<uuid_str>")
 def start(uuid_str):
     # used_orders.txt から UUID, session_id, mode, shop_id を取得
@@ -148,11 +150,13 @@ def start(uuid_str):
     except Exception as e:
         print("❌ DB保存エラー:", e)
 
-    # 対象モードへリダイレクト (full_year はURLには不要)
+    # 対象モードへリダイレクト
     target_mode = mode
     if target_mode.endswith("_full"):
         target_mode = target_mode.replace("_full", "")
-    return redirect(url_for(f"{target_mode}_uuid", uuid_str=uuid_str))
+
+    # 🔧 修正点：_uuid → _entry_uuid に変更
+    return redirect(url_for(f"{target_mode}_entry_uuid", uuid_str=uuid_str))
 
 
 
