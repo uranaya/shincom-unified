@@ -154,18 +154,33 @@ def start(uuid_str):
         target_mode = target_mode.replace("_full", "")
     return redirect(url_for(f"{target_mode}_uuid", uuid_str=uuid_str))
 
-def create_payment_link(price, uuid_str, redirect_url, metadata, full_year=False, mode="selfmob"):
+
+
+
+def create_payment_link(price, uuid_str, redirect_url, shop_id, full_year=False, mode="selfmob"):
     if mode == "renaiselfmob":
         komoju_id = os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID_FULL") if full_year else os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID")
     else:
         komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL") if full_year else os.getenv("KOMOJU_PUBLIC_LINK_ID")
     if not komoju_id:
         raise ValueError("KOMOJUリンクID未設定")
+
     encoded_redirect = quote(redirect_url, safe='')
-    encoded_metadata = quote(metadata)
-    url = f"https://komoju.com/payment_links/{komoju_id}?external_order_num={uuid_str}&customer_redirect_url={encoded_redirect}&metadata={encoded_metadata}"
+
+    # ✅ UUIDをmetadataに含める（external_order_numとして）
+    metadata_dict = {
+        "shop_id": shop_id,
+        "external_order_num": uuid_str
+    }
+    encoded_metadata = quote(json.dumps(metadata_dict))
+
+    # external_order_num は使わず、metadata のみ使用（KOMOJU公式推奨）
+    url = f"https://komoju.com/payment_links/{komoju_id}?customer_redirect_url={encoded_redirect}&metadata={encoded_metadata}"
     print(f"🔗 決済URL [{mode}] (full={full_year}): {url}")
     return url
+
+
+
 
 # --- 決済リンク生成ルート ---
 @app.route("/selfmob-<shop_id>")
@@ -258,14 +273,15 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
 def webhook_selfmob():
     data = request.get_json()
     print("📩 Webhook受信: selfmob", data)
+
     session_id = data.get("data", {}).get("session")
     metadata = data.get("data", {}).get("metadata", {})
     uuid_from_metadata = metadata.get("external_order_num")
 
     matched_uuid = None
-    shop_id = "default"
+    shop_id = metadata.get("shop_id", "default")
 
-    # セッションIDログ記録
+    # ✅ セッションIDログ記録
     if session_id:
         try:
             with open("webhook_sessions.txt", "a") as f:
@@ -273,13 +289,13 @@ def webhook_selfmob():
         except Exception as e:
             print("⚠️ Webhookセッション記録失敗:", e)
 
-    # used_orders.txt からUUIDを照合
+    # ✅ used_orders.txt をUUIDまたはsession_idで照合し、session_idが空欄なら追記
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = f.readlines()
         for i, line in enumerate(lines):
             parts = line.strip().split(",")
-            if len(parts) >= 4 and (parts[1] == session_id or parts[0] == uuid_from_metadata):
+            if len(parts) >= 4 and (parts[0] == uuid_from_metadata or parts[1] == session_id):
                 matched_uuid = parts[0]
                 shop_id = parts[3]
                 if not parts[1] and session_id:
@@ -292,7 +308,7 @@ def webhook_selfmob():
     except Exception as e:
         print("⚠️ UUID逆照合失敗:", e)
 
-    # DBへ記録
+    # ✅ DBに記録
     if matched_uuid:
         try:
             if DATABASE_URL:
@@ -312,6 +328,7 @@ def webhook_selfmob():
             print("❌ Webhook DBエラー:", e)
 
     return "", 200
+
 
 
 
