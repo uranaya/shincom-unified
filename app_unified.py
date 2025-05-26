@@ -228,22 +228,47 @@ def selfmob_shop_entry(shop_id):
 
 
 def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
-    # 1) Generate unique UUID
     uuid_str = str(uuid.uuid4())
-    # 2) Define return URL to our thanks page with the UUID
-    return_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
-    # 3) Determine price and create the Komoju session
-    amount = 1000 if full_year else 500
-    session_url = create_payment_session(amount, uuid_str, return_url, shop_id)
-    # 4) Record the new order (uuid, blank session_id, mode, shop_id) in used_orders
+    return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
+
+    # ✅ テスト中につき、金額をすべて1円に固定
+    amount = 1
+
+    session_url = create_payment_session(
+        amount=amount,
+        uuid_str=uuid_str,
+        return_url_thanks=return_url_thanks,
+        shop_id=shop_id,
+        mode=mode
+    )
+
     mode_key = mode + ("_full" if full_year else "")
-    with open("used_orders.txt", "a") as f:
-        f.write(f"{uuid_str},,{mode_key},{shop_id}\n")
-    # 5) Redirect user to the payment page
+    try:
+        with open(USED_UUID_FILE, "a") as f:
+            f.write(f"{uuid_str},,{mode_key},{shop_id}\n")
+    except Exception as e:
+        print("⚠️ UUID書き込み失敗:", e)
+
+    try:
+        if DATABASE_URL:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            today = datetime.now().strftime("%Y-%m-%d")
+            cur.execute("""
+                INSERT INTO webhook_events (uuid, shop_id, service, date)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT DO NOTHING;
+            """, (uuid_str, shop_id, mode_key, today))
+            conn.commit()
+            cur.close()
+            conn.close()
+    except Exception as e:
+        print("❌ DB記録失敗 (generate_link):", e)
+
     resp = make_response(redirect(session_url))
-    # Store UUID in cookie (for /thanks page)
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
+
 
 
 
