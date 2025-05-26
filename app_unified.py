@@ -228,35 +228,66 @@ def create_payment_link(price, uuid_str, redirect_url, shop_id, full_year=False,
 
 
 
+
+
+
+# カウント記録処理
+
+def record_shop_log_if_needed(uuid_str, mode):
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            lines = f.readlines()
+        for line in lines:
+            parts = line.strip().split(",")
+            if len(parts) >= 4 and parts[0] == uuid_str:
+                shop_id = parts[3]
+                break
+        else:
+            shop_id = "default"
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        log_line = f"{shop_id},{mode},{today}\n"
+
+        with open("shop_logs.csv", "a") as log:
+            log.write(log_line)
+            print(f"🧮 カウント記録: {log_line.strip()}")
+    except Exception as e:
+        print("⚠️ カウント記録エラー:", e)
+
+
+
 # --- 決済リンク生成ルート ---
 @app.route("/selfmob-<shop_id>")
 def selfmob_shop_entry(shop_id):
     session["shop_id"] = shop_id
     return render_template("pay.html", shop_id=shop_id)
 
-
 @app.route("/selfmob/<uuid_str>")
 def selfmob_entry_uuid(uuid_str):
     if not is_paid_uuid(uuid_str):
         return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "selfmob")
     return render_template("index_selfmob.html", full_year=False)
 
 @app.route("/selfmob_full/<uuid_str>")
 def selfmob_full_entry_uuid(uuid_str):
     if not is_paid_uuid(uuid_str):
         return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "selfmob_full")
     return render_template("index_selfmob.html", full_year=True)
 
 @app.route("/renaiselfmob/<uuid_str>")
 def renaiselfmob_entry_uuid(uuid_str):
     if not is_paid_uuid(uuid_str):
         return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "renaiselfmob")
     return render_template("index_renaiselfmob.html", full_year=False)
 
 @app.route("/renaiselfmob_full/<uuid_str>")
 def renaiselfmob_full_entry_uuid(uuid_str):
     if not is_paid_uuid(uuid_str):
         return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "renaiselfmob_full")
     return render_template("index_renaiselfmob.html", full_year=True)
 
 
@@ -325,8 +356,9 @@ def generate_link_renai_full(shop_id):
 
 
 
+# 決済済みか判定
+
 def is_paid_uuid(uuid_str):
-    # used_orders.txt でUUID確認
     try:
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
@@ -335,7 +367,6 @@ def is_paid_uuid(uuid_str):
                     return True
     except Exception as e:
         print("⚠️ used_orders.txt 読み込みエラー(is_paid_uuid):", e)
-    # DBのwebhook_eventsテーブルで確認
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
