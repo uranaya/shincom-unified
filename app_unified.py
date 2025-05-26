@@ -31,6 +31,9 @@ UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", ".")
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "secret!123")
 
+# Initialize locks for thread-safe operations
+used_file_lock = threading.Lock()
+
 # used_orders.txt 存在チェック
 os.makedirs(os.path.dirname(USED_UUID_FILE) or ".", exist_ok=True)
 if not os.path.exists(USED_UUID_FILE):
@@ -642,6 +645,49 @@ def renaiselfmob_uuid(uuid_str):
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
 
 # --- PDF出力関連 ---
+# Background thread task to generate PDF and handle post-processing
+def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
+    try:
+        create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
+    except Exception as e:
+        print(f"❌ PDF generation error (mode={pdf_mode}, uuid={uuid_str}):", e)
+        traceback.print_exc()
+        return
+    # Mark UUID as used if applicable
+    if uuid_str:
+        try:
+            with used_file_lock:
+                lines_content = []
+                if os.path.exists(USED_UUID_FILE):
+                    with open(USED_UUID_FILE, "r") as f:
+                        lines_content = [line.strip() for line in f if line.strip()]
+                updated_lines = []
+                for line in lines_content:
+                    parts = line.split(",")
+                    if len(parts) >= 3:
+                        uid, flag, mode = parts[0], parts[1], parts[2]
+                        if uid == uuid_str:
+                            updated_lines.append(f"{uid},used,{mode}")
+                        else:
+                            updated_lines.append(line)
+                with open(USED_UUID_FILE, "w") as f:
+                    for line in updated_lines:
+                        f.write(line + "\n")
+        except Exception as e:
+            print(f"❌ Error updating {USED_UUID_FILE} for {uuid_str}:", e)
+            traceback.print_exc()
+    # Write to access_log.txt if applicable
+    if shop_id and uuid_str:
+        try:
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with open("access_log.txt", "a", encoding="utf-8") as f:
+                f.write(f"{now_str},{shop_id},{uuid_str}\n")
+        except Exception as e:
+            print(f"❌ Error writing access_log for {uuid_str}:", e)
+            traceback.print_exc()
+
+
+
 @app.route("/preview/<filename>")
 def preview(filename):
     """占い結果PDFのプレビュー画面表示"""
