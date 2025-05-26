@@ -676,31 +676,7 @@ def renai():
 def selfmob_start():
     return render_template("pay.html", shop_id="default")
 
-@app.route("/selfmob/<uuid_str>")
-def selfmob_entry_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        try:
-            with open(USED_UUID_FILE, "a") as f:
-                f.write(f"{uuid_str},,selfmob,default\n")
-                print(f"✅ UUID {uuid_str} を used_orders.txt に記録")
-        except Exception as e:
-            print("⚠️ used_orders.txt 書き込み失敗:", e)
-        if not is_paid_uuid(uuid_str):
-            return "このUUIDは未決済です", 403
-    return render_template("index.html")
 
-@app.route("/renaiselfmob/<uuid_str>")
-def renaiselfmob_entry_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        try:
-            with open(USED_UUID_FILE, "a") as f:
-                f.write(f"{uuid_str},,renaiselfmob,default\n")
-                print(f"✅ UUID {uuid_str} を used_orders.txt に記録 (恋愛版)")
-        except Exception as e:
-            print("⚠️ used_orders.txt 書き込み失敗 (恋愛版):", e)
-        if not is_paid_uuid(uuid_str):
-            return "このUUIDは未決済です", 403
-    return render_template("renai_form.html")
 
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
