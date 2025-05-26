@@ -70,6 +70,15 @@ if DATABASE_URL:
 else:
     print("⚠️ DATABASE_URL が未設定。ローカル実行ではDB非使用。")
 
+
+
+
+@app.route("/selfmob", methods=["GET"])
+def selfmob_start():
+    return render_template("pay.html", shop_id="default")
+
+
+
 # --- thanksルート ---
 @app.route("/thanks")
 def thanks():
