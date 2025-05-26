@@ -31,6 +31,11 @@ UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", ".")
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "secret!123")
 
+
+# Initialize locks for thread-safe operations
+used_file_lock = threading.Lock()
+
+
 # used_orders.txt 存在チェック
 os.makedirs(os.path.dirname(USED_UUID_FILE) or ".", exist_ok=True)
 if not os.path.exists(USED_UUID_FILE):
