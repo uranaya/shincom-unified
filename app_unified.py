@@ -82,76 +82,6 @@ def thanks():
 
 
 
-@app.route("/start/<uuid_str>")
-def start(uuid_str):
-    # used_orders.txt から UUID, session_id, mode, shop_id を取得
-    mode = None
-    shop_id = None
-    session_id = None
-    try:
-        with open(USED_UUID_FILE, "r") as f:
-            for line in f:
-                parts = line.strip().split(",")
-                if len(parts) >= 4 and parts[0] == uuid_str:
-                    session_id = parts[1]
-                    mode = parts[2]
-                    shop_id = parts[3]
-                    break
-    except Exception as e:
-        print("⚠️ used_orders.txt 読み込みエラー:", e)
-    if mode is None or shop_id is None:
-        return "Invalid UUID", 403
-    if not session_id:
-        return "Session ID not found", 403
-
-    # webhook_sessions.txt に session_id が記録されているか確認
-    try:
-        with open("webhook_sessions.txt", "r") as f:
-            sessions = [line.strip() for line in f]
-    except Exception as e:
-        print("⚠️ webhook_sessions.txt 読み込みエラー:", e)
-        return "Server error", 500
-    if session_id not in sessions:
-        return "Payment not confirmed", 403
-
-    today = datetime.now().strftime("%Y-%m-%d")
-    try:
-        if DATABASE_URL:
-            conn = psycopg2.connect(DATABASE_URL)
-            cur = conn.cursor()
-            final_service = f"{mode}_thanks"
-
-            # ✅ Webhookイベントを記録（重複防止）
-            cur.execute("""
-                INSERT INTO webhook_events (uuid, shop_id, service, date)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT DO NOTHING;
-            """, (uuid_str, shop_id, final_service, today))
-
-            # ✅ shop_logs は毎回加算（重複してもOK）
-            cur.execute("""
-                INSERT INTO shop_logs (date, shop_id, service, count)
-                VALUES (%s, %s, %s, 1)
-                ON CONFLICT (date, shop_id, service)
-                DO UPDATE SET count = shop_logs.count + 1;
-            """, (today, shop_id, mode))
-            print(f"📝 shop_logs カウント更新: {today} / {shop_id} / {mode}")
-
-            conn.commit()
-            cur.close()
-            conn.close()
-    except Exception as e:
-        print("❌ DB保存エラー:", e)
-
-    # 対象モードへ遷移
-    target_mode = mode
-    if target_mode.endswith("_full"):
-        target_mode = target_mode.replace("_full", "")
-    return redirect(url_for(f"{target_mode}_entry_uuid", uuid_str=uuid_str))
-
-
-
-
 def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="selfmob"):
     """KOMOJUのセッションAPIを使って支払い画面URLを生成する（selfmob系ルート自動判定付き）"""
     secret = os.getenv("KOMOJU_SECRET_KEY")
@@ -477,6 +407,9 @@ def webhook_selfmob():
 
     return "", 200
 
+
+
+
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
     data = request.get_json()
@@ -532,6 +465,201 @@ def webhook_renaiselfmob():
             print("❌ Webhook DBエラー:", e)
 
     return "", 200
+
+
+
+# --- self系実占い部分  ---
+
+
+
+@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
+def selfmob_uuid(uuid_str):
+    full_year = None
+    lines = []
+    # Verify UUID existence and get full_year flag from used_orders.txt
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            lines = [line.strip().split(",") for line in f if line.strip()]
+        for uid, flag, mode in lines:
+            if uid == uuid_str and mode == "selfmob":
+                full_year = (flag == "1")
+                break
+        if full_year is None:
+            return "無効なリンクです（UUID不一致）", 400
+    except FileNotFoundError:
+        return "使用履歴が確認できません", 400
+    # Handle fortune generation after payment
+    if request.method == "POST":
+        is_json = request.is_json
+        try:
+            data = request.get_json() if is_json else request.form
+            image_data = data.get("image_data")
+            birthdate = data.get("birthdate")
+            # Validate birthdate
+            try:
+                year, month, day = map(int, birthdate.split("-"))
+            except Exception:
+                return "生年月日が不正です", 400
+            # Get lucky direction (with error handling)
+            try:
+                kyusei_text = get_kyusei_fortune(year, month, day)
+            except Exception as e:
+                print("❌ lucky_direction 取得エラー:", e)
+                kyusei_text = ""
+            eto = get_nicchu_eto(birthdate)
+            # Generate results using shincom fortune logic
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
+                image_data, birthdate, kyusei_text
+            )
+            palm_result = "\n".join(palm_texts)
+            summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
+            # Convert lucky_info to a list of lines (string or list/dict)
+            lucky_lines = []
+            if isinstance(lucky_info, str):
+                for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+                    line = line.strip()
+                    if line:
+                        if line.startswith("・"):
+                            line = line[1:].strip()
+                        lucky_lines.append(line.replace(":", "：", 1))
+            elif isinstance(lucky_info, dict):
+                for k, v in lucky_info.items():
+                    line = f"{k}：{v}".strip()
+                    if line:
+                        if line.startswith("・"):
+                            line = line[1:].strip()
+                        lucky_lines.append(line)
+            else:
+                for item in lucky_info:
+                    for line in str(item).replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+                        line = line.strip()
+                        if line:
+                            if line.startswith("・"):
+                                line = line[1:].strip()
+                            lucky_lines.append(line.replace(":", "：", 1))
+            # Prepare titles for output sections
+            today = datetime.today()
+            target1 = today.replace(day=15)
+            if today.day >= 20:
+                target1 += relativedelta(months=1)
+            target2 = target1 + relativedelta(months=1)
+            year_label = f"{today.year}年の運勢"
+            month_label = f"{target1.year}年{target1.month}月の運勢"
+            next_month_label = f"{target2.year}年{target2.month}月の運勢"
+            result_data = {
+                "palm_titles": palm_titles,
+                "palm_texts": palm_texts,
+                "titles": {
+                    "palm_summary": "手相の総合アドバイス",
+                    "personality": "性格診断",
+                    "year_fortune": year_label,
+                    "month_fortune": month_label,
+                    "next_month_fortune": next_month_label
+                },
+                "texts": {
+                    "palm_summary": summary_text,
+                    "personality": shichu_result.get("personality", ""),
+                    "year_fortune": shichu_result.get("year_fortune", ""),
+                    "month_fortune": shichu_result.get("month_fortune", ""),
+                    "next_month_fortune": shichu_result.get("next_month_fortune", "")
+                },
+                "lucky_info": lucky_lines,
+                "lucky_direction": kyusei_text,
+                "birthdate": birthdate,
+                "palm_result": palm_result,
+                "shichu_result": shichu_result,
+                "iching_result": iching_result,
+                "palm_image": image_data
+            }
+            if full_year:
+                yearly_data = generate_yearly_fortune(birthdate, today)
+                result_data["yearly_fortunes"] = yearly_data
+                result_data["titles"]["year_fortune"] = yearly_data["year_label"]
+                result_data["texts"]["year_fortune"] = yearly_data["year_text"]
+            # Generate PDF in background thread and mark usage
+            filename = f"result_{uuid_str}.pdf"
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            shop_id = session.get("shop_id", "default")
+            threading.Thread(
+                target=background_generate_pdf,
+                args=(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id)
+            ).start()
+            redirect_url = url_for("preview", filename=filename)
+            if is_json:
+                return jsonify({"redirect_url": redirect_url})
+            else:
+                return redirect(redirect_url)
+        except Exception as e:
+            print("処理エラー:", e)
+            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
+    # GET: render the input page for paid user
+    return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
+
+@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
+@app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
+def renaiselfmob_uuid(uuid_str):
+    full_year = None
+    lines = []
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            lines = [line.strip().split(",") for line in f if line.strip()]
+        for uid, flag, mode in lines:
+            if uid == uuid_str:
+                full_year = (flag == "1")
+                break
+        if full_year is None:
+            return "無効なリンクです（UUID不一致）", 400
+    except FileNotFoundError:
+        return "使用履歴が確認できません", 400
+    if request.method == "POST":
+        try:
+            user_birth = request.form.get("user_birth")
+            partner_birth = request.form.get("partner_birth")
+            if not user_birth or not isinstance(user_birth, str):
+                return "生年月日が不正です", 400
+            # Prepare labels for the love fortune output
+            now = datetime.now()
+            target1 = now.replace(day=15)
+            if now.day >= 20:
+                target1 += relativedelta(months=1)
+            target2 = target1 + relativedelta(months=1)
+            year_label = f"{now.year}年の恋愛運"
+            month_label = f"{target1.year}年{target1.month}月の恋愛運"
+            next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
+            raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
+            result_data = {
+                "texts": {
+                    "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
+                    "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),
+                    "year_love": raw_result.get("texts", {}).get("year_love", ""),
+                    "month_love": raw_result.get("texts", {}).get("month_love", ""),
+                    "next_month_love": raw_result.get("texts", {}).get("next_month_love", "")
+                },
+                "titles": {
+                    "compatibility": raw_result.get("titles", {}).get("compatibility", "相性診断" if partner_birth else "恋愛傾向と出会い"),
+                    "overall_love_fortune": raw_result.get("titles", {}).get("overall_love_fortune", "総合恋愛運"),
+                    "year_love": raw_result.get("titles", {}).get("year_love", year_label),
+                    "month_love": raw_result.get("titles", {}).get("month_love", month_label),
+                    "next_month_love": raw_result.get("titles", {}).get("next_month_love", next_month_label)
+                },
+                "themes": raw_result.get("themes", []),
+                "lucky_info": raw_result.get("lucky_info", []),
+                "lucky_direction": raw_result.get("lucky_direction", ""),
+                "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
+            }
+            filename = f"renai_{uuid_str}.pdf"
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            shop_id = session.get("shop_id", "default")
+            threading.Thread(
+                target=background_generate_pdf,
+                args=(filepath, result_data, "renai", "a4", full_year, uuid_str, shop_id)
+            ).start()
+            return redirect(url_for("preview", filename=filename))
+        except Exception as e:
+            print("処理エラー:", e)
+            return "処理中にエラーが発生しました", 500
+    # GET: render the input page for love fortune (after payment)
+    return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
 
 
 
