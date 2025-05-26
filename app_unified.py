@@ -100,11 +100,10 @@ def start(uuid_str):
     except Exception as e:
         print("⚠️ used_orders.txt 読み込みエラー:", e)
     if mode is None or shop_id is None:
-        # UUIDがファイルになければアクセス禁止
         return "Invalid UUID", 403
-    # session_id が未記録なら決済済みではない
     if not session_id:
         return "Session ID not found", 403
+
     # webhook_sessions.txt に session_id が記録されているか確認
     try:
         with open("webhook_sessions.txt", "r") as f:
@@ -115,48 +114,41 @@ def start(uuid_str):
     if session_id not in sessions:
         return "Payment not confirmed", 403
 
-    # DBに記録およびshop_logsカウント更新
     today = datetime.now().strftime("%Y-%m-%d")
     try:
         if DATABASE_URL:
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
             final_service = f"{mode}_thanks"
+
+            # ✅ Webhookイベントを記録（重複防止）
             cur.execute("""
-                UPDATE webhook_events SET shop_id=%s, service=%s, date=%s
-                WHERE uuid=%s AND service != %s;
-            """, (shop_id, final_service, today, uuid_str, final_service))
-            updated = cur.rowcount
-            if updated == 0:
-                cur.execute("""
-                    INSERT INTO webhook_events (uuid, shop_id, service, date)
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT DO NOTHING;
-                """, (uuid_str, shop_id, final_service, today))
-            # shop_logs にカウント処理
-            if updated or cur.rowcount:
-                cur.execute("""
-                    INSERT INTO shop_logs (date, shop_id, service, count)
-                    VALUES (%s, %s, %s, 1)
-                    ON CONFLICT (date, shop_id, service)
-                    DO UPDATE SET count = shop_logs.count + 1;
-                """, (today, shop_id, mode))
-                print(f"📝 shop_logs カウント更新: {today} / {shop_id} / {mode}")
-            else:
-                print(f"ℹ️ UUID {uuid_str} は重複でカウントスキップ")
+                INSERT INTO webhook_events (uuid, shop_id, service, date)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT DO NOTHING;
+            """, (uuid_str, shop_id, final_service, today))
+
+            # ✅ shop_logs は毎回加算（重複してもOK）
+            cur.execute("""
+                INSERT INTO shop_logs (date, shop_id, service, count)
+                VALUES (%s, %s, %s, 1)
+                ON CONFLICT (date, shop_id, service)
+                DO UPDATE SET count = shop_logs.count + 1;
+            """, (today, shop_id, mode))
+            print(f"📝 shop_logs カウント更新: {today} / {shop_id} / {mode}")
+
             conn.commit()
             cur.close()
             conn.close()
     except Exception as e:
         print("❌ DB保存エラー:", e)
 
-    # 対象モードへリダイレクト
+    # 対象モードへ遷移
     target_mode = mode
     if target_mode.endswith("_full"):
         target_mode = target_mode.replace("_full", "")
-
-    # 🔧 修正点：_uuid → _entry_uuid に変更
     return redirect(url_for(f"{target_mode}_entry_uuid", uuid_str=uuid_str))
+
 
 
 
