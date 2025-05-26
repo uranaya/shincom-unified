@@ -203,33 +203,6 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
 
 
 
-def create_payment_link(price, uuid_str, redirect_url, shop_id, full_year=False, mode="selfmob"):
-    if mode == "renaiselfmob":
-        komoju_id = os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID_FULL") if full_year else os.getenv("KOMOJU_RENAI_PUBLIC_LINK_ID")
-    else:
-        komoju_id = os.getenv("KOMOJU_PUBLIC_LINK_ID_FULL") if full_year else os.getenv("KOMOJU_PUBLIC_LINK_ID")
-    if not komoju_id:
-        raise ValueError("KOMOJUリンクID未設定")
-
-    encoded_redirect = quote(redirect_url, safe='')
-
-    # ✅ UUIDをmetadataに含める（external_order_numとして）
-    metadata_dict = {
-        "shop_id": shop_id,
-        "external_order_num": uuid_str
-    }
-    encoded_metadata = quote(json.dumps(metadata_dict))
-
-    # external_order_num は使わず、metadata のみ使用（KOMOJU公式推奨）
-    url = f"https://komoju.com/payment_links/{komoju_id}?customer_redirect_url={encoded_redirect}&metadata={encoded_metadata}"
-    print(f"🔗 決済URL [{mode}] (full={full_year}): {url}")
-    return url
-
-
-
-
-
-
 
 # カウント記録処理
 
@@ -246,13 +219,34 @@ def record_shop_log_if_needed(uuid_str, mode):
             shop_id = "default"
 
         today = datetime.now().strftime("%Y-%m-%d")
-        log_line = f"{shop_id},{mode},{today}\n"
 
+        # ✅ DBにも記録（同日・同shop_id・同modeがあれば更新）
+        if DATABASE_URL:
+            try:
+                conn = psycopg2.connect(DATABASE_URL)
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO shop_logs (date, shop_id, service, count)
+                    VALUES (%s, %s, %s, 1)
+                    ON CONFLICT (date, shop_id, service)
+                    DO UPDATE SET count = shop_logs.count + 1;
+                """, (today, shop_id, mode))
+                conn.commit()
+                cur.close()
+                conn.close()
+                print(f"📝 DBカウント更新: {today} / {shop_id} / {mode}")
+            except Exception as e:
+                print("❌ DB記録失敗 (record_shop_log_if_needed):", e)
+
+        # ✅ CSVにもログ（参考用）
+        log_line = f"{shop_id},{mode},{today}\n"
         with open("shop_logs.csv", "a") as log:
             log.write(log_line)
-            print(f"🧮 カウント記録: {log_line.strip()}")
+            print(f"🧮 CSVカウント記録: {log_line.strip()}")
+
     except Exception as e:
         print("⚠️ カウント記録エラー:", e)
+
 
 
 
