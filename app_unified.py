@@ -528,8 +528,15 @@ def selfmob_uuid(uuid_str):
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
-        for uid, flag, mode, shop_id in lines:
-            if uid == uuid_str and mode == "selfmob":
+        for parts in lines:
+        if len(parts) >= 4:
+            uid, flag, mode, shop_id = parts[:4]
+        elif len(parts) == 3:
+            uid, flag, mode = parts
+            shop_id = "default"
+        else:
+            continue
+if uid == uuid_str and mode == "selfmob":
                 full_year = (flag == "1")
                 break
         if full_year is None:
@@ -651,8 +658,15 @@ def renaiselfmob_uuid(uuid_str):
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
-        for uid, flag, mode, shop_id in lines:
-            if uid == uuid_str:
+        for parts in lines:
+        if len(parts) >= 4:
+            uid, flag, mode, shop_id = parts[:4]
+        elif len(parts) == 3:
+            uid, flag, mode = parts
+            shop_id = "default"
+        else:
+            continue
+if uid == uuid_str:
                 full_year = (flag == "1")
                 break
         if full_year is None:
