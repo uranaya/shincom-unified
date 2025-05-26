@@ -227,19 +227,22 @@ def is_paid_uuid(uuid_str):
         print("❌ 決済確認エラー:", e)
         return False
 
+
+
+
 def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
-    metadata = json.dumps({"shop_id": shop_id})
+
     komoju_url = create_payment_link(
         price=1000 if full_year else 500,
         uuid_str=uuid_str,
         redirect_url=redirect_url,
-        metadata=metadata,
+        shop_id=shop_id,  # ✅ ← ここが変更点
         full_year=full_year,
         mode=mode
     )
-    # used_orders.txt に書き込むモード名 (full_year フラグで区別)
+
     mode_str = mode
     if full_year:
         mode_str = f"{mode}_full"
@@ -248,7 +251,6 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
             f.write(f"{uuid_str},,{mode_str},{shop_id}\n")
     except Exception as e:
         print("⚠️ UUID書き込み失敗:", e)
-    # DBにも仮記録
     try:
         if DATABASE_URL:
             conn = psycopg2.connect(DATABASE_URL)
@@ -264,9 +266,12 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
             conn.close()
     except Exception as e:
         print("❌ DB記録失敗 (generate_link):", e)
+
     resp = make_response(redirect(komoju_url))
-    resp.set_cookie("uuid", uuid_str, max_age=600)  # 有効期限10分
+    resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
+
+
 
 # --- Komoju Webhook ルート ---
 @app.route("/webhook/selfmob", methods=["POST"])
