@@ -259,32 +259,40 @@ def webhook_selfmob():
     data = request.get_json()
     print("📩 Webhook受信: selfmob", data)
     session_id = data.get("data", {}).get("session")
+    metadata = data.get("data", {}).get("metadata", {})
+    uuid_from_metadata = metadata.get("external_order_num")
+
     matched_uuid = None
     shop_id = "default"
-    # session_id をログ用に記録
+
+    # セッションIDログ記録
     if session_id:
         try:
             with open("webhook_sessions.txt", "a") as f:
                 f.write(f"{session_id}\n")
         except Exception as e:
             print("⚠️ Webhookセッション記録失敗:", e)
+
+    # used_orders.txt からUUIDを照合
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = f.readlines()
         for i, line in enumerate(lines):
             parts = line.strip().split(",")
-            if len(parts) >= 4 and parts[1] == session_id:
+            if len(parts) >= 4 and (parts[1] == session_id or parts[0] == uuid_from_metadata):
                 matched_uuid = parts[0]
                 shop_id = parts[3]
-                # used_orders.txt に session_id を更新
-                parts[1] = session_id
-                lines[i] = ",".join(parts) + "\n"
+                if not parts[1] and session_id:
+                    parts[1] = session_id
+                    lines[i] = ",".join(parts) + "\n"
                 break
         if matched_uuid:
             with open(USED_UUID_FILE, "w") as f:
                 f.writelines(lines)
     except Exception as e:
         print("⚠️ UUID逆照合失敗:", e)
+
+    # DBへ記録
     if matched_uuid:
         try:
             if DATABASE_URL:
@@ -302,7 +310,11 @@ def webhook_selfmob():
                 print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
         except Exception as e:
             print("❌ Webhook DBエラー:", e)
+
     return "", 200
+
+
+
 
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
