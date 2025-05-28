@@ -851,9 +851,15 @@ def renai():
         }
         filename = f"renai_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
-        threading.Thread(target=background_generate_pdf, args=(filepath, result_data, "renai", size.lower(), include_yearly)).start()
+        shop_id = session.get("shop_id", "default")
+        uuid_str = "manual_" + datetime.now().strftime('%Y%m%d%H%M%S')
+        threading.Thread(
+            target=background_generate_pdf,
+            args=(filepath, result_data, "renai", size.lower(), include_yearly, uuid_str, shop_id)
+        ).start()
         return redirect(url_for("preview", filename=filename))
     return render_template("renai_form.html")
+
 
 # --- ユーティリティ ---
 @app.route("/get_eto", methods=["POST"])
