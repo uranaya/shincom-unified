@@ -291,12 +291,27 @@ def selfmob_shop_entry(shop_id):
     session["shop_id"] = shop_id
     return render_template("pay.html", shop_id=shop_id)
 
-@app.route("/selfmob/<uuid_str>")
-def selfmob_entry_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
-    record_shop_log_if_needed(uuid_str, "selfmob")
-    return render_template("index_selfmob.html", full_year=False)
+
+
+@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
+def selfmob_uuid(uuid_str):
+    full_year = None
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if not parts or len(parts) < 3:
+                    continue
+                uid, flag, mode = parts[0], parts[1], parts[2]
+                if uid == uuid_str and mode.startswith("selfmob"):
+                    full_year = mode.endswith("_full")
+                    break
+        if full_year is None:
+            return "無効なリンクです（UUID不一致）", 400
+    except FileNotFoundError:
+        return "使用履歴が確認できません", 400
+
+
 
 @app.route("/selfmob_full/<uuid_str>")
 def selfmob_full_entry_uuid(uuid_str):
