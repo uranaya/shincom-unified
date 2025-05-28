@@ -281,6 +281,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     from nicchu_utils import get_nicchu_eto
     from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
     from yearly_love_fortune_utils import generate_yearly_love_fortune
+    from iching_utils import get_iching_advice
 
     user_eto = get_nicchu_eto(user_birth)
     partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
@@ -405,15 +406,15 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     except Exception as e:
         year_love = month_love = next_month_love = f"（恋愛運取得エラー: {e}）"
 
+    # ✅ 年運データの取得（include_yearly が True の場合のみ）
     yearly_love_fortunes = {}
     if include_yearly:
         try:
-            yearly_love_fortunes = generate_yearly_love_fortune(user_birth, datetime.now())
-            print("✅ 年運データ取得:", yearly_love_fortunes)
+            yearly_love_fortunes = generate_yearly_love_fortune(user_birth, datetime.today())
         except Exception as e:
             print(f"❌ 年運取得失敗: {e}")
+            yearly_love_fortunes = {}
 
-    # 年齢・方位計算して恋愛用ラッキー情報生成
     try:
         birth_date_obj = datetime.strptime(user_birth, "%Y-%m-%d")
         age = datetime.today().year - birth_date_obj.year - ((datetime.today().month, datetime.today().day) < (birth_date_obj.month, birth_date_obj.day))
