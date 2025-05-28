@@ -293,25 +293,12 @@ def selfmob_shop_entry(shop_id):
 
 
 
-@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
-def selfmob_uuid(uuid_str):
-    full_year = None
-    try:
-        with open(USED_UUID_FILE, "r") as f:
-            for line in f:
-                parts = line.strip().split(",")
-                if not parts or len(parts) < 3:
-                    continue
-                uid, flag, mode = parts[0], parts[1], parts[2]
-                if uid == uuid_str and mode.startswith("selfmob"):
-                    full_year = mode.endswith("_full")
-                    break
-        if full_year is None:
-            return "無効なリンクです（UUID不一致）", 400
-    except FileNotFoundError:
-        return "使用履歴が確認できません", 400
-
-
+@app.route("/selfmob/<uuid_str>")
+def selfmob_entry_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "selfmob")
+    return render_template("index_selfmob.html", full_year=False)
 
 @app.route("/selfmob_full/<uuid_str>")
 def selfmob_full_entry_uuid(uuid_str):
@@ -333,6 +320,8 @@ def renaiselfmob_full_entry_uuid(uuid_str):
         return "このUUIDは未決済です", 403
     record_shop_log_if_needed(uuid_str, "renaiselfmob_full")
     return render_template("index_renaiselfmob.html", full_year=True)
+
+
 
 # --- 決済リンク生成ルート（管理用） ---
 @app.route("/generate_link/<shop_id>")
@@ -468,7 +457,6 @@ def webhook_renaiselfmob():
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
     full_year = None
-    # Verify UUID existence and get full_year flag from used_orders.txt
     try:
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
@@ -476,39 +464,35 @@ def selfmob_uuid(uuid_str):
                 if not parts or len(parts) < 3:
                     continue
                 uid, flag, mode = parts[0], parts[1], parts[2]
-                if uid == uuid_str and mode == "selfmob":
-                    full_year = (flag == "1")
+                if uid == uuid_str and mode.startswith("selfmob"):
+                    full_year = mode.endswith("_full")
                     break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
     except FileNotFoundError:
         return "使用履歴が確認できません", 400
-    # Handle fortune generation after payment
+
     if request.method == "POST":
         is_json = request.is_json
         try:
             data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
-            # Validate birthdate
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
-            # Get lucky direction (with error handling)
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
             eto = get_nicchu_eto(birthdate)
-            # Generate results using shincom fortune logic
             palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
                 image_data, birthdate, kyusei_text
             )
             palm_result = "\n".join(palm_texts)
             summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
-            # Convert lucky_info to a list of lines (string or list/dict)
             lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
@@ -532,31 +516,29 @@ def selfmob_uuid(uuid_str):
                             if line.startswith("・"):
                                 line = line[1:].strip()
                             lucky_lines.append(line.replace(":", "：", 1))
-            # Prepare titles for output sections
+
             today = datetime.today()
             target1 = today.replace(day=15)
             if today.day >= 20:
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
-            year_label = f"{today.year}年の運勢"
-            month_label = f"{target1.year}年{target1.month}月の運勢"
-            next_month_label = f"{target2.year}年{target2.month}月の運勢"
+
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
                     "palm_summary": "手相の総合アドバイス",
                     "personality": "性格診断",
-                    "year_fortune": year_label,
-                    "month_fortune": month_label,
-                    "next_month_fortune": next_month_label
+                    "year_fortune": f"{today.year}年の運勢",
+                    "month_fortune": f"{target1.year}年{target1.month}月の運勢",
+                    "next_month_fortune": f"{target2.year}年{target2.month}月の運勢",
                 },
                 "texts": {
                     "palm_summary": summary_text,
                     "personality": shichu_result.get("personality", ""),
                     "year_fortune": shichu_result.get("year_fortune", ""),
                     "month_fortune": shichu_result.get("month_fortune", ""),
-                    "next_month_fortune": shichu_result.get("next_month_fortune", "")
+                    "next_month_fortune": shichu_result.get("next_month_fortune", ""),
                 },
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
@@ -564,31 +546,33 @@ def selfmob_uuid(uuid_str):
                 "palm_result": palm_result,
                 "shichu_result": shichu_result,
                 "iching_result": iching_result,
-                "palm_image": image_data
+                "palm_image": image_data,
             }
+
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, today)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
-            # Generate PDF in background thread and mark usage
+
             filename = f"result_{uuid_str}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             shop_id = session.get("shop_id", "default")
             threading.Thread(
                 target=background_generate_pdf,
-                args=(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id)
+                args=(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id),
             ).start()
+
             redirect_url = url_for("preview", filename=filename)
-            if is_json:
-                return jsonify({"redirect_url": redirect_url})
-            else:
-                return redirect(redirect_url)
+            return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
         except Exception as e:
             print("処理エラー:", e)
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
-    # GET: render the input page for paid user
+
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
+
+
+
 
 # --- renai系実占いルート ---
 @app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
