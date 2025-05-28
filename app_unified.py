@@ -586,20 +586,21 @@ def renaiselfmob_uuid(uuid_str):
                 if not parts or len(parts) < 3:
                     continue
                 uid, flag, mode = parts[0], parts[1], parts[2]
-                if uid == uuid_str:
-                    full_year = (flag == "1")
+                if uid == uuid_str and mode.startswith("renaiselfmob"):
+                    full_year = mode.endswith("_full")
                     break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
     except FileNotFoundError:
         return "使用履歴が確認できません", 400
+
     if request.method == "POST":
         try:
             user_birth = request.form.get("user_birth")
             partner_birth = request.form.get("partner_birth")
             if not user_birth or not isinstance(user_birth, str):
                 return "生年月日が不正です", 400
-            # Prepare labels for the love fortune output
+
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
@@ -608,7 +609,9 @@ def renaiselfmob_uuid(uuid_str):
             year_label = f"{now.year}年の恋愛運"
             month_label = f"{target1.year}年{target1.month}月の恋愛運"
             next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
+
             raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
+
             result_data = {
                 "texts": {
                     "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
@@ -627,8 +630,9 @@ def renaiselfmob_uuid(uuid_str):
                 "themes": raw_result.get("themes", []),
                 "lucky_info": raw_result.get("lucky_info", []),
                 "lucky_direction": raw_result.get("lucky_direction", ""),
-                "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
+                "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {}) if full_year else {}
             }
+
             filename = f"renai_{uuid_str}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             shop_id = session.get("shop_id", "default")
@@ -637,11 +641,13 @@ def renaiselfmob_uuid(uuid_str):
                 args=(filepath, result_data, "renai", "a4", full_year, uuid_str, shop_id)
             ).start()
             return redirect(url_for("preview", filename=filename))
+
         except Exception as e:
             print("処理エラー:", e)
             return "処理中にエラーが発生しました", 500
-    # GET: render the input page for love fortune (after payment)
+
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
+
 
 # --- PDF出力関連 ---
 # Background thread task to generate PDF and handle post-processing
