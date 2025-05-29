@@ -274,14 +274,6 @@ def generate_fortune(image_data, birthdate, kyusei_text):
 
 
 def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = 'a4') -> dict:
-    from datetime import datetime
-    from dateutil.relativedelta import relativedelta
-    import openai
-    from lucky_utils import generate_lucky_renai_info, generate_lucky_direction
-    from nicchu_utils import get_nicchu_eto
-    from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
-    from yearly_love_fortune_utils import generate_yearly_love_fortune
-    from iching_utils import get_iching_advice
 
     user_eto = get_nicchu_eto(user_birth)
     partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
