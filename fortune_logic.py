@@ -375,9 +375,14 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     yearly_love_fortunes = {}
     if include_yearly:
         try:
-            yearly_love_fortunes = generate_yearly_love_fortune(user_birth, today)
+            raw_fortunes = generate_yearly_love_fortune(user_birth, today)
+            yearly_love_fortunes = {
+                item["label"]: item["text"]
+                for item in raw_fortunes.get("months", [])
+            }
         except Exception as e:
             print("❌ 年運取得失敗:", e)
+
 
     return {
         "texts": {
