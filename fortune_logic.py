@@ -411,7 +411,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         birth_date_obj = datetime.strptime(user_birth, "%Y-%m-%d")
         age = datetime.today().year - birth_date_obj.year - ((datetime.today().month, datetime.today().day) < (birth_date_obj.month, birth_date_obj.day))
         kyusei_text = generate_lucky_direction(user_birth, datetime.today().date())
-        lucky_info = generate_lucky_renai_info(user_eto, user_birth, age, year_love, kyusei_text)
+        lucky_info = generate_lucky_info(user_eto, user_birth, age, year_love, kyusei_text)
     except Exception as e:
         print("❌ 恋愛ラッキー情報取得失敗:", e)
         lucky_info = []
