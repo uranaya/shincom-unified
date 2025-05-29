@@ -312,58 +312,68 @@ def draw_yearly_pages_shincom_b4(c, yearly):
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
+    from reportlab.lib.pagesizes import A4, B4
+    from reportlab.lib.units import mm
+    from header_utils import draw_header
+    from pdf_generator_unified import draw_yearly_pages_renai_a4, draw_yearly_pages_renai_b4, draw_lucky_section, FONT_NAME
     from textwrap import wrap as wrap_text
-    def wrap_lines(text, limit):
+
+    def wrap(text, limit):
         lines = []
-        for ln in text.splitlines():
-            lines.extend(wrap_text(ln, limit))
+        for line in text.splitlines():
+            lines.extend(wrap_text(line, limit))
         return lines
 
     width, height = A4 if size == 'a4' else B4
     margin = 20 * mm
-    wrap_main = 40 if size == 'a4' else 45
-    wrap_theme = 40 if size == 'a4' else 45
-    font_title = 12 if size == 'a4' else 14
-    font_text = 10 if size == 'a4' else 12
-    line_space = 6 * mm if size == 'a4' else 7 * mm
-
+    wrap_len = 40 if size == 'a4' else 45
     y = draw_header(c, width, margin, height - margin)
-    main_keys = ["compatibility", "year_love", "month_love", "next_month_love"]
-    c.setFont(FONT_NAME, font_title)
+
+    # 1ページ目：相性診断・恋愛運（年/月/来月）
+    main_keys = [
+        "compatibility",
+        "year_love",
+        "month_love",
+        "next_month_love",
+    ]
+    c.setFont(FONT_NAME, 12)
     for key in main_keys:
-        text = data["texts"].get(key, "").strip()
-        if text:
-            title = data["titles"].get(key, key)
-            c.drawString(margin, y, f"◆ {title}")
-            y -= line_space
-            c.setFont(FONT_NAME, font_text)
-            for line in wrap_lines(text, wrap_main):
+        if key in data.get("texts", {}) and data["texts"][key].strip():
+            c.drawString(margin, y, f"◆ {data['titles'].get(key, key)}")
+            y -= 6 * mm
+            c.setFont(FONT_NAME, 10)
+            for line in wrap(data["texts"][key], wrap_len):
                 c.drawString(margin, y, line)
-                y -= line_space
+                y -= 6 * mm
             y -= 4 * mm
-            c.setFont(FONT_NAME, font_title)
+            c.setFont(FONT_NAME, 12)
 
     c.showPage()
     y = height - margin
+
+    # 2ページ目：恋愛テーマ3項目（注意点・距離感・結婚）
     if data.get("themes"):
-        c.setFont(FONT_NAME, font_title)
+        c.setFont(FONT_NAME, 12)
         for section in data["themes"]:
-            title = section.get("title", "")
-            content = section.get("content", "")
-            if title and content:
-                c.drawString(margin, y, f"◆ {title}")
-                y -= line_space
-                c.setFont(FONT_NAME, font_text)
-                for line in wrap_lines(content, wrap_theme):
-                    c.drawString(margin, y, line)
-                    y -= line_space
-                y -= 4 * mm
-                c.setFont(FONT_NAME, font_title)
+            c.drawString(margin, y, f"◆ {section['title']}")
+            y -= 6 * mm
+            c.setFont(FONT_NAME, 10)
+            for line in wrap(section["content"], wrap_len):
+                c.drawString(margin, y, line)
+                y -= 6 * mm
+            y -= 4 * mm
+            c.setFont(FONT_NAME, 12)
 
-    y = draw_lucky_section(c, width, margin, y, data.get("lucky_info", []), data.get("lucky_direction", ""))
+    # ラッキー情報・吉方位（2ページ目末尾）
+    y = draw_lucky_section(
+        c, width, margin, y,
+        data.get("lucky_info", []),
+        data.get("lucky_direction", "")
+    )
 
+    # 年運（オプション）
     if include_yearly and data.get("yearly_love_fortunes"):
-        if size == 'a4':
+        if size == "a4":
             draw_yearly_pages_renai_a4(c, data["yearly_love_fortunes"])
         else:
             draw_yearly_pages_renai_b4(c, data["yearly_love_fortunes"])
