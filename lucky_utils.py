@@ -9,35 +9,36 @@ from reportlab.lib.units import mm
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
-    prompt = f"""あなたは占いの専門家です。
-相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
-
-【手相】\n{palm_result}\n
-【四柱推命】\n{shichu_result}\n
-【九星気学の方位】\n{kyusei_text}
-
-以下5つの項目を、すべて1行にまとめて簡潔に出力してください：
-
-◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日
-
-- 「◆」で始める
-- 出力は1行だけにする
-- 各項目は短く（単語～数語）
-- 補足説明・理由・語り・改行は一切禁止
-- 他の文や文章は禁止（この形式のみで返答すること）
-"""
-
+def generate_lucky_info(eto: str, birthdate: str, age: int, love_fortune: str, kyusei_text: str) -> list:
     try:
+        prompt = f"""あなたは占い師です。
+- 干支（日柱）: {eto}
+- 生年月日: {birthdate}
+- 年齢: {age}
+- 恋愛運の要点: {love_fortune}
+- 九星気学の吉方位: {kyusei_text}
+
+以上の情報をもとに、次のラッキー項目を1つずつ箇条書きで示してください：
+
+・ラッキーアイテム  
+・ラッキーカラー  
+・ラッキーナンバー  
+・ラッキーフード  
+・ラッキーデー
+
+それぞれ実在するもので、日常生活で使える内容にしてください。"""
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.6
+            max_tokens=500,
+            temperature=0.9
         )
-        return [response["choices"][0]["message"]["content"].strip()]
+        content = response.choices[0].message.content.strip()
+        return content.split("\n")
     except Exception as e:
-        print("❌ ラッキー情報取得失敗:", e)
-        return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
+        print("❌ ラッキー情報生成エラー:", e)
+        return [f"（ラッキー情報取得エラー: {e}）"]
+
 
 
 def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
