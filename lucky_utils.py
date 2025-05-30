@@ -9,12 +9,10 @@ from reportlab.lib.units import mm
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-def generate_lucky_info(nicchu_eto: str, birthdate: str, age: int,
-                        palm_result: str, shichu_result_raw: str,
-                        kyusei_text: str) -> list:
+def generate_lucky_info(eto: str, birthdate: str, age: int, palm_result: str, shichu_result_raw: str, kyusei_text: str) -> list:
     try:
         prompt = f"""あなたは占い師です。
-- 干支（日柱）: {nicchu_eto}
+- 干支（日柱）: {eto}
 - 生年月日: {birthdate}
 - 年齢: {age}
 - 手相結果の要点: {palm_result}
@@ -37,11 +35,12 @@ def generate_lucky_info(nicchu_eto: str, birthdate: str, age: int,
             temperature=0.9
         )
         content = response.choices[0].message.content.strip()
-        return content.split("\n")
+        # 空白行を除く + "・" から始まる行だけ抽出
+        lines = [line for line in content.splitlines() if line.strip().startswith("・")]
+        return lines if lines else ["（出力フォーマット不正：内容取得失敗）"]
     except Exception as e:
         print("❌ ラッキー情報生成エラー:", e)
         return [f"（ラッキー情報取得エラー: {e}）"]
-
 
 
 
