@@ -266,7 +266,7 @@ def generate_fortune(nicchu_eto, birthdate, age, palm_result, shichu_result_raw,
         # ✅ ラッキー情報・吉方位を取得
         from lucky_utils import generate_lucky_info, generate_lucky_direction
         lucky_info = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text)
-        lucky_direction = generate_lucky_direction(birthdate, datetime.date.today())
+        lucky_direction = generate_lucky_direction(birthdate)
 
         result["lucky_info"] = lucky_info
         result["lucky_direction"] = lucky_direction
@@ -291,6 +291,7 @@ def generate_fortune(nicchu_eto, birthdate, age, palm_result, shichu_result_raw,
             "lucky_info": ["ラッキー情報取得失敗"],
             "lucky_direction": "吉方位取得失敗"
         }
+
 
 
 
