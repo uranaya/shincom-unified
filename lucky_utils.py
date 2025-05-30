@@ -168,11 +168,11 @@ def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_
             if "：" in line:
                 label, value = line.split("：", 1)
                 label = label.replace("・", "").strip()
-                value = value.strip().split("（")[0]  # 語尾の解説部分を除去
-                lucky_lines.append(f"◆ {label}：{value}")
+                value = value.strip().split("（")[0]
+                lucky_lines.append(f"{label}：{value}")  # 「◆」は付けない
             if len(lucky_lines) == 5:
                 break
         return lucky_lines
     except Exception as e:
         print("❌ 恋愛ラッキー情報取得失敗:", e)
-        return ["◆ アイテム：ー", "◆ カラー：ー", "◆ ナンバー：ー", "◆ フード：ー", "◆ デー：ー"]
+        return ["アイテム：ー", "カラー：ー", "ナンバー：ー", "フード：ー", "デー：ー"]
