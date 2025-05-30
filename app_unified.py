@@ -13,11 +13,10 @@ from fortune_logic import generate_fortune
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
 from yearly_fortune_utils import generate_yearly_fortune
-from fortune_logic import generate_renai_fortune
-from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto,analyze_palm
+from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
-
+from fortune_logic import generate_renai_fortune
 import sqlite3
 import threading
 import psycopg2
@@ -32,8 +31,10 @@ UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", ".")
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "secret!123")
 
+
 # Initialize locks for thread-safe operations
 used_file_lock = threading.Lock()
+
 
 # used_orders.txt 存在チェック
 os.makedirs(os.path.dirname(USED_UUID_FILE) or ".", exist_ok=True)
@@ -75,12 +76,46 @@ else:
     print("⚠️ DATABASE_URL が未設定。ローカル実行ではDB非使用。")
 
 
-
-
-@app.route("/selfmob", methods=["GET"])
-def selfmob_start():
-    return render_template("pay.html", shop_id="default")
-
+# Background thread task to generate PDF and handle post-processing
+def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
+    try:
+        create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
+    except Exception as e:
+        print(f"❌ PDF generation error (mode={pdf_mode}, uuid={uuid_str}):", e)
+        traceback.print_exc()
+        return
+    # Mark UUID as used if applicable
+    if uuid_str:
+        try:
+            with used_file_lock:
+                lines_content = []
+                if os.path.exists(USED_UUID_FILE):
+                    with open(USED_UUID_FILE, "r") as f:
+                        lines_content = [line.strip() for line in f if line.strip()]
+                updated_lines = []
+                for line in lines_content:
+                    parts = line.split(",")
+                    if len(parts) >= 3:
+                        uid, flag, mode = parts[0], parts[1], parts[2]
+                        if uid == uuid_str:
+                            updated_lines.append(f"{uid},used,{mode}")
+                        else:
+                            updated_lines.append(line)
+                with open(USED_UUID_FILE, "w") as f:
+                    for line in updated_lines:
+                        f.write(line + "\n")
+        except Exception as e:
+            print(f"❌ Error updating {USED_UUID_FILE} for {uuid_str}:", e)
+            traceback.print_exc()
+    # Write to access_log.txt if applicable
+    if shop_id and uuid_str:
+        try:
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with open("access_log.txt", "a", encoding="utf-8") as f:
+                f.write(f"{now_str},{shop_id},{uuid_str}\n")
+        except Exception as e:
+            print(f"❌ Error writing access_log for {uuid_str}:", e)
+            traceback.print_exc()
 
 
 # --- thanksルート ---
@@ -93,14 +128,15 @@ def thanks():
     # UUIDあり: thanksページにuuidを渡す（カウント処理は /start へ移動）
     return render_template("thanks.html", uuid_str=uuid_str)
 
-# --- 決済関連機能 ---
+
+
 def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="selfmob"):
-    """KOMOJUのセッションAPIを使って支払い画面URLを生成する"""
+    """KOMOJUのセッションAPIを使って支払い画面URLを生成する（selfmob系ルート自動判定付き）"""
     secret = os.getenv("KOMOJU_SECRET_KEY")
     if not secret:
         raise RuntimeError("KOMOJU_SECRET_KEY is not set")
 
-    # ルーティング判定：決済金額とモードに応じて自動で分岐
+    # ✅ ルーティング判定：決済金額とモードに応じて自動で分岐
     if mode == "renaiselfmob":
         redirect_path = "renaiselfmob_full" if amount >= 1000 else "renaiselfmob"
     else:
@@ -135,11 +171,18 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
     )
     response.raise_for_status()
 
-    session_data = response.json()
-    session_url = session_data.get("session_url")
+    session = response.json()
+    session_url = session.get("session_url")
     if not session_url:
         raise RuntimeError("KOMOJUセッションURLの取得に失敗しました")
     return session_url
+
+
+
+
+
+
+# カウント記録処理
 
 def record_shop_log_if_needed(uuid_str, mode):
     try:
@@ -155,7 +198,7 @@ def record_shop_log_if_needed(uuid_str, mode):
 
         today = datetime.now().strftime("%Y-%m-%d")
 
-        # DBにも記録（同日・同shop_id・同modeがあれば更新）
+        # ✅ DBにも記録（同日・同shop_id・同modeがあれば更新）
         if DATABASE_URL:
             try:
                 conn = psycopg2.connect(DATABASE_URL)
@@ -173,7 +216,7 @@ def record_shop_log_if_needed(uuid_str, mode):
             except Exception as e:
                 print("❌ DB記録失敗 (record_shop_log_if_needed):", e)
 
-        # CSVにもログ（参考用）
+        # ✅ CSVにもログ（参考用）
         log_line = f"{shop_id},{mode},{today}\n"
         with open("shop_logs.csv", "a") as log:
             log.write(log_line)
@@ -182,11 +225,59 @@ def record_shop_log_if_needed(uuid_str, mode):
     except Exception as e:
         print("⚠️ カウント記録エラー:", e)
 
+
+
+
+# --- 決済リンク生成ルート ---
+@app.route("/selfmob-<shop_id>")
+def selfmob_shop_entry(shop_id):
+    session["shop_id"] = shop_id
+    return render_template("pay.html", shop_id=shop_id)
+
+
+
+@app.route("/selfmob/<uuid_str>")
+def selfmob_entry_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "selfmob")
+    return render_template("index_selfmob.html", full_year=False)
+
+
+
+
+@app.route("/selfmob_full/<uuid_str>")
+def selfmob_full_entry_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "selfmob_full")
+    return render_template("index_selfmob.html", full_year=True)
+
+
+
+@app.route("/renaiselfmob/<uuid_str>")
+def renaiselfmob_entry_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "renaiselfmob")
+    return render_template("index_renaiselfmob.html", full_year=False)
+
+
+
+@app.route("/renaiselfmob_full/<uuid_str>")
+def renaiselfmob_full_entry_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "renaiselfmob_full")
+    return render_template("index_renaiselfmob.html", full_year=True)
+
+
+
 def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
 
-    # テスト中につき、金額をすべて1円に固定
+    # ✅ テスト中につき、金額をすべて1円に固定
     amount = 1
 
     session_url = create_payment_session(
@@ -224,6 +315,30 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
 
+
+
+
+@app.route("/generate_link/<shop_id>")
+def generate_link(shop_id):
+    return _generate_session_for_shop(shop_id, full_year=False, mode="selfmob")
+
+@app.route("/generate_link_full/<shop_id>")
+def generate_link_full(shop_id):
+    return _generate_session_for_shop(shop_id, full_year=True,  mode="selfmob")
+
+@app.route("/generate_link_renai/<shop_id>")
+def generate_link_renai(shop_id):
+    return _generate_session_for_shop(shop_id, full_year=False, mode="renaiselfmob")
+
+@app.route("/generate_link_renai_full/<shop_id>")
+def generate_link_renai_full(shop_id):
+    return _generate_session_for_shop(shop_id, full_year=True,  mode="renaiselfmob")
+
+
+
+
+# 決済済みか判定
+
 def is_paid_uuid(uuid_str):
     try:
         with open(USED_UUID_FILE, "r") as f:
@@ -244,6 +359,9 @@ def is_paid_uuid(uuid_str):
     except Exception as e:
         print("❌ 決済確認エラー:", e)
         return False
+
+
+
 
 def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
@@ -286,72 +404,20 @@ def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
 
-# --- 決済リンク生成ルート ---
-@app.route("/selfmob-<shop_id>")
-def selfmob_shop_entry(shop_id):
-    session["shop_id"] = shop_id
-    return render_template("pay.html", shop_id=shop_id)
 
-
-
-@app.route("/selfmob/<uuid_str>")
-def selfmob_entry_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
-    record_shop_log_if_needed(uuid_str, "selfmob")
-    return render_template("index_selfmob.html", full_year=False)
-
-@app.route("/selfmob_full/<uuid_str>")
-def selfmob_full_entry_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
-    record_shop_log_if_needed(uuid_str, "selfmob_full")
-    return render_template("index_selfmob.html", full_year=True)
-
-@app.route("/renaiselfmob/<uuid_str>")
-def renaiselfmob_entry_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
-    record_shop_log_if_needed(uuid_str, "renaiselfmob")
-    return render_template("index_renaiselfmob.html", full_year=False)
-
-@app.route("/renaiselfmob_full/<uuid_str>")
-def renaiselfmob_full_entry_uuid(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
-    record_shop_log_if_needed(uuid_str, "renaiselfmob_full")
-    return render_template("index_renaiselfmob.html", full_year=True)
-
-
-
-# --- 決済リンク生成ルート（管理用） ---
-@app.route("/generate_link/<shop_id>")
-def generate_link(shop_id):
-    return _generate_session_for_shop(shop_id, full_year=False, mode="selfmob")
-
-@app.route("/generate_link_full/<shop_id>")
-def generate_link_full(shop_id):
-    return _generate_session_for_shop(shop_id, full_year=True, mode="selfmob")
-
-@app.route("/generate_link_renai/<shop_id>")
-def generate_link_renai(shop_id):
-    return _generate_session_for_shop(shop_id, full_year=False, mode="renaiselfmob")
-
-@app.route("/generate_link_renai_full/<shop_id>")
-def generate_link_renai_full(shop_id):
-    return _generate_session_for_shop(shop_id, full_year=True, mode="renaiselfmob")
 
 # --- Komoju Webhook ルート ---
 @app.route("/webhook/selfmob", methods=["POST"])
 def webhook_selfmob():
     data = request.get_json()
     print("📩 Webhook受信: selfmob", data)
+
     session_id = data.get("data", {}).get("session")
     metadata = data.get("data", {}).get("metadata", {})
     uuid_from_metadata = metadata.get("external_order_num")
-    shop_id = metadata.get("shop_id", "default")
 
     matched_uuid = None
+    shop_id = metadata.get("shop_id", "default")
 
     if session_id:
         try:
@@ -398,6 +464,9 @@ def webhook_selfmob():
 
     return "", 200
 
+
+
+
 @app.route("/webhook/renaiselfmob", methods=["POST"])
 def webhook_renaiselfmob():
     data = request.get_json()
@@ -405,9 +474,9 @@ def webhook_renaiselfmob():
     session_id = data.get("data", {}).get("session")
     metadata = data.get("data", {}).get("metadata", {})
     uuid_from_metadata = metadata.get("external_order_num")
-    shop_id = metadata.get("shop_id", "default")
 
     matched_uuid = None
+    shop_id = metadata.get("shop_id", "default")
 
     if session_id:
         try:
@@ -454,7 +523,12 @@ def webhook_renaiselfmob():
 
     return "", 200
 
-# --- self系実占いルート ---
+
+
+# --- self系実占い部分  ---
+
+
+
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
     full_year = None
@@ -489,14 +563,9 @@ def selfmob_uuid(uuid_str):
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
             eto = get_nicchu_eto(birthdate)
-
-
-            # 年齢を算出
-            today = datetime.now()
-            birth_year, birth_month, birth_day = map(int, birthdate.split("-"))
-            age = today.year - birth_year - ((today.month, today.day) < (birth_month, birth_day))
-
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, age, palm_result, shichu_result_raw, kyusei_text)
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
+                image_data, birthdate, kyusei_text
+            )
             palm_result = "\n".join(palm_texts)
             summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
             lucky_lines = []
@@ -579,34 +648,29 @@ def selfmob_uuid(uuid_str):
 
 
 
-
-# --- renai系実占いルート ---
 @app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
     full_year = None
+    lines = []
     try:
         with open(USED_UUID_FILE, "r") as f:
-            for line in f:
-                parts = line.strip().split(",")
-                if not parts or len(parts) < 3:
-                    continue
-                uid, flag, mode = parts[0], parts[1], parts[2]
-                if uid == uuid_str and mode.startswith("renaiselfmob"):
-                    full_year = mode.endswith("_full")
-                    break
+            lines = [line.strip().split(",") for line in f if line.strip()]
+        for uid, flag, mode, shop_id in lines:
+            if uid == uuid_str:
+                full_year = (flag == "1")
+                break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
     except FileNotFoundError:
         return "使用履歴が確認できません", 400
-
     if request.method == "POST":
         try:
             user_birth = request.form.get("user_birth")
             partner_birth = request.form.get("partner_birth")
             if not user_birth or not isinstance(user_birth, str):
                 return "生年月日が不正です", 400
-
+            # Prepare labels for the love fortune output
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
@@ -615,9 +679,7 @@ def renaiselfmob_uuid(uuid_str):
             year_label = f"{now.year}年の恋愛運"
             month_label = f"{target1.year}年{target1.month}月の恋愛運"
             next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
-
             raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
-
             result_data = {
                 "texts": {
                     "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
@@ -636,9 +698,8 @@ def renaiselfmob_uuid(uuid_str):
                 "themes": raw_result.get("themes", []),
                 "lucky_info": raw_result.get("lucky_info", []),
                 "lucky_direction": raw_result.get("lucky_direction", ""),
-                "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {}) if full_year else {}
+                "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
             }
-
             filename = f"renai_{uuid_str}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             shop_id = session.get("shop_id", "default")
@@ -647,55 +708,12 @@ def renaiselfmob_uuid(uuid_str):
                 args=(filepath, result_data, "renai", "a4", full_year, uuid_str, shop_id)
             ).start()
             return redirect(url_for("preview", filename=filename))
-
         except Exception as e:
             print("処理エラー:", e)
             return "処理中にエラーが発生しました", 500
-
+    # GET: render the input page for love fortune (after payment)
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
 
-
-# --- PDF出力関連 ---
-# Background thread task to generate PDF and handle post-processing
-def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
-    try:
-        create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
-    except Exception as e:
-        print(f"❌ PDF generation error (mode={pdf_mode}, uuid={uuid_str}):", e)
-        traceback.print_exc()
-        return
-    # Mark UUID as used if applicable
-    if uuid_str:
-        try:
-            with used_file_lock:
-                lines_content = []
-                if os.path.exists(USED_UUID_FILE):
-                    with open(USED_UUID_FILE, "r") as f:
-                        lines_content = [line.strip() for line in f if line.strip()]
-                updated_lines = []
-                for line in lines_content:
-                    parts = line.split(",")
-                    if len(parts) >= 3:
-                        uid, flag, mode = parts[0], parts[1], parts[2]
-                        if uid == uuid_str:
-                            updated_lines.append(f"{uid},used,{mode}")
-                        else:
-                            updated_lines.append(line)
-                with open(USED_UUID_FILE, "w") as f:
-                    for line in updated_lines:
-                        f.write(line + "\n")
-        except Exception as e:
-            print(f"❌ Error updating {USED_UUID_FILE} for {uuid_str}:", e)
-            traceback.print_exc()
-    # Write to access_log.txt if applicable
-    if shop_id and uuid_str:
-        try:
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            with open("access_log.txt", "a", encoding="utf-8") as f:
-                f.write(f"{now_str},{shop_id},{uuid_str}\n")
-        except Exception as e:
-            print(f"❌ Error writing access_log for {uuid_str}:", e)
-            traceback.print_exc()
 
 
 
@@ -713,7 +731,6 @@ def view_file(filename):
     except Exception as e:
         return f"ファイルの送信エラー: {e}", 404
 
-# --- 管理用機能 ---
 @app.route("/view_shop_log")
 def view_shop_log():
     """shop_logsテーブルの内容を表示（管理用）"""
@@ -750,54 +767,30 @@ def logout():
 @app.route("/tenmob", methods=["GET", "POST"], endpoint="tenmob")
 def ten_shincom():
     if "logged_in" not in session:
-        return redirect(url_for("login"))
-
+        return redirect(url_for("login", next=request.endpoint))
     mode = "shincom"
     size = "B4" if request.path == "/ten" else "A4"
-    is_json = request.is_json
-
     if request.method == "POST":
+        is_json = request.is_json
         try:
             data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
-
-            year, month, day = map(int, birthdate.split("-"))
-            from kyusei_utils import get_kyusei_fortune
-            kyusei_text = get_kyusei_fortune(year, month, day)
-
-            age = get_age(birthdate)
-            nicchu_eto = get_nicchu_eto(birthdate)
-            palm_result = analyze_palm(image_data)
-            shichu_result_raw = get_shichu_result(birthdate)
-
-            result = generate_fortune(
-                nicchu_eto,
-                birthdate,
-                age,
-                palm_result,
-                shichu_result_raw,
-                kyusei_text,
-                include_yearly=full_year,
-                size=size
-            )
-
-            from iching_utils import generate_iching_result
-            iching_result = generate_iching_result(birthdate)
-
-            palm_sections = [sec for sec in palm_result.split("### ") if sec.strip()]
-            palm_texts, summary_text = [], ""
-            if palm_sections:
-                *main_sections, summary_section = palm_sections
-                for sec in main_sections:
-                    title_line, body = sec.split("\n", 1) if "\n" in sec else (sec, "")
-                    body = body.strip()
-                    if body:
-                        palm_texts.append(body)
-                if summary_section:
-                    summary_text = summary_section.split("\n", 1)[1].strip() if "\n" in summary_section else summary_section.strip()
-
+            try:
+                year, month, day = map(int, birthdate.split("-"))
+            except Exception:
+                return "生年月日が不正です", 400
+            try:
+                kyusei_text = get_kyusei_fortune(year, month, day)
+            except Exception as e:
+                print("❌ lucky_direction 取得エラー:", e)
+                kyusei_text = ""
+            eto = get_nicchu_eto(birthdate)
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text)
+            summary_text = ""
+            if len(palm_texts) == 6:
+                summary_text = palm_texts.pop()
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
@@ -806,9 +799,8 @@ def ten_shincom():
             year_label = f"{now.year}年の運勢"
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
-
             result_data = {
-                "palm_titles": ["生命線", "運命線", "金運線", "特殊線1", "特殊線2"],
+                "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
                     "palm_summary": "手相の総合アドバイス",
@@ -819,40 +811,36 @@ def ten_shincom():
                 },
                 "texts": {
                     "palm_summary": summary_text,
-                    "personality": result["texts"].get("personality", ""),
-                    "year_fortune": result["texts"].get("year_fortune", ""),
-                    "month_fortune": result["texts"].get("month_fortune", ""),
-                    "next_month_fortune": result["texts"].get("next_month_fortune", "")
+                    "personality": shichu_result.get("personality", ""),
+                    "year_fortune": shichu_result.get("year_fortune", ""),
+                    "month_fortune": shichu_result.get("month_fortune", ""),
+                    "next_month_fortune": shichu_result.get("next_month_fortune", "")
                 },
-                "lucky_info": result.get("lucky_info", []),
-                "lucky_direction": result.get("lucky_direction", ""),
+                "lucky_info": lucky_lines,
+                "lucky_direction": kyusei_text,
                 "birthdate": birthdate,
-                "palm_result": palm_result,
-                "shichu_result": shichu_result_raw,
-                "iching_result": iching_result,
+                "palm_result": "\n".join(palm_texts),
+                "shichu_result": shichu_result,
+                "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "palm_image": image_data
             }
-
             if full_year:
-                from yearly_fortune_utils import generate_yearly_fortune
-                result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
-
-            filename = f"result_{now.strftime('%Y%m%d_%H%M%S')}.pdf"
+                yearly_data = generate_yearly_fortune(birthdate, now)
+                result_data["yearly_fortunes"] = yearly_data
+                result_data["titles"]["year_fortune"] = yearly_data["year_label"]
+                result_data["texts"]["year_fortune"] = yearly_data["year_text"]
+            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
-
-            from pdf_generator_unified import create_pdf
-            create_pdf(filepath, result_data, mode, size=size.lower(), include_yearly=full_year)
-
+            threading.Thread(target=background_generate_pdf, args=(filepath, result_data, mode, size.lower(), full_year)).start()
             redirect_url = url_for("preview", filename=filename)
-            return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
-
+            if is_json:
+                return jsonify({"redirect_url": redirect_url})
+            else:
+                return redirect(redirect_url)
         except Exception as e:
-            import traceback
             traceback.print_exc()
-            return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
-
+            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
     return render_template("index.html")
-
 
 
 
@@ -888,23 +876,15 @@ def renai():
         }
         filename = f"renai_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
-        shop_id = session.get("shop_id", "default")
-        uuid_str = "manual_" + datetime.now().strftime('%Y%m%d%H%M%S')
-        threading.Thread(
-            target=background_generate_pdf,
-            args=(filepath, result_data, "renai", size.lower(), include_yearly, uuid_str, shop_id)
-        ).start()
+        threading.Thread(target=background_generate_pdf, args=(filepath, result_data, "renai", size.lower(), include_yearly)).start()
         return redirect(url_for("preview", filename=filename))
     return render_template("renai_form.html")
 
+@app.route("/selfmob", methods=["GET"])
+def selfmob_start():
+    return render_template("pay.html", shop_id="default")
 
-# --- ユーティリティ ---
 
-def get_age(birthdate):
-    from datetime import datetime
-    birth = datetime.strptime(birthdate, "%Y-%m-%d")
-    today = datetime.today()
-    return today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
 
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
@@ -922,7 +902,6 @@ def get_eto():
     honmeisei = get_honmeisei(y, m, d)
     return jsonify({"eto": eto, "honmeisei": honmeisei})
 
-# --- 固定ページ ---
 @app.route("/")
 @app.route("/home")
 def home():
