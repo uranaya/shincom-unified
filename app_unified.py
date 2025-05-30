@@ -488,6 +488,13 @@ def selfmob_uuid(uuid_str):
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
             eto = get_nicchu_eto(birthdate)
+
+
+            # 年齢を算出
+            today = datetime.now()
+            birth_year, birth_month, birth_day = map(int, birthdate.split("-"))
+            age = today.year - birth_year - ((today.month, today.day) < (birth_month, birth_day))
+
             palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, age, palm_result, shichu_result_raw, kyusei_text)
             palm_result = "\n".join(palm_texts)
             summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
@@ -762,6 +769,12 @@ def ten_shincom():
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
             eto = get_nicchu_eto(birthdate)
+
+            # 年齢を算出
+            today = datetime.now()
+            birth_year, birth_month, birth_day = map(int, birthdate.split("-"))
+            age = today.year - birth_year - ((today.month, today.day) < (birth_month, birth_day))
+
             palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, age, palm_result, shichu_result_raw, kyusei_text)
 
             summary_text = ""
