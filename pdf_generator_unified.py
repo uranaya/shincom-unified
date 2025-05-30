@@ -340,6 +340,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             y -= 4 * mm
             c.setFont(FONT_NAME, 12)
 
+    # 新ページ：テーマ占い
     c.showPage()
     y = height - margin
 
@@ -356,31 +357,12 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             y -= 4 * mm
             c.setFont(FONT_NAME, 12)
 
-    # ラッキー情報（2列表示）
-    lucky_info = data.get("lucky_info", [])
-    lucky_direction = data.get("lucky_direction", "")
-    if lucky_info:
-        c.setFont(FONT_NAME, 12)
-        c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
-        for i in range(0, len(lucky_info), 2):
-            left = lucky_info[i]
-            right = lucky_info[i + 1] if i + 1 < len(lucky_info) else ""
-            line = f"{left:<25}    {right}"
-            c.drawString(margin, y, line)
-            y -= 6 * mm
-
-    # 吉方位
-    if lucky_direction:
-        y -= 2 * mm
-        c.setFont(FONT_NAME, 12)
-        c.drawString(margin, y, "■ 吉方位（九星気学より）")
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
-        for line in lucky_direction.strip().splitlines():
-            c.drawString(margin, y, line.strip())
-            y -= 6 * mm
+    # ラッキー情報・吉方位（2ページ目末尾・2列表示・共通関数化）
+    y = draw_lucky_section(
+        c, width, margin, y,
+        data.get("lucky_info", []),
+        data.get("lucky_direction", "")
+    )
 
     # 年運（オプション）
     if include_yearly and data.get("yearly_love_fortunes"):
