@@ -648,39 +648,38 @@ def selfmob_uuid(uuid_str):
 
 
 
-
 @app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
     full_year = None
+    lines = []
     try:
         with open(USED_UUID_FILE, "r") as f:
-            for line in f:
-                parts = line.strip().split(",")
-                if len(parts) >= 2 and parts[0] == uuid_str:
-                    full_year = (parts[1] == "1")
-                    break
+            lines = [line.strip().split(",") for line in f if line.strip()]
+        for uid, flag, mode, shop_id in lines:
+            if uid == uuid_str:
+                full_year = (flag == "1")
+                break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
     except FileNotFoundError:
         return "使用履歴が確認できません", 400
-
     if request.method == "POST":
         try:
             user_birth = request.form.get("user_birth")
             partner_birth = request.form.get("partner_birth")
+            if not user_birth or not isinstance(user_birth, str):
+                return "生年月日が不正です", 400
+            # Prepare labels for the love fortune output
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
-
             year_label = f"{now.year}年の恋愛運"
             month_label = f"{target1.year}年{target1.month}月の恋愛運"
             next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
-
             raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
-
             result_data = {
                 "texts": {
                     "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
@@ -701,7 +700,6 @@ def renaiselfmob_uuid(uuid_str):
                 "lucky_direction": raw_result.get("lucky_direction", ""),
                 "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
             }
-
             filename = f"renai_{uuid_str}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             shop_id = session.get("shop_id", "default")
@@ -713,7 +711,7 @@ def renaiselfmob_uuid(uuid_str):
         except Exception as e:
             print("処理エラー:", e)
             return "処理中にエラーが発生しました", 500
-
+    # GET: render the input page for love fortune (after payment)
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
 
 
@@ -845,6 +843,7 @@ def ten_shincom():
     return render_template("index.html")
 
 
+
 @app.route("/renai", methods=["GET", "POST"])
 @app.route("/renaib4", methods=["GET", "POST"])
 def renai():
@@ -852,28 +851,25 @@ def renai():
         return redirect(url_for("login", next=request.endpoint))
 
     size = "A4" if request.path == "/renai" else "B4"
-
+    
     if request.method == "POST":
         user_birth = request.form.get("user_birth")
         partner_birth = request.form.get("partner_birth")
         include_yearly = (request.form.get("full_year") == "yes")
+
+        # ✅ size を明示的に渡す
+        raw_result = generate_renai_fortune(
+            user_birth,
+            partner_birth,
+            include_yearly=include_yearly,
+            size=size.lower()  # A4→a4 / B4→b4 に変換して渡す
+        )
 
         now = datetime.now()
         target1 = now.replace(day=15)
         if now.day >= 20:
             target1 += relativedelta(months=1)
         target2 = target1 + relativedelta(months=1)
-
-        raw_result = generate_renai_fortune(
-            user_birth,
-            partner_birth,
-            include_yearly=include_yearly,
-            size=size.lower()
-        )
-
-        year_label = f"{now.year}年の恋愛運"
-        month_label = f"{target1.year}年{target1.month}月の恋愛運"
-        next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
 
         result_data = {
             "texts": {
@@ -883,13 +879,7 @@ def renai():
                 "month_love": raw_result.get("texts", {}).get("month_love", ""),
                 "next_month_love": raw_result.get("texts", {}).get("next_month_love", "")
             },
-            "titles": {
-                "compatibility": raw_result.get("titles", {}).get("compatibility", "相性診断" if partner_birth else "恋愛傾向と出会い"),
-                "overall_love_fortune": raw_result.get("titles", {}).get("overall_love_fortune", "総合恋愛運"),
-                "year_love": raw_result.get("titles", {}).get("year_love", year_label),
-                "month_love": raw_result.get("titles", {}).get("month_love", month_label),
-                "next_month_love": raw_result.get("titles", {}).get("next_month_love", next_month_label)
-            },
+            "titles": raw_result.get("titles", {}),
             "themes": raw_result.get("themes", []),
             "lucky_info": raw_result.get("lucky_info", []),
             "lucky_direction": raw_result.get("lucky_direction", ""),
@@ -899,6 +889,7 @@ def renai():
         filename = f"renai_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
 
+        # ✅ include_yearly を正しく渡す（既存の通り）
         threading.Thread(
             target=background_generate_pdf,
             args=(filepath, result_data, "renai", size.lower(), include_yearly)
@@ -908,6 +899,10 @@ def renai():
 
     return render_template("renai_form.html")
 
+
+@app.route("/selfmob", methods=["GET"])
+def selfmob_start():
+    return render_template("pay.html", shop_id="default")
 
 
 
