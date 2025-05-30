@@ -9,13 +9,16 @@ from reportlab.lib.units import mm
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-def generate_lucky_info(eto: str, birthdate: str, age: int, love_fortune: str, kyusei_text: str) -> list:
+def generate_lucky_info(nicchu_eto: str, birthdate: str, age: int,
+                        palm_result: str, shichu_result_raw: str,
+                        kyusei_text: str) -> list:
     try:
         prompt = f"""あなたは占い師です。
-- 干支（日柱）: {eto}
+- 干支（日柱）: {nicchu_eto}
 - 生年月日: {birthdate}
 - 年齢: {age}
-- 恋愛運の要点: {love_fortune}
+- 手相結果の要点: {palm_result}
+- 四柱推命の結果: {shichu_result_raw}
 - 九星気学の吉方位: {kyusei_text}
 
 以上の情報をもとに、次のラッキー項目を1つずつ箇条書きで示してください：
@@ -38,6 +41,8 @@ def generate_lucky_info(eto: str, birthdate: str, age: int, love_fortune: str, k
     except Exception as e:
         print("❌ ラッキー情報生成エラー:", e)
         return [f"（ラッキー情報取得エラー: {e}）"]
+
+
 
 
 
