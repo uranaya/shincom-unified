@@ -313,6 +313,8 @@ def draw_yearly_pages_shincom_b4(c, yearly):
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
 
+    from textwrap import wrap as wrap_text
+
     def wrap(text, limit):
         lines = []
         for line in text.splitlines():
