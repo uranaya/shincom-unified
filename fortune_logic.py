@@ -216,13 +216,26 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 
 def generate_fortune(image_data, birthdate, kyusei_text):
-    import re
+
+
+    # 手相、四柱推命、易経
     palm_result = analyze_palm(image_data)
     shichu_result_raw = get_shichu_fortune(birthdate)
     iching_result = get_iching_advice()
+
+    # 干支・年齢
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
-    raw_lucky_info = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text)
+
+    # ラッキー情報（6引数対応）
+    raw_lucky_info = generate_lucky_info(
+        nicchu_eto,
+        birthdate,
+        age,
+        palm_result,
+        shichu_result_raw,
+        kyusei_text
+    )
 
     lucky_lines = []
     try:
@@ -239,6 +252,7 @@ def generate_fortune(image_data, birthdate, kyusei_text):
         print("❌ lucky_info 整形失敗:", e)
         lucky_lines = []
 
+    # 月運タイトル生成
     today = datetime.today()
     target1 = today.replace(day=15)
     if today.day >= 20:
@@ -247,7 +261,13 @@ def generate_fortune(image_data, birthdate, kyusei_text):
     month_label = f"{target1.year}年{target1.month}月の運勢"
     next_month_label = f"{target2.year}年{target2.month}月の運勢"
 
-    shichu_texts = {"personality": "", "year_fortune": "", "month_fortune": "", "next_month_fortune": ""}
+    # 四柱推命テキスト抽出
+    shichu_texts = {
+        "personality": "",
+        "year_fortune": "",
+        "month_fortune": "",
+        "next_month_fortune": ""
+    }
     pattern = r"[■◆]\s*(性格|[0-9]{4}年の運勢|[0-9]{4}年[0-9]{1,2}月の運勢)(.*?)(?=[■◆]|$)"
     matches = re.findall(pattern, str(shichu_result_raw), flags=re.DOTALL)
     for title, body in matches:
@@ -262,6 +282,7 @@ def generate_fortune(image_data, birthdate, kyusei_text):
         elif "年" in title and "運勢" in title:
             shichu_texts["year_fortune"] = body
 
+    # 手相結果整形
     palm_titles = []
     palm_texts = []
     for part in palm_result.split("### "):
@@ -271,6 +292,7 @@ def generate_fortune(image_data, birthdate, kyusei_text):
             palm_texts.append(body[0].strip() if body else "")
 
     return palm_titles, palm_texts, shichu_result_raw, iching_result, lucky_lines
+
 
 
 def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = "a4"):
