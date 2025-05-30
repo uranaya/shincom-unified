@@ -21,6 +21,7 @@ import sqlite3
 import threading
 import psycopg2
 
+
 # --- 環境変数とパス ---
 DATABASE_URL = os.getenv("DATABASE_URL")
 BASE_URL = os.getenv("BASE_URL", "http://localhost:5000")
@@ -143,6 +144,7 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
         redirect_path = "selfmob_full" if amount >= 1000 else "selfmob"
 
     customer_redirect_url = f"{BASE_URL}/{redirect_path}/{uuid_str}"
+        print('[LOG] redirect_url =', redirect_url)
     cancel_url = customer_redirect_url  # 戻るボタンでも同じ場所に戻す
 
     payload = {
@@ -366,6 +368,7 @@ def is_paid_uuid(uuid_str):
 def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
+        print('[LOG] redirect_url =', redirect_url)
 
     komoju_url = create_payment_link(
         price=1000 if full_year else 500,
@@ -625,7 +628,9 @@ def selfmob_uuid(uuid_str):
             }
 
             if full_year:
+        print('[LOG] 年間運勢（通常版）を生成中...')
                 yearly_data = generate_yearly_fortune(birthdate, today)
+        print('[LOG] yearly_fortune =', yearly_fortune)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
@@ -639,6 +644,7 @@ def selfmob_uuid(uuid_str):
             ).start()
 
             redirect_url = url_for("preview", filename=filename)
+        print('[LOG] redirect_url =', redirect_url)
             return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
         except Exception as e:
             print("処理エラー:", e)
@@ -679,7 +685,9 @@ def renaiselfmob_uuid(uuid_str):
             year_label = f"{now.year}年の恋愛運"
             month_label = f"{target1.year}年{target1.month}月の恋愛運"
             next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
+        print('[LOG] 年間運勢（恋愛版）を生成中...')
             raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
+        print('[LOG] yearly_love_fortunes =', yearly_love_fortunes)
             result_data = {
                 "texts": {
                     "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
@@ -825,7 +833,9 @@ def ten_shincom():
                 "palm_image": image_data
             }
             if full_year:
+        print('[LOG] 年間運勢（通常版）を生成中...')
                 yearly_data = generate_yearly_fortune(birthdate, now)
+        print('[LOG] yearly_fortune =', yearly_fortune)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
@@ -833,6 +843,7 @@ def ten_shincom():
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             threading.Thread(target=background_generate_pdf, args=(filepath, result_data, mode, size.lower(), full_year)).start()
             redirect_url = url_for("preview", filename=filename)
+        print('[LOG] redirect_url =', redirect_url)
             if is_json:
                 return jsonify({"redirect_url": redirect_url})
             else:
@@ -856,9 +867,12 @@ def renai():
         user_birth = request.form.get("user_birth")
         partner_birth = request.form.get("partner_birth")
         include_yearly = (request.form.get("full_year") == "yes")
+        print('[LOG] include_yearly =', include_yearly)
 
         # ✅ size を明示的に渡す
+        print('[LOG] 年間運勢（恋愛版）を生成中...')
         raw_result = generate_renai_fortune(
+        print('[LOG] yearly_love_fortunes =', yearly_love_fortunes)
             user_birth,
             partner_birth,
             include_yearly=include_yearly,
