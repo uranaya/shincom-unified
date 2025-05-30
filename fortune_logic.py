@@ -277,55 +277,79 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     user_eto = get_nicchu_eto(user_birth)
     partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
 
-    try:
-        if partner_eto:
-            prompt_comp = f"""あなたは恋愛占いの専門家です。
+    def ask_gpt(prompt, max_tokens=400):
+        try:
+            return openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=0.9
+            ).choices[0].message.content.strip()
+        except Exception as e:
+            return f"（取得エラー: {e}）"
+
+    # 相性 or 性格＋理想
+    if partner_eto:
+        prompt_comp = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}
 - お相手の日柱: {partner_eto}
 
 この2人の恋愛相性や関係性の特徴、注意点について、200文字で教えてください。"""
-            prompt_future = f"""あなたは恋愛占いの専門家です。
+        prompt_future = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}
 - お相手の日柱: {partner_eto}
 
 お相手の気持ちと今後の展開について、200文字で教えてください。"""
-        else:
-            prompt_comp = f"""あなたは恋愛占いの専門家です。
+    else:
+        prompt_comp = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}
 
 あなたの性格や恋愛傾向について、200文字で教えてください。"""
-            prompt_future = f"""あなたは恋愛占いの専門家です。
+        prompt_future = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}
 
 理想の相手像と出会いのチャンスについて、200文字で教えてください。"""
 
-        comp_text = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt_comp}],
-            max_tokens=400,
-            temperature=0.9
-        ).choices[0].message.content.strip()
+    comp_text = ask_gpt(prompt_comp)
+    future_text = ask_gpt(prompt_future)
 
-        future_text = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt_future}],
-            max_tokens=400,
-            temperature=0.9
-        ).choices[0].message.content.strip()
-    except Exception as e:
-        comp_text = f"（相性・性格占い取得エラー: {e}）"
-        future_text = ""
+    # 年/今月/来月の恋愛運
+    today = datetime.today()
+    this_year, this_month = today.year, today.month
+    next_month_date = today.replace(day=15) + relativedelta(months=1)
+    next_year, next_month = next_month_date.year, next_month_date.month
 
-    topic_sections = []
+    tsuhen_year = get_tsuhensei_for_year(user_birth, this_year)
+    tsuhen_month = get_tsuhensei_for_date(user_birth, this_year, this_month)
+    tsuhen_next = get_tsuhensei_for_date(user_birth, next_year, next_month)
+
+    year_love = ask_gpt(f"""あなたは四柱推命の専門家です。
+- 日柱: {user_eto}
+- 年の通変星: {tsuhen_year}
+- 月の通変星: {tsuhen_month}
+今年（{this_year}年）の恋愛運について、出会いや進展、距離の縮まり方などに触れて200文字でやさしく教えてください。主語は「あなた」。""")
+
+    month_love = ask_gpt(f"""あなたは四柱推命の専門家です。
+- 日柱: {user_eto}
+- 年の通変星: {tsuhen_year}
+- 月の通変星: {tsuhen_month}
+今月（{this_month}月）の恋愛運を150文字でやさしく教えてください。""")
+
+    next_month_love = ask_gpt(f"""あなたは四柱推命の専門家です。
+- 日柱: {user_eto}
+- 年の通変星: {tsuhen_year}
+- 月の通変星: {tsuhen_next}
+来月（{next_month}月）の恋愛運を150文字でやさしく教えてください。""")
+
+    # 恋愛テーマ3項目
     iching_result = get_iching_advice()
-
+    topic_sections = []
     for topic in ["恋愛の障害と乗り越え方", "相手との距離感・深め方", "結婚"]:
-        try:
-            topic_prompt = f"""あなたは恋愛占いの専門家です。
+        topic_prompt = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}"""
-            if partner_eto:
-                topic_prompt += f"\n- お相手の日柱: {partner_eto}"
-            topic_prompt += f"""
+        if partner_eto:
+            topic_prompt += f"\n- お相手の日柱: {partner_eto}"
+        topic_prompt += f"""
 - 易占いからの示唆：{iching_result}
 
 以下の条件で「{topic}」についてアドバイスしてください：
@@ -335,86 +359,27 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 ・現実的で誠実だが希望が持てる言葉で  
 ・一般論や抽象的な助言ではなく、読み手に刺さるような内容にする
 """
+        topic_text = ask_gpt(topic_prompt, max_tokens=600)
+        topic_sections.append({"title": topic, "content": topic_text})
 
-            topic_text = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": topic_prompt}],
-                max_tokens=600,
-                temperature=0.9
-            ).choices[0].message.content.strip()
-
-            topic_sections.append({"title": topic, "content": topic_text})
-        except Exception as e:
-            topic_sections.append({"title": topic, "content": f"（この項目の取得エラー: {e}）"})
-
-    try:
-        today = datetime.today()
-        this_year = today.year
-        this_month = today.month
-        next_month_date = today.replace(day=15) + relativedelta(months=1)
-        next_month = next_month_date.month
-        next_year = next_month_date.year
-
-        tsuhen_year = get_tsuhensei_for_year(user_birth, this_year)
-        tsuhen_month = get_tsuhensei_for_date(user_birth, this_year, this_month)
-        tsuhen_next = get_tsuhensei_for_date(user_birth, next_year, next_month)
-
-        prompt_year = f"""あなたは四柱推命の専門家です。
-- 日柱: {user_eto}
-- 年の通変星: {tsuhen_year}
-- 月の通変星: {tsuhen_month}
-今年（{this_year}年）の恋愛運について、出会いや進展、距離の縮まり方などに触れて200文字でやさしく教えてください。主語は「あなた」。"""
-
-        prompt_month = f"""あなたは四柱推命の専門家です。
-- 日柱: {user_eto}
-- 年の通変星: {tsuhen_year}
-- 月の通変星: {tsuhen_month}
-今月（{this_month}月）の恋愛運を150文字でやさしく教えてください。"""
-
-        prompt_next = f"""あなたは四柱推命の専門家です。
-- 日柱: {user_eto}
-- 年の通変星: {tsuhen_year}
-- 月の通変星: {tsuhen_next}
-来月（{next_month}月）の恋愛運を150文字でやさしく教えてください。"""
-
-        year_love = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt_year}],
-            max_tokens=400
-        ).choices[0].message.content.strip()
-
-        month_love = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt_month}],
-            max_tokens=400
-        ).choices[0].message.content.strip()
-
-        next_month_love = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt_next}],
-            max_tokens=400
-        ).choices[0].message.content.strip()
-    except Exception as e:
-        year_love = month_love = next_month_love = f"（恋愛運取得エラー: {e}）"
-
+    # 年運
     yearly_love_fortunes = {}
     if include_yearly:
         try:
             from yearly_love_fortune_utils import generate_yearly_love_fortune
-            yearly_love_fortunes = generate_yearly_love_fortune(user_birth, datetime.now())
-            print("✅ 年運データ取得:", yearly_love_fortunes)
+            yearly_love_fortunes = generate_yearly_love_fortune(user_birth, today)
         except Exception as e:
             print(f"❌ 年運取得失敗: {e}")
 
+    # ラッキー情報と吉方位
     try:
-        birth_date_obj = datetime.strptime(user_birth, "%Y-%m-%d")
-        age = datetime.today().year - birth_date_obj.year - ((datetime.today().month, datetime.today().day) < (birth_date_obj.month, birth_date_obj.day))
-        kyusei_text = generate_lucky_direction(user_birth, datetime.today().date())
+        birth_obj = datetime.strptime(user_birth, "%Y-%m-%d")
+        age = today.year - birth_obj.year - ((today.month, today.day) < (birth_obj.month, birth_obj.day))
+        kyusei_text = generate_lucky_direction(user_birth, today.date())
         lucky_info = generate_lucky_info(user_eto, user_birth, age, year_love, "", kyusei_text)
     except Exception as e:
-        print("❌ 恋愛ラッキー情報取得失敗:", e)
-        lucky_info = []
-        kyusei_text = ""
+        print(f"❌ ラッキー情報取得失敗: {e}")
+        lucky_info, kyusei_text = [], ""
 
     return {
         "texts": {
