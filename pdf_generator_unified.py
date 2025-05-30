@@ -312,11 +312,6 @@ def draw_yearly_pages_shincom_b4(c, yearly):
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
-    from reportlab.lib.pagesizes import A4, B4
-    from reportlab.lib.units import mm
-    from header_utils import draw_header
-    from pdf_generator_unified import draw_yearly_pages_renai_a4, draw_yearly_pages_renai_b4, draw_lucky_section, FONT_NAME
-    from textwrap import wrap as wrap_text
 
     def wrap(text, limit):
         lines = []

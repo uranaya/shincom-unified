@@ -849,17 +849,28 @@ def ten_shincom():
 def renai():
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
+
     size = "A4" if request.path == "/renai" else "B4"
+    
     if request.method == "POST":
         user_birth = request.form.get("user_birth")
         partner_birth = request.form.get("partner_birth")
         include_yearly = (request.form.get("full_year") == "yes")
-        raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly)
+
+        # ✅ size を明示的に渡す
+        raw_result = generate_renai_fortune(
+            user_birth,
+            partner_birth,
+            include_yearly=include_yearly,
+            size=size.lower()  # A4→a4 / B4→b4 に変換して渡す
+        )
+
         now = datetime.now()
         target1 = now.replace(day=15)
         if now.day >= 20:
             target1 += relativedelta(months=1)
         target2 = target1 + relativedelta(months=1)
+
         result_data = {
             "texts": {
                 "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
@@ -874,11 +885,20 @@ def renai():
             "lucky_direction": raw_result.get("lucky_direction", ""),
             "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
         }
+
         filename = f"renai_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
-        threading.Thread(target=background_generate_pdf, args=(filepath, result_data, "renai", size.lower(), include_yearly)).start()
+
+        # ✅ include_yearly を正しく渡す（既存の通り）
+        threading.Thread(
+            target=background_generate_pdf,
+            args=(filepath, result_data, "renai", size.lower(), include_yearly)
+        ).start()
+
         return redirect(url_for("preview", filename=filename))
+
     return render_template("renai_form.html")
+
 
 @app.route("/selfmob", methods=["GET"])
 def selfmob_start():
