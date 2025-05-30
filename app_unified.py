@@ -13,10 +13,11 @@ from fortune_logic import generate_fortune
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
 from yearly_fortune_utils import generate_yearly_fortune
-from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
+from fortune_logic import generate_renai_fortune
+from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto,analyze_palm
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
-from fortune_logic import generate_renai_fortune
+
 import sqlite3
 import threading
 import psycopg2
@@ -768,7 +769,7 @@ def ten_shincom():
 
             age = get_age(birthdate)
             nicchu_eto = get_nicchu_eto(birthdate)
-            palm_result = get_palm_result(image_data)
+            palm_result = analyze_palm(image_data)
             shichu_result_raw = get_shichu_result(birthdate)
 
             result = generate_fortune(
