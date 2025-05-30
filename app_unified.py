@@ -766,9 +766,6 @@ def ten_shincom():
             from kyusei_utils import get_kyusei_fortune
             kyusei_text = get_kyusei_fortune(year, month, day)
 
-            from eto_utils import get_nicchu_eto
-            from fortune_logic import get_age, get_shichu_result, get_palm_result, generate_fortune
-
             age = get_age(birthdate)
             nicchu_eto = get_nicchu_eto(birthdate)
             palm_result = get_palm_result(image_data)
