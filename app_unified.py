@@ -898,6 +898,13 @@ def renai():
 
 
 # --- ユーティリティ ---
+
+def get_age(birthdate):
+    from datetime import datetime
+    birth = datetime.strptime(birthdate, "%Y-%m-%d")
+    today = datetime.today()
+    return today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
+
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
     try:
