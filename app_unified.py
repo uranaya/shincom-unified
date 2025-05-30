@@ -598,9 +598,7 @@ def selfmob_uuid(uuid_str):
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
 
-            print("✅ yearly_love_fortunes keys:", list(raw_result.get("yearly_love_fortunes", {}).keys()))
-        print("📅 include_yearly =", full_year if "full_year" in locals() else include_yearly)
-        result_data = {
+            result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
@@ -682,9 +680,7 @@ def renaiselfmob_uuid(uuid_str):
             month_label = f"{target1.year}年{target1.month}月の恋愛運"
             next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
             raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
-            print("✅ yearly_love_fortunes keys:", list(raw_result.get("yearly_love_fortunes", {}).keys()))
-        print("📅 include_yearly =", full_year if "full_year" in locals() else include_yearly)
-        result_data = {
+            result_data = {
                 "texts": {
                     "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
                     "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),
@@ -803,9 +799,7 @@ def ten_shincom():
             year_label = f"{now.year}年の運勢"
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
-            print("✅ yearly_love_fortunes keys:", list(raw_result.get("yearly_love_fortunes", {}).keys()))
-        print("📅 include_yearly =", full_year if "full_year" in locals() else include_yearly)
-        result_data = {
+            result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
@@ -877,8 +871,6 @@ def renai():
             target1 += relativedelta(months=1)
         target2 = target1 + relativedelta(months=1)
 
-        print("✅ yearly_love_fortunes keys:", list(raw_result.get("yearly_love_fortunes", {}).keys()))
-        print("📅 include_yearly =", full_year if "full_year" in locals() else include_yearly)
         result_data = {
             "texts": {
                 "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
