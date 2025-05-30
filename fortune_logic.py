@@ -274,7 +274,6 @@ def generate_fortune(image_data, birthdate, kyusei_text):
 
 
 def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = 'a4') -> dict:
-
     user_eto = get_nicchu_eto(user_birth)
     partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
 
@@ -401,17 +400,17 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     yearly_love_fortunes = {}
     if include_yearly:
         try:
+            from yearly_love_fortune_utils import generate_yearly_love_fortune
             yearly_love_fortunes = generate_yearly_love_fortune(user_birth, datetime.now())
             print("✅ 年運データ取得:", yearly_love_fortunes)
         except Exception as e:
             print(f"❌ 年運取得失敗: {e}")
 
-    # 年齢・方位計算して恋愛用ラッキー情報生成
     try:
         birth_date_obj = datetime.strptime(user_birth, "%Y-%m-%d")
         age = datetime.today().year - birth_date_obj.year - ((datetime.today().month, datetime.today().day) < (birth_date_obj.month, birth_date_obj.day))
         kyusei_text = generate_lucky_direction(user_birth, datetime.today().date())
-        lucky_info = generate_lucky_renai_info(user_eto, user_birth, age, year_love, kyusei_text)
+        lucky_info = generate_lucky_info(user_eto, user_birth, age, year_love, "", kyusei_text)
     except Exception as e:
         print("❌ 恋愛ラッキー情報取得失敗:", e)
         lucky_info = []
