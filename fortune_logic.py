@@ -215,83 +215,83 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 
 
-def generate_fortune(image_data, birthdate, kyusei_text):
-
-
-    # 手相、四柱推命、易経
-    palm_result = analyze_palm(image_data)
-    shichu_result_raw = get_shichu_fortune(birthdate)
-    iching_result = get_iching_advice()
-
-    # 干支・年齢
-    age = datetime.today().year - int(birthdate[:4])
-    nicchu_eto = get_nicchu_eto(birthdate)
-
-    # ラッキー情報（6引数対応）
-    raw_lucky_info = generate_lucky_info(
-        nicchu_eto,
-        birthdate,
-        age,
-        palm_result,
-        shichu_result_raw,
-        kyusei_text
-    )
-
-    lucky_lines = []
+def generate_fortune(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text, include_yearly=False, size="A4"):
     try:
-        if isinstance(raw_lucky_info, list):
-            raw_line = raw_lucky_info[0]
-        elif isinstance(raw_lucky_info, str):
-            raw_line = raw_lucky_info.strip().splitlines()[0]
-        else:
-            raw_line = ""
-        if "◆" in raw_line:
-            items = [item.strip() for item in raw_line.split("◆") if item.strip()]
-            lucky_lines = [f"◆ {item}" for item in items]
+        # GPTによる四柱推命占い生成
+        prompt = f"""あなたはプロの占い師です。
+以下の情報に基づいて、相談者の性格と今後の運勢を簡潔に占ってください。
+
+- 干支（日柱）: {nicchu_eto}
+- 生年月日: {birthdate}
+- 年齢: {age}
+
+【手相】\n{palm_result}
+
+【四柱推命の技術的結果】\n{shichu_result_raw}
+
+上記を参考に、以下を出力してください：
+・性格診断（200文字以内）
+・今年の運勢（200文字以内）
+・今月の運勢（150文字以内）
+・来月の運勢（150文字以内）
+
+形式は以下に厳密に従ってください（タイトル含む）：
+{{"personality": "...", "year_fortune": "...", "month_fortune": "...", "next_month_fortune": "..."}}"""
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=700
+        )
+        content = response.choices[0].message.content.strip()
+
+        import json
+        parsed = json.loads(content)
+
+        result = {
+            "texts": {
+                "personality": parsed["personality"],
+                "year_fortune": parsed["year_fortune"] if include_yearly else "",
+                "month_fortune": parsed["month_fortune"],
+                "next_month_fortune": parsed["next_month_fortune"]
+            },
+            "titles": {
+                "personality": "あなたの性格診断",
+                "year_fortune": "今年の運勢",
+                "month_fortune": "今月の運勢",
+                "next_month_fortune": "来月の運勢"
+            }
+        }
+
+        # ✅ ラッキー情報・吉方位を取得
+        from lucky_utils import generate_lucky_info, generate_lucky_direction
+        lucky_info = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text)
+        lucky_direction = generate_lucky_direction(birthdate, datetime.date.today())
+
+        result["lucky_info"] = lucky_info
+        result["lucky_direction"] = lucky_direction
+
+        return result
+
     except Exception as e:
-        print("❌ lucky_info 整形失敗:", e)
-        lucky_lines = []
+        print("❌ generate_fortune エラー:", e)
+        return {
+            "texts": {
+                "personality": "性格診断エラー",
+                "year_fortune": "年運取得失敗",
+                "month_fortune": "月運取得失敗",
+                "next_month_fortune": "来月運取得失敗"
+            },
+            "titles": {
+                "personality": "あなたの性格診断",
+                "year_fortune": "今年の運勢",
+                "month_fortune": "今月の運勢",
+                "next_month_fortune": "来月の運勢"
+            },
+            "lucky_info": ["ラッキー情報取得失敗"],
+            "lucky_direction": "吉方位取得失敗"
+        }
 
-    # 月運タイトル生成
-    today = datetime.today()
-    target1 = today.replace(day=15)
-    if today.day >= 20:
-        target1 += relativedelta(months=1)
-    target2 = target1 + relativedelta(months=1)
-    month_label = f"{target1.year}年{target1.month}月の運勢"
-    next_month_label = f"{target2.year}年{target2.month}月の運勢"
-
-    # 四柱推命テキスト抽出
-    shichu_texts = {
-        "personality": "",
-        "year_fortune": "",
-        "month_fortune": "",
-        "next_month_fortune": ""
-    }
-    pattern = r"[■◆]\s*(性格|[0-9]{4}年の運勢|[0-9]{4}年[0-9]{1,2}月の運勢)(.*?)(?=[■◆]|$)"
-    matches = re.findall(pattern, str(shichu_result_raw), flags=re.DOTALL)
-    for title, body in matches:
-        title = title.strip()
-        body = body.strip()
-        if "性格" in title:
-            shichu_texts["personality"] = body
-        elif title == month_label:
-            shichu_texts["month_fortune"] = body
-        elif title == next_month_label:
-            shichu_texts["next_month_fortune"] = body
-        elif "年" in title and "運勢" in title:
-            shichu_texts["year_fortune"] = body
-
-    # 手相結果整形
-    palm_titles = []
-    palm_texts = []
-    for part in palm_result.split("### "):
-        if part.strip():
-            title, *body = part.strip().split("\n", 1)
-            palm_titles.append(title.strip())
-            palm_texts.append(body[0].strip() if body else "")
-
-    return palm_titles, palm_texts, shichu_result_raw, iching_result, lucky_lines
 
 
 
