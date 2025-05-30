@@ -25,24 +25,33 @@ def get_honmeisei(year: int, month: int, day: int) -> str:
 def get_directions(year: int, month: int, honmeisei: str) -> dict:
     """
     Query OpenAI for lucky and unlucky directions for a given year/month and honmeisei.
-    If month == 0, it queries for the whole year.
-    Returns a dict like {"good": "南東", "bad": "北西"} or indicates failure.
+    If month == 0, it queries for the whole year (年盤のみ)。
+    月ごとの場合は、年盤と月盤を重ねた吉方位を返す。
     """
-    period = f"{year}年の年間" if month == 0 else f"{year}年{month}月"
+    if month == 0:
+        period = f"{year}年の年間"
+        explanation = "年盤を元に判断してください。"
+    else:
+        period = f"{year}年{month}月"
+        explanation = "年盤と月盤を重ねて、総合的に吉方位・凶方位を判断してください。"
+
     prompt = f"""
 あなたは九星気学の専門家です。
 {period}において、本命星「{honmeisei}」の人の
-吉方位と凶方位を、次のようなJSONだけで出力してください。
+吉方位と凶方位を、{explanation}
+次の形式で日本語のJSONのみを出力してください：
 
 {{"good": "南東", "bad": "北西"}}
 
-方位は次の中から1つずつ選んでください：
+※ 方位は次の8方位からそれぞれ1つずつ選んでください：
 北, 北東, 東, 南東, 南, 南西, 西, 北西
-説明文は不要です。JSONだけで返してください。
+
+※説明文・注釈は一切不要。JSONのみを返答してください。
 """.strip()
+
     try:
         res = openai.ChatCompletion.create(
-            model="gpt-4",  # or gpt-3.5-turbo
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=100,
             temperature=0.3,
@@ -52,6 +61,7 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
     except Exception as e:
         print("❌ get_directions エラー:", e)
         return {"good": "取得失敗", "bad": "取得失敗"}
+
 
 def get_kyusei_fortune(year: int, month: int, day: int) -> str:
     """
