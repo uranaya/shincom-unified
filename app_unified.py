@@ -762,17 +762,31 @@ def ten_shincom():
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
 
-            try:
-                year, month, day = map(int, birthdate.split("-"))
-                kyusei_text = get_kyusei_fortune(year, month, day)
-            except Exception as e:
-                print("❌ lucky_direction 取得エラー:", e)
-                kyusei_text = ""
+            year, month, day = map(int, birthdate.split("-"))
+            from kyusei_utils import get_kyusei_fortune
+            kyusei_text = get_kyusei_fortune(year, month, day)
 
-            eto = get_nicchu_eto(birthdate)
-            palm_result, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
-                image_data, birthdate, kyusei_text
+            from eto_utils import get_nicchu_eto
+            from fortune_logic import get_age, get_shichu_result, get_palm_result, generate_fortune
+
+            age = get_age(birthdate)
+            nicchu_eto = get_nicchu_eto(birthdate)
+            palm_result = get_palm_result(image_data)
+            shichu_result_raw = get_shichu_result(birthdate)
+
+            result = generate_fortune(
+                nicchu_eto,
+                birthdate,
+                age,
+                palm_result,
+                shichu_result_raw,
+                kyusei_text,
+                include_yearly=full_year,
+                size=size
             )
+
+            from iching_utils import generate_iching_result
+            iching_result = generate_iching_result(birthdate)
 
             palm_sections = [sec for sec in palm_result.split("### ") if sec.strip()]
             palm_texts, summary_text = [], ""
@@ -785,33 +799,6 @@ def ten_shincom():
                         palm_texts.append(body)
                 if summary_section:
                     summary_text = summary_section.split("\n", 1)[1].strip() if "\n" in summary_section else summary_section.strip()
-
-            shichu_texts = {}
-            if isinstance(shichu_result, dict) and "texts" in shichu_result:
-                shichu_texts = {
-                    "性格": shichu_result["texts"].get("personality", ""),
-                    "今年の運勢": shichu_result["texts"].get("year_fortune", ""),
-                    "今月の運勢": shichu_result["texts"].get("month_fortune", ""),
-                    "来月の運勢": shichu_result["texts"].get("next_month_fortune", "")
-                }
-            else:
-                shichu_parts = [part for part in shichu_result.split("■ ") if part.strip()]
-                for part in shichu_parts:
-                    title, body = part.split("\n", 1) if "\n" in part else (part, "")
-                    shichu_texts[title] = body.strip()
-
-            lucky_direction = kyusei_text
-            lucky_lines = []
-            if isinstance(lucky_info, str):
-                for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-                    line = line.strip()
-                    if line:
-                        lucky_lines.append(f"◆ {line.replace(':', '：', 1)}")
-            elif isinstance(lucky_info, dict):
-                for k, v in lucky_info.items():
-                    lucky_lines.append(f"◆ {k}：{v}")
-            else:
-                lucky_lines = list(lucky_info)
 
             now = datetime.now()
             target1 = now.replace(day=15)
@@ -834,31 +821,35 @@ def ten_shincom():
                 },
                 "texts": {
                     "palm_summary": summary_text,
-                    "personality": shichu_texts.get("性格", ""),
-                    "year_fortune": shichu_texts.get(year_label, ""),
-                    "month_fortune": shichu_texts.get(month_label, ""),
-                    "next_month_fortune": shichu_texts.get(next_month_label, "")
+                    "personality": result["texts"].get("personality", ""),
+                    "year_fortune": result["texts"].get("year_fortune", ""),
+                    "month_fortune": result["texts"].get("month_fortune", ""),
+                    "next_month_fortune": result["texts"].get("next_month_fortune", "")
                 },
-                "lucky_info": lucky_lines,
-                "lucky_direction": lucky_direction,
+                "lucky_info": result.get("lucky_info", []),
+                "lucky_direction": result.get("lucky_direction", ""),
                 "birthdate": birthdate,
-                "palm_result": "\n".join(palm_texts),
-                "shichu_result": shichu_result if isinstance(shichu_result, str) else "",
-                "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
+                "palm_result": palm_result,
+                "shichu_result": shichu_result_raw,
+                "iching_result": iching_result,
                 "palm_image": image_data
             }
 
             if full_year:
+                from yearly_fortune_utils import generate_yearly_fortune
                 result_data["yearly_fortunes"] = generate_yearly_fortune(birthdate, now)
 
             filename = f"result_{now.strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
-            create_pdf_unified(filepath, result_data, mode, size=size.lower(), include_yearly=full_year)
+
+            from pdf_generator_unified import create_pdf
+            create_pdf(filepath, result_data, mode, size=size.lower(), include_yearly=full_year)
 
             redirect_url = url_for("preview", filename=filename)
             return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
 
         except Exception as e:
+            import traceback
             traceback.print_exc()
             return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
 
