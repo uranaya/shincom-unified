@@ -30,12 +30,12 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
     y -= 6 * mm
     c.setFont(FONT_NAME, 10)
 
-    # 2項目ずつ描画、1行に1〜2項目を表示
+    # 2項目ずつ改行する形式（最大3行）
     for i in range(0, len(lucky_lines), 2):
-        line = lucky_lines[i]
-        if i + 1 < len(lucky_lines):
-            line += "　　" + lucky_lines[i + 1]
-        c.drawString(margin, y, line)
+        line1 = lucky_lines[i]
+        line2 = lucky_lines[i + 1] if i + 1 < len(lucky_lines) else ""
+        formatted = f"{line1:<38}    {line2}"
+        c.drawString(margin, y, formatted)
         y -= 6 * mm
 
     if lucky_direction:
@@ -49,6 +49,7 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
             y -= 6 * mm
 
     return y
+
 
 
 
