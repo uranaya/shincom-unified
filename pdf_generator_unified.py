@@ -30,13 +30,20 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
     y -= 6 * mm
     c.setFont(FONT_NAME, 10)
 
-    for i in range(0, len(lucky_lines), 2):
-        line1 = f"◆ {lucky_lines[i]}"
-        line2 = f"◆ {lucky_lines[i+1]}" if i+1 < len(lucky_lines) else ""
+    # 2項目ずつ改行、最後1つだけ単独で
+    for i in range(0, len(lucky_lines) - 1, 2):
+        line1 = lucky_lines[i]
+        line2 = lucky_lines[i + 1]
         formatted = f"{line1:<38}    {line2}"
         c.drawString(margin, y, formatted)
         y -= 6 * mm
 
+    # 5項目目（単独で表示）
+    if len(lucky_lines) % 2 == 1:
+        c.drawString(margin, y, lucky_lines[-1])
+        y -= 6 * mm
+
+    # 吉方位の表示
     if lucky_direction:
         y -= 2 * mm
         c.setFont(FONT_NAME, 12)
@@ -48,6 +55,7 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
             y -= 6 * mm
 
     return y
+
 
 
 
