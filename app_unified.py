@@ -548,9 +548,6 @@ def selfmob_uuid(uuid_str):
         return "使用履歴が確認できません", 400
 
     if request.method == "POST":
-    print("\n--- [LOG] POST request received ---")
-    print("📅 include_yearly =", full_year if "full_year" in locals() else include_yearly)
-
         is_json = request.is_json
         try:
             data = request.get_json() if is_json else request.form
@@ -668,9 +665,6 @@ def renaiselfmob_uuid(uuid_str):
     except FileNotFoundError:
         return "使用履歴が確認できません", 400
     if request.method == "POST":
-    print("\n--- [LOG] POST request received ---")
-    print("📅 include_yearly =", full_year if "full_year" in locals() else include_yearly)
-
         try:
             user_birth = request.form.get("user_birth")
             partner_birth = request.form.get("partner_birth")
@@ -757,9 +751,6 @@ def view_shop_log():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-    print("\n--- [LOG] POST request received ---")
-    print("📅 include_yearly =", full_year if "full_year" in locals() else include_yearly)
-
         pw = request.form.get("password")
         if pw == os.getenv("ADMIN_PASSWORD", "pass"):
             session["logged_in"] = True
@@ -780,9 +771,6 @@ def ten_shincom():
     mode = "shincom"
     size = "B4" if request.path == "/ten" else "A4"
     if request.method == "POST":
-    print("\n--- [LOG] POST request received ---")
-    print("📅 include_yearly =", full_year if "full_year" in locals() else include_yearly)
-
         is_json = request.is_json
         try:
             data = request.get_json() if is_json else request.form
@@ -865,9 +853,6 @@ def renai():
     size = "A4" if request.path == "/renai" else "B4"
     
     if request.method == "POST":
-    print("\n--- [LOG] POST request received ---")
-    print("📅 include_yearly =", full_year if "full_year" in locals() else include_yearly)
-
         user_birth = request.form.get("user_birth")
         partner_birth = request.form.get("partner_birth")
         include_yearly = (request.form.get("full_year") == "yes")
