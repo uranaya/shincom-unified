@@ -676,6 +676,14 @@ def view_shop_log():
             cur = conn.cursor()
             cur.execute("SELECT date, shop_id, service, count FROM shop_logs ORDER BY date DESC;")
             logs = cur.fetchall()@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
+            cur.close()
+            conn.close()
+        except Exception as e:
+            return f"エラー: {e}"
+    return render_template("shop_log.html", logs=logs)
+
+
+
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
     full_year = None
@@ -749,11 +757,7 @@ def renaiselfmob_uuid(uuid_str):
 
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
 
-            cur.close()
-            conn.close()
-        except Exception as e:
-            return f"エラー: {e}"
-    return render_template("shop_log.html", logs=logs)
+
 
 # ログイン制御（シンプルな仮ユーザー認証）
 @app.route("/login", methods=["GET", "POST"])
