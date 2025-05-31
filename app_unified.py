@@ -648,6 +648,7 @@ def selfmob_uuid(uuid_str):
 
 
 
+
 @app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
