@@ -851,25 +851,24 @@ def renai():
         return redirect(url_for("login", next=request.endpoint))
 
     size = "A4" if request.path == "/renai" else "B4"
-    
+
     if request.method == "POST":
         user_birth = request.form.get("user_birth")
         partner_birth = request.form.get("partner_birth")
-        include_yearly = (request.form.get("full_year") == "yes")
-
-        # ✅ size を明示的に渡す
-        raw_result = generate_renai_fortune(
-            user_birth,
-            partner_birth,
-            include_yearly=include_yearly,
-            size=size.lower()  # A4→a4 / B4→b4 に変換して渡す
-        )
+        include_yearly = request.form.get("include_yearly") == "yes"
 
         now = datetime.now()
         target1 = now.replace(day=15)
         if now.day >= 20:
             target1 += relativedelta(months=1)
         target2 = target1 + relativedelta(months=1)
+
+        year_label = f"{now.year}年の恋愛運"
+        month_label = f"{target1.year}年{target1.month}月の恋愛運"
+        next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
+
+        # 🎯 正しく texts/titles を含んだ構造で取得
+        raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
 
         result_data = {
             "texts": {
@@ -879,23 +878,23 @@ def renai():
                 "month_love": raw_result.get("texts", {}).get("month_love", ""),
                 "next_month_love": raw_result.get("texts", {}).get("next_month_love", "")
             },
-            "titles": raw_result.get("titles", {}),
+            "titles": {
+                "compatibility": raw_result.get("titles", {}).get("compatibility", "相性診断" if partner_birth else "恋愛傾向と出会い"),
+                "overall_love_fortune": raw_result.get("titles", {}).get("overall_love_fortune", "総合恋愛運"),
+                "year_love": raw_result.get("titles", {}).get("year_love", year_label),
+                "month_love": raw_result.get("titles", {}).get("month_love", month_label),
+                "next_month_love": raw_result.get("titles", {}).get("next_month_love", next_month_label)
+            },
             "themes": raw_result.get("themes", []),
             "lucky_info": raw_result.get("lucky_info", []),
             "lucky_direction": raw_result.get("lucky_direction", ""),
             "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
         }
 
-        filename = f"renai_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
-
-        # ✅ include_yearly を正しく渡す（既存の通り）
-        threading.Thread(
-            target=background_generate_pdf,
-            args=(filepath, result_data, "renai", size.lower(), include_yearly)
-        ).start()
-
-        return redirect(url_for("preview", filename=filename))
+        create_pdf_unified(filepath, result_data, "renai", size=size.lower(), include_yearly=include_yearly)
+        return send_file(filepath, as_attachment=True)
 
     return render_template("renai_form.html")
 
