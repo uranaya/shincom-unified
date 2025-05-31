@@ -740,6 +740,7 @@ def view_file(filename):
     except Exception as e:
         return f"ファイルの送信エラー: {e}", 404
 
+
 @app.route("/view_shop_log")
 def view_shop_log():
     """shop_logsテーブルの内容を表示（管理用）"""
@@ -749,14 +750,12 @@ def view_shop_log():
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
             cur.execute("SELECT date, shop_id, service, count FROM shop_logs ORDER BY date DESC;")
-            logs = cur.fetchall()@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
+            logs = cur.fetchall()
             cur.close()
             conn.close()
         except Exception as e:
             return f"エラー: {e}"
     return render_template("shop_log.html", logs=logs)
-
-
 
 
 
