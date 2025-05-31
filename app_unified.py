@@ -656,14 +656,19 @@ def renaiselfmob_uuid(uuid_str):
     try:
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip().split(",") for line in f if line.strip()]
-        for uid, flag, mode, shop_id in lines:
-            if uid == uuid_str:
-                full_year = mode.endswith("_full")
-                break
+        for line in lines:
+            # UUIDファイルに4項目あることを前提に柔軟に分割
+            if len(line) == 4:
+                uid, flag, mode, shop_id = line
+                if uid == uuid_str:
+                    full_year = mode.endswith("_full")
+                    break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
     except FileNotFoundError:
         return "使用履歴が確認できません", 400
+    except ValueError:
+        return "UUIDファイルの形式が不正です", 500
 
     if request.method == "POST":
         try:
@@ -672,7 +677,6 @@ def renaiselfmob_uuid(uuid_str):
             if not user_birth or not isinstance(user_birth, str):
                 return "生年月日が不正です", 400
 
-            # 🎯 正しく texts/titles を含んだ構造で取得
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
@@ -683,7 +687,9 @@ def renaiselfmob_uuid(uuid_str):
             month_label = f"{target1.year}年{target1.month}月の恋愛運"
             next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
 
-            raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
+            raw_result = generate_renai_fortune(
+                user_birth, partner_birth, include_yearly=full_year, size="a4"
+            )
 
             result_data = {
                 "texts": {
@@ -702,9 +708,11 @@ def renaiselfmob_uuid(uuid_str):
                 },
                 "themes": raw_result.get("themes", []),
                 "lucky_info": raw_result.get("lucky_info", []),
-                "lucky_direction": raw_result.get("lucky_direction", ""),
-                "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
+                "lucky_direction": raw_result.get("lucky_direction", "")
             }
+
+            if full_year:
+                result_data["yearly_love_fortunes"] = raw_result.get("yearly_love_fortunes", {})
 
             filename = f"renai_{uuid_str}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
@@ -721,6 +729,7 @@ def renaiselfmob_uuid(uuid_str):
             return "処理中にエラーが発生しました", 500
 
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
+
 
 
 
