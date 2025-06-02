@@ -277,8 +277,11 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
 
-    # ✅ テスト中につき、金額をすべて1円に固定
-    amount = 1
+    # ✅ 本番価格に設定：通常500円／年運付き1000円
+    if mode == "renaiselfmob":
+        amount = 1000 if full_year else 500
+    else:
+        amount = 1000 if full_year else 500
 
     session_url = create_payment_session(
         amount=amount,
