@@ -737,11 +737,16 @@ def preview(filename):
 
 @app.route("/view/<filename>")
 def view_file(filename):
-    """PDFファイルをクライアントに送信"""
+    """PDFファイルをクライアントに送信（mimetype明示）"""
     try:
-        return send_file(os.path.join(".", filename), as_attachment=False)
+        return send_file(
+            os.path.join(".", filename),
+            mimetype="application/pdf",
+            as_attachment=False
+        )
     except Exception as e:
         return f"ファイルの送信エラー: {e}", 404
+
 
 
 @app.route("/view_shop_log")
