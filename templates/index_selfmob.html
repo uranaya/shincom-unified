@@ -38,13 +38,14 @@
   <video id="camera" autoplay playsinline></video>
   <canvas id="canvas" style="display:none;"></canvas>
 
-  <button onclick="takePhoto()">📷 撮影</button>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <button onclick="takePhoto()">📷 撮影</button>
+    <button onclick="switchCamera()">🔄 カメラ切替</button>
+  </div>
 
   <label for="birthdate">生年月日：</label>
   <input type="date" id="birthdate" required oninput="fetchEto()">
   <div id="eto-display"></div>
-
-  <!-- チェックボックス削除済 -->
 
   <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
 
@@ -55,13 +56,33 @@
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
 
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
-      } catch (e) {
-        alert("カメラが使用できません：" + e.message);
+    let currentStream = null;
+    let currentFacingMode = "environment"; // 初期値はアウトカメラ
+
+    async function startCamera(facingMode = "environment") {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
       }
+
+      try {
+        const constraints = {
+          video: { facingMode: { exact: facingMode } }
+        };
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+      } catch (e) {
+        try {
+          currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          video.srcObject = currentStream;
+        } catch (err) {
+          alert("カメラが使用できません：" + err.message);
+        }
+      }
+    }
+
+    function switchCamera() {
+      currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+      startCamera(currentFacingMode);
     }
 
     function takePhoto() {
@@ -124,7 +145,7 @@
       const payload = {
         image_data: imageData,
         birthdate,
-        full_year: false  // チェックボックスがないので false 固定
+        full_year: false
       };
 
       try {
@@ -144,7 +165,7 @@
       }
     }
 
-    window.onload = startCamera;
+    window.onload = () => startCamera("environment");
   </script>
 
   <footer style="text-align:center; font-size:small; margin-top:40px; padding:20px; background-color:#f9f9f9;">
