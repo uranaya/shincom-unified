@@ -725,13 +725,22 @@ def renaiselfmob_uuid(uuid_str):
 
 
 
-
-
 @app.route("/preview/<filename>")
 def preview(filename):
-    """占い結果PDFのプレビュー画面表示"""
+    """PDFプレビュー画面（スマホは直接表示）"""
     referer = request.referrer or ""
-    return render_template("fortune_pdf.html", filename=filename, referer=referer)
+
+    user_agent = request.user_agent.string.lower()
+    is_mobile = any(keyword in user_agent for keyword in ["iphone", "android", "ipad"])
+
+    if is_mobile:
+        # スマホは直接PDF表示へリダイレクト
+        return redirect(f"/view/{filename}")
+    else:
+        # PCはプレビュー画面に埋め込み表示
+        return render_template("fortune_pdf.html", filename=filename, referer=referer)
+
+
 
 @app.route("/view/<filename>")
 def view_file(filename):
