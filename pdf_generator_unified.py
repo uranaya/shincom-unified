@@ -57,17 +57,39 @@ def draw_palm_image(c, base64_image, width, y):
         image_data = base64.b64decode(base64_image.split(',')[1])
         img = ImageReader(io.BytesIO(image_data))
         img_width, img_height = img.getSize()
-        scale = (width * 0.45) / img_width  # ★ 元は 0.6、ここを小さく
-        img_width *= scale
-        img_height *= scale
-        x_center = (width - img_width) / 2
-        y -= img_height + 5 * mm
-        c.drawImage(img, x_center, y, width=img_width, height=img_height)
+
+        # 🔧 最大サイズ（ポイント単位）
+        max_width = 180
+        max_height = 140
+
+        # 🔄 アスペクト比を保持してリサイズ
+        width_ratio = max_width / img_width
+        height_ratio = max_height / img_height
+        scale = min(width_ratio, height_ratio)
+
+        resized_width = img_width * scale
+        resized_height = img_height * scale
+
+        x_center = (width - resized_width) / 2
+        y -= resized_height + 5 * mm
+
+        c.drawImage(
+            img,
+            x_center,
+            y,
+            width=resized_width,
+            height=resized_height,
+            preserveAspectRatio=True,
+            anchor='nw'
+        )
+
         y -= 10 * mm
+
     except Exception as e:
         print("Image decode error:", e)
 
     return y
+
 
 
 
