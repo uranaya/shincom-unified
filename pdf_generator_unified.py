@@ -59,8 +59,8 @@ def draw_palm_image(c, base64_image, width, y):
         img_width, img_height = img.getSize()
 
         # 🔧 最大サイズ（ポイント単位）
-        max_width = 180
-        max_height = 140
+        max_width = 210
+        max_height = 160
 
         # 🔄 アスペクト比を保持してリサイズ
         width_ratio = max_width / img_width
@@ -89,6 +89,7 @@ def draw_palm_image(c, base64_image, width, y):
         print("Image decode error:", e)
 
     return y
+
 
 
 
