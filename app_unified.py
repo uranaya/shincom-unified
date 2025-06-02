@@ -236,40 +236,45 @@ def selfmob_shop_entry(shop_id):
 
 
 
-@app.route("/selfmob/<uuid_str>")
+@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_entry_uuid(uuid_str):
+    if request.method == "POST":
+        return redirect(url_for("selfmob_entry_uuid", uuid_str=uuid_str))
     if not is_paid_uuid(uuid_str):
         return "このUUIDは未決済です", 403
     record_shop_log_if_needed(uuid_str, "selfmob")
     return render_template("index_selfmob.html", full_year=False)
 
 
-
-
-@app.route("/selfmob_full/<uuid_str>")
+@app.route("/selfmob_full/<uuid_str>", methods=["GET", "POST"])
 def selfmob_full_entry_uuid(uuid_str):
+    if request.method == "POST":
+        return redirect(url_for("selfmob_full_entry_uuid", uuid_str=uuid_str))
     if not is_paid_uuid(uuid_str):
         return "このUUIDは未決済です", 403
     record_shop_log_if_needed(uuid_str, "selfmob_full")
     return render_template("index_selfmob.html", full_year=True)
 
 
-
-@app.route("/renaiselfmob/<uuid_str>")
+@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_entry_uuid(uuid_str):
+    if request.method == "POST":
+        return redirect(url_for("renaiselfmob_entry_uuid", uuid_str=uuid_str))
     if not is_paid_uuid(uuid_str):
         return "このUUIDは未決済です", 403
     record_shop_log_if_needed(uuid_str, "renaiselfmob")
     return render_template("index_renaiselfmob.html", full_year=False)
 
 
-
-@app.route("/renaiselfmob_full/<uuid_str>")
+@app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_full_entry_uuid(uuid_str):
+    if request.method == "POST":
+        return redirect(url_for("renaiselfmob_full_entry_uuid", uuid_str=uuid_str))
     if not is_paid_uuid(uuid_str):
         return "このUUIDは未決済です", 403
     record_shop_log_if_needed(uuid_str, "renaiselfmob_full")
     return render_template("index_renaiselfmob.html", full_year=True)
+
 
 
 

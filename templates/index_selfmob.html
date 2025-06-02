@@ -156,8 +156,8 @@
         });
         const result = await response.json();
         if (result.redirect_url) {
-          window.location.href = result.redirect_url;
-        } else {
+        window.open(result.redirect_url, '_blank');
+    } else {
           alert("PDF生成後のリダイレクトが取得できませんでした");
         }
       } catch (error) {
