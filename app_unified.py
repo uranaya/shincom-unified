@@ -748,12 +748,11 @@ def preview(filename):
 
 @app.route("/view/<filename>")
 def view_file(filename):
-    """PDFファイルをクライアントに送信（スマホ互換・mimetype指定）"""
-    try:
-        path = os.path.join(UPLOAD_FOLDER, filename)  # ← ここを明示！
-        return send_file(path, mimetype="application/pdf", as_attachment=False)
-    except Exception as e:
-        return f"ファイルの送信エラー: {e}", 404
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.exists(file_path):
+        print(f"❌ ファイルが存在しません: {file_path}")
+        return f"ファイルの送信エラー: {filename} が見つかりません", 404
+    return send_file(file_path, mimetype="application/pdf", as_attachment=False)
 
 
 
