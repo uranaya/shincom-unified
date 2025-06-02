@@ -52,14 +52,12 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
 
 
 
-
 def draw_palm_image(c, base64_image, width, y):
-
     try:
         image_data = base64.b64decode(base64_image.split(',')[1])
         img = ImageReader(io.BytesIO(image_data))
         img_width, img_height = img.getSize()
-        scale = (width * 0.6) / img_width
+        scale = (width * 0.45) / img_width  # ★ 元は 0.6、ここを小さく
         img_width *= scale
         img_height *= scale
         x_center = (width - img_width) / 2
@@ -70,6 +68,8 @@ def draw_palm_image(c, base64_image, width, y):
         print("Image decode error:", e)
 
     return y
+
+
 
 
 def draw_yearly_pages_renai_a4(c, yearly):
