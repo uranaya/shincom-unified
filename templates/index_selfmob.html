@@ -182,5 +182,51 @@
     </nav>
     <p style="margin-top:10px; color:gray;">&copy; 2025 シン・コンピューター占い</p>
   </footer>
+
+<script>
+async function submitForm() {
+  const birthdate = document.getElementById("birthdate").value;
+  const path = window.location.pathname;
+
+  if (!birthdate) {
+    alert("生年月日を入力してください。");
+    return;
+  }
+
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true;
+  btn.textContent = "鑑定中... 1分程度お待ちください";
+
+  // canvas から Blob を取得
+  canvas.toBlob(async (blob) => {
+    if (!blob) {
+      alert("画像の変換に失敗しました。再度撮影してください。");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("image_file", blob, "palm.jpg");
+    formData.append("birthdate", birthdate);
+    formData.append("full_year", path.includes("_full"));
+
+    try {
+      const response = await fetch(path, {
+        method: "POST",
+        body: formData
+      });
+
+      const result = await response.json();
+      if (result.redirect_url) {
+        window.open(result.redirect_url, '_blank');
+      } else {
+        alert("PDF生成後のリダイレクトが取得できませんでした");
+      }
+    } catch (error) {
+      alert("送信エラー: " + error.message);
+    }
+  }, "image/jpeg", 0.8);
+}
+</script>
+
 </body>
 </html>
