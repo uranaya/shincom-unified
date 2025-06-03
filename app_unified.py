@@ -724,13 +724,19 @@ def renaiselfmob_uuid(uuid_str):
 
 
 
-
-
 @app.route("/preview/<filename>")
 def preview(filename):
     """占い結果PDFのプレビュー画面表示"""
+    user_agent = request.headers.get("User-Agent", "").lower()
+
+    # iPhoneまたはAndroidの簡易判定（必要に応じて拡張可）
+    if "iphone" in user_agent or "android" in user_agent:
+        return redirect(url_for("view_file", filename=filename))
+
     referer = request.referrer or ""
     return render_template("fortune_pdf.html", filename=filename, referer=referer)
+
+
 
 @app.route("/view/<filename>")
 def view_file(filename):
