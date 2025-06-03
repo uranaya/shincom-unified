@@ -2,100 +2,183 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>スマホ専用鑑定フォーム</title>
+  <title>手相鑑定（スマホ用）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    video, canvas { width: 100%; max-width: 600px; margin: 10px 0; }
-    .btn { padding: 10px 20px; font-size: 16px; }
+    body {
+      font-size: 16px;
+      padding: 10px;
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: auto;
+    }
+    input, button {
+      font-size: 16px;
+      padding: 10px;
+      margin: 10px 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #video, #canvas {
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #ccc;
+    }
+    #eto-display {
+      font-size: 16px;
+      margin-top: 5px;
+      margin-bottom: 10px;
+      color: #444;
+    }
   </style>
 </head>
 <body>
-  <h1>手相鑑定（スマホ用）</h1>
-  
-  <video id="video" autoplay playsinline></video>
-  <canvas id="myCanvas" style="display:none;"></canvas>
+  <h2>📱 手相鑑定フォーム</h2>
 
-  <div>
-    <button class="btn" onclick="switchCamera()">📷 カメラ切替</button>
-    <button class="btn" onclick="takePhoto()">📸 撮影</button>
-    <button class="btn" onclick="submitForm()">📤 送信</button>
+  <video id="camera" autoplay playsinline></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <button onclick="takePhoto()">📷 撮影</button>
+    <button onclick="switchCamera()">🔄 カメラ切替</button>
   </div>
 
-  <form id="fortuneForm">
-    <label>生年月日: <input type="date" id="birthdate" name="birthdate" required></label><br>
-    <label><input type="checkbox" id="include_yearly" name="include_yearly"> 1年分の運勢も含める</label>
-  </form>
+  <label for="birthdate">生年月日：</label>
+  <input type="date" id="birthdate" required oninput="fetchEto()">
+  <div id="eto-display"></div>
+
+  <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
 
   <script>
-    let video = document.getElementById('video');
-    let canvas = document.getElementById('myCanvas');
-    let ctx = canvas.getContext('2d');
-    let currentStream = null;
-    let useFrontCamera = true;
+    const video = document.getElementById("camera");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
 
-    async function startCamera() {
+    let currentStream = null;
+    let currentFacingMode = "environment";
+
+    async function startCamera(facingMode = "environment") {
       if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop());
       }
-      const constraints = {
-        video: {
-          facingMode: useFrontCamera ? "user" : "environment"
-        }
-      };
+
       try {
+        const constraints = {
+          video: { facingMode: { exact: facingMode } }
+        };
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = currentStream;
-      } catch (err) {
-        alert("カメラの起動に失敗しました: " + err);
+      } catch (e) {
+        try {
+          currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          video.srcObject = currentStream;
+        } catch (err) {
+          alert("カメラが使用できません：" + err.message);
+        }
       }
     }
 
     function switchCamera() {
-      useFrontCamera = !useFrontCamera;
-      startCamera();
+      currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+      startCamera(currentFacingMode);
     }
 
     function takePhoto() {
-      const scale = 0.5; // 縮小倍率（例: 50%）
-      const width = video.videoWidth * scale;
-      const height = video.videoHeight * scale;
+      const width = 600;
+      const height = video.videoHeight * (600 / video.videoWidth);
       canvas.width = width;
       canvas.height = height;
       ctx.drawImage(video, 0, 0, width, height);
-      canvas.style.display = 'block';
+      canvas.style.display = "block";
       alert("📷 撮影完了しました！");
     }
 
-    function submitForm() {
-      const dataURL = canvas.toDataURL("image/jpeg", 0.8);
+    async function fetchEto() {
       const birthdate = document.getElementById("birthdate").value;
-      const includeYearly = document.getElementById("include_yearly").checked;
+      const etoDisplay = document.getElementById("eto-display");
 
-      const payload = {
-        image: dataURL,
-        birthdate: birthdate,
-        include_yearly: includeYearly
-      };
+      if (!birthdate) {
+        etoDisplay.textContent = "";
+        return;
+      }
 
-      fetch("/selfmob_submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      })
-      .then(response => {
-        if (!response.ok) throw new Error("送信エラー: " + response.status);
-        return response.blob();
-      })
-      .then(blob => {
-        const url = window.URL.createObjectURL(blob);
-        window.open(url, "_blank");
-      })
-      .catch(err => {
-        alert("送信失敗: " + err);
-        console.error("送信失敗", err);
-      });
+      try {
+        const response = await fetch("/get_eto", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ birthdate })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          etoDisplay.textContent = `⚠️ エラー: ${data.error || '不明なエラー'}`;
+          return;
+        }
+
+        if (data.eto && data.honmeisei) {
+          etoDisplay.textContent = `あなたの干支：${data.eto} ／ 本命星：${data.honmeisei}`;
+        } else {
+          etoDisplay.textContent = "⚠️ 情報の取得に失敗しました";
+        }
+      } catch (error) {
+        etoDisplay.textContent = "⚠️ 通信エラー: " + error.message;
+      }
     }
 
-    window.onload = startCamera;
+    async function submitForm() {
+      const birthdate = document.getElementById("birthdate").value;
+      const imageData = canvas.toDataURL("image/jpeg", 0.8);
+      const path = window.location.pathname;
+
+      if (!birthdate || !imageData) {
+        alert("生年月日と手相画像の両方を入力してください。");
+        return;
+      }
+
+      const btn = document.getElementById("submitBtn");
+      btn.disabled = true;
+      btn.textContent = "鑑定中... 1分程度お待ちください";
+
+      const payload = {
+        image_data: imageData,
+        birthdate,
+        full_year: false
+      };
+
+      try {
+        const response = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (result.redirect_url) {
+          window.location.href = result.redirect_url;
+        } else {
+          alert("PDF生成後のリダイレクトが取得できませんでした");
+        }
+      } catch (error) {
+        alert("送信エラー: " + error.message);
+      }
+    }
+
+    window.onload = () => startCamera("environment");
   </script>
+
+  <footer style="text-align:center; font-size:small; margin-top:40px; padding:20px; background-color:#f9f9f9;">
+    <p style="margin-bottom:10px;">
+      ご利用は18歳以上を推奨しています。未成年者のご利用は保護者の同意を前提とします。
+    </p>
+    <p style="margin-bottom:10px;">
+      お問い合わせ：<a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a> ／ TEL：090-7506-2065
+    </p>
+    <nav>
+      <a href="/tokutei" target="_blank" style="margin:0 10px;">特定商取引法に基づく表記</a> |
+      <a href="/privacy" target="_blank" style="margin:0 10px;">プライバシーポリシー</a> |
+      <a href="/terms" target="_blank" style="margin:0 10px;">利用規約</a>
+    </nav>
+    <p style="margin-top:10px; color:gray;">&copy; 2025 シン・コンピューター占い</p>
+  </footer>
 </body>
 </html>
