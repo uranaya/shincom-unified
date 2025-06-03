@@ -1,6 +1,8 @@
 import openai
 import os
 import re
+import io
+import base64
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from tesou import tesou_names, tesou_descriptions
@@ -9,7 +11,7 @@ from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 from lucky_utils import generate_lucky_info, generate_lucky_direction
 from yearly_love_fortune_utils import generate_yearly_love_fortune
 from pdf_generator_unified import create_pdf_unified
-
+from PIL import Image
 
 
 
@@ -96,13 +98,18 @@ def get_shichu_fortune(birthdate):
 
 
 
+
 def analyze_palm(image_data):
     try:
-        # Data URL形式 or base64のみの両方に対応
-        if "," in image_data:
-            base64data = image_data.split(",", 1)[1]
-        else:
-            base64data = image_data
+        # ✅ バイナリ画像（image_data）をPILで開いてリサイズ＋JPEG化
+        image = Image.open(io.BytesIO(image_data)).convert("RGB")
+        width = 600
+        height = int(600 * image.height / image.width)
+        resized_image = image.resize((width, height))
+
+        buffer = io.BytesIO()
+        resized_image.save(buffer, format="JPEG", quality=80)
+        base64data = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
         # 除外線（基本3本＋感情線・頭脳線）
         excluded = {"生命線", "運命線", "金運線", "頭脳線", "感情線"}
@@ -116,7 +123,7 @@ def analyze_palm(image_data):
             if name in tesou_descriptions
         )
 
-        # システムプロンプト（AIの注意点）
+        # システムプロンプト
         system_prompt = (
             "あなたはプロの手相鑑定士です。以下の条件に従って、手相画像から5つの線・相を選び、"
             "それぞれ意味と印象をわかりやすく説明してください。\n\n"
@@ -130,7 +137,6 @@ def analyze_palm(image_data):
             "全体として、読み手が安心し前向きになれるよう、柔らかく肯定的な語り口でまとめてください。"
         )
 
-        # ユーザープロンプト（出力フォーマット）
         user_prompt = (
             "以下の形式で出力してください：\n"
             "### 1. 生命線\n（説明文）\n\n"
@@ -155,7 +161,7 @@ def analyze_palm(image_data):
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:image/png;base64,{base64data}"
+                                "url": f"data:image/jpeg;base64,{base64data}"
                             },
                         },
                     ],
@@ -164,11 +170,14 @@ def analyze_palm(image_data):
             max_tokens=3000,
             temperature=0.8,
         )
+
         return response.choices[0].message.content.strip()
 
     except Exception as e:
         print("❌ Vision APIエラー:", e)
         return "手相診断中にエラーが発生しました。"
+
+
 
 
 def get_iching_advice():
