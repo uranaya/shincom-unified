@@ -1,72 +1,123 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>手相撮影</title>
+    <meta charset="UTF-8">
+    <title>占いフォーム</title>
+    <style>
+        #video {
+            width: 100%;
+            max-width: 400px;
+        }
+        #myCanvas {
+            display: none;
+        }
+    </style>
 </head>
 <body>
-  <h1>📷 手相を撮影してください</h1>
-  <video id="video" autoplay playsinline width="300"></video><br>
-  <button onclick="switchCamera()">🔄 カメラ切替</button>
-  <button onclick="takePhoto()">📸 撮影</button>
-  <canvas id="canvas" style="display:none;"></canvas><br><br>
-  <button onclick="submitForm()">✅ 鑑定を開始</button>
+    <h2>占いフォーム</h2>
 
-  <script>
-    let useFrontCamera = true;
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    <form id="fortuneForm" method="post">
+        <label for="birthdate">生年月日:</label>
+        <input type="date" id="birthdate" name="birthdate" required><br>
 
-    function startCamera() {
-      const constraints = {
-        video: { facingMode: useFrontCamera ? "user" : "environment" }
-      };
-      navigator.mediaDevices.getUserMedia(constraints)
-        .then(stream => {
-          video.srcObject = stream;
-        })
-        .catch(err => console.error("カメラ起動エラー:", err));
-    }
+        <label for="full_year">1年分の運勢を表示:</label>
+        <input type="checkbox" id="full_year" name="full_year"><br>
 
-    function switchCamera() {
-      useFrontCamera = !useFrontCamera;
-      startCamera();
-    }
+        <label for="cameraSelect">カメラ選択:</label>
+        <select id="cameraSelect"></select><br>
 
-    function takePhoto() {
-      const width = 600;
-      const height = video.videoHeight * (600 / video.videoWidth);
-      canvas.width = width;
-      canvas.height = height;
-      ctx.drawImage(video, 0, 0, width, height);
-      canvas.style.display = "block";
-      alert("📷 撮影完了しました！");
-    }
+        <video id="video" autoplay playsinline></video><br>
+        <button type="button" onclick="takePhoto()">📷 撮影</button>
+        <canvas id="myCanvas"></canvas><br>
 
-    function submitForm() {
-      canvas.toBlob(blob => {
-        const formData = new FormData();
-        formData.append('image_file', blob, 'photo.jpg');
-        fetch("/unified", {
-          method: "POST",
-          body: formData
-        })
-        .then(response => {
-          if (!response.ok) throw new Error("送信失敗");
-          return response.blob();
-        })
-        .then(blob => {
-          const url = URL.createObjectURL(blob);
-          window.open(url, "_blank");
-        })
-        .catch(error => {
-          console.error("送信エラー:", error);
-        });
-      }, "image/jpeg", 0.8);
-    }
+        <button type="button" onclick="submitForm()">PDF送信</button>
+    </form>
 
-    startCamera();
-  </script>
+    <script>
+        let stream;
+        let selectedDeviceId = null;
+
+        async function setupCamera() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            const cameraSelect = document.getElementById('cameraSelect');
+
+            cameraSelect.innerHTML = '';
+            videoDevices.forEach((device, index) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.text = device.label || `カメラ ${index + 1}`;
+                cameraSelect.appendChild(option);
+            });
+
+            cameraSelect.onchange = () => {
+                selectedDeviceId = cameraSelect.value;
+                startCamera(selectedDeviceId);
+            };
+
+            if (videoDevices.length > 0) {
+                selectedDeviceId = videoDevices[0].deviceId;
+                startCamera(selectedDeviceId);
+            }
+        }
+
+        async function startCamera(deviceId) {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { deviceId: { exact: deviceId } },
+                    audio: false
+                });
+                document.getElementById('video').srcObject = stream;
+            } catch (err) {
+                alert('カメラの起動に失敗しました: ' + err.message);
+            }
+        }
+
+        function takePhoto() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('myCanvas');
+            const ctx = canvas.getContext('2d');
+            const width = 600;
+            const height = video.videoHeight * (600 / video.videoWidth);
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(video, 0, 0, width, height);
+            canvas.style.display = 'block';
+            alert('📷 撮影完了しました！');
+        }
+
+        function submitForm() {
+            const canvas = document.getElementById('myCanvas');
+            canvas.toBlob(function(blob) {
+                const formData = new FormData();
+                formData.append('image_file', blob, 'photo.jpg');
+                formData.append('birthdate', document.getElementById('birthdate').value);
+                formData.append('full_year', document.getElementById('full_year').checked);
+
+                fetch('/unified', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Network error: ' + response.status);
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                })
+                .catch(error => {
+                    console.error('送信エラー:', error);
+                    alert('送信エラー: ' + error.message);
+                });
+            }, 'image/jpeg', 0.8);
+        }
+
+        window.onload = setupCamera;
+    </script>
 </body>
 </html>

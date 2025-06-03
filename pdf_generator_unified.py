@@ -5,7 +5,6 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from textwrap import wrap
-from PIL import Image
 import base64
 import io
 import os
@@ -54,32 +53,23 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
 
 
 
+def draw_palm_image(c, base64_image, width, y):
 
-def draw_palm_image(c, image_data, size="A4"):
     try:
-        # base64を画像として読み込む
-        image_bytes = io.BytesIO(base64.b64decode(image_data.split(",")[1]))
-        with Image.open(image_bytes) as img:
-            # 最大サイズ1000pxにリサイズ（アスペクト比保持）
-            max_size = (1000, 1000)
-            img.thumbnail(max_size, Image.LANCZOS)
-
-            # RGB変換（PNGなどでもOKに）
-            if img.mode != "RGB":
-                img = img.convert("RGB")
-
-            # 再エンコード
-            output = io.BytesIO()
-            img.save(output, format='JPEG')
-            output.seek(0)
-
-            img_reader = ImageReader(output)
-            c.drawImage(img_reader, x=30*mm, y=180*mm, width=140*mm, height=90*mm, preserveAspectRatio=True, anchor='c')
+        image_data = base64.b64decode(base64_image.split(',')[1])
+        img = ImageReader(io.BytesIO(image_data))
+        img_width, img_height = img.getSize()
+        scale = (width * 0.6) / img_width
+        img_width *= scale
+        img_height *= scale
+        x_center = (width - img_width) / 2
+        y -= img_height + 5 * mm
+        c.drawImage(img, x_center, y, width=img_width, height=img_height)
+        y -= 10 * mm
     except Exception as e:
-        print("Image decode or resize error:", e)
-        raise RuntimeError("手相画像の読み込みに失敗しました。")
+        print("Image decode error:", e)
 
-
+    return y
 
 
 def draw_yearly_pages_renai_a4(c, yearly):

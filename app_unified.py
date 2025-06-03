@@ -236,45 +236,40 @@ def selfmob_shop_entry(shop_id):
 
 
 
-@app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
+@app.route("/selfmob/<uuid_str>")
 def selfmob_entry_uuid(uuid_str):
-    if request.method == "POST":
-        return redirect(url_for("selfmob_entry_uuid", uuid_str=uuid_str))
     if not is_paid_uuid(uuid_str):
         return "このUUIDは未決済です", 403
     record_shop_log_if_needed(uuid_str, "selfmob")
     return render_template("index_selfmob.html", full_year=False)
 
 
-@app.route("/selfmob_full/<uuid_str>", methods=["GET", "POST"])
+
+
+@app.route("/selfmob_full/<uuid_str>")
 def selfmob_full_entry_uuid(uuid_str):
-    if request.method == "POST":
-        return redirect(url_for("selfmob_full_entry_uuid", uuid_str=uuid_str))
     if not is_paid_uuid(uuid_str):
         return "このUUIDは未決済です", 403
     record_shop_log_if_needed(uuid_str, "selfmob_full")
     return render_template("index_selfmob.html", full_year=True)
 
 
-@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
+
+@app.route("/renaiselfmob/<uuid_str>")
 def renaiselfmob_entry_uuid(uuid_str):
-    if request.method == "POST":
-        return redirect(url_for("renaiselfmob_entry_uuid", uuid_str=uuid_str))
     if not is_paid_uuid(uuid_str):
         return "このUUIDは未決済です", 403
     record_shop_log_if_needed(uuid_str, "renaiselfmob")
     return render_template("index_renaiselfmob.html", full_year=False)
 
 
-@app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
+
+@app.route("/renaiselfmob_full/<uuid_str>")
 def renaiselfmob_full_entry_uuid(uuid_str):
-    if request.method == "POST":
-        return redirect(url_for("renaiselfmob_full_entry_uuid", uuid_str=uuid_str))
     if not is_paid_uuid(uuid_str):
         return "このUUIDは未決済です", 403
     record_shop_log_if_needed(uuid_str, "renaiselfmob_full")
     return render_template("index_renaiselfmob.html", full_year=True)
-
 
 
 
@@ -366,6 +361,48 @@ def is_paid_uuid(uuid_str):
         return False
 
 
+
+
+def _generate_link_with_shopid(shop_id, full_year=False, mode="selfmob"):
+    uuid_str = str(uuid.uuid4())
+    redirect_url = f"{BASE_URL}/thanks?uuid={uuid_str}"
+
+    komoju_url = create_payment_link(
+        price=1000 if full_year else 500,
+        uuid_str=uuid_str,
+        redirect_url=redirect_url,
+        shop_id=shop_id,  # ✅ ← ここが変更点
+        full_year=full_year,
+        mode=mode
+    )
+
+    mode_str = mode
+    if full_year:
+        mode_str = f"{mode}_full"
+    try:
+        with open(USED_UUID_FILE, "a") as f:
+            f.write(f"{uuid_str},,{mode_str},{shop_id}\n")
+    except Exception as e:
+        print("⚠️ UUID書き込み失敗:", e)
+    try:
+        if DATABASE_URL:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            today = datetime.now().strftime("%Y-%m-%d")
+            cur.execute("""
+                INSERT INTO webhook_events (uuid, shop_id, service, date)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT DO NOTHING;
+            """, (uuid_str, shop_id, mode_str, today))
+            conn.commit()
+            cur.close()
+            conn.close()
+    except Exception as e:
+        print("❌ DB記録失敗 (generate_link):", e)
+
+    resp = make_response(redirect(komoju_url))
+    resp.set_cookie("uuid", uuid_str, max_age=600)
+    return resp
 
 
 
@@ -514,38 +551,23 @@ def selfmob_uuid(uuid_str):
         is_json = request.is_json
         try:
             data = request.get_json() if is_json else request.form
+            image_data = data.get("image_data")
             birthdate = data.get("birthdate")
-
-            # ✅ image_file（画像ファイル）と image_data（base64文字列）どちらでも対応
-            image_file = request.files.get("image_file")
-            if image_file:
-                image_bytes = image_file.read()
-                encoded_image = base64.b64encode(image_bytes).decode('utf-8')
-                image_data = f"data:image/jpeg;base64,{encoded_image}"
-            else:
-                image_data = data.get("image_data")
-
-            if not birthdate or not image_data:
-                return "生年月日または画像データが不足しています", 400
-
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
-
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
-
             eto = get_nicchu_eto(birthdate)
             palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
                 image_data, birthdate, kyusei_text
             )
             palm_result = "\n".join(palm_texts)
             summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
-
             lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
@@ -611,7 +633,6 @@ def selfmob_uuid(uuid_str):
             filename = f"result_{uuid_str}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             shop_id = session.get("shop_id", "default")
-
             threading.Thread(
                 target=background_generate_pdf,
                 args=(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id),
@@ -624,7 +645,6 @@ def selfmob_uuid(uuid_str):
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
 
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
-
 
 
 
@@ -704,33 +724,21 @@ def renaiselfmob_uuid(uuid_str):
 
 
 
+
+
 @app.route("/preview/<filename>")
 def preview(filename):
-    """PDFプレビュー画面（スマホは直接表示）"""
+    """占い結果PDFのプレビュー画面表示"""
     referer = request.referrer or ""
-
-    user_agent = request.user_agent.string.lower()
-    is_mobile = any(keyword in user_agent for keyword in ["iphone", "android", "ipad"])
-
-    if is_mobile:
-        # スマホは直接PDF表示へリダイレクト
-        return redirect(f"/view/{filename}")
-    else:
-        # PCはプレビュー画面に埋め込み表示
-        return render_template("fortune_pdf.html", filename=filename, referer=referer)
-
-
-
+    return render_template("fortune_pdf.html", filename=filename, referer=referer)
 
 @app.route("/view/<filename>")
 def view_file(filename):
-    file_path = os.path.join(UPLOAD_FOLDER, filename)
-    if not os.path.exists(file_path):
-        print(f"❌ ファイルが存在しません: {file_path}")
-        return f"ファイルの送信エラー: {filename} が見つかりません", 404
-    return send_file(file_path, mimetype="application/pdf", as_attachment=False)
-
-
+    """PDFファイルをクライアントに送信"""
+    try:
+        return send_file(os.path.join(".", filename), as_attachment=False)
+    except Exception as e:
+        return f"ファイルの送信エラー: {e}", 404
 
 
 @app.route("/view_shop_log")
@@ -772,57 +780,37 @@ def logout():
 def ten_shincom():
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
-
     mode = "shincom"
     size = "B4" if request.path == "/ten" else "A4"
-
     if request.method == "POST":
         is_json = request.is_json
         try:
             data = request.get_json() if is_json else request.form
+            image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
-
-            # ✅ image_file（画像ファイル）と image_data（base64文字列）どちらでも対応
-            image_file = request.files.get("image_file")
-            if image_file:
-                image_bytes = image_file.read()
-                encoded_image = base64.b64encode(image_bytes).decode('utf-8')
-                image_data = f"data:image/jpeg;base64,{encoded_image}"
-            else:
-                image_data = data.get("image_data")
-
-            if not birthdate or not image_data:
-                return "生年月日または画像データが不足しています", 400
-
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
-
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
-
             eto = get_nicchu_eto(birthdate)
             palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text)
-
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()
-
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
-
             year_label = f"{now.year}年の運勢"
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
-
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
@@ -848,30 +836,23 @@ def ten_shincom():
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "palm_image": image_data
             }
-
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, now)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
-
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
-
-            threading.Thread(
-                target=background_generate_pdf,
-                args=(filepath, result_data, mode, size.lower(), full_year)
-            ).start()
-
+            threading.Thread(target=background_generate_pdf, args=(filepath, result_data, mode, size.lower(), full_year)).start()
             redirect_url = url_for("preview", filename=filename)
-            return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
-
+            if is_json:
+                return jsonify({"redirect_url": redirect_url})
+            else:
+                return redirect(redirect_url)
         except Exception as e:
             traceback.print_exc()
-            return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
-
+            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
     return render_template("index.html")
-
 
 
 

@@ -1,37 +1,59 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>手相鑑定（決済後）</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>スマホ手相占い</title>
 </head>
 <body>
-  <h1>📷 手相を撮影してください</h1>
-  <video id="video" autoplay playsinline width="300"></video><br>
-  <button onclick="switchCamera()">🔄 カメラ切替</button>
-  <button onclick="takePhoto()">📸 撮影</button>
-  <canvas id="canvas" style="display:none;"></canvas><br><br>
-  <button onclick="submitForm()">✅ 鑑定を開始</button>
+  <h1>🔮 手相鑑定へようこそ</h1>
+  <p>生年月日と手相画像を入力してください。</p>
+  <input type="date" id="birthdate" required />
+  <br /><br />
+
+  <select id="cameraSelect">
+    <option value="environment">アウトカメラ</option>
+    <option value="user">インカメラ</option>
+  </select>
+  <button onclick="switchCamera()">切替</button>
+  <br /><br />
+
+  <video id="video" autoplay playsinline></video>
+  <br />
+  <button onclick="takePhoto()">📷 撮影</button>
+  <br /><br />
+
+  <canvas id="canvas" style="display: none;"></canvas>
+  <br />
+  <button id="submitBtn" onclick="submitForm()">送信</button>
 
   <script>
-    let useFrontCamera = true;
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    let imageDataBase64 = null;
+    let currentFacingMode = "environment";
 
-    function startCamera() {
-      const constraints = {
-        video: { facingMode: useFrontCamera ? "user" : "environment" }
-      };
-      navigator.mediaDevices.getUserMedia(constraints)
-        .then(stream => {
-          video.srcObject = stream;
-        })
-        .catch(err => console.error("カメラ起動エラー:", err));
+    async function startCamera(facingMode = "environment") {
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: facingMode } },
+          audio: false
+        });
+        video.srcObject = stream;
+        currentFacingMode = facingMode;
+      } catch (err) {
+        alert("カメラの使用が許可されていません");
+      }
     }
 
     function switchCamera() {
-      useFrontCamera = !useFrontCamera;
-      startCamera();
+      const selectedMode = document.getElementById("cameraSelect").value;
+      startCamera(selectedMode);
     }
 
     function takePhoto() {
@@ -42,31 +64,45 @@
       ctx.drawImage(video, 0, 0, width, height);
       canvas.style.display = "block";
       alert("📷 撮影完了しました！");
+      imageDataBase64 = canvas.toDataURL("image/jpeg", 0.8);
     }
 
-    function submitForm() {
-      canvas.toBlob(blob => {
-        const formData = new FormData();
-        formData.append('image_file', blob, 'photo.jpg');
-        fetch("/selfmob", {
+    async function submitForm() {
+      const birthdate = document.getElementById("birthdate").value;
+      const path = window.location.pathname;
+
+      if (!birthdate || !imageDataBase64) {
+        alert("生年月日と手相画像の両方を入力してください。");
+        return;
+      }
+
+      const btn = document.getElementById("submitBtn");
+      btn.disabled = true;
+      btn.textContent = "鑑定中... 1分程度お待ちください";
+
+      const payload = {
+        image_data: imageDataBase64,
+        birthdate
+      };
+
+      try {
+        const response = await fetch(path, {
           method: "POST",
-          body: formData
-        })
-        .then(response => {
-          if (!response.ok) throw new Error("送信失敗");
-          return response.blob();
-        })
-        .then(blob => {
-          const url = URL.createObjectURL(blob);
-          window.open(url, "_blank");
-        })
-        .catch(error => {
-          console.error("送信エラー:", error);
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
         });
-      }, "image/jpeg", 0.8);
+        const result = await response.json();
+        if (result.redirect_url) {
+          window.open(result.redirect_url, '_blank');
+        } else {
+          alert("PDF生成後のリダイレクトが取得できませんでした");
+        }
+      } catch (error) {
+        alert("送信エラー: " + error.message);
+      }
     }
 
-    startCamera();
+    window.onload = () => startCamera(currentFacingMode);
   </script>
 </body>
 </html>
