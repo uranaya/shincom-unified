@@ -738,13 +738,18 @@ def preview(filename):
 
 
 
-@app.route("/view/<filename>")
-def view_file(filename):
-    """PDFファイルをクライアントに送信"""
-    try:
-        return send_file(os.path.join(".", filename), as_attachment=False)
-    except Exception as e:
-        return f"ファイルの送信エラー: {e}", 404
+import time
+@app.route('/view/<filename>')
+def view_pdf(filename):
+    full_path = os.path.join(UPLOAD_FOLDER, filename)
+    wait_time = 0
+    while not os.path.exists(full_path) and wait_time < 5:
+        time.sleep(0.5)
+        wait_time += 0.5
+    if not os.path.exists(full_path):
+        return "PDFが見つかりませんでした", 404
+    return send_file(full_path, mimetype="application/pdf")
+
 
 
 @app.route("/view_shop_log")
