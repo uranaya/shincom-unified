@@ -55,9 +55,9 @@
     const video = document.getElementById("camera");
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
-
     let currentStream = null;
-    let currentFacingMode = "environment"; // 初期値はアウトカメラ
+    let currentFacingMode = "environment";
+    let imageDataBase64 = null;
 
     async function startCamera(facingMode = "environment") {
       if (currentStream) {
@@ -93,6 +93,7 @@
       ctx.drawImage(video, 0, 0, width, height);
       canvas.style.display = "block";
       alert("📷 撮影完了しました！");
+      imageDataBase64 = canvas.toDataURL("image/jpeg", 0.8);
     }
 
     async function fetchEto() {
@@ -130,10 +131,9 @@
 
     async function submitForm() {
       const birthdate = document.getElementById("birthdate").value;
-      const imageData = canvas.toDataURL("image/png");
       const path = window.location.pathname;
 
-      if (!birthdate || !imageData) {
+      if (!birthdate || !imageDataBase64) {
         alert("生年月日と手相画像の両方を入力してください。");
         return;
       }
@@ -143,9 +143,9 @@
       btn.textContent = "鑑定中... 1分程度お待ちください";
 
       const payload = {
-        image_data: imageData,
+        image_data: imageDataBase64,
         birthdate,
-        full_year: false
+        full_year: path.includes("_full")
       };
 
       try {
@@ -156,8 +156,8 @@
         });
         const result = await response.json();
         if (result.redirect_url) {
-        window.open(result.redirect_url, '_blank');
-    } else {
+          window.open(result.redirect_url, '_blank');
+        } else {
           alert("PDF生成後のリダイレクトが取得できませんでした");
         }
       } catch (error) {
