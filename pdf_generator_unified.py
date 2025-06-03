@@ -53,59 +53,31 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
 
 
 
-def draw_palm_image(c, base64_image, width, y):
+
+
+def draw_palm_image(c, image_data, size="A4"):
     try:
-        # ✅ base64の先頭確認
-        if ',' not in base64_image:
-            raise ValueError("base64形式が不正")
+        # base64を画像として読み込む
+        image_bytes = io.BytesIO(base64.b64decode(image_data.split(",")[1]))
+        with Image.open(image_bytes) as img:
+            # 最大サイズ1000pxにリサイズ（アスペクト比保持）
+            max_size = (1000, 1000)
+            img.thumbnail(max_size, Image.LANCZOS)
 
-        image_data = base64.b64decode(base64_image.split(',')[1])
-        image = Image.open(io.BytesIO(image_data))
+            # RGB変換（PNGなどでもOKに）
+            if img.mode != "RGB":
+                img = img.convert("RGB")
 
-        # ✅ 自動リサイズ処理（最大サイズ 1000px）
-        max_pixel = 1000
-        if max(image.size) > max_pixel:
-            ratio = max_pixel / max(image.size)
-            new_size = (int(image.width * ratio), int(image.height * ratio))
-            image = image.resize(new_size, Image.LANCZOS)
+            # 再エンコード
+            output = io.BytesIO()
+            img.save(output, format='JPEG')
+            output.seek(0)
 
-        # ✅ 再エンコードしてImageReaderへ
-        buffer = io.BytesIO()
-        image.save(buffer, format="JPEG")
-        buffer.seek(0)
-        img = ImageReader(buffer)
-
-        img_width, img_height = img.getSize()
-
-        # 🔧 PDF上の表示サイズ
-        max_width = 210
-        max_height = 160
-        scale = min(max_width / img_width, max_height / img_height)
-        resized_width = img_width * scale
-        resized_height = img_height * scale
-
-        x_center = (width - resized_width) / 2
-        y -= resized_height + 5 * mm
-
-        c.drawImage(
-            img,
-            x_center,
-            y,
-            width=resized_width,
-            height=resized_height,
-            preserveAspectRatio=True,
-            anchor='nw'
-        )
-
-        y -= 10 * mm
-
+            img_reader = ImageReader(output)
+            c.drawImage(img_reader, x=30*mm, y=180*mm, width=140*mm, height=90*mm, preserveAspectRatio=True, anchor='c')
     except Exception as e:
         print("Image decode or resize error:", e)
-
-    return y
-
-
-
+        raise RuntimeError("手相画像の読み込みに失敗しました。")
 
 
 
