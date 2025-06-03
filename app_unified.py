@@ -83,12 +83,24 @@ else:
 
 # Background thread task to generate PDF and handle post-processing
 def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
+    # ✅ 画像データのBase64ヘッダー除去処理（data:image/jpeg;base64, など）
+    image_data = result_data.get("image_data", "")
+    if isinstance(image_data, str) and image_data.startswith("data:image"):
+        try:
+            _, image_data = image_data.split(",", 1)
+            result_data["image_data"] = image_data  # 上書き保存
+        except Exception as e:
+            print("❌ Error processing image_data base64 header:", e)
+            traceback.print_exc()
+            return
+
     try:
         create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
     except Exception as e:
         print(f"❌ PDF generation error (mode={pdf_mode}, uuid={uuid_str}):", e)
         traceback.print_exc()
         return
+
     # Mark UUID as used if applicable
     if uuid_str:
         try:
@@ -112,6 +124,7 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
         except Exception as e:
             print(f"❌ Error updating {USED_UUID_FILE} for {uuid_str}:", e)
             traceback.print_exc()
+
     # Write to access_log.txt if applicable
     if shop_id and uuid_str:
         try:
@@ -121,6 +134,7 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
         except Exception as e:
             print(f"❌ Error writing access_log for {uuid_str}:", e)
             traceback.print_exc()
+
 
 
 # --- thanksルート ---
