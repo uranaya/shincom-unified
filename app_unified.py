@@ -32,6 +32,11 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "secret!123")
 
 
+def is_smartphone():
+    ua = request.user_agent.string.lower()
+    return "iphone" in ua or "android" in ua or "mobile" in ua
+
+
 # Initialize locks for thread-safe operations
 used_file_lock = threading.Lock()
 
@@ -645,7 +650,38 @@ def selfmob_uuid(uuid_str):
 
 
 
-@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
+
+
+
+
+
+
+
+@app.route("/preview/<filename>")
+def preview(filename):
+    """占い結果PDFのプレビュー画面表示"""
+    referer = request.referrer or ""
+    return render_template("fortune_pdf.html", filename=filename, referer=referer)
+
+@app.route("/view/<filename>")
+def view_file(filename):
+    """PDFファイルをクライアントに送信"""
+    try:
+        return send_file(os.path.join(".", filename), as_attachment=False)
+    except Exception as e:
+        return f"ファイルの送信エラー: {e}", 404
+
+
+@app.route("/view_shop_log")
+def view_shop_log():
+    """shop_logsテーブルの内容を表示（管理用）"""
+    logs = []
+    if DATABASE_URL:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute("SELECT date, shop_id, service, count FROM shop_logs ORDER BY date DESC;")
+            logs = cur.fetchall()@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
     full_year = None
@@ -711,43 +747,19 @@ def renaiselfmob_uuid(uuid_str):
                 args=(filepath, result_data, "renai", "a4", full_year, uuid_str, shop_id)
             ).start()
 
-            return redirect(url_for("static", filename=f"preview/{filename}"))  # ←ここが修正ポイント
+            # ✅ 直接PDF表示（スマホなら）
+            if is_smartphone():
+                return redirect(url_for("static", filename=f"preview/{filename}"))
+
+            # PC向け処理（必要ならビュー画面に切り替え可能）
+            return redirect(url_for("static", filename=f"preview/{filename}"))
+
         except Exception as e:
             print("処理エラー:", e)
             return "処理中にエラーが発生しました", 500
 
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
 
-
-
-
-
-
-@app.route("/preview/<filename>")
-def preview(filename):
-    """占い結果PDFのプレビュー画面表示"""
-    referer = request.referrer or ""
-    return render_template("fortune_pdf.html", filename=filename, referer=referer)
-
-@app.route("/view/<filename>")
-def view_file(filename):
-    """PDFファイルをクライアントに送信"""
-    try:
-        return send_file(os.path.join(".", filename), as_attachment=False)
-    except Exception as e:
-        return f"ファイルの送信エラー: {e}", 404
-
-
-@app.route("/view_shop_log")
-def view_shop_log():
-    """shop_logsテーブルの内容を表示（管理用）"""
-    logs = []
-    if DATABASE_URL:
-        try:
-            conn = psycopg2.connect(DATABASE_URL)
-            cur = conn.cursor()
-            cur.execute("SELECT date, shop_id, service, count FROM shop_logs ORDER BY date DESC;")
-            logs = cur.fetchall()
             cur.close()
             conn.close()
         except Exception as e:
@@ -851,23 +863,26 @@ def ten_shincom():
 
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
-            threading.Thread(
-                target=background_generate_pdf,
-                args=(filepath, result_data, mode, size.lower(), full_year)
-            ).start()
+            create_pdf_unified(filepath, result_data, mode, size.lower(), include_yearly=full_year)
 
-            redirect_url = url_for("static", filename=f"preview/{filename}")  # ← プレビュー画面ではなくPDF直表示に修正
-
-            if is_json:
-                return jsonify({"redirect_url": redirect_url})
+            if is_smartphone() and request.path == "/tenmob":
+                return send_file(
+                    filepath,
+                    mimetype="application/pdf",
+                    as_attachment=False,
+                    download_name=filename
+                )
             else:
-                return redirect(redirect_url)
+                redirect_url = url_for("preview", filename=filename)
+                return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
 
         except Exception as e:
             traceback.print_exc()
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
 
     return render_template("index.html")
+
+
 
 
 
@@ -895,7 +910,6 @@ def renai():
         month_label = f"{target1.year}年{target1.month}月の恋愛運"
         next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
 
-        # 🎯 正しく texts/titles を含んだ構造で取得
         raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
 
         result_data = {
@@ -923,13 +937,15 @@ def renai():
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         create_pdf_unified(filepath, result_data, "renai", size=size.lower(), include_yearly=include_yearly)
 
-        # 直接表示（Content-Disposition: inline）でスマホPDF表示に対応
-        return send_file(
-            filepath,
-            mimetype="application/pdf",
-            as_attachment=False,
-            download_name=filename
-        )
+        if is_smartphone():
+            return send_file(
+                filepath,
+                mimetype="application/pdf",
+                as_attachment=False,
+                download_name=filename
+            )
+        else:
+            return redirect(url_for("preview", filename=filename))
 
     return render_template("renai_form.html")
 
