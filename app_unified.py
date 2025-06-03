@@ -650,38 +650,6 @@ def selfmob_uuid(uuid_str):
 
 
 
-
-
-
-
-
-
-
-@app.route("/preview/<filename>")
-def preview(filename):
-    """占い結果PDFのプレビュー画面表示"""
-    referer = request.referrer or ""
-    return render_template("fortune_pdf.html", filename=filename, referer=referer)
-
-@app.route("/view/<filename>")
-def view_file(filename):
-    """PDFファイルをクライアントに送信"""
-    try:
-        return send_file(os.path.join(".", filename), as_attachment=False)
-    except Exception as e:
-        return f"ファイルの送信エラー: {e}", 404
-
-
-@app.route("/view_shop_log")
-def view_shop_log():
-    """shop_logsテーブルの内容を表示（管理用）"""
-    logs = []
-    if DATABASE_URL:
-        try:
-            conn = psycopg2.connect(DATABASE_URL)
-            cur = conn.cursor()
-            cur.execute("SELECT date, shop_id, service, count FROM shop_logs ORDER BY date DESC;")
-            logs = cur.fetchall()@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
     full_year = None
@@ -760,6 +728,36 @@ def renaiselfmob_uuid(uuid_str):
 
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
 
+
+
+
+
+
+@app.route("/preview/<filename>")
+def preview(filename):
+    """占い結果PDFのプレビュー画面表示"""
+    referer = request.referrer or ""
+    return render_template("fortune_pdf.html", filename=filename, referer=referer)
+
+@app.route("/view/<filename>")
+def view_file(filename):
+    """PDFファイルをクライアントに送信"""
+    try:
+        return send_file(os.path.join(".", filename), as_attachment=False)
+    except Exception as e:
+        return f"ファイルの送信エラー: {e}", 404
+
+
+@app.route("/view_shop_log")
+def view_shop_log():
+    """shop_logsテーブルの内容を表示（管理用）"""
+    logs = []
+    if DATABASE_URL:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute("SELECT date, shop_id, service, count FROM shop_logs ORDER BY date DESC;")
+            logs = cur.fetchall()@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
             cur.close()
             conn.close()
         except Exception as e:
