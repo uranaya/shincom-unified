@@ -12,7 +12,7 @@
       max-width: 600px;
       margin: auto;
     }
-    input, button {
+    input, button, select {
       font-size: 16px;
       padding: 10px;
       margin: 10px 0;
@@ -35,6 +35,9 @@
 <body>
   <h2>📸 手相撮影＆送信フォーム</h2>
 
+  <label for="cameraSelect">カメラ選択：</label>
+  <select id="cameraSelect" onchange="switchCamera()"></select>
+
   <video id="camera" autoplay playsinline></video>
   <canvas id="canvas" style="display:none;"></canvas>
 
@@ -44,8 +47,6 @@
   <input type="date" id="birthdate" required oninput="fetchEto()">
   <div id="eto-display"></div>
 
-  <!-- チェックボックス削除済 -->
-
   <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
 
   <form action="/logout"><button>ログアウト</button></form>
@@ -54,13 +55,40 @@
     const video = document.getElementById("camera");
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
+    const cameraSelect = document.getElementById("cameraSelect");
+    let currentStream = null;
 
-    async function startCamera() {
+    async function getCameras() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      cameraSelect.innerHTML = "";
+      videoDevices.forEach((device, index) => {
+        const option = document.createElement("option");
+        option.value = device.deviceId;
+        option.text = device.label || `カメラ ${index + 1}`;
+        cameraSelect.appendChild(option);
+      });
+    }
+
+    async function switchCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      const deviceId = cameraSelect.value;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } } });
+        currentStream = stream;
         video.srcObject = stream;
       } catch (e) {
-        alert("カメラが使用できません：" + e.message);
+        alert("カメラの切り替えに失敗しました：" + e.message);
+      }
+    }
+
+    async function startCamera() {
+      await getCameras();
+      if (cameraSelect.options.length > 0) {
+        cameraSelect.selectedIndex = 0;
+        await switchCamera();
       }
     }
 
@@ -124,7 +152,7 @@
       const payload = {
         image_data: imageData,
         birthdate,
-        full_year: false  // チェックボックスがないので false 固定
+        full_year: false
       };
 
       try {
