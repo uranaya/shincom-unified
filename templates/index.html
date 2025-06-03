@@ -12,7 +12,7 @@
       max-width: 600px;
       margin: auto;
     }
-    input, button {
+    input, button, select {
       font-size: 16px;
       padding: 10px;
       margin: 10px 0;
@@ -35,9 +35,9 @@
 <body>
   <h2>📸 手相撮影＆送信フォーム</h2>
 
+  <button onclick="toggleCamera()">🔄 カメラ切替</button>
   <video id="camera" autoplay playsinline></video>
   <canvas id="canvas" style="display:none;"></canvas>
-  <button onclick="switchCamera()">📷 カメラ切り替え</button>
   <button onclick="takePhoto()">📷 撮影</button>
 
   <label for="birthdate">生年月日：</label>
@@ -50,38 +50,32 @@
   </div>
 
   <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
+
   <form action="/logout"><button>ログアウト</button></form>
 
   <script>
     const video = document.getElementById("camera");
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
-    let currentDeviceId = null;
-    let useFrontCamera = true;
+    let currentFacingMode = "environment";
+    let stream = null;
 
     async function startCamera() {
-      const constraints = {
-        video: {
-          facingMode: useFrontCamera ? "user" : "environment"
-        }
-      };
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: currentFacingMode }
+        });
         video.srcObject = stream;
-        const track = stream.getVideoTracks()[0];
-        const settings = track.getSettings();
-        currentDeviceId = settings.deviceId;
       } catch (e) {
         alert("カメラが使用できません：" + e.message);
       }
     }
 
-    function switchCamera() {
-      useFrontCamera = !useFrontCamera;
-      const stream = video.srcObject;
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+    function toggleCamera() {
+      currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
       startCamera();
     }
 
@@ -143,7 +137,11 @@
       btn.disabled = true;
       btn.textContent = "鑑定中... 1分程度お待ちください";
 
-      const payload = { image_data: imageData, birthdate, full_year: fullYear };
+      const payload = {
+        image_data: imageData,
+        birthdate,
+        full_year: fullYear
+      };
 
       try {
         const response = await fetch(path, {
