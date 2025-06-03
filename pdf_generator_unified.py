@@ -61,7 +61,7 @@ def draw_palm_image(c, base64_image, width, y):
         img_width, img_height = img.getSize()
         scale = (width * 0.6) / img_width
         img_width *= scale
-        img_height *= scale
+        img_height *= scale * 0.5  # 高さのみ半分に
         x_center = (width - img_width) / 2
         y -= img_height + 5 * mm
         c.drawImage(img, x_center, y, width=img_width, height=img_height)
