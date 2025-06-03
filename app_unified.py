@@ -573,14 +573,14 @@ def selfmob_uuid(uuid_str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
                     line = line.strip()
                     if line:
-                        if line.startswith("・"):
+                        if line.startswith("\u30fb"):
                             line = line[1:].strip()
                         lucky_lines.append(line.replace(":", "：", 1))
             elif isinstance(lucky_info, dict):
                 for k, v in lucky_info.items():
                     line = f"{k}：{v}".strip()
                     if line:
-                        if line.startswith("・"):
+                        if line.startswith("\u30fb"):
                             line = line[1:].strip()
                         lucky_lines.append(line)
             else:
@@ -588,7 +588,7 @@ def selfmob_uuid(uuid_str):
                     for line in str(item).replace("\r\n", "\n").replace("\r", "\n").split("\n"):
                         line = line.strip()
                         if line:
-                            if line.startswith("・"):
+                            if line.startswith("\u30fb"):
                                 line = line[1:].strip()
                             lucky_lines.append(line.replace(":", "：", 1))
 
@@ -633,18 +633,15 @@ def selfmob_uuid(uuid_str):
             filename = f"result_{uuid_str}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             shop_id = session.get("shop_id", "default")
-            threading.Thread(
-                target=background_generate_pdf,
-                args=(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id),
-            ).start()
+            background_generate_pdf(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id)
 
-            redirect_url = url_for("preview", filename=filename)
-            return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
+            return redirect(url_for("static", filename=f"preview/{filename}"))
         except Exception as e:
             print("処理エラー:", e)
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
 
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
+
 
 
 
@@ -672,7 +669,6 @@ def renaiselfmob_uuid(uuid_str):
             if not user_birth or not isinstance(user_birth, str):
                 return "生年月日が不正です", 400
 
-            # 🎯 正しく texts/titles を含んだ構造で取得
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
@@ -715,12 +711,13 @@ def renaiselfmob_uuid(uuid_str):
                 args=(filepath, result_data, "renai", "a4", full_year, uuid_str, shop_id)
             ).start()
 
-            return redirect(url_for("preview", filename=filename))
+            return redirect(url_for("static", filename=f"preview/{filename}"))  # ←ここが修正ポイント
         except Exception as e:
             print("処理エラー:", e)
             return "処理中にエラーが発生しました", 500
 
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
+
 
 
 
@@ -780,8 +777,10 @@ def logout():
 def ten_shincom():
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
+
     mode = "shincom"
     size = "B4" if request.path == "/ten" else "A4"
+
     if request.method == "POST":
         is_json = request.is_json
         try:
@@ -789,28 +788,35 @@ def ten_shincom():
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
+
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
+
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
+
             eto = get_nicchu_eto(birthdate)
             palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text)
+
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()
+
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
+
             year_label = f"{now.year}年の運勢"
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
+
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
@@ -836,23 +842,33 @@ def ten_shincom():
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "palm_image": image_data
             }
+
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, now)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
+
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
-            threading.Thread(target=background_generate_pdf, args=(filepath, result_data, mode, size.lower(), full_year)).start()
-            redirect_url = url_for("preview", filename=filename)
+            threading.Thread(
+                target=background_generate_pdf,
+                args=(filepath, result_data, mode, size.lower(), full_year)
+            ).start()
+
+            redirect_url = url_for("static", filename=f"preview/{filename}")  # ← プレビュー画面ではなくPDF直表示に修正
+
             if is_json:
                 return jsonify({"redirect_url": redirect_url})
             else:
                 return redirect(redirect_url)
+
         except Exception as e:
             traceback.print_exc()
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
+
     return render_template("index.html")
+
 
 
 
@@ -906,9 +922,17 @@ def renai():
         filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         create_pdf_unified(filepath, result_data, "renai", size=size.lower(), include_yearly=include_yearly)
-        return send_file(filepath, as_attachment=True)
+
+        # 直接表示（Content-Disposition: inline）でスマホPDF表示に対応
+        return send_file(
+            filepath,
+            mimetype="application/pdf",
+            as_attachment=False,
+            download_name=filename
+        )
 
     return render_template("renai_form.html")
+
 
 
 @app.route("/selfmob", methods=["GET"])
