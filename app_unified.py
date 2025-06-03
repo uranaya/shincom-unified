@@ -546,8 +546,6 @@ def webhook_renaiselfmob():
 
 # --- self系実占い部分  ---
 
-
-
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
     full_year = None
@@ -567,11 +565,14 @@ def selfmob_uuid(uuid_str):
         return "使用履歴が確認できません", 400
 
     if request.method == "POST":
-        is_json = request.is_json
         try:
-            data = request.get_json() if is_json else request.form
-            image_data = data.get("image_data")
-            birthdate = data.get("birthdate")
+            image_file = request.files["image"]
+            birthdate = request.form.get("birthdate")
+            full_year = request.form.get("full_year", "false").lower() == "true"
+
+            image_binary = image_file.read()
+            image_data = base64.b64encode(image_binary).decode("utf-8")
+
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
@@ -657,9 +658,9 @@ def selfmob_uuid(uuid_str):
             return redirect(url_for("static", filename=f"preview/{filename}"))
         except Exception as e:
             print("処理エラー:", e)
-            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
-
+            return jsonify({"error": str(e)})
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
+
 
 
 
@@ -796,6 +797,7 @@ def logout():
     session.clear()
     return redirect("/")
 
+
 @app.route("/ten", methods=["GET", "POST"], endpoint="ten")
 @app.route("/tenmob", methods=["GET", "POST"], endpoint="tenmob")
 def ten_shincom():
@@ -806,12 +808,13 @@ def ten_shincom():
     size = "B4" if request.path == "/ten" else "A4"
 
     if request.method == "POST":
-        is_json = request.is_json
         try:
-            data = request.get_json() if is_json else request.form
-            image_data = data.get("image_data")
-            birthdate = data.get("birthdate")
-            full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
+            image_file = request.files["image"]
+            birthdate = request.form.get("birthdate")
+            full_year = request.form.get("full_year", "false").lower() == "true"
+
+            image_binary = image_file.read()
+            image_data = base64.b64encode(image_binary).decode("utf-8")
 
             try:
                 year, month, day = map(int, birthdate.split("-"))
@@ -886,11 +889,11 @@ def ten_shincom():
                 )
             else:
                 redirect_url = url_for("preview", filename=filename)
-                return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
+                return redirect(redirect_url)
 
         except Exception as e:
             traceback.print_exc()
-            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
+            return "処理中にエラーが発生しました"
 
     return render_template("index.html")
 

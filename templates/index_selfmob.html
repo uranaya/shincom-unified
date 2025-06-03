@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>手相鑑定（スマホ用）</title>
+  <title>手相鑑定フォーム</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
@@ -33,7 +33,7 @@
   </style>
 </head>
 <body>
-  <h2>📱 手相鑑定フォーム</h2>
+  <h2>📸 手相撮影＆送信フォーム</h2>
 
   <video id="camera" autoplay playsinline></video>
   <canvas id="canvas" style="display:none;"></canvas>
@@ -47,7 +47,14 @@
   <input type="date" id="birthdate" required oninput="fetchEto()">
   <div id="eto-display"></div>
 
+  <div style="margin: 10px 0;">
+    <input type="checkbox" id="full_year" name="full_year" value="yes" style="margin-right: 8px; vertical-align: middle;">
+    <label for="full_year" style="vertical-align: middle;">1年分の運勢を出す（＋2ページ）</label>
+  </div>
+
   <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
+
+  <form action="/logout"><button>ログアウト</button></form>
 
   <script>
     const video = document.getElementById("camera");
@@ -128,11 +135,11 @@
 
     async function submitForm() {
       const birthdate = document.getElementById("birthdate").value;
-      const imageData = canvas.toDataURL("image/jpeg", 0.8);
+      const fullYear = false;
       const path = window.location.pathname;
 
-      if (!birthdate || !imageData) {
-        alert("生年月日と手相画像の両方を入力してください。");
+      if (!birthdate) {
+        alert("生年月日を入力してください。");
         return;
       }
 
@@ -140,27 +147,40 @@
       btn.disabled = true;
       btn.textContent = "鑑定中... 1分程度お待ちください";
 
-      const payload = {
-        image_data: imageData,
-        birthdate,
-        full_year: false
-      };
-
-      try {
-        const response = await fetch(path, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        const result = await response.json();
-        if (result.redirect_url) {
-          window.location.href = result.redirect_url;
-        } else {
-          alert("PDF生成後のリダイレクトが取得できませんでした");
+      canvas.toBlob(async function(blob) {
+        if (!blob) {
+          alert("画像の取得に失敗しました。");
+          btn.disabled = false;
+          btn.textContent = "送信してPDF生成";
+          return;
         }
-      } catch (error) {
-        alert("送信エラー: " + error.message);
-      }
+
+        const formData = new FormData();
+        formData.append("image", blob, "photo.jpg");
+        formData.append("birthdate", birthdate);
+        formData.append("full_year", "false");
+
+        try {
+          const response = await fetch(path, {
+            method: "POST",
+            body: formData
+          });
+
+          const result = await response.json();
+
+          if (result.redirect_url) {
+            window.location.href = result.redirect_url;
+          } else {
+            alert("PDF生成後のリダイレクトが取得できませんでした");
+            btn.disabled = false;
+            btn.textContent = "送信してPDF生成";
+          }
+        } catch (error) {
+          alert("送信エラー: " + error.message);
+          btn.disabled = false;
+          btn.textContent = "送信してPDF生成";
+        }
+      }, "image/jpeg", 0.8);
     }
 
     window.onload = () => startCamera("environment");
