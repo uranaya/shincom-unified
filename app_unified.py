@@ -8,6 +8,28 @@ from datetime import datetime
 from urllib.parse import quote
 from sqlalchemy import create_engine, text
 import csv
+
+from PIL import Image
+import base64
+import io
+
+def resize_base64_image(base64_str, max_width=600):
+    try:
+        image_data = base64.b64decode(base64_str)
+        image = Image.open(io.BytesIO(image_data))
+
+        width_percent = max_width / float(image.width)
+        new_height = int(image.height * width_percent)
+        image = image.resize((max_width, new_height))
+
+        buffered = io.BytesIO()
+        image.save(buffered, format="JPEG", quality=80)
+
+        return base64.b64encode(buffered.getvalue()).decode("utf-8")
+    except Exception as e:
+        print("❌ 画像リサイズ失敗:", e)
+        return base64_str  # 失敗した場合は元データを返す
+
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response
 from fortune_logic import generate_fortune
 from dotenv import load_dotenv
