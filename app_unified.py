@@ -665,6 +665,7 @@ def selfmob_uuid(uuid_str):
 
 
 
+
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
     full_year = None
@@ -813,8 +814,7 @@ def ten_shincom():
             birthdate = request.form.get("birthdate")
             full_year = request.form.get("full_year", "false").lower() == "true"
 
-            image_binary = image_file.read()
-            image_data = base64.b64encode(image_binary).decode("utf-8")
+            image_binary = image_file.read()  # 🔄 base64処理を削除
 
             try:
                 year, month, day = map(int, birthdate.split("-"))
@@ -828,7 +828,11 @@ def ten_shincom():
                 kyusei_text = ""
 
             eto = get_nicchu_eto(birthdate)
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text)
+
+            # 🔄 base64ではなくバイナリ画像をそのまま渡す
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(
+                image_binary, birthdate, kyusei_text
+            )
 
             summary_text = ""
             if len(palm_texts) == 6:
@@ -840,19 +844,15 @@ def ten_shincom():
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
 
-            year_label = f"{now.year}年の運勢"
-            month_label = f"{target1.year}年{target1.month}月の運勢"
-            next_month_label = f"{target2.year}年{target2.month}月の運勢"
-
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
                     "palm_summary": "手相の総合アドバイス",
                     "personality": "性格診断",
-                    "year_fortune": year_label,
-                    "month_fortune": month_label,
-                    "next_month_fortune": next_month_label
+                    "year_fortune": f"{now.year}年の運勢",
+                    "month_fortune": f"{target1.year}年{target1.month}月の運勢",
+                    "next_month_fortune": f"{target2.year}年{target2.month}月の運勢"
                 },
                 "texts": {
                     "palm_summary": summary_text,
@@ -867,7 +867,7 @@ def ten_shincom():
                 "palm_result": "\n".join(palm_texts),
                 "shichu_result": shichu_result,
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
-                "palm_image": image_data
+                "palm_image": None  # 🔄 画像は表示用途でなければここには不要
             }
 
             if full_year:
@@ -876,26 +876,21 @@ def ten_shincom():
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
 
-            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filename = f"result_{now.strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             create_pdf_unified(filepath, result_data, mode, size.lower(), include_yearly=full_year)
 
             if is_smartphone() and request.path == "/tenmob":
-                return send_file(
-                    filepath,
-                    mimetype="application/pdf",
-                    as_attachment=False,
-                    download_name=filename
-                )
+                return send_file(filepath, mimetype="application/pdf", as_attachment=False, download_name=filename)
             else:
-                redirect_url = url_for("preview", filename=filename)
-                return redirect(redirect_url)
+                return redirect(url_for("preview", filename=filename))
 
         except Exception as e:
             traceback.print_exc()
             return "処理中にエラーが発生しました"
 
     return render_template("index.html")
+
 
 
 
