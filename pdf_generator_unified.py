@@ -5,6 +5,7 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from textwrap import wrap
+from PIL import Image
 import base64
 import io
 import os
@@ -54,19 +55,32 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
 
 def draw_palm_image(c, base64_image, width, y):
     try:
+        # ✅ base64の先頭確認
+        if ',' not in base64_image:
+            raise ValueError("base64形式が不正")
+
         image_data = base64.b64decode(base64_image.split(',')[1])
-        img = ImageReader(io.BytesIO(image_data))
+        image = Image.open(io.BytesIO(image_data))
+
+        # ✅ 自動リサイズ処理（最大サイズ 1000px）
+        max_pixel = 1000
+        if max(image.size) > max_pixel:
+            ratio = max_pixel / max(image.size)
+            new_size = (int(image.width * ratio), int(image.height * ratio))
+            image = image.resize(new_size, Image.LANCZOS)
+
+        # ✅ 再エンコードしてImageReaderへ
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG")
+        buffer.seek(0)
+        img = ImageReader(buffer)
+
         img_width, img_height = img.getSize()
 
-        # 🔧 最大サイズ（ポイント単位）
+        # 🔧 PDF上の表示サイズ
         max_width = 210
         max_height = 160
-
-        # 🔄 アスペクト比を保持してリサイズ
-        width_ratio = max_width / img_width
-        height_ratio = max_height / img_height
-        scale = min(width_ratio, height_ratio)
-
+        scale = min(max_width / img_width, max_height / img_height)
         resized_width = img_width * scale
         resized_height = img_height * scale
 
@@ -86,9 +100,10 @@ def draw_palm_image(c, base64_image, width, y):
         y -= 10 * mm
 
     except Exception as e:
-        print("Image decode error:", e)
+        print("Image decode or resize error:", e)
 
     return y
+
 
 
 
