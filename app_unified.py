@@ -8,28 +8,6 @@ from datetime import datetime
 from urllib.parse import quote
 from sqlalchemy import create_engine, text
 import csv
-
-from PIL import Image
-import base64
-import io
-
-def resize_base64_image(base64_str, max_width=600):
-    try:
-        image_data = base64.b64decode(base64_str)
-        image = Image.open(io.BytesIO(image_data))
-
-        width_percent = max_width / float(image.width)
-        new_height = int(image.height * width_percent)
-        image = image.resize((max_width, new_height))
-
-        buffered = io.BytesIO()
-        image.save(buffered, format="JPEG", quality=80)
-
-        return base64.b64encode(buffered.getvalue()).decode("utf-8")
-    except Exception as e:
-        print("❌ 画像リサイズ失敗:", e)
-        return base64_str  # 失敗した場合は元データを返す
-
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response
 from fortune_logic import generate_fortune
 from dotenv import load_dotenv
@@ -52,11 +30,6 @@ UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", ".")
 # Flask アプリ初期化
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "secret!123")
-
-
-def is_smartphone():
-    ua = request.user_agent.string.lower()
-    return "iphone" in ua or "android" in ua or "mobile" in ua
 
 
 # Initialize locks for thread-safe operations
@@ -105,24 +78,12 @@ else:
 
 # Background thread task to generate PDF and handle post-processing
 def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
-    # ✅ 画像データのBase64ヘッダー除去処理（data:image/jpeg;base64, など）
-    image_data = result_data.get("image_data", "")
-    if isinstance(image_data, str) and image_data.startswith("data:image"):
-        try:
-            _, image_data = image_data.split(",", 1)
-            result_data["image_data"] = image_data  # 上書き保存
-        except Exception as e:
-            print("❌ Error processing image_data base64 header:", e)
-            traceback.print_exc()
-            return
-
     try:
         create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
     except Exception as e:
         print(f"❌ PDF generation error (mode={pdf_mode}, uuid={uuid_str}):", e)
         traceback.print_exc()
         return
-
     # Mark UUID as used if applicable
     if uuid_str:
         try:
@@ -146,7 +107,6 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
         except Exception as e:
             print(f"❌ Error updating {USED_UUID_FILE} for {uuid_str}:", e)
             traceback.print_exc()
-
     # Write to access_log.txt if applicable
     if shop_id and uuid_str:
         try:
@@ -156,7 +116,6 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
         except Exception as e:
             print(f"❌ Error writing access_log for {uuid_str}:", e)
             traceback.print_exc()
-
 
 
 # --- thanksルート ---
@@ -568,6 +527,8 @@ def webhook_renaiselfmob():
 
 # --- self系実占い部分  ---
 
+
+
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
     full_year = None
@@ -587,14 +548,11 @@ def selfmob_uuid(uuid_str):
         return "使用履歴が確認できません", 400
 
     if request.method == "POST":
+        is_json = request.is_json
         try:
-            image_file = request.files["image"]
-            birthdate = request.form.get("birthdate")
-            full_year = request.form.get("full_year", "false").lower() == "true"
-
-            image_binary = image_file.read()
-            image_data = base64.b64encode(image_binary).decode("utf-8")
-
+            data = request.get_json() if is_json else request.form
+            image_data = data.get("image_data")
+            birthdate = data.get("birthdate")
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
@@ -615,14 +573,14 @@ def selfmob_uuid(uuid_str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
                     line = line.strip()
                     if line:
-                        if line.startswith("\u30fb"):
+                        if line.startswith("・"):
                             line = line[1:].strip()
                         lucky_lines.append(line.replace(":", "：", 1))
             elif isinstance(lucky_info, dict):
                 for k, v in lucky_info.items():
                     line = f"{k}：{v}".strip()
                     if line:
-                        if line.startswith("\u30fb"):
+                        if line.startswith("・"):
                             line = line[1:].strip()
                         lucky_lines.append(line)
             else:
@@ -630,7 +588,7 @@ def selfmob_uuid(uuid_str):
                     for line in str(item).replace("\r\n", "\n").replace("\r", "\n").split("\n"):
                         line = line.strip()
                         if line:
-                            if line.startswith("\u30fb"):
+                            if line.startswith("・"):
                                 line = line[1:].strip()
                             lucky_lines.append(line.replace(":", "：", 1))
 
@@ -675,19 +633,22 @@ def selfmob_uuid(uuid_str):
             filename = f"result_{uuid_str}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             shop_id = session.get("shop_id", "default")
-            background_generate_pdf(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id)
+            threading.Thread(
+                target=background_generate_pdf,
+                args=(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id),
+            ).start()
 
-            return redirect(url_for("static", filename=f"preview/{filename}"))
+            redirect_url = url_for("preview", filename=filename)
+            return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
         except Exception as e:
             print("処理エラー:", e)
-            return jsonify({"error": str(e)})
+            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
+
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
 
 
 
-
-
-
+@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
 @app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
 def renaiselfmob_uuid(uuid_str):
     full_year = None
@@ -711,6 +672,7 @@ def renaiselfmob_uuid(uuid_str):
             if not user_birth or not isinstance(user_birth, str):
                 return "生年月日が不正です", 400
 
+            # 🎯 正しく texts/titles を含んだ構造で取得
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
@@ -753,19 +715,12 @@ def renaiselfmob_uuid(uuid_str):
                 args=(filepath, result_data, "renai", "a4", full_year, uuid_str, shop_id)
             ).start()
 
-            # ✅ 直接PDF表示（スマホなら）
-            if is_smartphone():
-                return redirect(url_for("static", filename=f"preview/{filename}"))
-
-            # PC向け処理（必要ならビュー画面に切り替え可能）
-            return redirect(url_for("static", filename=f"preview/{filename}"))
-
+            return redirect(url_for("preview", filename=filename))
         except Exception as e:
             print("処理エラー:", e)
             return "処理中にエラーが発生しました", 500
 
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
-
 
 
 
@@ -795,7 +750,7 @@ def view_shop_log():
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
             cur.execute("SELECT date, shop_id, service, count FROM shop_logs ORDER BY date DESC;")
-            logs = cur.fetchall()@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
+            logs = cur.fetchall()
             cur.close()
             conn.close()
         except Exception as e:
@@ -820,61 +775,51 @@ def logout():
     session.clear()
     return redirect("/")
 
-
 @app.route("/ten", methods=["GET", "POST"], endpoint="ten")
 @app.route("/tenmob", methods=["GET", "POST"], endpoint="tenmob")
 def ten_shincom():
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
-
     mode = "shincom"
     size = "B4" if request.path == "/ten" else "A4"
-
     if request.method == "POST":
+        is_json = request.is_json
         try:
-            image_file = request.files["image"]
-            birthdate = request.form.get("birthdate")
-            full_year = request.form.get("full_year", "false").lower() == "true"
-
-            image_binary = image_file.read()  # 🔄 base64処理を削除
-
+            data = request.get_json() if is_json else request.form
+            image_data = data.get("image_data")
+            birthdate = data.get("birthdate")
+            full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
-
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
-
             eto = get_nicchu_eto(birthdate)
-
-            # 🔄 base64ではなくバイナリ画像をそのまま渡す
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(
-                image_binary, birthdate, kyusei_text
-            )
-
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text)
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()
-
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
-
+            year_label = f"{now.year}年の運勢"
+            month_label = f"{target1.year}年{target1.month}月の運勢"
+            next_month_label = f"{target2.year}年{target2.month}月の運勢"
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
                     "palm_summary": "手相の総合アドバイス",
                     "personality": "性格診断",
-                    "year_fortune": f"{now.year}年の運勢",
-                    "month_fortune": f"{target1.year}年{target1.month}月の運勢",
-                    "next_month_fortune": f"{target2.year}年{target2.month}月の運勢"
+                    "year_fortune": year_label,
+                    "month_fortune": month_label,
+                    "next_month_fortune": next_month_label
                 },
                 "texts": {
                     "palm_summary": summary_text,
@@ -889,33 +834,25 @@ def ten_shincom():
                 "palm_result": "\n".join(palm_texts),
                 "shichu_result": shichu_result,
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
-                "palm_image": None  # 🔄 画像は表示用途でなければここには不要
+                "palm_image": image_data
             }
-
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, now)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
-
-            filename = f"result_{now.strftime('%Y%m%d_%H%M%S')}.pdf"
+            filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
-            create_pdf_unified(filepath, result_data, mode, size.lower(), include_yearly=full_year)
-
-            if is_smartphone() and request.path == "/tenmob":
-                return send_file(filepath, mimetype="application/pdf", as_attachment=False, download_name=filename)
+            threading.Thread(target=background_generate_pdf, args=(filepath, result_data, mode, size.lower(), full_year)).start()
+            redirect_url = url_for("preview", filename=filename)
+            if is_json:
+                return jsonify({"redirect_url": redirect_url})
             else:
-                return redirect(url_for("preview", filename=filename))
-
+                return redirect(redirect_url)
         except Exception as e:
             traceback.print_exc()
-            return "処理中にエラーが発生しました"
-
+            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
     return render_template("index.html")
-
-
-
-
 
 
 
@@ -942,6 +879,7 @@ def renai():
         month_label = f"{target1.year}年{target1.month}月の恋愛運"
         next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
 
+        # 🎯 正しく texts/titles を含んだ構造で取得
         raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
 
         result_data = {
@@ -968,19 +906,9 @@ def renai():
         filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         create_pdf_unified(filepath, result_data, "renai", size=size.lower(), include_yearly=include_yearly)
-
-        if is_smartphone():
-            return send_file(
-                filepath,
-                mimetype="application/pdf",
-                as_attachment=False,
-                download_name=filename
-            )
-        else:
-            return redirect(url_for("preview", filename=filename))
+        return send_file(filepath, as_attachment=True)
 
     return render_template("renai_form.html")
-
 
 
 @app.route("/selfmob", methods=["GET"])

@@ -38,14 +38,13 @@
   <video id="camera" autoplay playsinline></video>
   <canvas id="canvas" style="display:none;"></canvas>
 
-  <div style="display:flex; gap:10px; flex-wrap:wrap;">
-    <button onclick="takePhoto()">📷 撮影</button>
-    <button onclick="switchCamera()">🔄 カメラ切替</button>
-  </div>
+  <button onclick="takePhoto()">📷 撮影</button>
 
   <label for="birthdate">生年月日：</label>
   <input type="date" id="birthdate" required oninput="fetchEto()">
   <div id="eto-display"></div>
+
+  <!-- チェックボックス削除済 -->
 
   <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
 
@@ -56,33 +55,13 @@
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
 
-    let currentStream = null;
-    let currentFacingMode = "environment";
-
-    async function startCamera(facingMode = "environment") {
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-      }
-
+    async function startCamera() {
       try {
-        const constraints = {
-          video: { facingMode: { exact: facingMode } }
-        };
-        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = currentStream;
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
       } catch (e) {
-        try {
-          currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
-          video.srcObject = currentStream;
-        } catch (err) {
-          alert("カメラが使用できません：" + err.message);
-        }
+        alert("カメラが使用できません：" + e.message);
       }
-    }
-
-    function switchCamera() {
-      currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
-      startCamera(currentFacingMode);
     }
 
     function takePhoto() {
@@ -130,11 +109,11 @@
 
     async function submitForm() {
       const birthdate = document.getElementById("birthdate").value;
-      const fullYear = false;
+      const imageData = canvas.toDataURL("image/png");
       const path = window.location.pathname;
 
-      if (!birthdate) {
-        alert("生年月日を入力してください。");
+      if (!birthdate || !imageData) {
+        alert("生年月日と手相画像の両方を入力してください。");
         return;
       }
 
@@ -142,43 +121,30 @@
       btn.disabled = true;
       btn.textContent = "鑑定中... 1分程度お待ちください";
 
-      canvas.toBlob(async function(blob) {
-        if (!blob) {
-          alert("画像の取得に失敗しました。");
-          btn.disabled = false;
-          btn.textContent = "送信してPDF生成";
-          return;
+      const payload = {
+        image_data: imageData,
+        birthdate,
+        full_year: false  // チェックボックスがないので false 固定
+      };
+
+      try {
+        const response = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (result.redirect_url) {
+          window.location.href = result.redirect_url;
+        } else {
+          alert("PDF生成後のリダイレクトが取得できませんでした");
         }
-
-        const formData = new FormData();
-        formData.append("image", blob, "photo.jpg");
-        formData.append("birthdate", birthdate);
-        formData.append("full_year", "false");
-
-        try {
-          const response = await fetch(path, {
-            method: "POST",
-            body: formData
-          });
-
-          const result = await response.json();
-
-          if (result.redirect_url) {
-            window.location.href = result.redirect_url;
-          } else {
-            alert("PDF生成後のリダイレクトが取得できませんでした");
-            btn.disabled = false;
-            btn.textContent = "送信してPDF生成";
-          }
-        } catch (error) {
-          alert("送信エラー: " + error.message);
-          btn.disabled = false;
-          btn.textContent = "送信してPDF生成";
-        }
-      }, "image/jpeg", 0.8);
+      } catch (error) {
+        alert("送信エラー: " + error.message);
+      }
     }
 
-    window.onload = () => startCamera("environment");
+    window.onload = startCamera;
   </script>
 
   <footer style="text-align:center; font-size:small; margin-top:40px; padding:20px; background-color:#f9f9f9;">
