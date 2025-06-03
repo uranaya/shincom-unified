@@ -1,60 +1,39 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>スマホ手相占い</title>
+  <meta charset="UTF-8">
+  <title>手相診断 - スマホ版</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 1em; }
+    video, canvas { max-width: 100%; margin: 1em 0; }
+    form { margin-top: 1em; }
+  </style>
 </head>
 <body>
-  <h1>🔮 手相鑑定へようこそ</h1>
-  <p>生年月日と手相画像を入力してください。</p>
-  <input type="date" id="birthdate" required />
-  <br /><br />
-
-  <select id="cameraSelect">
-    <option value="environment">アウトカメラ</option>
-    <option value="user">インカメラ</option>
-  </select>
-  <button onclick="switchCamera()">切替</button>
-  <br /><br />
+  <h1>📷 手相診断（スマホ版）</h1>
 
   <video id="video" autoplay playsinline></video>
-  <br />
-  <button onclick="takePhoto()">📷 撮影</button>
-  <br /><br />
+  <canvas id="myCanvas" style="display:none;"></canvas>
 
-  <canvas id="canvas" style="display: none;"></canvas>
-  <br />
-  <button id="submitBtn" onclick="submitForm()">送信</button>
+  <button onclick="takePhoto()">📸 撮影する</button>
+
+  <form onsubmit="submitForm(); return false;">
+    <label>生年月日: <input type="date" id="birthdate" required></label><br><br>
+    <button type="submit">送信して鑑定</button>
+  </form>
 
   <script>
     const video = document.getElementById("video");
-    const canvas = document.getElementById("canvas");
+    const canvas = document.getElementById("myCanvas");
     const ctx = canvas.getContext("2d");
     let imageDataBase64 = null;
-    let currentFacingMode = "environment";
 
-    async function startCamera(facingMode = "environment") {
-      if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-      }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: facingMode } },
-          audio: false
-        });
-        video.srcObject = stream;
-        currentFacingMode = facingMode;
-      } catch (err) {
-        alert("カメラの使用が許可されていません");
-      }
-    }
-
-    function switchCamera() {
-      const selectedMode = document.getElementById("cameraSelect").value;
-      startCamera(selectedMode);
-    }
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: false
+    })
+    .then(stream => video.srcObject = stream)
+    .catch(err => alert("カメラの起動に失敗しました: " + err));
 
     function takePhoto() {
       const width = 600;
@@ -67,42 +46,34 @@
       imageDataBase64 = canvas.toDataURL("image/jpeg", 0.8);
     }
 
-    async function submitForm() {
+    function submitForm() {
       const birthdate = document.getElementById("birthdate").value;
-      const path = window.location.pathname;
-
-      if (!birthdate || !imageDataBase64) {
-        alert("生年月日と手相画像の両方を入力してください。");
+      if (!imageDataBase64) {
+        alert("先に手相を撮影してください！");
         return;
       }
 
-      const btn = document.getElementById("submitBtn");
-      btn.disabled = true;
-      btn.textContent = "鑑定中... 1分程度お待ちください";
-
-      const payload = {
-        image_data: imageDataBase64,
-        birthdate
-      };
-
-      try {
-        const response = await fetch(path, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        const result = await response.json();
-        if (result.redirect_url) {
-          window.open(result.redirect_url, '_blank');
+      fetch(window.location.pathname, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          birthdate: birthdate,
+          image_data: imageDataBase64
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.redirect_url) {
+          window.open(data.redirect_url, "_blank");
         } else {
-          alert("PDF生成後のリダイレクトが取得できませんでした");
+          alert("サーバーからの応答に失敗しました");
         }
-      } catch (error) {
-        alert("送信エラー: " + error.message);
-      }
+      })
+      .catch(err => {
+        console.error("送信エラー:", err);
+        alert("送信に失敗しました");
+      });
     }
-
-    window.onload = () => startCamera(currentFacingMode);
   </script>
 </body>
 </html>

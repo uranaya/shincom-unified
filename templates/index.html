@@ -1,123 +1,79 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>占いフォーム</title>
-    <style>
-        #video {
-            width: 100%;
-            max-width: 400px;
-        }
-        #myCanvas {
-            display: none;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>手相診断 - 店舗版</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 1em; }
+    video, canvas { max-width: 100%; margin: 1em 0; }
+    form { margin-top: 1em; }
+  </style>
 </head>
 <body>
-    <h2>占いフォーム</h2>
+  <h1>📷 手相診断（店舗版）</h1>
 
-    <form id="fortuneForm" method="post">
-        <label for="birthdate">生年月日:</label>
-        <input type="date" id="birthdate" name="birthdate" required><br>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="myCanvas" style="display:none;"></canvas>
 
-        <label for="full_year">1年分の運勢を表示:</label>
-        <input type="checkbox" id="full_year" name="full_year"><br>
+  <button onclick="takePhoto()">📸 撮影する</button>
 
-        <label for="cameraSelect">カメラ選択:</label>
-        <select id="cameraSelect"></select><br>
+  <form onsubmit="submitForm(); return false;">
+    <label>生年月日: <input type="date" id="birthdate" required></label><br><br>
+    <button type="submit">送信して鑑定</button>
+  </form>
 
-        <video id="video" autoplay playsinline></video><br>
-        <button type="button" onclick="takePhoto()">📷 撮影</button>
-        <canvas id="myCanvas"></canvas><br>
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("myCanvas");
+    const ctx = canvas.getContext("2d");
+    let imageDataBase64 = null;
 
-        <button type="button" onclick="submitForm()">PDF送信</button>
-    </form>
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: false
+    })
+    .then(stream => video.srcObject = stream)
+    .catch(err => alert("カメラの起動に失敗しました: " + err));
 
-    <script>
-        let stream;
-        let selectedDeviceId = null;
+    function takePhoto() {
+      const width = 600;
+      const height = video.videoHeight * (600 / video.videoWidth);
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(video, 0, 0, width, height);
+      canvas.style.display = "block";
+      alert("📷 撮影完了しました！");
+      imageDataBase64 = canvas.toDataURL("image/jpeg", 0.8);
+    }
 
-        async function setupCamera() {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(device => device.kind === 'videoinput');
-            const cameraSelect = document.getElementById('cameraSelect');
+    function submitForm() {
+      const birthdate = document.getElementById("birthdate").value;
+      if (!imageDataBase64) {
+        alert("先に手相を撮影してください！");
+        return;
+      }
 
-            cameraSelect.innerHTML = '';
-            videoDevices.forEach((device, index) => {
-                const option = document.createElement('option');
-                option.value = device.deviceId;
-                option.text = device.label || `カメラ ${index + 1}`;
-                cameraSelect.appendChild(option);
-            });
-
-            cameraSelect.onchange = () => {
-                selectedDeviceId = cameraSelect.value;
-                startCamera(selectedDeviceId);
-            };
-
-            if (videoDevices.length > 0) {
-                selectedDeviceId = videoDevices[0].deviceId;
-                startCamera(selectedDeviceId);
-            }
+      fetch("/tenmob", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          birthdate: birthdate,
+          image_data: imageDataBase64
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.redirect_url) {
+          window.open(data.redirect_url, "_blank");
+        } else {
+          alert("サーバーからの応答に失敗しました");
         }
-
-        async function startCamera(deviceId) {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { deviceId: { exact: deviceId } },
-                    audio: false
-                });
-                document.getElementById('video').srcObject = stream;
-            } catch (err) {
-                alert('カメラの起動に失敗しました: ' + err.message);
-            }
-        }
-
-        function takePhoto() {
-            const video = document.getElementById('video');
-            const canvas = document.getElementById('myCanvas');
-            const ctx = canvas.getContext('2d');
-            const width = 600;
-            const height = video.videoHeight * (600 / video.videoWidth);
-            canvas.width = width;
-            canvas.height = height;
-            ctx.drawImage(video, 0, 0, width, height);
-            canvas.style.display = 'block';
-            alert('📷 撮影完了しました！');
-        }
-
-        function submitForm() {
-            const canvas = document.getElementById('myCanvas');
-            canvas.toBlob(function(blob) {
-                const formData = new FormData();
-                formData.append('image_file', blob, 'photo.jpg');
-                formData.append('birthdate', document.getElementById('birthdate').value);
-                formData.append('full_year', document.getElementById('full_year').checked);
-
-                fetch('/unified', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => {
-                    if (!response.ok) throw new Error('Network error: ' + response.status);
-                    return response.blob();
-                })
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    window.open(url, '_blank');
-                })
-                .catch(error => {
-                    console.error('送信エラー:', error);
-                    alert('送信エラー: ' + error.message);
-                });
-            }, 'image/jpeg', 0.8);
-        }
-
-        window.onload = setupCamera;
-    </script>
+      })
+      .catch(err => {
+        console.error("送信エラー:", err);
+        alert("送信に失敗しました");
+      });
+    }
+  </script>
 </body>
 </html>
