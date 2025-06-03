@@ -514,23 +514,38 @@ def selfmob_uuid(uuid_str):
         is_json = request.is_json
         try:
             data = request.get_json() if is_json else request.form
-            image_data = data.get("image_data")
             birthdate = data.get("birthdate")
+
+            # ✅ image_file（画像ファイル）と image_data（base64文字列）どちらでも対応
+            image_file = request.files.get("image_file")
+            if image_file:
+                image_bytes = image_file.read()
+                encoded_image = base64.b64encode(image_bytes).decode('utf-8')
+                image_data = f"data:image/jpeg;base64,{encoded_image}"
+            else:
+                image_data = data.get("image_data")
+
+            if not birthdate or not image_data:
+                return "生年月日または画像データが不足しています", 400
+
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
+
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
+
             eto = get_nicchu_eto(birthdate)
             palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
                 image_data, birthdate, kyusei_text
             )
             palm_result = "\n".join(palm_texts)
             summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
+
             lucky_lines = []
             if isinstance(lucky_info, str):
                 for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
@@ -596,6 +611,7 @@ def selfmob_uuid(uuid_str):
             filename = f"result_{uuid_str}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             shop_id = session.get("shop_id", "default")
+
             threading.Thread(
                 target=background_generate_pdf,
                 args=(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id),
@@ -608,6 +624,7 @@ def selfmob_uuid(uuid_str):
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
 
     return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
+
 
 
 
@@ -755,37 +772,57 @@ def logout():
 def ten_shincom():
     if "logged_in" not in session:
         return redirect(url_for("login", next=request.endpoint))
+
     mode = "shincom"
     size = "B4" if request.path == "/ten" else "A4"
+
     if request.method == "POST":
         is_json = request.is_json
         try:
             data = request.get_json() if is_json else request.form
-            image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
+
+            # ✅ image_file（画像ファイル）と image_data（base64文字列）どちらでも対応
+            image_file = request.files.get("image_file")
+            if image_file:
+                image_bytes = image_file.read()
+                encoded_image = base64.b64encode(image_bytes).decode('utf-8')
+                image_data = f"data:image/jpeg;base64,{encoded_image}"
+            else:
+                image_data = data.get("image_data")
+
+            if not birthdate or not image_data:
+                return "生年月日または画像データが不足しています", 400
+
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
+
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
+
             eto = get_nicchu_eto(birthdate)
             palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text)
+
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()
+
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
+
             year_label = f"{now.year}年の運勢"
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
+
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
@@ -811,23 +848,30 @@ def ten_shincom():
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "palm_image": image_data
             }
+
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, now)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
+
             filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
-            threading.Thread(target=background_generate_pdf, args=(filepath, result_data, mode, size.lower(), full_year)).start()
+
+            threading.Thread(
+                target=background_generate_pdf,
+                args=(filepath, result_data, mode, size.lower(), full_year)
+            ).start()
+
             redirect_url = url_for("preview", filename=filename)
-            if is_json:
-                return jsonify({"redirect_url": redirect_url})
-            else:
-                return redirect(redirect_url)
+            return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
+
         except Exception as e:
             traceback.print_exc()
-            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
+            return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました"
+
     return render_template("index.html")
+
 
 
 
