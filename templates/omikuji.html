@@ -74,17 +74,7 @@
     </audio>
     <div class="omikuji">
         <div class="title">{{ omikuji.title }}</div>
-        <div class="fortune">
-            {% if omikuji.fortune.startswith("大吉") %}
-                🎉🌸{{ omikuji.fortune }}🌸🎉
-            {% elif omikuji.fortune.startswith("吉") %}
-                🌟{{ omikuji.fortune }}🌟
-            {% elif omikuji.fortune.startswith("凶") %}
-                💧{{ omikuji.fortune }}💧
-            {% else %}
-                🔮{{ omikuji.fortune }}
-            {% endif %}
-        </div>
+        <div class="fortune">{{ omikuji.fortune }}</div>
         <div class="section">
             <pre style="white-space: pre-wrap;">{{ omikuji.poem }}</pre>
         </div>
