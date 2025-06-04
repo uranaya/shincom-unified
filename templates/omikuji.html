@@ -4,40 +4,42 @@
     <meta charset="UTF-8">
     <title>{{ omikuji.title }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Klee+One&display=swap" rel="stylesheet">
     <style>
         html, body {
             margin: 0;
             padding: 0;
-            background: #f9f9f9;
-            font-family: 'serif';
+            background: #f4f1e9;
+            font-family: 'Klee One', serif;
         }
         .omikuji {
-            max-width: 320px;
-            margin: auto;
-            background: #fff;
-            border: 2px solid red;
-            padding: 16px;
+            max-width: 340px;
+            margin: 20px auto;
+            background: url('/static/omikuji_paper_bg.png') no-repeat center;
+            background-size: cover;
+            border: 4px double #aa0000;
+            padding: 20px;
             line-height: 1.8;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            box-shadow: 0 0 12px rgba(0,0,0,0.3);
             word-wrap: break-word;
         }
         .title {
             text-align: center;
             font-weight: bold;
-            font-size: 1.1em;
-            margin-bottom: 8px;
+            font-size: 1.3em;
+            margin-bottom: 10px;
             border-bottom: 2px dotted red;
-            padding-bottom: 4px;
+            padding-bottom: 6px;
         }
         .fortune {
             text-align: center;
-            font-size: 1.2em;
+            font-size: 1.5em;
             color: darkred;
             font-weight: bold;
-            margin: 8px 0;
+            margin: 12px 0;
         }
         .section {
-            margin-top: 10px;
+            margin-top: 12px;
         }
         .section-title {
             font-weight: bold;
@@ -51,10 +53,9 @@
         }
         li {
             font-size: 0.95em;
-            margin-bottom: 2px;
+            margin-bottom: 4px;
         }
 
-        /* 印刷対応 */
         @media print {
             body {
                 background: white;
@@ -62,14 +63,28 @@
             .omikuji {
                 border: 1px solid black;
                 box-shadow: none;
+                background: none;
             }
         }
     </style>
 </head>
 <body>
+    <audio autoplay>
+      <source src="/static/omikuji_result_bell.mp3" type="audio/mp3">
+    </audio>
     <div class="omikuji">
         <div class="title">{{ omikuji.title }}</div>
-        <div class="fortune">{{ omikuji.fortune }}</div>
+        <div class="fortune">
+            {% if omikuji.fortune.startswith("大吉") %}
+                🎉🌸{{ omikuji.fortune }}🌸🎉
+            {% elif omikuji.fortune.startswith("吉") %}
+                🌟{{ omikuji.fortune }}🌟
+            {% elif omikuji.fortune.startswith("凶") %}
+                💧{{ omikuji.fortune }}💧
+            {% else %}
+                🔮{{ omikuji.fortune }}
+            {% endif %}
+        </div>
         <div class="section">
             <pre style="white-space: pre-wrap;">{{ omikuji.poem }}</pre>
         </div>
