@@ -2,6 +2,7 @@ import os
 import base64
 import uuid
 import json
+import random
 import requests
 import traceback
 from datetime import datetime
@@ -963,3 +964,38 @@ def terms():
 @app.route("/tokutei")
 def tokutei():
     return render_template("tokutei.html")
+
+
+
+
+
+# JSONデータ読み込み（プレーンおみくじ）
+with open("omikuji_plain.json", encoding="utf-8") as f:
+    OMikuji_DATA = json.load(f)
+
+@app.route("/omikuji", methods=["GET"])
+def omikuji_top():
+    return render_template("omikuji_index.html")
+
+@app.route("/omikuji/result", methods=["POST"])
+def result():
+    # ランダムに一卦を選ぶ
+    choice = random.choice(list(OMikuji_DATA.keys()))
+    entry = OMikuji_DATA[choice]
+
+    omikuji = {
+        "title": entry["name"],
+        "fortune": entry["fortune"]["overall"],  # 大吉・吉など
+        "poem": entry["description"],
+        "explanation": "柔軟な姿勢を忘れずに。流れに乗ることが開運の鍵です。",
+        "categories": {
+            "金運": entry["fortune"]["money"],
+            "恋愛運": entry["fortune"]["love"],
+            "仕事運": entry["fortune"]["work"],
+            "健康運": entry["fortune"]["health"],
+            "ラッキーアイテム": entry["fortune"]["item"]
+        },
+        "teaching": "自分を信じて、目の前の一歩を大切にしましょう。"
+    }
+
+    return render_template("omikuji.html", omikuji=omikuji)

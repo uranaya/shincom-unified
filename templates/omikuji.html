@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ omikuji.title }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #f9f9f9;
+            font-family: 'serif';
+        }
+        .omikuji {
+            max-width: 320px;
+            margin: auto;
+            background: #fff;
+            border: 2px solid red;
+            padding: 16px;
+            line-height: 1.8;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            word-wrap: break-word;
+        }
+        .title {
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 8px;
+            border-bottom: 2px dotted red;
+            padding-bottom: 4px;
+        }
+        .fortune {
+            text-align: center;
+            font-size: 1.2em;
+            color: darkred;
+            font-weight: bold;
+            margin: 8px 0;
+        }
+        .section {
+            margin-top: 10px;
+        }
+        .section-title {
+            font-weight: bold;
+            font-size: 1em;
+            margin-bottom: 4px;
+            border-bottom: 1px dotted #ccc;
+        }
+        ul {
+            padding-left: 1em;
+            margin: 0;
+        }
+        li {
+            font-size: 0.95em;
+            margin-bottom: 2px;
+        }
+
+        /* 印刷対応 */
+        @media print {
+            body {
+                background: white;
+            }
+            .omikuji {
+                border: 1px solid black;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="omikuji">
+        <div class="title">{{ omikuji.title }}</div>
+        <div class="fortune">{{ omikuji.fortune }}</div>
+        <div class="section">
+            <pre style="white-space: pre-wrap;">{{ omikuji.poem }}</pre>
+        </div>
+        <div class="section">
+            <div class="section-title">御神託</div>
+            <p>{{ omikuji.explanation }}</p>
+        </div>
+        <div class="section">
+            <div class="section-title">各運勢</div>
+            <ul>
+                {% for key, value in omikuji.categories.items() %}
+                    <li><strong>{{ key }}</strong>：{{ value }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="section">
+            <div class="section-title">神の教</div>
+            <p style="white-space: pre-wrap;">{{ omikuji.teaching }}</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>山陽小野田 64卦おみくじ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: 'serif';
+      background-color: #f9f9f9;
+      text-align: center;
+      padding: 50px;
+    }
+    .button {
+      background-color: darkred;
+      color: white;
+      padding: 15px 30px;
+      font-size: 1.2em;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .button:hover {
+      background-color: #aa0000;
+    }
+    #animation {
+      display: none;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>山陽小野田 64卦おみくじ</h1>
+
+  <form id="omikujiForm" action="{{ url_for('result') }}" method="post" onsubmit="event.preventDefault(); drawOmikuji();">
+    <button type="submit" class="button">おみくじを引く 🔮</button>
+  </form>
+
+  <div id="animation">
+    <video src="{{ url_for('static', filename='Icon_B330_omikuji_800_800_green.mp4') }}" autoplay muted playsinline width="300"></video>
+    <p>神様にお伺い中...</p>
+  </div>
+
+  <audio id="omikujiSound" src="{{ url_for('static', filename='教会の鐘1.mp3') }}"></audio>
+
+  <script>
+    function drawOmikuji() {
+      const form = document.getElementById('omikujiForm');
+      const animation = document.getElementById('animation');
+      const sound = document.getElementById('omikujiSound');
+
+      form.style.display = 'none';
+      animation.style.display = 'block';
+      sound.play();
+
+      setTimeout(() => {
+        form.submit();
+      }, 2000);
+    }
+  </script>
+</body>
+</html>
