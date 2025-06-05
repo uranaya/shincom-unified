@@ -17,25 +17,44 @@
       color: #aa0000;
       margin-bottom: 20px;
     }
-    .profile {
-      display: flex;
-      align-items: center;
-      margin-bottom: 20px;
-      background-color: #fff5f5;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
-    }
-    .profile-img {
-      width: 80px;
-      height: 80px;
-      margin-right: 20px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-    .profile-text p {
-      margin: 4px 0;
-    }
+.profile {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  background-color: #fff5f5;
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  flex-wrap: wrap;
+  justify-content: center;
+  text-align: center;
+}
+.profile-img {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 10px;
+}
+.profile-text {
+  max-width: 100%;
+}
+.profile-text p {
+  margin: 4px 0;
+}
+
+/* スマホ対策 */
+@media (min-width: 600px) {
+  .profile {
+    flex-wrap: nowrap;
+    text-align: left;
+  }
+  .profile-img {
+    margin-right: 20px;
+    margin-bottom: 0;
+  }
+}
+
     .sns-buttons {
       display: flex;
       justify-content: center;
