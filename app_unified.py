@@ -945,7 +945,17 @@ def result():
 
 @app.route("/weekly")
 def weekly():
-    return render_template("weekly.html")
+    # スプレッドシートのCSV出力URL（公開済みである必要あり）
+    url = "https://docs.google.com/spreadsheets/d/1920Ymf6yVIf4uC6-WIGXm1IiQHSSTsocKXBWw0XwbBQ/export?format=csv"
+    response = requests.get(url)
+    response.encoding = "utf-8"
+
+    # CSVをパース
+    rows = list(csv.reader(response.text.splitlines()))
+    headers = rows[0]
+    data = rows[1:]  # ヘッダーを除いたデータ部分
+
+    return render_template("weekly.html", headers=headers, data=data)
 
 
 
