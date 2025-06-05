@@ -941,6 +941,11 @@ def result():
         return "エラーが発生しました。"
 
 
+
+
 @app.route("/weekly")
 def weekly():
     return render_template("weekly.html")
+
+
+
