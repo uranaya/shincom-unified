@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <title>今週の占いランキング</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- ✅ CDN変更 -->
-  <script src="https://cdn.jsdelivr.net/npm/tabletop@1.6.0/tabletop.min.js"></script>
   <style>
     body {
       font-family: 'Klee One', sans-serif;
@@ -48,29 +46,34 @@
     </tr>
   </thead>
   <tbody>
-    <!-- データがここに挿入されます -->
+    <!-- ここにJSでデータを挿入 -->
   </tbody>
 </table>
 
 <script>
-  window.onload = function() {
-    Tabletop.init({
-      key: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTtv13kPxmrU7u6ug1XkRiwgEM5XZQAzMHVp679eUKGNCpoijBEnoD-KLGuknvF-AZbi8g0kEdOuXjt/pubhtml',
-      callback: function(data, tabletop) {
-        const tbody = document.querySelector("#ranking-table tbody");
-        data.forEach(row => {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td>${row["順位"]}</td>
-            <td>${row["星座"]}</td>
-            <td>${row["アドバイス"]}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-      },
-      simpleSheet: true
-    });
-  };
+  // CSVをfetchしてテーブルに表示
+  async function loadCSV() {
+    const url = 'https://docs.google.com/spreadsheets/d/1920Ymf6yVIf4uC6-WIGXm1IiQHSSTsocKXBWw0XwbBQ/export?format=csv';
+    const response = await fetch(url);
+    const text = await response.text();
+    const rows = text.trim().split('\\n').map(row => row.split(','));
+
+    const tbody = document.querySelector("#ranking-table tbody");
+
+    // 1行目はヘッダー（順位, 星座, アドバイス）
+    for (let i = 1; i < rows.length; i++) {
+      const [rank, sign, advice] = rows[i];
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${rank}</td>
+        <td>${sign}</td>
+        <td>${advice}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+  }
+
+  window.onload = loadCSV;
 </script>
 
 </body>
