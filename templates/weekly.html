@@ -17,11 +17,46 @@
       color: #aa0000;
       margin-bottom: 20px;
     }
+    .profile {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+      background-color: #fff5f5;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    .profile-img {
+      width: 80px;
+      height: 80px;
+      margin-right: 20px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    .profile-text p {
+      margin: 4px 0;
+    }
+    .sns-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .sns-icon {
+      width: 32px;
+      height: 32px;
+    }
+    .qr-code {
+      width: 120px;
+      height: 120px;
+      margin-top: 10px;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
       background: white;
       box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      margin-top: 30px;
     }
     th, td {
       border: 1px solid #ccc;
@@ -37,6 +72,40 @@
 
 <h2>🔮 今週の占いランキング</h2>
 
+<!-- プロフィール -->
+<div class="profile">
+  <img src="{{ url_for('static', filename='fortune_master.png') }}" alt="占い師アイコン" class="profile-img">
+  <div class="profile-text">
+    <p><strong>占い師「うらなや」</strong></p>
+    <p>「あなたの運命、ちょっと覗いてみませんか？」</p>
+    <p>🌐 <a href="https://shincom-unified.onrender.com" target="_blank">https://shincom-unified.onrender.com</a></p>
+  </div>
+</div>
+
+<!-- SNSボタン -->
+<div class="sns-buttons">
+  <a href="https://twitter.com/your_account" target="_blank">
+    <img src="{{ url_for('static', filename='icon_twitter.png') }}" alt="Twitter" class="sns-icon">
+  </a>
+  <a href="https://instagram.com/your_account" target="_blank">
+    <img src="{{ url_for('static', filename='icon_instagram.png') }}" alt="Instagram" class="sns-icon">
+  </a>
+</div>
+
+<!-- お問い合わせ -->
+<p style="text-align: center; margin-top: 10px;">
+  📩 <a href="mailto:uranaya@example.com">お問い合わせはこちら</a>
+</p>
+
+<!-- QRコード -->
+<div class="qr-section">
+  <p style="text-align: center; margin: 10px 0 5px;">📱 QRコードからもアクセスできます</p>
+  <div style="text-align: center;">
+    <img src="{{ url_for('static', filename='qrcode_shincom.png') }}" alt="QRコード" class="qr-code">
+  </div>
+</div>
+
+<!-- ランキングテーブル -->
 <table>
   <thead>
     <tr>
