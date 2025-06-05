@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>今週の占いランキング</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/tabletop@1.6.0/tabletop.js"></script>
+  <style>
+    body {
+      font-family: 'Klee One', sans-serif;
+      background: #f4f1e9;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+    }
+    h2 {
+      text-align: center;
+      color: #aa0000;
+      margin-bottom: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 12px;
+      text-align: center;
+    }
+    th {
+      background-color: #ffe8e8;
+    }
+  </style>
+</head>
+<body>
+
+<h2>🔮 今週の占いランキング</h2>
+
+<table id="ranking-table">
+  <thead>
+    <tr>
+      <th>順位</th>
+      <th>星座</th>
+      <th>今週の運勢</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- データがここに挿入されます -->
+  </tbody>
+</table>
+
+<script>
+  window.onload = function() {
+    Tabletop.init({
+      key: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTtv13kPxmrU7u6ug1XkRiwgEM5XZQAzMHVp679eUKGNCpoijBEnoD-KLGuknvF-AZbi8g0kEdOuXjt/pub?output=csv',
+      callback: function(data, tabletop) {
+        const tbody = document.querySelector("#ranking-table tbody");
+        data.forEach(row => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${row["順位"]}</td>
+            <td>${row["星座"]}</td>
+            <td>${row["今週の運勢"]}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      },
+      simpleSheet: true
+    });
+  };
+</script>
+
+</body>
+</html>

@@ -939,3 +939,8 @@ def result():
     except Exception as e:
         print("🔴 Error in /omikuji/result:", e)
         return "エラーが発生しました。"
+
+
+@app.route("/weekly")
+def weekly():
+    return render_template("weekly.html")
