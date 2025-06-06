@@ -20,7 +20,9 @@ from pdf_generator_unified import create_pdf_unified
 from fortune_logic import generate_renai_fortune
 
 from aura_fortune_utils import generate_aura_fortune
+from aura_image_utils import generate_aura_image
 from pdf_generator_aura import create_aura_pdf
+from prompt_utils import extract_prompts_from_result
 
 
 import sqlite3
@@ -963,6 +965,8 @@ def weekly():
     return render_template("weekly.html", headers=headers, data=data)
 
 
+
+
 # --- /aura へのアクセス時にUUIDを生成してリダイレクト ---
 @app.route("/aura", methods=["GET"])
 def aura_redirect():
@@ -981,20 +985,34 @@ def aura_submit(uuid_str):
     if not image_data:
         return "画像が送信されていません", 400
 
-    # 🧠 OpenAIでスピリチュアル診断テキスト生成
+    # 🧠 1. 占い結果生成（テキスト）
     try:
         result = generate_aura_fortune(image_data)
         result_text = result.get("text", "")
     except Exception as e:
         return f"OpenAI診断エラー: {e}", 500
 
-    # 🖨 PDF出力
+    # 🔤 2. プロンプト抽出（前世・守護霊）＋オーラ色判定
+    try:
+        past_prompt, spirit_prompt = extract_prompts_from_result(result_text)
+        aura_prompt = result.get("aura", "")  # オーラ色の説明（例："purple aura"）
+    except Exception as e:
+        return f"プロンプト抽出エラー: {e}", 500
+
+    # 🖼 3. 合成画像生成（オーラ加工付き）
+    try:
+        merged_image_base64 = generate_aura_image(image_data, past_prompt, spirit_prompt, aura_prompt)
+    except Exception as e:
+        return f"画像合成エラー: {e}", 500
+
+    # 🖨 4. PDF出力
     filename = f"aura_{uuid_str}.pdf"
     output_path = os.path.join(UPLOAD_FOLDER, filename)
 
     try:
-        create_aura_pdf(output_path, image_data, result_text)
+        create_aura_pdf(output_path, merged_image_base64, result_text)
     except Exception as e:
         return f"PDF生成エラー: {e}", 500
 
+    # 📄 5. 表示またはダウンロード
     return send_file(output_path, mimetype="application/pdf")
