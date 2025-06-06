@@ -55,29 +55,32 @@ def apply_aura_effect(image: Image.Image, aura_color: str) -> Image.Image:
 
     return combined.convert("RGB")
 
-def generate_aura_image(user_image_base64, past_prompt, spirit_prompt, aura_color="紫") -> str:
+def generate_aura_image(user_image_base64, past_prompt, spirit_prompt, aura_prompt) -> str:
     """
-    撮影画像＋前世＋守護霊の画像を合成しbase64で返す。
-    ユーザー画像にはオーラ効果を追加。
+    撮影画像（base64）＋オーラ色加工＋AI生成の前世・守護霊画像を結合し、base64で返す
     """
-    # 1. ユーザー画像読み込み
+
+    # 1. ユーザー画像のbase64デコード
     user_image_data = base64.b64decode(user_image_base64.split(",")[-1])
     user_image = Image.open(BytesIO(user_image_data)).convert("RGB").resize((256, 256))
 
-    # ⭐️ 2. オーラ効果を追加
-    user_image = apply_aura_effect(user_image, aura_color)
+    # 2. オーラカラーを適用
+    rgba = map_color_name_to_rgba(aura_prompt)
+    user_image = apply_aura_overlay(user_image, rgba)
 
-    # 3. DALL·Eで画像生成
+    # 3. DALL·Eで前世画像生成
     past_life_img = dalle_image(past_prompt)
+
+    # 4. DALL·Eで守護霊画像生成
     spirit_img = dalle_image(spirit_prompt)
 
-    # 4. 横に3枚合成
+    # 5. 横に3枚並べて合成
     merged = Image.new("RGB", (256 * 3, 256), (255, 255, 255))
     merged.paste(user_image, (0, 0))
     merged.paste(past_life_img, (256, 0))
     merged.paste(spirit_img, (512, 0))
 
-    # 5. base64エンコードして返す
+    # 6. base64エンコードして返す
     buffer = BytesIO()
     merged.save(buffer, format="JPEG")
     encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
