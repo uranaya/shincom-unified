@@ -1,14 +1,26 @@
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.utils import simpleSplit
-from reportlab.lib.fonts import addMapping
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.fonts import addMapping
+import textwrap
 
 # IPAフォントの登録
 FONT_NAME = "IPAexGothic"
 pdfmetrics.registerFont(TTFont(FONT_NAME, "ipaexg.ttf"))
 addMapping(FONT_NAME, 0, 0, FONT_NAME)
+
+def split_text_to_lines(text, max_chars=40):
+    """長文を40文字ごとに分割（段落単位で処理）"""
+    paragraphs = text.split("\n")
+    lines = []
+    for para in paragraphs:
+        para = para.strip()
+        if para:
+            lines.extend(textwrap.wrap(para, width=max_chars))
+        else:
+            lines.append("")
+    return lines
 
 def create_pdf_tarot(question: str, fortune_dict: dict, save_path: str):
     c = canvas.Canvas(save_path, pagesize=A4)
@@ -23,11 +35,8 @@ def create_pdf_tarot(question: str, fortune_dict: dict, save_path: str):
 
     def add_paragraph(label, content):
         nonlocal line_count, textobject
-        if label:
-            lines = [label]
-        else:
-            lines = []
-        lines += simpleSplit(content, FONT_NAME, 12, width - 2 * margin)
+        combined = label + "\n" + content if label else content
+        lines = split_text_to_lines(combined)
 
         for line in lines:
             if line_count >= max_lines_per_page:
@@ -38,20 +47,20 @@ def create_pdf_tarot(question: str, fortune_dict: dict, save_path: str):
                 line_count = 0
             textobject.textLine(line)
             line_count += 1
-        textobject.textLine("")
+
+        textobject.textLine("")  # 段落の余白
         line_count += 1
 
     # 🔮 ヘッダー
     add_paragraph("🔮 タロットスプレッド占い", "")
 
-    # 📝 質問文
+    # 📝 ご相談内容
     add_paragraph("【ご相談内容】", question)
 
-    # 📖 結果本文
+    # 📖 鑑定結果（改行＆ページ制御付き）
     result_text = fortune_dict.get("result_text", "")
     add_paragraph("【鑑定結果】", result_text)
 
-    # 最終描画と保存
     c.drawText(textobject)
     c.save()
     print(f"✅ PDF保存成功: {save_path}")
