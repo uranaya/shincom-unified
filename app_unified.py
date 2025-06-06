@@ -1036,8 +1036,9 @@ def tarotmob_redirect():
 
 @app.route("/tarotmob/<uuid_str>", methods=["GET", "POST"])
 def tarotmob_entry(uuid_str):
-    if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
+    # ↓ この行を一時的にコメントアウトまたは削除
+    # if not is_paid_uuid(uuid_str):
+    #     return "このUUIDは未決済です", 403
 
     if request.method == "GET":
         return render_template("index_tarotmob.html")
