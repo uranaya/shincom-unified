@@ -4,10 +4,21 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from io import BytesIO
 import base64
+import os
 
-FONT_NAME = "HeiseiKakuGo-W5"  # 環境に応じて変更可
+# IPAフォント登録（必要）
+FONT_PATH = "ipaexg.ttf"
+FONT_NAME = "IPAexGothic"
+
+if not FONT_NAME in pdfmetrics.getRegisteredFontNames():
+    if os.path.exists(FONT_PATH):
+        pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
+    else:
+        raise FileNotFoundError("日本語フォント ipaexg.ttf が見つかりません。")
 
 def create_aura_pdf(output_path, merged_image_data_base64, result_text):
     """

@@ -30,9 +30,11 @@
       margin: 10px auto;
       display: block;
     }
-    #image-preview {
+    #preview {
       display: none;
       margin-top: 10px;
+      max-width: 100%;
+      border: 2px solid #666;
     }
   </style>
 </head>
@@ -47,6 +49,7 @@
   <form id="auraForm" method="POST" enctype="multipart/form-data">
     <input type="hidden" name="uuid" value="{{ uuid }}">
     <input type="hidden" name="image_data" id="image_data">
+    <img id="preview" src="" alt="撮影画像プレビュー">
     <button type="submit">🔮 鑑定を送信</button>
   </form>
 
@@ -54,6 +57,7 @@
     let video = document.getElementById("video");
     let canvas = document.getElementById("canvas");
     let imageDataInput = document.getElementById("image_data");
+    let preview = document.getElementById("preview");
     let ctx = canvas.getContext("2d");
     let currentStream;
     let useFrontCamera = true;
@@ -87,8 +91,13 @@
       canvas.width = width;
       canvas.height = height;
       ctx.drawImage(video, 0, 0, width, height);
-      const imageData = canvas.toDataURL("image/jpeg", 0.8); // 軽量JPEG
+      const imageData = canvas.toDataURL("image/jpeg", 0.8);
       imageDataInput.value = imageData;
+
+      // プレビュー表示
+      preview.src = imageData;
+      preview.style.display = "block";
+
       alert("📷 撮影完了しました！下の送信ボタンを押してください");
     }
 
