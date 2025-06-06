@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>🔮 タロット占いフォーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-size: 16px;
+      padding: 20px;
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: auto;
+      background: #f8f4f0;
+    }
+    h2 {
+      text-align: center;
+      color: #663399;
+    }
+    textarea, button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+    button {
+      background-color: #663399;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <h2>🔮 タロット占い</h2>
+  <form method="POST" action="">
+    <label for="question">ご相談内容を入力してください（300文字以内）:</label>
+    <textarea id="question" name="question" rows="6" maxlength="300" required></textarea>
+    <button type="submit">占ってもらう</button>
+  </form>
+</body>
+</html>
