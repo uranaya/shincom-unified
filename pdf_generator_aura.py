@@ -7,6 +7,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from io import BytesIO
+from PIL import Image
 import base64
 import os
 import textwrap
@@ -43,37 +44,30 @@ def wrap_text(text, max_chars):
             lines.append("")
     return lines
 
-def create_aura_pdf(output_path, image_base64: str, text: str):
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
+def create_aura_pdf(output_path, image_base64, result_text):
+    c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
 
-    # 1. ヘッダー描画
-    draw_header(c, "オーラ・前世・守護霊鑑定書", FONT_NAME)
+    # 🖼 base64 → PIL Image
+    image_data = base64.b64decode(image_base64.split(",")[-1])
+    image = Image.open(BytesIO(image_data)).convert("RGB")
 
-    # 2. 合成画像描画（中央やや上に配置）
-    img_data = base64.b64decode(image_base64.split(",")[-1])
-    img_reader = ImageReader(BytesIO(img_data))
-    image_width = 460
-    image_height = 140
-    x = (width - image_width) / 2
-    y = height - 180
-    c.drawImage(img_reader, x, y, width=image_width, height=image_height)
+    # 保存しておいて PDF に貼り付け
+    temp_image_path = "/tmp/temp_aura.jpg"
+    image.save(temp_image_path)
 
-    # 3. テキスト描画（余白を詰めて配置）
-    c.setFont(FONT_NAME, 11)
-    textobject = c.beginText(50, y - 20)
-    lines = text.split("\n")
-    for line in lines:
-        for sub in split_text(line, max_chars=40):
-            textobject.textLine(sub)
+    # 📎 画像を貼り付け（サイズ調整含む）
+    c.drawImage(temp_image_path, 50, height - 300, width=500, height=200)
+
+    # ✏️ テキスト部分
+    textobject = c.beginText(50, height - 330)
+    textobject.setFont("HeiseiKakuGo-W5", 12)  # または ipaexg.ttf を使っているなら pdfmetrics 登録済で
+    for line in result_text.split("\n"):
+        textobject.textLine(line)
     c.drawText(textobject)
 
     c.showPage()
     c.save()
-
-    with open(output_path, "wb") as f:
-        f.write(buffer.getvalue())
 
 def split_text(text, max_chars=40):
     """長すぎる行を改行するユーティリティ"""
