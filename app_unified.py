@@ -1025,7 +1025,13 @@ def aura_submit(uuid_str):
     return send_file(output_path, mimetype="application/pdf")
 
 
+# ✅ PDF保存フォルダ設定（Render対応）
+UPLOAD_FOLDER = "static/pdf"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# -----------------------------------
 # 🔮 タロット占いルート
+# -----------------------------------
 
 # --- /tarotmob にアクセスされたら UUID を生成して /tarotmob/<uuid> にリダイレクト ---
 @app.route("/tarotmob", methods=["GET"])
@@ -1034,32 +1040,34 @@ def tarotmob_redirect():
     return redirect(f"/tarotmob/{new_uuid}")
 
 
+# --- UUID付きアクセス：フォーム表示＆送信処理 ---
 @app.route("/tarotmob/<uuid_str>", methods=["GET", "POST"])
 def tarotmob_entry(uuid_str):
-    # ↓ この行を一時的にコメントアウトまたは削除
+    # 🔓 決済制限なし（必要あれば is_paid_uuid(uuid_str) を追加）
     # if not is_paid_uuid(uuid_str):
     #     return "このUUIDは未決済です", 403
 
     if request.method == "GET":
         return render_template("index_tarotmob.html")
 
-    # POST：質問を取得
+    # POST：質問取得
     question = request.form.get("question", "").strip()
     if not question:
         return "質問文が空です", 400
 
-    # 🧠 タロット占い結果生成
+    # 🧠 タロット占い生成（OpenAI API）
     try:
         from tarot_fortune_logic import generate_tarot_fortune
         fortune = generate_tarot_fortune(question)
     except Exception as e:
         return f"OpenAI診断エラー: {e}", 500
 
-    # 🖨️ PDF生成
+    # 🖨️ PDF生成処理
     try:
         from pdf_generator_tarot import create_pdf_tarot
         filename = f"{uuid_str}.pdf"
         save_path = os.path.join(UPLOAD_FOLDER, filename)
+        print(f"📄 PDF生成開始: {save_path}")  # デバッグログ
         create_pdf_tarot(question, fortune, save_path)
         return redirect(url_for("static", filename=f"pdf/{filename}"))
     except Exception as e:
