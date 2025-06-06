@@ -1026,6 +1026,14 @@ def aura_submit(uuid_str):
 
 
 # 🔮 タロット占いルート
+
+# --- /tarotmob にアクセスされたら UUID を生成して /tarotmob/<uuid> にリダイレクト ---
+@app.route("/tarotmob", methods=["GET"])
+def tarotmob_redirect():
+    new_uuid = str(uuid.uuid4())
+    return redirect(f"/tarotmob/{new_uuid}")
+
+
 @app.route("/tarotmob/<uuid_str>", methods=["GET", "POST"])
 def tarotmob_entry(uuid_str):
     if not is_paid_uuid(uuid_str):
