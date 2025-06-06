@@ -963,7 +963,11 @@ def weekly():
     return render_template("weekly.html", headers=headers, data=data)
 
 
-
+# --- /aura へのアクセス時にUUIDを生成してリダイレクト ---
+@app.route("/aura", methods=["GET"])
+def aura_redirect():
+    new_uuid = str(uuid.uuid4())
+    return redirect(f"/aura/{new_uuid}")
 
 # --- AURAルート：フォーム表示 ---
 @app.route("/aura/<uuid_str>", methods=["GET"])
