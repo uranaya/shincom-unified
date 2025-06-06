@@ -10,6 +10,8 @@ from io import BytesIO
 import base64
 import os
 import textwrap
+from header_utils import draw_header  # selfmobと同様
+
 
 # フォント設定
 FONT_PATH = "ipaexg.ttf"
@@ -41,41 +43,38 @@ def wrap_text(text, max_chars):
             lines.append("")
     return lines
 
-def create_aura_pdf(output_path, merged_image_data_base64, result_text):
-    """
-    オーラPDFを生成（A4縦1ページ：上部に合成画像、下部に折返しテキスト）
-    """
-    c = canvas.Canvas(output_path, pagesize=A4)
+def create_aura_pdf(output_path, image_base64: str, text: str):
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # --- ヘッダー ---
-    draw_header(c, width, height)
+    # 1. ヘッダー描画
+    draw_header(c, "オーラ・前世・守護霊鑑定書", FONT_NAME)
 
-    # --- 合成画像 ---
-    try:
-        img_data = base64.b64decode(merged_image_data_base64.split(",")[-1])
-        image = ImageReader(BytesIO(img_data))
-        image_width = width - 40 * mm
-        image_height = height / 2 - 30 * mm
-        x = 20 * mm
-        y = height - image_height - 30 * mm
-        c.drawImage(image, x, y, width=image_width, height=image_height, preserveAspectRatio=True)
-    except Exception as e:
-        c.setFont(FONT_NAME, 12)
-        c.drawString(20 * mm, height - 40 * mm, f"画像読み込みエラー：{e}")
+    # 2. 合成画像描画（中央やや上に配置）
+    img_data = base64.b64decode(image_base64.split(",")[-1])
+    img_reader = ImageReader(BytesIO(img_data))
+    image_width = 460
+    image_height = 140
+    x = (width - image_width) / 2
+    y = height - 180
+    c.drawImage(img_reader, x, y, width=image_width, height=image_height)
 
-    # --- 鑑定テキスト ---
-    c.setFont(FONT_NAME, 12)
-    textobject = c.beginText()
-    textobject.setTextOrigin(20 * mm, height / 2 - 35 * mm)
-    textobject.setLeading(16)
-
-    wrapped_lines = wrap_text(result_text, max_chars=42)
-    for line in wrapped_lines:
-        textobject.textLine(line)
-
+    # 3. テキスト描画（余白を詰めて配置）
+    c.setFont(FONT_NAME, 11)
+    textobject = c.beginText(50, y - 20)
+    lines = text.split("\n")
+    for line in lines:
+        for sub in split_text(line, max_chars=40):
+            textobject.textLine(sub)
     c.drawText(textobject)
 
-    # 保存
     c.showPage()
     c.save()
+
+    with open(output_path, "wb") as f:
+        f.write(buffer.getvalue())
+
+def split_text(text, max_chars=40):
+    """長すぎる行を改行するユーティリティ"""
+    return [text[i:i+max_chars] for i in range(0, len(text), max_chars)]

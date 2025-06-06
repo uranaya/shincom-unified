@@ -1,7 +1,7 @@
 import openai
 import base64
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter
 import requests
 
 def dalle_image(prompt, size="256x256") -> Image.Image:
@@ -18,57 +18,66 @@ def dalle_image(prompt, size="256x256") -> Image.Image:
     image_bytes = requests.get(image_url).content
     return Image.open(BytesIO(image_bytes))
 
-def map_color_name_to_rgba(aura_prompt):
+def apply_aura_effect(image: Image.Image, aura_color: str) -> Image.Image:
     """
-    オーラプロンプト内の色名を簡易判定してRGBAを返す
+    ユーザー画像にオーラ風の光を重ねる加工処理。
+    放射状グラデーション＋光のにじみ効果を加える。
     """
-    aura_prompt = aura_prompt.lower()
-    if "purple" in aura_prompt or "lavender" in aura_prompt:
-        return (180, 140, 255, 100)
-    if "blue" in aura_prompt:
-        return (100, 150, 255, 100)
-    if "green" in aura_prompt:
-        return (100, 255, 150, 100)
-    if "pink" in aura_prompt or "rose" in aura_prompt:
-        return (255, 160, 200, 100)
-    if "yellow" in aura_prompt:
-        return (255, 255, 150, 100)
-    return (200, 200, 255, 80)  # fallback light aura
+    aura_overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(aura_overlay)
 
-def apply_aura_overlay(image: Image.Image, rgba_color) -> Image.Image:
-    """
-    与えられた画像にRGBA色のオーラを重ねて返す
-    """
-    aura_layer = Image.new("RGBA", image.size, rgba_color)
-    base = image.convert("RGBA")
-    blended = Image.alpha_composite(base, aura_layer)
-    return blended.convert("RGB")  # JPEG保存用にRGBへ
+    color_map = {
+        "赤": (255, 80, 80),
+        "青": (80, 80, 255),
+        "緑": (80, 255, 80),
+        "黄": (255, 255, 80),
+        "紫": (160, 80, 255),
+        "白": (255, 255, 255),
+        "黒": (80, 80, 80),
+        "金": (255, 215, 0),
+        "銀": (200, 200, 200)
+    }
+    base_color = color_map.get(aura_color.strip(), (255, 160, 220))
 
-def generate_aura_image(user_image_base64, past_prompt, spirit_prompt, aura_prompt) -> str:
+    center = (image.width // 2, image.height // 2)
+    max_radius = max(image.width, image.height) // 2
+
+    for r in range(max_radius, 0, -5):
+        alpha = int(120 * (r / max_radius))  # 中心ほど濃く
+        draw.ellipse([
+            center[0] - r, center[1] - r,
+            center[0] + r, center[1] + r
+        ], fill=base_color + (alpha,))
+
+    aura_overlay = aura_overlay.filter(ImageFilter.GaussianBlur(radius=20))
+    image_rgba = image.convert("RGBA")
+    combined = Image.alpha_composite(image_rgba, aura_overlay)
+
+    return combined.convert("RGB")
+
+def generate_aura_image(user_image_base64, past_prompt, spirit_prompt, aura_color="紫") -> str:
     """
-    撮影画像（base64）＋オーラ色加工＋AI生成の前世・守護霊画像を結合し、base64で返す
+    撮影画像＋前世＋守護霊の画像を合成しbase64で返す。
+    ユーザー画像にはオーラ効果を追加。
     """
-    # 1. ユーザー画像のbase64デコード
+    # 1. ユーザー画像読み込み
     user_image_data = base64.b64decode(user_image_base64.split(",")[-1])
     user_image = Image.open(BytesIO(user_image_data)).convert("RGB").resize((256, 256))
 
-    # 2. オーラカラーを適用
-    rgba = map_color_name_to_rgba(aura_prompt)
-    user_image = apply_aura_overlay(user_image, rgba)
+    # ⭐️ 2. オーラ効果を追加
+    user_image = apply_aura_effect(user_image, aura_color)
 
-    # 3. DALL·Eで前世画像生成
+    # 3. DALL·Eで画像生成
     past_life_img = dalle_image(past_prompt)
-
-    # 4. DALL·Eで守護霊画像生成
     spirit_img = dalle_image(spirit_prompt)
 
-    # 5. 横に3枚並べて合成
+    # 4. 横に3枚合成
     merged = Image.new("RGB", (256 * 3, 256), (255, 255, 255))
     merged.paste(user_image, (0, 0))
     merged.paste(past_life_img, (256, 0))
     merged.paste(spirit_img, (512, 0))
 
-    # 6. base64エンコードして返す
+    # 5. base64エンコードして返す
     buffer = BytesIO()
     merged.save(buffer, format="JPEG")
     encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
