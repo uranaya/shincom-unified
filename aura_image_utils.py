@@ -18,6 +18,34 @@ def dalle_image(prompt, size="256x256") -> Image.Image:
     image_bytes = requests.get(image_url).content
     return Image.open(BytesIO(image_bytes))
 
+def map_color_name_to_rgba(aura_prompt):
+    """
+    オーラプロンプト内の色名を簡易判定してRGBAを返す
+    """
+    aura_prompt = aura_prompt.lower()
+    if "purple" in aura_prompt or "lavender" in aura_prompt:
+        return (180, 140, 255, 100)
+    if "blue" in aura_prompt:
+        return (100, 150, 255, 100)
+    if "green" in aura_prompt:
+        return (100, 255, 150, 100)
+    if "pink" in aura_prompt or "rose" in aura_prompt:
+        return (255, 160, 200, 100)
+    if "yellow" in aura_prompt:
+        return (255, 255, 150, 100)
+    return (200, 200, 255, 80)  # fallback light aura
+
+
+def apply_aura_overlay(image: Image.Image, rgba_color) -> Image.Image:
+    """
+    与えられた画像にRGBA色のオーラを重ねて返す
+    """
+    aura_layer = Image.new("RGBA", image.size, rgba_color)
+    base = image.convert("RGBA")
+    blended = Image.alpha_composite(base, aura_layer)
+    return blended.convert("RGB")  # JPEG保存用にRGBへ
+
+
 def apply_aura_effect(image: Image.Image, aura_color: str) -> Image.Image:
     """
     ユーザー画像にオーラ風の光を重ねる加工処理。
