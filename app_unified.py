@@ -18,6 +18,11 @@ from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicc
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
 from fortune_logic import generate_renai_fortune
+
+from aura_fortune_utils import generate_aura_fortune
+from pdf_generator_aura import create_aura_pdf
+
+
 import sqlite3
 import threading
 import psycopg2
@@ -957,3 +962,35 @@ def weekly():
 
     return render_template("weekly.html", headers=headers, data=data)
 
+
+
+
+# --- AURAルート：フォーム表示 ---
+@app.route("/aura/<uuid_str>", methods=["GET"])
+def aura_entry(uuid_str):
+    return render_template("index_aura.html", uuid=uuid_str)
+
+# --- AURAルート：POST処理 ---
+@app.route("/aura/<uuid_str>", methods=["POST"])
+def aura_submit(uuid_str):
+    image_data = request.form.get("image_data", "")
+    if not image_data:
+        return "画像が送信されていません", 400
+
+    # 🧠 OpenAIでスピリチュアル診断テキスト生成
+    try:
+        result = generate_aura_fortune(image_data)
+        result_text = result.get("text", "")
+    except Exception as e:
+        return f"OpenAI診断エラー: {e}", 500
+
+    # 🖨 PDF出力
+    filename = f"aura_{uuid_str}.pdf"
+    output_path = os.path.join(UPLOAD_FOLDER, filename)
+
+    try:
+        create_aura_pdf(output_path, image_data, result_text)
+    except Exception as e:
+        return f"PDF生成エラー: {e}", 500
+
+    return send_file(output_path, mimetype="application/pdf")

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>オーラ鑑定フォーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-size: 16px;
+      padding: 10px;
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: auto;
+      background: #f0f4f8;
+    }
+    h2 {
+      text-align: center;
+    }
+    input, button, select {
+      font-size: 16px;
+      padding: 10px;
+      margin: 10px 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #video, #canvas {
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #ccc;
+      margin: 10px auto;
+      display: block;
+    }
+    #image-preview {
+      display: none;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>📸 オーラ鑑定カメラフォーム</h2>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <button onclick="toggleCamera()">🔄 カメラ切替</button>
+  <button onclick="takePhoto()">📷 撮影</button>
+
+  <form id="auraForm" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="uuid" value="{{ uuid }}">
+    <input type="hidden" name="image_data" id="image_data">
+    <button type="submit">🔮 鑑定を送信</button>
+  </form>
+
+  <script>
+    let video = document.getElementById("video");
+    let canvas = document.getElementById("canvas");
+    let imageDataInput = document.getElementById("image_data");
+    let ctx = canvas.getContext("2d");
+    let currentStream;
+    let useFrontCamera = true;
+
+    async function initCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+
+      const constraints = {
+        video: {
+          facingMode: useFrontCamera ? "user" : "environment"
+        }
+      };
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+      } catch (e) {
+        alert("カメラにアクセスできません：" + e.message);
+      }
+    }
+
+    function toggleCamera() {
+      useFrontCamera = !useFrontCamera;
+      initCamera();
+    }
+
+    function takePhoto() {
+      const width = 600;
+      const height = video.videoHeight * (600 / video.videoWidth);
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(video, 0, 0, width, height);
+      const imageData = canvas.toDataURL("image/jpeg", 0.8); // 軽量JPEG
+      imageDataInput.value = imageData;
+      alert("📷 撮影完了しました！下の送信ボタンを押してください");
+    }
+
+    window.onload = () => {
+      initCamera();
+    };
+  </script>
+</body>
+</html>
