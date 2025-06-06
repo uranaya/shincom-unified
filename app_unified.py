@@ -992,16 +992,22 @@ def aura_submit(uuid_str):
     except Exception as e:
         return f"OpenAI診断エラー: {e}", 500
 
-    # 🔤 2. プロンプト抽出（前世・守護霊）＋オーラ色判定
+    # 🔤 2. プロンプト生成（result_textから抽出）
     try:
-        past_prompt, spirit_prompt = extract_prompts_from_result(result_text)
-        aura_prompt = result.get("aura", "")  # オーラ色の説明（例："purple aura"）
+        from prompt_utils import extract_prompts_from_result
+        aura_color_prompt, past_prompt, spirit_prompt = extract_prompts_from_result(result_text)
     except Exception as e:
         return f"プロンプト抽出エラー: {e}", 500
 
-    # 🖼 3. 合成画像生成（オーラ加工付き）
+    # 🖼 3. 合成画像生成（オーラ色＋前世＋守護霊）
     try:
-        merged_image_base64 = generate_aura_image(image_data, past_prompt, spirit_prompt, aura_prompt)
+        from aura_image_utils import generate_aura_image
+        merged_image_base64 = generate_aura_image(
+            user_image_base64=image_data,
+            past_prompt=past_prompt,
+            spirit_prompt=spirit_prompt,
+            aura_prompt=aura_color_prompt
+        )
     except Exception as e:
         return f"画像合成エラー: {e}", 500
 
@@ -1010,6 +1016,7 @@ def aura_submit(uuid_str):
     output_path = os.path.join(UPLOAD_FOLDER, filename)
 
     try:
+        from pdf_generator_aura import create_aura_pdf
         create_aura_pdf(output_path, merged_image_base64, result_text)
     except Exception as e:
         return f"PDF生成エラー: {e}", 500
