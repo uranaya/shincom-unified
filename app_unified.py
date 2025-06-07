@@ -129,61 +129,14 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
 
 
 
-
-from flask import Flask, request, redirect, render_template, make_response
-import os
-import uuid
-import requests
-import psycopg2
-from datetime import datetime
-
-app = Flask(__name__)
-
-BASE_URL = os.getenv("BASE_URL", "https://shincom-unified.onrender.com")
-USED_UUID_FILE = "used_uuids.csv"
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-
-@app.route("/pay.html")
-def pay_redirect():
-    session_id = request.args.get("session_id", "")
-    if not session_id:
-        return "セッションIDがありません", 400
-
-    uuid_str, mode_key = get_uuid_and_mode_by_session_id(session_id)
-    if not uuid_str or not mode_key:
-        return "UUIDまたはモードが見つかりません", 404
-
-    if "tarotmob" in mode_key:
-        return redirect(f"/tarotmob/{uuid_str}")
-    elif "renaiselfmob" in mode_key:
-        return redirect(f"/renaiselfmob/{uuid_str}")
-    elif "selfmob" in mode_key:
-        return redirect(f"/selfmob/{uuid_str}")
-    else:
-        return "不明なモードです", 400
-
-
-def get_uuid_and_mode_by_session_id(session_id):
-    try:
-        with open(USED_UUID_FILE, "r") as f:
-            for line in f:
-                parts = line.strip().split(",")
-                if len(parts) >= 5:
-                    uuid_str, _, mode_key, _, sid = parts
-                    if sid == session_id:
-                        return uuid_str, mode_key
-    except Exception as e:
-        print("❌ セッションIDの検索エラー:", e)
-    return None, None
-
-
 @app.route("/thanks")
 def thanks():
     uuid_str = request.cookies.get("uuid") or request.args.get("uuid")
     if not uuid_str:
         return render_template("thanks.html", uuid_str="")
     return render_template("thanks.html", uuid_str=uuid_str)
+
+
 
 
 def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="selfmob"):
@@ -226,21 +179,19 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
         json=payload
     )
     response.raise_for_status()
-
     session = response.json()
-    session_url = session.get("session_url")
-    if not session_url:
-        raise RuntimeError("KOMOJUセッションURLの取得に失敗しました")
-    return session_url
+    return session.get("session_url"), session.get("id")
+
+
 
 
 def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
 
-    amount = 1  # ✅ テスト用に全モード1円に固定
+    amount = 1  # ← 全モード1円に固定（テスト用）
 
-    session_url = create_payment_session(
+    session_url, session_id = create_payment_session(
         amount=amount,
         uuid_str=uuid_str,
         return_url_thanks=return_url_thanks,
@@ -248,7 +199,6 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
         mode=mode
     )
 
-    session_id = session_url.split("session_id=")[-1]
     mode_key = mode + ("_full" if full_year and mode != "tarotmob" else "")
     try:
         with open(USED_UUID_FILE, "a") as f:
@@ -279,8 +229,39 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
 
 
 
+def get_uuid_and_mode_by_session_id(session_id):
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) >= 5:
+                    uuid_str, _, mode_key, _, sid = parts
+                    if sid == session_id:
+                        return uuid_str, mode_key
+    except Exception as e:
+        print("❌ セッションIDの検索エラー:", e)
+    return None, None
 
 
+
+@app.route("/pay.html")
+def pay_redirect():
+    session_id = request.args.get("session_id", "")
+    if not session_id:
+        return "セッションIDがありません", 400
+
+    uuid_str, mode_key = get_uuid_and_mode_by_session_id(session_id)
+    if not uuid_str or not mode_key:
+        return "UUIDまたはモードが見つかりません", 404
+
+    if "tarotmob" in mode_key:
+        return redirect(f"/tarotmob/{uuid_str}")
+    elif "renaiselfmob" in mode_key:
+        return redirect(f"/renaiselfmob/{uuid_str}")
+    elif "selfmob" in mode_key:
+        return redirect(f"/selfmob/{uuid_str}")
+    else:
+        return "不明なモードです", 400
 
 
 
