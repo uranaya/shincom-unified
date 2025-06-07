@@ -282,36 +282,6 @@ def get_uuid_and_mode_by_session_id(session_id):
 
 
 
-
-
-
-
-def record_shop_log_if_needed(uuid_str, mode):
-    try:
-        # UUIDからshop_idを取得
-        with open(USED_UUID_FILE, "r") as f:
-            lines = f.readlines()
-        for line in lines:
-            parts = line.strip().split(",")
-            if len(parts) >= 4 and parts[0] == uuid_str:
-                shop_id = parts[3]
-                break
-        else:
-            shop_id = "default"
-
-        today = datetime.now().strftime("%Y-%m-%d")
-
-        # ✅ DBにも記録（同日・同shop_id・同modeがあれば更新）
-        if DATABASE_URL:
-            try:
-                conn = psycopg2.connect(DATABASE_URL)
-                cur = conn.cursor()
-                cur.execute("""
-                    INSERT INTO shop_logs (date, shop_id, service, count)
-                    VALUES (%s, %s, %s, 1)
-                    ON CONFLICT (date, shop_id, service)
-                    DO UPDATE SET count = shop_logs.count + 1;
-                """, (today, shop_id, mode))@app.route("/pay.html")
 def pay_redirect():
     session_id = request.args.get("session_id", "")
     if not session_id:
@@ -348,6 +318,37 @@ def pay_redirect():
     else:
         return "不明なモードです", 400
 
+
+
+
+
+
+def record_shop_log_if_needed(uuid_str, mode):
+    try:
+        # UUIDからshop_idを取得
+        with open(USED_UUID_FILE, "r") as f:
+            lines = f.readlines()
+        for line in lines:
+            parts = line.strip().split(",")
+            if len(parts) >= 4 and parts[0] == uuid_str:
+                shop_id = parts[3]
+                break
+        else:
+            shop_id = "default"
+
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # ✅ DBにも記録（同日・同shop_id・同modeがあれば更新）
+        if DATABASE_URL:
+            try:
+                conn = psycopg2.connect(DATABASE_URL)
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO shop_logs (date, shop_id, service, count)
+                    VALUES (%s, %s, %s, 1)
+                    ON CONFLICT (date, shop_id, service)
+                    DO UPDATE SET count = shop_logs.count + 1;
+                """, (today, shop_id, mode))@app.route("/pay.html")
                 conn.commit()
                 cur.close()
                 conn.close()
