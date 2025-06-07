@@ -140,20 +140,21 @@ def thanks():
 
 
 
+
 def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="selfmob"):
-    """KOMOJUのセッションAPIを使って支払い画面URLを生成する（selfmob系ルート自動判定付き）"""
     secret = os.getenv("KOMOJU_SECRET_KEY")
     if not secret:
         raise RuntimeError("KOMOJU_SECRET_KEY is not set")
 
-    # ✅ ルーティング判定：決済金額とモードに応じて自動で分岐
     if mode == "renaiselfmob":
         redirect_path = "renaiselfmob_full" if amount >= 1000 else "renaiselfmob"
+    elif mode == "tarotmob":
+        redirect_path = f"tarotmob/{uuid_str}"
     else:
         redirect_path = "selfmob_full" if amount >= 1000 else "selfmob"
 
-    customer_redirect_url = f"{BASE_URL}/{redirect_path}/{uuid_str}"
-    cancel_url = customer_redirect_url  # 戻るボタンでも同じ場所に戻す
+    customer_redirect_url = f"{BASE_URL}/{redirect_path}"
+    cancel_url = customer_redirect_url
 
     payload = {
         "amount": amount,
@@ -180,14 +181,11 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
         json=payload
     )
     response.raise_for_status()
-
     session = response.json()
     session_url = session.get("session_url")
     if not session_url:
         raise RuntimeError("KOMOJUセッションURLの取得に失敗しました")
     return session_url
-
-
 
 
 
@@ -277,9 +275,10 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
 
-    # ✅ 本番価格に設定：通常500円／年運付き1000円
     if mode == "renaiselfmob":
         amount = 1000 if full_year else 500
+    elif mode == "tarotmob":
+        amount = 500
     else:
         amount = 1000 if full_year else 500
 
@@ -291,7 +290,7 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
         mode=mode
     )
 
-    mode_key = mode + ("_full" if full_year else "")
+    mode_key = mode + ("_full" if full_year and mode != "tarotmob" else "")
     try:
         with open(USED_UUID_FILE, "a") as f:
             f.write(f"{uuid_str},,{mode_key},{shop_id}\n")
@@ -321,6 +320,7 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
 
 
 
+
 @app.route("/generate_link/<shop_id>")
 def generate_link(shop_id):
     return _generate_session_for_shop(shop_id, full_year=False, mode="selfmob")
@@ -337,6 +337,16 @@ def generate_link_renai(shop_id):
 def generate_link_renai_full(shop_id):
     return _generate_session_for_shop(shop_id, full_year=True,  mode="renaiselfmob")
 
+
+
+@app.route("/generate_link_tarot/<shop_id>")
+def generate_link_tarot(shop_id):
+    return _generate_session_for_shop(shop_id, full_year=False, mode="tarotmob")
+
+@app.route("/tarotmob-<shop_id>")
+def tarotmob_shop_entry(shop_id):
+    session["shop_id"] = shop_id
+    return render_template("pay.html", shop_id=shop_id)
 
 
 
