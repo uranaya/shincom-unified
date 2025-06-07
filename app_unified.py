@@ -266,10 +266,9 @@ def pay_redirect():
 
 
 
-# カウント記録処理
-
 def record_shop_log_if_needed(uuid_str, mode):
     try:
+        # UUIDからshop_idを取得
         with open(USED_UUID_FILE, "r") as f:
             lines = f.readlines()
         for line in lines:
@@ -288,53 +287,7 @@ def record_shop_log_if_needed(uuid_str, mode):
                 conn = psycopg2.connect(DATABASE_URL)
                 cur = conn.cursor()
                 cur.execute("""
-                    INSERT INTO shop_logs (datedef create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="selfmob"):
-    secret = os.getenv("KOMOJU_SECRET_KEY")
-    if not secret:
-        raise RuntimeError("KOMOJU_SECRET_KEY is not set")
-
-    if mode == "renaiselfmob":
-        redirect_path = "renaiselfmob_full" if amount >= 1000 else "renaiselfmob"
-    elif mode == "tarotmob":
-        redirect_path = "tarotmob"  # tarotは1パターンのみ
-    else:
-        redirect_path = "selfmob_full" if amount >= 1000 else "selfmob"
-
-    customer_redirect_url = f"{BASE_URL}/{redirect_path}/{uuid_str}"
-    cancel_url = f"{BASE_URL}/pay.html"  # ← これは戻るボタン用に固定
-
-    payload = {
-        "amount": amount,
-        "currency": "JPY",
-        "return_url": cancel_url,
-        "customer_redirect_url": customer_redirect_url,
-        "payment_data": {
-            "external_order_num": uuid_str
-        },
-        "metadata": {
-            "external_order_num": uuid_str,
-            "shop_id": shop_id
-        },
-        "payment_methods": [
-            {"type": "credit_card"},
-            {"type": "paypay"}
-        ],
-        "description": "シン・コンピューター占い"
-    }
-
-    response = requests.post(
-        "https://komoju.com/api/v1/sessions",
-        auth=(secret, ""),
-        json=payload
-    )
-    response.raise_for_status()
-
-    session = response.json()
-    session_url = session.get("session_url")
-    if not session_url:
-        raise RuntimeError("KOMOJUセッションURLの取得に失敗しました")
-    return session_url
-, shop_id, service, count)
+                    INSERT INTO shop_logs (date, shop_id, service, count)
                     VALUES (%s, %s, %s, 1)
                     ON CONFLICT (date, shop_id, service)
                     DO UPDATE SET count = shop_logs.count + 1;
@@ -354,6 +307,7 @@ def record_shop_log_if_needed(uuid_str, mode):
 
     except Exception as e:
         print("⚠️ カウント記録エラー:", e)
+
 
 
 
