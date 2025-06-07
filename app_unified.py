@@ -31,6 +31,18 @@ import sqlite3
 import threading
 import psycopg2
 
+
+# 料金設定（テスト中はここをいじるだけ）
+PRICE_MAP = {
+    "tarotmob": 500,
+    "selfmob": 500,
+    "selfmob_full": 1000,
+    "renaiselfmob": 500,
+    "renaiselfmob_full": 1000
+}
+
+
+
 # --- 環境変数とパス ---
 DATABASE_URL = os.getenv("DATABASE_URL")
 BASE_URL = os.getenv("BASE_URL", "http://localhost:5000")
@@ -209,17 +221,14 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
     return session.get("session_url"), session.get("id")
 
 
+
+
 def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
 
-    # 💰 金額をモード・期間に応じて設定
-    if mode == "tarotmob":
-        amount = 500  # タロットは固定500円
-    elif full_year:
-        amount = 1000  # 通常鑑定
-    else:
-        amount = 500  # 簡易鑑定
+    mode_key = mode + ("_full" if full_year and mode != "tarotmob" else "")
+    amount = PRICE_MAP.get(mode_key, 500)  # 不明な場合はデフォルト500円
 
     session_url, session_id = create_payment_session(
         amount=amount,
@@ -229,7 +238,6 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
         mode=mode
     )
 
-    mode_key = mode + ("_full" if full_year and mode != "tarotmob" else "")
     try:
         with open(USED_UUID_FILE, "a") as f:
             f.write(f"{uuid_str},,{mode_key},{shop_id},{session_id}\n")
@@ -239,6 +247,7 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     resp = make_response(redirect(session_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
+
 
 
 
