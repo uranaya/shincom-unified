@@ -28,22 +28,29 @@ def create_pdf_tarot(question: str, result_dict: dict, save_path: str):
         leading=14,
     )
 
-    # ヘッダー：質問文
+    # 🔹ヘッダー：相談内容
     c.setFont(FONT_NAME, 14)
-    c.drawString(x_margin, y, f"📍 ご相談内容：{question}")
-    y -= 25
+    c.drawString(x_margin, y, "📍 ご相談内容")
+    y -= 20
+    para = Paragraph(question, style)
+    w, h = para.wrap(width - 2 * x_margin, y)
+    para.drawOn(c, x_margin, y - h)
+    y -= (h + 15)
 
-    # 各質問とカード結果のリスト
+    # 🔹各カード結果
+    c.setFont(FONT_NAME, 14)
+    c.drawString(x_margin, y, "🔮 タロットカードの結果")
+    y -= 20
+
     c.setFont(FONT_NAME, 12)
     for idx, item in enumerate(result_dict.get("questions", []), start=1):
         q_text = item.get("question", "")
         card = item.get("card", "")
         answer = item.get("answer", "")
-        text = f"{idx}. カード: {card} （質問: {q_text}）\n{answer}"
+        text = f"{idx}. カード: {card}（質問: {q_text}）<br/>{answer}"
         para = Paragraph(text, style)
         w, h = para.wrap(width - 2 * x_margin, y)
         if y - h < bottom_margin:
-            # 余白に収まらない場合は改ページ
             c.showPage()
             y = height - 30 * mm
             c.setFont(FONT_NAME, 12)
@@ -52,19 +59,23 @@ def create_pdf_tarot(question: str, result_dict: dict, save_path: str):
         para.drawOn(c, x_margin, y - h)
         y -= (h + 10)
 
-    # 総合読み解きとアドバイス（同一ページ内）
+    # 🔹アドバイス（必要に応じて改ページ）
+    y -= 10
+    if y < 120:
+        c.showPage()
+        y = height - 30 * mm
+
     c.setFont(FONT_NAME, 14)
     c.drawString(x_margin, y, "🌟 総合読み解きとアドバイス")
     y -= 20
     advice = result_dict.get("summary_advice", "")
     para = Paragraph(advice, style)
     w, h = para.wrap(width - 2 * x_margin, y)
-    # 必要なら改ページ（今回1ページに収まる想定）
     if y - h < bottom_margin:
         c.showPage()
         y = height - 30 * mm
     para.drawOn(c, x_margin, y - h)
 
-    # PDF保存
+    # 保存
     c.save()
     print(f"✅ PDF保存成功: {save_path}")
