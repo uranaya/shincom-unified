@@ -1057,8 +1057,9 @@ def tarotmob_entry(uuid_str):
 
     # 🧠 タロット占い生成（OpenAI API）
     try:
-        from tarot_fortune_logic import generate_tarot_fortune
-        fortune = generate_tarot_fortune(question)
+        from tarot_fortune_logic import generate_tarot_fortune, parse_tarot_reply_to_dict
+        fortune_raw = generate_tarot_fortune(question)
+        fortune = parse_tarot_reply_to_dict(fortune_raw)  # ✅ 文字列を辞書に変換
     except Exception as e:
         return f"OpenAI診断エラー: {e}", 500
 
@@ -1067,7 +1068,7 @@ def tarotmob_entry(uuid_str):
         from pdf_generator_tarot import create_pdf_tarot
         filename = f"{uuid_str}.pdf"
         save_path = os.path.join(UPLOAD_FOLDER, filename)
-        print(f"📄 PDF生成開始: {save_path}")  # デバッグログ
+        print(f"\U0001f4c4 PDF生成開始: {save_path}")  # デバッグログ
         create_pdf_tarot(question, fortune, save_path)
         return redirect(url_for("static", filename=f"pdf/{filename}"))
     except Exception as e:
