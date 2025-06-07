@@ -131,7 +131,8 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
 
 @app.route("/pay.html")
 def pay_page():
-    return render_template("pay.html")
+    return render_template("pay.html", shop_id="default")
+
 
 
 
