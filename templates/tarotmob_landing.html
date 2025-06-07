@@ -2,89 +2,90 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>タロット占い - うらなや</title>
+  <title>タロット占い｜うらなや監修</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/static/style.css">
   <style>
     body {
       margin: 0;
-      font-family: "Helvetica Neue", sans-serif;
       background: url("/static/bg_tarot.jpg") no-repeat center center fixed;
       background-size: cover;
+      font-family: 'Helvetica Neue', sans-serif;
       color: #fff;
-      text-align: center;
     }
-    .overlay {
+    .wrapper {
       background-color: rgba(0, 0, 0, 0.7);
-      padding: 40px 20px;
-      min-height: 100vh;
-    }
-    .content {
-      max-width: 800px;
+      padding: 30px;
+      max-width: 700px;
       margin: 0 auto;
     }
-    .intro-img {
+    .fortune-img {
       width: 180px;
       border-radius: 50%;
-      margin-bottom: 20px;
+      display: block;
+      margin: 0 auto 20px;
       box-shadow: 0 0 10px #000;
     }
     h1 {
-      font-size: 28px;
+      text-align: center;
+      font-size: 24px;
       margin-bottom: 10px;
     }
     p {
-      font-size: 16px;
-      line-height: 1.7;
-      margin-bottom: 25px;
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 20px;
     }
     .btn {
-      display: inline-block;
-      background-color: #ff6699;
+      display: block;
+      text-align: center;
+      background-color: #ff66a5;
       color: white;
-      text-decoration: none;
-      padding: 12px 24px;
-      border-radius: 30px;
       font-weight: bold;
-      margin: 10px 10px;
+      padding: 12px;
+      border-radius: 30px;
+      margin: 20px auto;
+      width: 80%;
+      max-width: 300px;
+      text-decoration: none;
     }
     .btn:hover {
-      background-color: #ff3366;
+      background-color: #ff3388;
     }
     footer {
+      text-align: center;
       margin-top: 40px;
       font-size: 12px;
       color: #ccc;
     }
     footer a {
       color: #ccc;
-      margin: 0 8px;
+      margin: 0 10px;
       text-decoration: underline;
     }
   </style>
 </head>
 <body>
-  <div class="overlay">
-    <div class="content">
-      <img src="/static/fortune_master.png" alt="うらなや" class="intro-img">
-      <h1>タロット占い（1回500円）</h1>
-      <p>ご相談内容に応じて、タロットカードからのメッセージをお届けします。<br>
-      自由にご質問内容を入力でき、対面ではないからこその気軽さも魅力です。</p>
-      <p>このサービスは「うらなや」監修のもと運営されています。<br>
-      決済完了後、1回のみ鑑定が可能です。鑑定完了後は初期画面（このページ）に戻り、再利用には再決済が必要です。</p>
-      <p>※ご利用は18歳以上を推奨しています。未成年者のご利用には保護者の同意が必要です。<br>
-      ※占い結果はエンターテインメントとしてご活用ください。</p>
+  <div class="wrapper">
+    <img src="/static/fortune_master.png" alt="うらなや" class="fortune-img">
+    <h1>タロット占い（1回500円）</h1>
+    <p>ご相談内容に応じて、タロットカードからのメッセージをお届けします。<br>
+    自由にご質問内容を入力でき、気軽にご利用いただけます。</p>
+    <p>「うらなや」監修のもと、決済完了後に1回のみ鑑定が可能です。<br>
+    鑑定完了後は初期画面（このページ）に戻り、再度のご利用には再決済が必要となります。</p>
+    <p>※ご利用は18歳以上を推奨しています。未成年者の方は保護者の同意を得てご利用ください。<br>
+    ※占い結果はエンターテインメントとしてご活用ください。</p>
 
-      <a class="btn" href="/generate_link_tarot/{{ shop_id }}">鑑定へ（お支払い）</a>
-      <a class="btn" href="https://uranaya.wixsite.com/uranaya/about" target="_blank">うらなや紹介</a>
-      <a class="btn" href="https://uranaya.wixsite.com/uranaya" target="_blank">対面申し込み</a>
-      <a class="btn" href="/static/sample_tarot.pdf" target="_blank">鑑定サンプルを見る</a>
+    <a class="btn" href="/generate_link_tarot/{{ shop_id }}">鑑定へ（お支払い）</a>
+    <a class="btn" href="/urana_profile" target="_blank">うらなや紹介</a>
+    <a class="btn" href="/urana_face_to_face" target="_blank">対面申し込み</a>
+    <a class="btn" href="/sample_tarot.pdf" target="_blank">鑑定サンプルを見る</a>
 
-      <footer>
-        <a href="/kiyaku" target="_blank">利用規約</a>｜
-        <a href="/tokusho" target="_blank">特定商取引法</a>｜
-        <a href="/privacy" target="_blank">プライバシーポリシー</a>
-      </footer>
-    </div>
+    <footer>
+      <a href="/kiyaku" target="_blank">利用規約</a>｜
+      <a href="/tokusho" target="_blank">特定商取引法</a>｜
+      <a href="/privacy" target="_blank">プライバシーポリシー</a>
+    </footer>
   </div>
 </body>
 </html>
