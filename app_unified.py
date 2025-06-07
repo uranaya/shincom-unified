@@ -1031,44 +1031,59 @@ def aura_submit(uuid_str):
 
 # ✅ PDF保存フォルダ設定（Render対応）
 
-UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "static/pdf")
 
-# 🔧 PDF出力用フォルダが無ければ作成
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "static/pdf")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-# /tarotmob にアクセス時：UUID生成→リダイレクト
+# --- Webhook受信（KOMOJU） ---
+@app.route("/webhook/tarotmob", methods=["POST"])
+def webhook_tarotmob():
+    data = request.get_json()
+    uuid_str = data.get("external_order_num", "")
+    if not uuid_str:
+        return "NG: UUIDなし", 400
+    with open(USED_UUID_FILE, "a") as f:
+        f.write(f"{uuid_str},1,tarotmob\n")
+    return "OK", 200
+
+
+# --- /tarotmob：UUID生成してリダイレクト ---
 @app.route("/tarotmob", methods=["GET"])
 def tarotmob_redirect():
     new_uuid = str(uuid.uuid4())
     return redirect(f"/tarotmob/{new_uuid}")
 
-# /tarotmob/<uuid>：フォーム表示・送信処理
+
+# --- /tarotmob/<uuid>：フォーム表示・送信処理 ---
 @app.route("/tarotmob/<uuid_str>", methods=["GET", "POST"])
 def tarotmob_entry(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このUUIDは未決済です", 403
+
     if request.method == "GET":
         return render_template("index_tarotmob.html")
-    
+
     # POST: 質問取得
     question = request.form.get("question", "").strip()
     if not question:
         return "質問文が空です", 400
 
-    # タロット占い結果の生成（generate_tarot_fortune は辞書を返す）
+    # タロット占い生成
     try:
         fortune = generate_tarot_fortune(question)
-        # エラーがあればメッセージとともに終了
         if "error" in fortune:
             return fortune["error"], 500
     except Exception as e:
         return f"OpenAI診断エラー: {e}", 500
 
-    # PDF生成処理
+    # PDF生成
     try:
         filename = f"{uuid_str}.pdf"
         save_path = os.path.join(UPLOAD_FOLDER, filename)
-        print(f"📄 PDF生成開始: {save_path}")
         create_pdf_tarot(question, fortune, save_path)
+
+        record_shop_log_if_needed(uuid_str, "tarotmob")  # 鑑定ログ記録
         return redirect(url_for("static", filename=f"pdf/{filename}"))
     except Exception as e:
         return f"PDF生成エラー: {e}", 500
