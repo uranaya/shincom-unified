@@ -8,39 +8,85 @@
     body {
       font-size: 16px;
       padding: 20px;
-      font-family: sans-serif;
+      font-family: "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
       max-width: 600px;
       margin: auto;
-      background: #f8f4f0;
+      background: url("/static/bg_tarot.jpg") no-repeat center center fixed;
+      background-size: cover;
+      color: #f8f0f8;
+      text-shadow: 1px 1px 2px #000;
     }
-    h2 {
+
+    .container {
+      background: rgba(0, 0, 0, 0.7);
+      padding: 25px;
+      border-radius: 12px;
+    }
+
+    h1 {
       text-align: center;
-      color: #663399;
+      font-size: 28px;
+      color: #ffd700;
+      margin-bottom: 10px;
     }
+
+    .catch {
+      text-align: center;
+      font-size: 16px;
+      margin-bottom: 20px;
+      color: #eee;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 10px;
+      color: #ddd;
+    }
+
     textarea, button {
       width: 100%;
       padding: 12px;
       margin: 10px 0;
       box-sizing: border-box;
       font-size: 16px;
-    }
-    button {
-      background-color: #663399;
-      color: white;
+      border-radius: 6px;
       border: none;
-      cursor: pointer;
     }
+
+    textarea {
+      resize: vertical;
+    }
+
+    button {
+      background-color: #8a2be2;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
     button:hover {
-      opacity: 0.9;
+      background-color: #5f1c91;
+    }
+
+    .footer-note {
+      text-align: center;
+      font-size: 12px;
+      margin-top: 20px;
+      color: #ccc;
     }
   </style>
 </head>
 <body>
-  <h2>🔮 タロット占い</h2>
-  <form method="POST" action="">
-    <label for="question">ご相談内容を入力してください（300文字以内）:</label>
-    <textarea id="question" name="question" rows="6" maxlength="300" required></textarea>
-    <button type="submit">占ってもらう</button>
-  </form>
+  <div class="container">
+    <h1>🔮 タロット占い</h1>
+    <div class="catch">悩みの答えは、すでにあなたの中にあります。<br>神秘のタロットがそっと導き出します。</div>
+    <form method="POST" action="">
+      <label for="question">ご相談内容をご自由にお書きください（300文字以内）:</label>
+      <textarea id="question" name="question" rows="6" maxlength="300" required></textarea>
+      <button type="submit">占ってもらう</button>
+    </form>
+    <div class="footer-note">※占い結果はPDFで自動生成されます</div>
+  </div>
 </body>
 </html>
