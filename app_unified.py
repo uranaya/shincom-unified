@@ -1027,8 +1027,15 @@ def aura_submit(uuid_str):
     return send_file(output_path, mimetype="application/pdf")
 
 
+
+
 # ✅ PDF保存フォルダ設定（Render対応）
+
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "static/pdf")
+
+# 🔧 PDF出力用フォルダが無ければ作成
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 
 # /tarotmob にアクセス時：UUID生成→リダイレクト
 @app.route("/tarotmob", methods=["GET"])
