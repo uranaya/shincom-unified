@@ -7,15 +7,16 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.units import mm
 import os
 
-# IPAフォント登録（必ず /static/ipaexg.ttf に置いておくこと）
+# 日本語フォントを登録
 FONT_PATH = os.path.join("static", "ipaexg.ttf")
 FONT_NAME = "IPAexGothic"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
-def create_pdf_tarot(filename, question, tarot_result):
-    c = canvas.Canvas(filename, pagesize=A4)
+def create_pdf_tarot(question: str, result_dict: dict, save_path: str):
+    c = canvas.Canvas(save_path, pagesize=A4)
     width, height = A4
     x_margin = 20 * mm
+    bottom_margin = 30 * mm
     y = height - 30 * mm
 
     styles = getSampleStyleSheet()
@@ -27,62 +28,43 @@ def create_pdf_tarot(filename, question, tarot_result):
         leading=14,
     )
 
-    # 質問文
+    # ヘッダー：質問文
     c.setFont(FONT_NAME, 14)
-    c.drawString(x_margin, y, f"📍 質問内容：{question}")
+    c.drawString(x_margin, y, f"📍 ご相談内容：{question}")
     y -= 25
 
-    # ケルト十字スプレッド
-    c.setFont(FONT_NAME, 13)
-    for i in range(1, 11):
-        card_info = tarot_result["celtic_cross"].get(str(i), {})
-        if not card_info:
-            continue
-        card = card_info.get("card", "不明なカード")
-        meaning = card_info.get("answer", "")
-        text = f"【{i}】{card}：{meaning}"
+    # 各質問とカード結果のリスト
+    c.setFont(FONT_NAME, 12)
+    for idx, item in enumerate(result_dict.get("questions", []), start=1):
+        q_text = item.get("question", "")
+        card = item.get("card", "")
+        answer = item.get("answer", "")
+        text = f"{idx}. カード: {card} （質問: {q_text}）\n{answer}"
         para = Paragraph(text, style)
         w, h = para.wrap(width - 2 * x_margin, y)
-        if y - h < 30 * mm:
+        if y - h < bottom_margin:
+            # 余白に収まらない場合は改ページ
             c.showPage()
             y = height - 30 * mm
-            c.setFont(FONT_NAME, 13)
+            c.setFont(FONT_NAME, 12)
+            para = Paragraph(text, style)
+            w, h = para.wrap(width - 2 * x_margin, y)
         para.drawOn(c, x_margin, y - h)
-        y -= h + 5
+        y -= (h + 10)
 
-    # 総合読み解きとアドバイス
-    c.showPage()
-    y = height - 30 * mm
+    # 総合読み解きとアドバイス（同一ページ内）
     c.setFont(FONT_NAME, 14)
     c.drawString(x_margin, y, "🌟 総合読み解きとアドバイス")
     y -= 20
-
-    advice = tarot_result.get("summary_advice", "（未記入）")
+    advice = result_dict.get("summary_advice", "")
     para = Paragraph(advice, style)
     w, h = para.wrap(width - 2 * x_margin, y)
-    para.drawOn(c, x_margin, y - h)
-    y -= h + 10
-
-    # 補足質問
-    extras = tarot_result.get("extra_questions", [])
-    if extras:
+    # 必要なら改ページ（今回1ページに収まる想定）
+    if y - h < bottom_margin:
         c.showPage()
         y = height - 30 * mm
-        c.setFont(FONT_NAME, 14)
-        c.drawString(x_margin, y, "🔍 補足質問とカードの答え")
-        y -= 20
-        for item in extras:
-            q = item.get("question", "")
-            card = item.get("card", "")
-            ans = item.get("answer", "")
-            text = f"Q. {q}<br/>→ {card}：{ans}"
-            para = Paragraph(text, style)
-            w, h = para.wrap(width - 2 * x_margin, y)
-            if y - h < 30 * mm:
-                c.showPage()
-                y = height - 30 * mm
-                c.setFont(FONT_NAME, 14)
-            para.drawOn(c, x_margin, y - h)
-            y -= h + 10
+    para.drawOn(c, x_margin, y - h)
 
+    # PDF保存
     c.save()
+    print(f"✅ PDF保存成功: {save_path}")

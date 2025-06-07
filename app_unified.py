@@ -24,6 +24,8 @@ from aura_image_utils import generate_aura_image
 from pdf_generator_aura import create_aura_pdf
 from prompt_utils import extract_prompts_from_result
 
+from tarot_fortune_logic import generate_tarot_fortune
+from pdf_generator_tarot import create_pdf_tarot
 
 import sqlite3
 import threading
@@ -1026,45 +1028,36 @@ def aura_submit(uuid_str):
 
 
 # ✅ PDF保存フォルダ設定（Render対応）
-UPLOAD_FOLDER = "static/pdf"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "static/pdf")
 
-# -----------------------------------
-# 🔮 タロット占いルート
-# -----------------------------------
-
-# --- /tarotmob にアクセスされたら UUID を生成して /tarotmob/<uuid> にリダイレクト ---
+# /tarotmob にアクセス時：UUID生成→リダイレクト
 @app.route("/tarotmob", methods=["GET"])
 def tarotmob_redirect():
     new_uuid = str(uuid.uuid4())
     return redirect(f"/tarotmob/{new_uuid}")
 
-
-# --- UUID付きアクセス：フォーム表示＆送信処理 ---
+# /tarotmob/<uuid>：フォーム表示・送信処理
 @app.route("/tarotmob/<uuid_str>", methods=["GET", "POST"])
 def tarotmob_entry(uuid_str):
     if request.method == "GET":
         return render_template("index_tarotmob.html")
-
-    # POST：質問取得
+    
+    # POST: 質問取得
     question = request.form.get("question", "").strip()
     if not question:
         return "質問文が空です", 400
 
-    # 🧠 タロット占い生成（OpenAI API）
+    # タロット占い結果の生成（generate_tarot_fortune は辞書を返す）
     try:
-        from tarot_fortune_logic import generate_tarot_fortune, parse_tarot_reply_to_dict
-        fortune_raw = generate_tarot_fortune(question)
-        if "error" in fortune_raw:
-            return fortune_raw["error"], 500
-        result_text = fortune_raw["result_text"]
-        fortune = parse_tarot_reply_to_dict(result_text)
+        fortune = generate_tarot_fortune(question)
+        # エラーがあればメッセージとともに終了
+        if "error" in fortune:
+            return fortune["error"], 500
     except Exception as e:
         return f"OpenAI診断エラー: {e}", 500
 
-    # 🖨️ PDF生成処理
+    # PDF生成処理
     try:
-        from pdf_generator_tarot import create_pdf_tarot
         filename = f"{uuid_str}.pdf"
         save_path = os.path.join(UPLOAD_FOLDER, filename)
         print(f"📄 PDF生成開始: {save_path}")
