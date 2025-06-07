@@ -149,6 +149,10 @@ def thanks():
 
 
 
+
+
+
+
 def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
@@ -159,6 +163,52 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
         amount = 1
     else:
         amount = 1000 if full_year else 500
+def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="selfmob"):
+    secret = os.getenv("KOMOJU_SECRET_KEY")
+    if not secret:
+        raise RuntimeError("KOMOJU_SECRET_KEY is not set")
+
+    if mode == "renaiselfmob":
+        redirect_path = "renaiselfmob_full" if amount >= 1000 else "renaiselfmob"
+    elif mode == "tarotmob":
+        redirect_path = "tarotmob"  # tarotは1パターンのみ
+    else:
+        redirect_path = "selfmob_full" if amount >= 1000 else "selfmob"
+
+    customer_redirect_url = f"{BASE_URL}/{redirect_path}/{uuid_str}"
+    cancel_url = f"{BASE_URL}/pay.html"  # ← これは戻るボタン用に固定
+
+    payload = {
+        "amount": amount,
+        "currency": "JPY",
+        "return_url": cancel_url,
+        "customer_redirect_url": customer_redirect_url,
+        "payment_data": {
+            "external_order_num": uuid_str
+        },
+        "metadata": {
+            "external_order_num": uuid_str,
+            "shop_id": shop_id
+        },
+        "payment_methods": [
+            {"type": "credit_card"},
+            {"type": "paypay"}
+        ],
+        "description": "シン・コンピューター占い"
+    }
+
+    response = requests.post(
+        "https://komoju.com/api/v1/sessions",
+        auth=(secret, ""),
+        json=payload
+    )
+    response.raise_for_status()
+
+    session = response.json()
+    session_url = session.get("session_url")
+    if not session_url:
+        raise RuntimeError("KOMOJUセッションURLの取得に失敗しました")
+    return session_url
 
     session_url = create_payment_session(
         amount=amount,
