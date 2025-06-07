@@ -1,7 +1,6 @@
 import openai
 import re
 
-
 def generate_tarot_fortune(question: str) -> dict:
     prompt = f"""
 以下はお客様からのご相談内容です：
@@ -47,34 +46,23 @@ def generate_tarot_fortune(question: str) -> dict:
             temperature=0.9,
         )
         result_text = response["choices"][0]["message"]["content"].strip()
-        return {"result_text": result_text}
+        parsed = parse_tarot_reply_to_dict(result_text)
+        return parsed
 
     except Exception as e:
         return {"error": f"OpenAI診断エラー: {e}"}
 
-
-
-
-
 def parse_tarot_reply_to_dict(reply_text: str) -> dict:
-    # 1. ケルト十字全体リーディング
-    spread_match = re.search(r"🔮【1\. 全体リーディング.*?】\n(.*?)\n\n🃏【2\.", reply_text, re.DOTALL)
-    spread_result = spread_match.group(1).strip() if spread_match else ""
-
-    # 2. 個別質問（3問）
-    question_blocks = re.findall(r"【Q\d+】\s*（(.*?)）\n▶︎（(.*?)）：(.*?)\n", reply_text, re.DOTALL)
+    question_blocks = re.findall(r'{\s*"question":\s*"(.+?)",\s*"card":\s*"(.+?)",\s*"answer":\s*"(.+?)"\s*}', reply_text, re.DOTALL)
     extra_questions = [
         {"question": q.strip(), "card": c.strip(), "answer": a.strip()}
         for q, c, a in question_blocks
     ]
 
-    # 3. 総合読み解きとアドバイス
-    summary_match = re.search(r"💬【3\. 総合読み解きとアドバイス】\n(.*)", reply_text, re.DOTALL)
+    summary_match = re.search(r"【総合読み解きとアドバイス】\s*(.*)", reply_text, re.DOTALL)
     summary_advice = summary_match.group(1).strip() if summary_match else ""
 
     return {
-        "spread_result": spread_result,
         "extra_questions": extra_questions,
         "summary_advice": summary_advice
     }
-
