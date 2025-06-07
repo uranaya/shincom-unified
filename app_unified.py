@@ -405,26 +405,6 @@ def generate_link_renai_full(shop_id):
 
 
 
-
-
-@app.route("/generate_link_tarot/<shop_id>")
-def generate_link_tarot(shop_id):
-    return _generate_session_for_shop(shop_id, full_year=False, mode="tarotmob")
-
-
-@app.route("/tarotmob")
-@app.route("/tarotmob-<shop_id>")
-def tarotmob_landing(shop_id="default"):
-    return render_template("tarotmob_landing.html", shop_id=shop_id)
-
-
-@app.route("/tarotmob-<shop_id>")
-def tarotmob_shop_entry(shop_id):
-    session["shop_id"] = shop_id
-    return render_template("pay.html", shop_id=shop_id)
-
-
-
 # 決済済みか判定
 
 def is_paid_uuid(uuid_str):
@@ -1119,6 +1099,7 @@ def aura_submit(uuid_str):
 
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "static/pdf")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 
 # --- タロット：ランディングページ（紹介・決済誘導） ---
 @app.route("/tarotmob", defaults={"shop_id": "default"})
