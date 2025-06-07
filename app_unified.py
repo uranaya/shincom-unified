@@ -179,21 +179,6 @@ def thanks():
 
 
 
-
-
-
-
-
-def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
-    uuid_str = str(uuid.uuid4())
-    return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
-
-    if mode == "renaiselfmob":
-        amount = 1000 if full_year else 500
-    elif mode == "tarotmob":
-        amount = 1
-    else:
-        amount = 1000 if full_year else 500
 def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="selfmob"):
     secret = os.getenv("KOMOJU_SECRET_KEY")
     if not secret:
@@ -240,6 +225,21 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
     if not session_url:
         raise RuntimeError("KOMOJUセッションURLの取得に失敗しました")
     return session_url
+
+
+
+
+
+def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
+    uuid_str = str(uuid.uuid4())
+    return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
+
+    if mode == "renaiselfmob":
+        amount = 1000 if full_year else 500
+    elif mode == "tarotmob":
+        amount = 1
+    else:
+        amount = 1000 if full_year else 500
 
     session_url = create_payment_session(
         amount=amount,
