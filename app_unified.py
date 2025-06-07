@@ -1121,9 +1121,9 @@ UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "static/pdf")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # --- タロット：ランディングページ（紹介・決済誘導） ---
-@app.route("/tarotmob")
+@app.route("/tarotmob", defaults={"shop_id": "default"})
 @app.route("/tarotmob-<shop_id>")
-def tarotmob_landing(shop_id="default"):
+def tarotmob_landing(shop_id):
     return render_template("tarotmob_landing.html", shop_id=shop_id)
 
 
