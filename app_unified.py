@@ -129,11 +129,42 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
 
 
 
+
 @app.route("/pay.html")
-def pay_page():
-    return render_template("pay.html", shop_id="default")
+def pay_redirect():
+    session_id = request.args.get("session_id", "")
+    if not session_id:
+        return "セッションIDがありません", 400
+
+    uuid_str, mode_key = get_uuid_and_mode_by_session_id(session_id)
+    if not uuid_str or not mode_key:
+        return "UUIDまたはモードが見つかりません", 404
+
+    if "tarotmob" in mode_key:
+        return redirect(f"/tarotmob/{uuid_str}")
+    elif "renaiselfmob" in mode_key:
+        return redirect(f"/renaiselfmob/{uuid_str}")
+    elif "selfmob" in mode_key:
+        return redirect(f"/selfmob/{uuid_str}")
+    else:
+        return "不明なモードです", 400
 
 
+
+
+
+def get_uuid_and_mode_by_session_id(session_id):
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) >= 5:
+                    uuid_str, _, mode_key, _, sid = parts
+                    if sid == session_id:
+                        return uuid_str, mode_key
+    except Exception as e:
+        print("❌ セッションIDの検索エラー:", e)
+    return None, None
 
 
 # --- thanksルート ---
