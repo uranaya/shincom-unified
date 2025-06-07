@@ -404,9 +404,19 @@ def generate_link_renai_full(shop_id):
 
 
 
+
+
+
 @app.route("/generate_link_tarot/<shop_id>")
 def generate_link_tarot(shop_id):
     return _generate_session_for_shop(shop_id, full_year=False, mode="tarotmob")
+
+
+@app.route("/tarotmob")
+@app.route("/tarotmob-<shop_id>")
+def tarotmob_landing(shop_id="default"):
+    return render_template("tarotmob_landing.html", shop_id=shop_id)
+
 
 @app.route("/tarotmob-<shop_id>")
 def tarotmob_shop_entry(shop_id):
@@ -1110,27 +1120,20 @@ def aura_submit(uuid_str):
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "static/pdf")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-
-# --- Webhook受信（KOMOJU） ---
-@app.route("/webhook/tarotmob", methods=["POST"])
-def webhook_tarotmob():
-    data = request.get_json()
-    uuid_str = data.get("external_order_num", "")
-    if not uuid_str:
-        return "NG: UUIDなし", 400
-    with open(USED_UUID_FILE, "a") as f:
-        f.write(f"{uuid_str},1,tarotmob\n")
-    return "OK", 200
+# --- タロット：ランディングページ（紹介・決済誘導） ---
+@app.route("/tarotmob")
+@app.route("/tarotmob-<shop_id>")
+def tarotmob_landing(shop_id="default"):
+    return render_template("tarotmob_landing.html", shop_id=shop_id)
 
 
-# --- /tarotmob：UUID生成してリダイレクト ---
-@app.route("/tarotmob", methods=["GET"])
-def tarotmob_redirect():
-    new_uuid = str(uuid.uuid4())
-    return redirect(f"/tarotmob/{new_uuid}")
+# --- タロット：決済セッション生成 ---
+@app.route("/generate_link_tarot/<shop_id>")
+def generate_link_tarot(shop_id):
+    return _generate_session_for_shop(shop_id, full_year=False, mode="tarotmob")
 
 
-# --- /tarotmob/<uuid>：フォーム表示・送信処理 ---
+# --- タロット：決済後にリダイレクトされるUUIDページ（フォーム表示／診断） ---
 @app.route("/tarotmob/<uuid_str>", methods=["GET", "POST"])
 def tarotmob_entry(uuid_str):
     if not is_paid_uuid(uuid_str):
@@ -1144,7 +1147,6 @@ def tarotmob_entry(uuid_str):
     if not question:
         return "質問文が空です", 400
 
-    # タロット占い生成
     try:
         fortune = generate_tarot_fortune(question)
         if "error" in fortune:
@@ -1152,13 +1154,25 @@ def tarotmob_entry(uuid_str):
     except Exception as e:
         return f"OpenAI診断エラー: {e}", 500
 
-    # PDF生成
     try:
         filename = f"{uuid_str}.pdf"
         save_path = os.path.join(UPLOAD_FOLDER, filename)
         create_pdf_tarot(question, fortune, save_path)
 
-        record_shop_log_if_needed(uuid_str, "tarotmob")  # 鑑定ログ記録
+        record_shop_log_if_needed(uuid_str, "tarotmob")
         return redirect(url_for("static", filename=f"pdf/{filename}"))
     except Exception as e:
         return f"PDF生成エラー: {e}", 500
+
+
+# --- タロット：Webhook受信（決済成功） ---
+@app.route("/webhook/tarotmob", methods=["POST"])
+def webhook_tarotmob():
+    data = request.get_json()
+    uuid_str = data.get("external_order_num", "")
+    if not uuid_str:
+        return "NG: UUIDなし", 400
+    with open(USED_UUID_FILE, "a") as f:
+        f.write(f"{uuid_str},1,tarotmob\n")
+    return "OK", 200
+

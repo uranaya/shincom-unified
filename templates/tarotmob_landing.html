@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>タロット占い | うらなや</title>
+</head>
+<body>
+    <h1>ようこそ、うらなやのタロット占いへ</h1>
+    <p>うらなやは、あなたの心に寄り添うオンライン占いサービスです。</p>
+
+    <h2>🔮 タロット占いとは？</h2>
+    <p>タロットカードを用いて、あなたの悩みや運勢を読み解きます。</p>
+
+    <h2>💰 鑑定料金</h2>
+    <p>500円（税込）</p>
+
+    <h2>📌 ご利用の流れ</h2>
+    <ol>
+        <li>「鑑定へ」ボタンを押す</li>
+        <li>決済を完了する</li>
+        <li>自動的に鑑定が開始されます</li>
+    </ol>
+
+    <form action="/generate_link_tarot/{{ shop_id }}" method="get">
+        <button type="submit">鑑定へ（決済に進む）</button>
+    </form>
+</body>
+</html>
