@@ -1,92 +1,115 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>タロット占い | うらなや</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <title>タロット占い｜シン・コンピューター占い</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body {
-      font-size: 16px;
-      padding: 20px;
-      font-family: "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
-      max-width: 700px;
-      margin: auto;
+      margin: 0;
+      font-family: "Helvetica Neue", sans-serif;
       background: url("/static/bg_tarot.jpg") no-repeat center center fixed;
       background-size: cover;
-      color: #f8f0f8;
-      text-shadow: 1px 1px 2px #000;
+      color: #fff8e1;
     }
-
-    .container {
-      background: rgba(0, 0, 0, 0.75);
-      padding: 25px;
+    .hero {
+      text-align: center;
+      padding: 2em 1em;
+      background-color: rgba(0, 0, 0, 0.6);
+    }
+    .hero img {
+      width: 160px;
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    }
+    .section {
+      max-width: 720px;
+      margin: 1.5em auto;
+      background: rgba(0,0,0,0.6);
+      padding: 1.5em;
       border-radius: 12px;
     }
-
-    h1, h2 {
-      color: #ffd700;
-      text-align: center;
-      margin-bottom: 15px;
+    .section h2 {
+      font-size: 1.3em;
+      color: #ffe066;
+      border-bottom: 1px solid #ffe066;
+      margin-bottom: 0.5em;
     }
-
-    p, ol {
-      color: #eee;
-      margin-bottom: 15px;
+    .section p, .section ol {
       line-height: 1.6;
     }
-
-    ol {
-      padding-left: 20px;
-    }
-
-    button {
-      width: 100%;
-      padding: 12px;
-      font-size: 16px;
-      font-weight: bold;
-      color: white;
-      background-color: #8a2be2;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: 0.3s;
-    }
-
-    button:hover {
-      background-color: #5f1c91;
-    }
-
-    .footer-note {
+    .button-area {
       text-align: center;
-      font-size: 12px;
+      margin-top: 2em;
+    }
+    .button {
+      display: inline-block;
+      background-color: #d35400;
+      color: white;
+      padding: 12px 30px;
+      margin: 8px;
+      font-size: 1rem;
+      border-radius: 8px;
+      text-decoration: none;
+      box-shadow: 0 0 8px rgba(255,255,255,0.2);
+    }
+    .button:hover {
+      background-color: #e67e22;
+    }
+    footer {
+      text-align: center;
+      font-size: 0.85em;
+      margin: 3em auto 2em;
       color: #ccc;
-      margin-top: 20px;
+      background: rgba(0,0,0,0.6);
+      padding: 1em 0;
+    }
+    footer a {
+      color: #eee;
+      margin: 0 6px;
+      text-decoration: none;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>ようこそ、うらなやのタロット占いへ</h1>
-    <p>うらなやは、あなたの心に寄り添うオンライン占いサービスです。</p>
-
-    <h2>🔮 タロット占いとは？</h2>
-    <p>タロットカードを用いて、あなたの悩みや運勢を読み解きます。</p>
-
-    <h2>💰 鑑定料金</h2>
-    <p>500円（税込）</p>
-
-    <h2>📌 ご利用の流れ</h2>
-    <ol>
-      <li>「鑑定へ」ボタンを押す</li>
-      <li>決済を完了する</li>
-      <li>自動的に鑑定が開始されます</li>
-    </ol>
-
-    <form action="/generate_link_tarot/{{ shop_id }}" method="get">
-      <button type="submit">鑑定へ（決済に進む）</button>
-    </form>
-
-    <div class="footer-note">※占い結果はPDFでダウンロードできます</div>
+  <div class="hero">
+    <img src="/static/fortune_master.png" alt="占い師うらなや">
+    <h2>うらなや監修タロット占い</h2>
+    <p>カードが導く、あなたの運命とアドバイス</p>
   </div>
+
+  <div class="section">
+    <h2>タロット占いとは？</h2>
+    <p>
+      タロットカードの神秘的な力を使って、あなたの悩みや未来の指針を読み解きます。<br>
+      質問に対してケルト十字スプレッドを展開し、現在・過去・未来、そしてアドバイスまで詳細に読み取ります。
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>鑑定の流れ</h2>
+    <ol>
+      <li>「鑑定へ」ボタンをクリックして決済ページへ</li>
+      <li>決済完了後、自動的に鑑定ページへ移動</li>
+      <li>質問を入力して送信 → タロット占いをPDFで即時提供</li>
+    </ol>
+  </div>
+
+  <div class="button-area">
+    <a href="/generate_link_tarot/{{ shop_id }}" class="button">鑑定へ（500円）</a>
+  </div>
+
+  <footer>
+    <p>
+      お問い合わせ：<a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a> ／
+      TEL：<a href="tel:09075062065">090-7506-2065</a>
+    </p>
+    <p>
+      <a href="/tokutei">特定商取引法</a> |
+      <a href="/privacy">プライバシーポリシー</a> |
+      <a href="/terms">利用規約</a>
+    </p>
+    <p>&copy; 2025 シン・コンピューター占い</p>
+  </footer>
 </body>
 </html>
