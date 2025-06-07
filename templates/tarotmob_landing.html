@@ -1,115 +1,123 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>タロット占い｜シン・コンピューター占い</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <title>タロット占い - うらなや監修</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
+    html, body {
       margin: 0;
-      font-family: "Helvetica Neue", sans-serif;
-      background: url("/static/bg_tarot.jpg") no-repeat center center fixed;
+      padding: 0;
+      font-family: sans-serif;
+      background: url('/static/bg_tarot.jpg') no-repeat center center fixed;
       background-size: cover;
-      color: #fff8e1;
+      color: #fff;
     }
-    .hero {
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: rgba(0,0,0,0.7);
+      padding: 20px;
+      border-radius: 10px;
+      margin-top: 30px;
+    }
+    .header {
       text-align: center;
-      padding: 2em 1em;
-      background-color: rgba(0, 0, 0, 0.6);
     }
-    .hero img {
-      width: 160px;
-      border-radius: 50%;
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    .header img {
+      width: 140px;
+      border-radius: 70px;
+      margin-bottom: 10px;
+    }
+    h1 {
+      margin: 10px 0;
+      font-size: 24px;
     }
     .section {
-      max-width: 720px;
-      margin: 1.5em auto;
-      background: rgba(0,0,0,0.6);
-      padding: 1.5em;
-      border-radius: 12px;
-    }
-    .section h2 {
-      font-size: 1.3em;
-      color: #ffe066;
-      border-bottom: 1px solid #ffe066;
-      margin-bottom: 0.5em;
-    }
-    .section p, .section ol {
+      margin-top: 20px;
       line-height: 1.6;
     }
-    .button-area {
-      text-align: center;
-      margin-top: 2em;
+    .section h2 {
+      font-size: 18px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid #888;
+      padding-bottom: 4px;
     }
-    .button {
+    .button-area, .link-buttons {
+      text-align: center;
+      margin-top: 25px;
+    }
+    .button-area a, .link-buttons a {
       display: inline-block;
-      background-color: #d35400;
-      color: white;
-      padding: 12px 30px;
-      margin: 8px;
-      font-size: 1rem;
-      border-radius: 8px;
+      background: #ffcc00;
+      color: #000;
       text-decoration: none;
-      box-shadow: 0 0 8px rgba(255,255,255,0.2);
+      padding: 14px 24px;
+      border-radius: 30px;
+      font-weight: bold;
+      font-size: 16px;
+      margin: 6px;
     }
-    .button:hover {
-      background-color: #e67e22;
-    }
-    footer {
+    .footer {
+      font-size: 12px;
       text-align: center;
-      font-size: 0.85em;
-      margin: 3em auto 2em;
+      margin-top: 30px;
       color: #ccc;
-      background: rgba(0,0,0,0.6);
-      padding: 1em 0;
     }
-    footer a {
-      color: #eee;
-      margin: 0 6px;
-      text-decoration: none;
+    .footer a {
+      color: #ccc;
+      text-decoration: underline;
+      margin: 0 5px;
     }
   </style>
 </head>
 <body>
-  <div class="hero">
-    <img src="/static/fortune_master.png" alt="占い師うらなや">
-    <h2>うらなや監修タロット占い</h2>
-    <p>カードが導く、あなたの運命とアドバイス</p>
-  </div>
+  <div class="container">
+    <div class="header">
+      <img src="/static/fortune_master.png" alt="うらなや">
+      <h1>うらなや監修・タロット占い</h1>
+      <p>自由な質問に、<br>あなただけのタロット鑑定を</p>
+    </div>
 
-  <div class="section">
-    <h2>タロット占いとは？</h2>
-    <p>
-      タロットカードの神秘的な力を使って、あなたの悩みや未来の指針を読み解きます。<br>
-      質問に対してケルト十字スプレッドを展開し、現在・過去・未来、そしてアドバイスまで詳細に読み取ります。
-    </p>
-  </div>
+    <div class="section">
+      <h2>サービスの特徴</h2>
+      <p>恋愛、仕事、人間関係など、<strong>あなたの自由な質問</strong>に合わせて、タロットが答えを導き出します。</p>
+      <p>経験豊富な「うらなや」監修のもと、<strong>わかりやすく丁寧な文章</strong>で結果をお届けします。</p>
+    </div>
 
-  <div class="section">
-    <h2>鑑定の流れ</h2>
-    <ol>
-      <li>「鑑定へ」ボタンをクリックして決済ページへ</li>
-      <li>決済完了後、自動的に鑑定ページへ移動</li>
-      <li>質問を入力して送信 → タロット占いをPDFで即時提供</li>
-    </ol>
-  </div>
+    <div class="section">
+      <h2>ご利用の流れ</h2>
+      <ol>
+        <li>「鑑定へ」ボタンからお支払いページへ</li>
+        <li>決済完了後、鑑定フォームが表示されます</li>
+        <li>質問を送信するとPDFで鑑定結果が届きます</li>
+      </ol>
+      <p><strong>※決済完了後に1回のみ鑑定可能です。再利用には再決済が必要です。</strong></p>
+    </div>
 
-  <div class="button-area">
-    <a href="/generate_link_tarot/{{ shop_id }}" class="button">鑑定へ（500円）</a>
-  </div>
+    <div class="section">
+      <h2>注意事項</h2>
+      <ul>
+        <li>ご利用は18歳以上を推奨しています</li>
+        <li>未成年者は保護者の同意が必要です</li>
+        <li>占い結果はエンターテインメントとしてご活用ください</li>
+      </ul>
+    </div>
 
-  <footer>
-    <p>
-      お問い合わせ：<a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a> ／
-      TEL：<a href="tel:09075062065">090-7506-2065</a>
-    </p>
-    <p>
-      <a href="/tokutei">特定商取引法</a> |
-      <a href="/privacy">プライバシーポリシー</a> |
-      <a href="/terms">利用規約</a>
-    </p>
-    <p>&copy; 2025 シン・コンピューター占い</p>
-  </footer>
+    <div class="link-buttons">
+      <a href="/uranaya-profile" target="_blank">うらなやについて</a>
+      <a href="https://lin.ee/xxxxxxxx" target="_blank">対面鑑定を申し込む</a>
+      <a href="/sample_tarot.pdf" target="_blank">鑑定サンプルを見る</a>
+    </div>
+
+    <div class="button-area">
+      <a href="/generate_link_tarot/{{ shop_id }}">鑑定へ</a>
+    </div>
+
+    <div class="footer">
+      <a href="/kiyaku" target="_blank">利用規約</a>｜
+      <a href="/tokusho" target="_blank">特定商取引法</a>
+    </div>
+  </div>
 </body>
 </html>
