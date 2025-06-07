@@ -3,14 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <title>決済確認中</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            text-align: center;
+            padding: 50px;
+        }
+
+        .spinner {
+            width: 80px;
+            height: 80px;
+            margin: 30px auto;
+            border: 10px solid #eee;
+            border-top: 10px solid #5f5fc4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        p.note {
+            margin-top: 2em;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
 </head>
 <body>
-    <h1>決済確認中です...</h1>
-    <p id="status">しばらくお待ちください。</p>
+    <h1>ありがとうございます！</h1>
+    <div class="spinner"></div>
+    <p id="status">決済確認中です。しばらくお待ちください...</p>
+    <p class="note">※ 画面が切り替わらない場合はページを再読み込みしてください。</p>
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // URLのクエリパラメータから uuid を取得
         const params = new URLSearchParams(window.location.search);
         const uuid = params.get('uuid');
         if (!uuid) {
@@ -19,31 +50,25 @@
         }
 
         let checks = 0;
-        const maxChecks = 5;  // 5回チェック (約10秒)
-        const interval = 2000; // 2秒間隔でポーリング
+        const maxChecks = 5;  // 約10秒確認
+        const interval = 2000; // 2秒間隔
 
-        // 一定間隔で verify_payment を呼び出す（setInterval を使用）
         const timerId = setInterval(function() {
             fetch(`/verify_payment/${uuid}`)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.status === 'paid') {
-                        // 決済完了。リダイレクト先が返ってくる想定
+                    if (data.status === 'valid' && data.redirect) {
                         clearInterval(timerId);
                         window.location.href = data.redirect;
-                    } else {
-                        checks += 1;
-                        if (checks >= maxChecks) {
-                            // タイムアウト（未決済と判断）
-                            clearInterval(timerId);
-                            document.getElementById('status').innerText = '未決済です。購入が完了していませんでした。';
-                        }
+                    } else if (++checks >= maxChecks) {
+                        clearInterval(timerId);
+                        document.getElementById('status').innerText = '未決済です。購入が完了していませんでした。';
                     }
                 })
                 .catch(error => {
-                    console.error('Payment verify error:', error);
+                    console.error('確認エラー:', error);
                     clearInterval(timerId);
-                    document.getElementById('status').innerText = 'エラーが発生しました。';
+                    document.getElementById('status').innerText = 'エラーが発生しました。時間をおいて再試行してください。';
                 });
         }, interval);
     });
