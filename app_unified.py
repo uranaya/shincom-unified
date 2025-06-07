@@ -292,7 +292,7 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     if mode == "renaiselfmob":
         amount = 1000 if full_year else 500
     elif mode == "tarotmob":
-        amount = 500
+        amount = 1
     else:
         amount = 1000 if full_year else 500
 
