@@ -135,9 +135,7 @@ def thanks():
     if not uuid_str:
         return render_template("thanks.html", uuid_str="")
 
-    # ✅ 決済済みUUIDかどうか確認
     is_paid = False
-
     try:
         if DATABASE_URL:
             conn = psycopg2.connect(DATABASE_URL)
@@ -175,7 +173,6 @@ def verify_payment(uuid_str):
         return jsonify({"status": "error"})
 
 
-
 def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="selfmob"):
     secret = os.getenv("KOMOJU_SECRET_KEY")
     if not secret:
@@ -196,17 +193,9 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
         "currency": "JPY",
         "return_url": cancel_url,
         "customer_redirect_url": customer_redirect_url,
-        "payment_data": {
-            "external_order_num": uuid_str
-        },
-        "metadata": {
-            "external_order_num": uuid_str,
-            "shop_id": shop_id
-        },
-        "payment_methods": [
-            {"type": "credit_card"},
-            {"type": "paypay"}
-        ],
+        "payment_data": {"external_order_num": uuid_str},
+        "metadata": {"external_order_num": uuid_str, "shop_id": shop_id},
+        "payment_methods": [{"type": "credit_card"}, {"type": "paypay"}],
         "description": "シン・コンピューター占い"
     }
 
@@ -220,13 +209,10 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
     return session.get("session_url"), session.get("id")
 
 
-
-
 def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
-
-    amount = 1  # ← 全モード1円に固定（テスト用）
+    amount = 1
 
     session_url, session_id = create_payment_session(
         amount=amount,
@@ -243,27 +229,9 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     except Exception as e:
         print("⚠️ UUID書き込み失敗:", e)
 
-    try:
-        if DATABASE_URL:
-            conn = psycopg2.connect(DATABASE_URL)
-            cur = conn.cursor()
-            today = datetime.now().strftime("%Y-%m-%d")
-            cur.execute("""
-                INSERT INTO webhook_events (uuid, shop_id, service, date)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT DO NOTHING;
-            """, (uuid_str, shop_id, mode_key, today))
-            conn.commit()
-            cur.close()
-            conn.close()
-    except Exception as e:
-        print("❌ DB記録失敗 (generate_link):", e)
-
     resp = make_response(redirect(session_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
-
-
 
 
 def get_uuid_and_mode_by_session_id(session_id):
@@ -280,8 +248,7 @@ def get_uuid_and_mode_by_session_id(session_id):
     return None, None
 
 
-
-
+@app.route("/pay.html")
 def pay_redirect():
     session_id = request.args.get("session_id", "")
     if not session_id:
@@ -289,10 +256,9 @@ def pay_redirect():
 
     uuid_str, mode_key = get_uuid_and_mode_by_session_id(session_id)
     if not uuid_str or not mode_key:
-        print("❌ セッションIDが未登録 or モードなし: ", session_id)
-        return render_template("thanks.html", uuid_str="")  # ← 未決済なら何もしない
+        print("❌ セッションIDが未登録 or モードなし:", session_id)
+        return render_template("thanks.html", uuid_str="")
 
-    # ✅ DBを確認して、実際に決済されたUUIDかチェック
     try:
         if DATABASE_URL:
             conn = psycopg2.connect(DATABASE_URL)
@@ -303,12 +269,11 @@ def pay_redirect():
             conn.close()
             if not result:
                 print("🔒 決済未確認UUID:", uuid_str)
-                return render_template("thanks.html", uuid_str="")  # 未決済ならthanks止まり
+                return render_template("thanks.html", uuid_str="")
     except Exception as e:
         print("❌ DB確認エラー:", e)
         return render_template("thanks.html", uuid_str="")
 
-    # ✅ 決済確認済 → 対応する画面へリダイレクト
     if "tarotmob" in mode_key:
         return redirect(f"/tarotmob/{uuid_str}")
     elif "renaiselfmob" in mode_key:
@@ -317,53 +282,6 @@ def pay_redirect():
         return redirect(f"/selfmob/{uuid_str}")
     else:
         return "不明なモードです", 400
-
-
-
-
-
-
-def record_shop_log_if_needed(uuid_str, mode):
-    try:
-        # UUIDからshop_idを取得
-        with open(USED_UUID_FILE, "r") as f:
-            lines = f.readlines()
-        for line in lines:
-            parts = line.strip().split(",")
-            if len(parts) >= 4 and parts[0] == uuid_str:
-                shop_id = parts[3]
-                break
-        else:
-            shop_id = "default"
-
-        today = datetime.now().strftime("%Y-%m-%d")
-
-        # ✅ DBにも記録（同日・同shop_id・同modeがあれば更新）
-        if DATABASE_URL:
-            try:
-                conn = psycopg2.connect(DATABASE_URL)
-                cur = conn.cursor()
-                cur.execute("""
-                    INSERT INTO shop_logs (date, shop_id, service, count)
-                    VALUES (%s, %s, %s, 1)
-                    ON CONFLICT (date, shop_id, service)
-                    DO UPDATE SET count = shop_logs.count + 1;
-                """, (today, shop_id, mode))@app.route("/pay.html")
-                conn.commit()
-                cur.close()
-                conn.close()
-                print(f"📝 DBカウント更新: {today} / {shop_id} / {mode}")
-            except Exception as e:
-                print("❌ DB記録失敗 (record_shop_log_if_needed):", e)
-
-        # ✅ CSVにもログ（参考用）
-        log_line = f"{shop_id},{mode},{today}\n"
-        with open("shop_logs.csv", "a") as log:
-            log.write(log_line)
-            print(f"🧮 CSVカウント記録: {log_line.strip()}")
-
-    except Exception as e:
-        print("⚠️ カウント記録エラー:", e)
 
 
 
