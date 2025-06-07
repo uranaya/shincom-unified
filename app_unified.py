@@ -130,6 +130,20 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
 
 
 
+from flask import Flask, request, redirect, render_template, make_response
+import os
+import uuid
+import requests
+import psycopg2
+from datetime import datetime
+
+app = Flask(__name__)
+
+BASE_URL = os.getenv("BASE_URL", "https://shincom-unified.onrender.com")
+USED_UUID_FILE = "used_uuids.csv"
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+
 @app.route("/pay.html")
 def pay_redirect():
     session_id = request.args.get("session_id", "")
@@ -150,9 +164,6 @@ def pay_redirect():
         return "不明なモードです", 400
 
 
-
-
-
 def get_uuid_and_mode_by_session_id(session_id):
     try:
         with open(USED_UUID_FILE, "r") as f:
@@ -167,16 +178,12 @@ def get_uuid_and_mode_by_session_id(session_id):
     return None, None
 
 
-# --- thanksルート ---
 @app.route("/thanks")
 def thanks():
     uuid_str = request.cookies.get("uuid") or request.args.get("uuid")
     if not uuid_str:
-        # UUID未指定の場合は通常のthanksページ
         return render_template("thanks.html", uuid_str="")
-    # UUIDあり: thanksページにuuidを渡す（カウント処理は /start へ移動）
     return render_template("thanks.html", uuid_str=uuid_str)
-
 
 
 def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="selfmob"):
@@ -187,12 +194,12 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
     if mode == "renaiselfmob":
         redirect_path = "renaiselfmob_full" if amount >= 1000 else "renaiselfmob"
     elif mode == "tarotmob":
-        redirect_path = "tarotmob"  # tarotは1パターンのみ
+        redirect_path = "tarotmob"
     else:
         redirect_path = "selfmob_full" if amount >= 1000 else "selfmob"
 
     customer_redirect_url = f"{BASE_URL}/{redirect_path}/{uuid_str}"
-    cancel_url = f"{BASE_URL}/pay.html"  # ← これは戻るボタン用に固定
+    cancel_url = f"{BASE_URL}/pay.html"
 
     payload = {
         "amount": amount,
@@ -227,19 +234,11 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
     return session_url
 
 
-
-
-
 def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
 
-    if mode == "renaiselfmob":
-        amount = 1000 if full_year else 500
-    elif mode == "tarotmob":
-        amount = 1
-    else:
-        amount = 1000 if full_year else 500
+    amount = 1  # ✅ テスト用に全モード1円に固定
 
     session_url = create_payment_session(
         amount=amount,
@@ -249,56 +248,11 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
         mode=mode
     )
 
+    session_id = session_url.split("session_id=")[-1]
     mode_key = mode + ("_full" if full_year and mode != "tarotmob" else "")
     try:
         with open(USED_UUID_FILE, "a") as f:
-            f.write(f"{uuid_str},,{mode_key},{shop_id}\n")
-    except Exception as e:
-        print("⚠️ UUID書き込み失敗:", e)
-
-    try:
-        if DATABASE_URL:
-            conn = psycopg2.connect(DATABASE_URL)
-            cur = conn.cursor()
-            today = datetime.now().strftime("%Y-%m-%d")
-            cur.execute("""
-                INSERT INTO webhook_events (uuid, shop_id, service, date)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT DO NOTHING;
-            """, (uuid_str, shop_id, mode_key, today))
-            conn.commit()
-            cur.close()
-            conn.close()
-    except Exception as e:
-        print("❌ DB記録失敗 (generate_link):", e)
-
-    resp = make_response(redirect(session_url))
-    resp.set_cookie("uuid", uuid_str, max_age=600)
-    return resp
-
-
-
-
-
-def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
-    uuid_str = str(uuid.uuid4())
-    return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
-
-    # ✅ 全モード一時的に1円に統一（テスト用）
-    amount = 1
-
-    session_url = create_payment_session(
-        amount=amount,
-        uuid_str=uuid_str,
-        return_url_thanks=return_url_thanks,
-        shop_id=shop_id,
-        mode=mode
-    )
-
-    mode_key = mode + ("_full" if full_year and mode != "tarotmob" else "")
-    try:
-        with open(USED_UUID_FILE, "a") as f:
-            f.write(f"{uuid_str},,{mode_key},{shop_id}\n")
+            f.write(f"{uuid_str},,{mode_key},{shop_id},{session_id}\n")
     except Exception as e:
         print("⚠️ UUID書き込み失敗:", e)
 
