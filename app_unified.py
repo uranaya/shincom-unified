@@ -1043,10 +1043,6 @@ def tarotmob_redirect():
 # --- UUID付きアクセス：フォーム表示＆送信処理 ---
 @app.route("/tarotmob/<uuid_str>", methods=["GET", "POST"])
 def tarotmob_entry(uuid_str):
-    # 🔓 決済制限なし（必要あれば is_paid_uuid(uuid_str) を追加）
-    # if not is_paid_uuid(uuid_str):
-    #     return "このUUIDは未決済です", 403
-
     if request.method == "GET":
         return render_template("index_tarotmob.html")
 
@@ -1059,7 +1055,10 @@ def tarotmob_entry(uuid_str):
     try:
         from tarot_fortune_logic import generate_tarot_fortune, parse_tarot_reply_to_dict
         fortune_raw = generate_tarot_fortune(question)
-        fortune = parse_tarot_reply_to_dict(fortune_raw)  # ✅ 文字列を辞書に変換
+        if "error" in fortune_raw:
+            return fortune_raw["error"], 500
+        result_text = fortune_raw["result_text"]
+        fortune = parse_tarot_reply_to_dict(result_text)
     except Exception as e:
         return f"OpenAI診断エラー: {e}", 500
 
@@ -1068,7 +1067,7 @@ def tarotmob_entry(uuid_str):
         from pdf_generator_tarot import create_pdf_tarot
         filename = f"{uuid_str}.pdf"
         save_path = os.path.join(UPLOAD_FOLDER, filename)
-        print(f"\U0001f4c4 PDF生成開始: {save_path}")  # デバッグログ
+        print(f"📄 PDF生成開始: {save_path}")
         create_pdf_tarot(question, fortune, save_path)
         return redirect(url_for("static", filename=f"pdf/{filename}"))
     except Exception as e:
