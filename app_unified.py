@@ -128,6 +128,13 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
             traceback.print_exc()
 
 
+
+@app.route("/pay.html")
+def pay_page():
+    return render_template("pay.html")
+
+
+
 # --- thanksルート ---
 @app.route("/thanks")
 def thanks():
