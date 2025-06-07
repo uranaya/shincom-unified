@@ -142,25 +142,29 @@ def thanks():
 
 
 def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="selfmob"):
+    """KOMOJUのセッションAPIを使って支払い画面URLを生成する（selfmob系ルート自動判定付き）"""
     secret = os.getenv("KOMOJU_SECRET_KEY")
     if not secret:
         raise RuntimeError("KOMOJU_SECRET_KEY is not set")
 
+    # ✅ リダイレクト先：決済成功時（UUIDあり）を分岐
     if mode == "renaiselfmob":
         redirect_path = "renaiselfmob_full" if amount >= 1000 else "renaiselfmob"
     elif mode == "tarotmob":
-        redirect_path = f"tarotmob/{uuid_str}"
+        redirect_path = "tarotmob_full" if amount >= 1000 else "tarotmob"
     else:
         redirect_path = "selfmob_full" if amount >= 1000 else "selfmob"
 
-    customer_redirect_url = f"{BASE_URL}/{redirect_path}"
-    cancel_url = customer_redirect_url
+    customer_redirect_url = f"{BASE_URL}/{redirect_path}/{uuid_str}"
+
+    # ✅ 戻るボタンやキャンセル用URLは常に共通で pay.html に戻す
+    cancel_url = f"{BASE_URL}/pay.html"
 
     payload = {
         "amount": amount,
         "currency": "JPY",
-        "return_url": cancel_url,
-        "customer_redirect_url": customer_redirect_url,
+        "return_url": cancel_url,  # ← 戻るボタン押下時の遷移先
+        "customer_redirect_url": customer_redirect_url,  # ← 決済成功後の遷移先
         "payment_data": {
             "external_order_num": uuid_str
         },
@@ -181,11 +185,13 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
         json=payload
     )
     response.raise_for_status()
+
     session = response.json()
     session_url = session.get("session_url")
     if not session_url:
         raise RuntimeError("KOMOJUセッションURLの取得に失敗しました")
     return session_url
+
 
 
 
