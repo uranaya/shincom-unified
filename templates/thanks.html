@@ -2,63 +2,51 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>決済完了処理中｜シン・コンピューター占い</title>
+    <title>ありがとうございます</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body {
-            background-color: #111;
-            color: #fff;
             font-family: sans-serif;
             text-align: center;
-            padding: 80px 20px;
+            margin-top: 20%;
+            background-color: #f9f9f9;
         }
-        .loader {
-            border: 6px solid #333;
-            border-top: 6px solid #f90;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            animation: spin 1s linear infinite;
-            margin: 30px auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        h1 {
+            font-size: 2rem;
+            color: #333;
         }
         .note {
-            font-size: 14px;
-            margin-top: 20px;
-            color: #ccc;
+            margin-top: 1em;
+            color: #666;
+            font-size: 1rem;
         }
     </style>
-    <script>
-        window.onload = function () {
-            const urlParams = new URLSearchParams(window.location.search);
-            const uuid = urlParams.get('uuid');
-            const session_id = urlParams.get('session_id');
-            if (uuid) {
-                let redirectUrl = `/start/${uuid}`;
-                if (session_id) {
-                    redirectUrl += `?session_id=${session_id}`;
-                }
-                setTimeout(function () {
-                    window.location.href = redirectUrl;
-                }, 2000);
-            }
-        }
-    </script>
 </head>
 <body>
-    <h1>決済完了処理中...</h1>
-    <div class="loader"></div>
-    <div class="note">
-        ※ 通信状況により表示に1分程度かかる場合があります。<br>
-        ※ このページをブックマークしておくと再アクセス可能です。
-    </div>
-    <div class="note" style="color: #ffb;">
-        ※「戻る」ボタンでこのページに戻られた方へ：<br>
-        再決済が必要な場合があります。<br>
-        エラーが出た場合は一度このページを再読み込みしてから進んでください。
-    </div>
+    <h1>ありがとうございます！</h1>
+    <div class="note">確認中です。しばらくお待ちください...</div>
+
+    <script>
+        window.onload = async function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const uuid = urlParams.get('uuid');
+            if (!uuid) return;
+
+            try {
+                const res = await fetch(`/verify_payment/${uuid}`);
+                const data = await res.json();
+                if (data.status === "valid") {
+                    // ✅ 決済済みのみ遷移
+                    window.location.href = `/start/${uuid}`;
+                } else {
+                    // ❌ 決済未確認
+                    document.querySelector(".note").innerText = "決済が確認できませんでした。戻るボタンで再度お試しください。";
+                }
+            } catch (e) {
+                console.error("確認中にエラー:", e);
+                document.querySelector(".note").innerText = "確認中にエラーが発生しました。ページを再読み込みしてください。";
+            }
+        };
+    </script>
 </body>
 </html>
