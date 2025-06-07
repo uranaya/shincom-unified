@@ -280,47 +280,7 @@ def get_uuid_and_mode_by_session_id(session_id):
     return None, None
 
 
-@app.route("/pay.html")
-def pay_redirect():
-    session_id = request.args.get("session_id", "")
-    if not session_id:
-        return "セッションIDがありません", 400
 
-    # ✅ KOMOJUのセッションステータスを確認
-    try:
-        komoju_secret = os.getenv("KOMOJU_SECRET_KEY")
-        if not komoju_secret:
-            raise RuntimeError("KOMOJU_SECRET_KEY is not set")
-
-        response = requests.get(
-            f"https://komoju.com/api/v1/sessions/{session_id}",
-            auth=(komoju_secret, "")
-        )
-        response.raise_for_status()
-        session_data = response.json()
-
-        # ✅ ステータスを確認（authorized または captured ならOK）
-        status = session_data.get("status", "")
-        if status not in ["authorized", "captured"]:
-            return render_template("thanks.html", uuid_str="")  # 通常thanks画面に戻す
-
-        # ✅ 成功している場合のみ uuid + mode を探してリダイレクト
-        uuid_str, mode_key = get_uuid_and_mode_by_session_id(session_id)
-        if not uuid_str or not mode_key:
-            return "UUIDまたはモードが見つかりません", 404
-
-        if "tarotmob" in mode_key:
-            return redirect(f"/tarotmob/{uuid_str}")
-        elif "renaiselfmob" in mode_key:
-            return redirect(f"/renaiselfmob/{uuid_str}")
-        elif "selfmob" in mode_key:
-            return redirect(f"/selfmob/{uuid_str}")
-        else:
-            return "不明なモードです", 400
-
-    except Exception as e:
-        print("❌ KOMOJUセッション確認エラー:", e)
-        return "セッション確認に失敗しました", 500
 
 
 
@@ -351,7 +311,43 @@ def record_shop_log_if_needed(uuid_str, mode):
                     VALUES (%s, %s, %s, 1)
                     ON CONFLICT (date, shop_id, service)
                     DO UPDATE SET count = shop_logs.count + 1;
-                """, (today, shop_id, mode))
+                """, (today, shop_id, mode))@app.route("/pay.html")
+def pay_redirect():
+    session_id = request.args.get("session_id", "")
+    if not session_id:
+        return "セッションIDがありません", 400
+
+    uuid_str, mode_key = get_uuid_and_mode_by_session_id(session_id)
+    if not uuid_str or not mode_key:
+        print("❌ セッションIDが未登録 or モードなし: ", session_id)
+        return render_template("thanks.html", uuid_str="")  # ← 未決済なら何もしない
+
+    # ✅ DBを確認して、実際に決済されたUUIDかチェック
+    try:
+        if DATABASE_URL:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute("SELECT 1 FROM webhook_events WHERE uuid = %s", (uuid_str,))
+            result = cur.fetchone()
+            cur.close()
+            conn.close()
+            if not result:
+                print("🔒 決済未確認UUID:", uuid_str)
+                return render_template("thanks.html", uuid_str="")  # 未決済ならthanks止まり
+    except Exception as e:
+        print("❌ DB確認エラー:", e)
+        return render_template("thanks.html", uuid_str="")
+
+    # ✅ 決済確認済 → 対応する画面へリダイレクト
+    if "tarotmob" in mode_key:
+        return redirect(f"/tarotmob/{uuid_str}")
+    elif "renaiselfmob" in mode_key:
+        return redirect(f"/renaiselfmob/{uuid_str}")
+    elif "selfmob" in mode_key:
+        return redirect(f"/selfmob/{uuid_str}")
+    else:
+        return "不明なモードです", 400
+
                 conn.commit()
                 cur.close()
                 conn.close()
