@@ -65,8 +65,14 @@
       transition: 0.3s;
     }
 
-    button:hover {
+    button:hover:enabled {
       background-color: #5f1c91;
+    }
+
+    #loading {
+      display: none;
+      text-align: center;
+      margin-top: 20px;
     }
 
     .footer-note {
@@ -80,13 +86,31 @@
 <body>
   <div class="container">
     <h1>🔮 タロット占い</h1>
-    <div class="catch">悩みの答えは、すでにあなたの中にあります。<br>神秘のタロットがそっと導き出します。</div>
-    <form method="POST" action="">
+    <div class="catch">
+      悩みの答えは、すでにあなたの中にあります。<br>
+      神秘のタロットがそっと導き出します。
+    </div>
+
+    <form method="POST" action="" onsubmit="handleSubmit()">
       <label for="question">ご相談内容をご自由にお書きください（300文字以内）:</label>
       <textarea id="question" name="question" rows="6" maxlength="300" required></textarea>
-      <button type="submit">占ってもらう</button>
+      <button id="submitBtn" type="submit">占ってもらう</button>
     </form>
+
+    <div id="loading">
+      <p>カードを展開中... 少々お待ちください。</p>
+      <img src="/static/tarot_loading.gif" alt="タロット中" width="150">
+    </div>
+
     <div class="footer-note">※占い結果はPDFで自動生成されます</div>
   </div>
+
+  <script>
+    function handleSubmit() {
+      const btn = document.getElementById("submitBtn");
+      btn.disabled = true;
+      document.getElementById("loading").style.display = "block";
+    }
+  </script>
 </body>
 </html>
