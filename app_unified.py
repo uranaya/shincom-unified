@@ -285,6 +285,47 @@ def pay_redirect():
 
 
 
+def record_shop_log_if_needed(uuid_str, mode):
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            lines = f.readlines()
+        for line in lines:
+            parts = line.strip().split(",")
+            if len(parts) >= 4 and parts[0] == uuid_str:
+                shop_id = parts[3]
+                break
+        else:
+            shop_id = "default"
+
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        if DATABASE_URL:
+            try:
+                conn = psycopg2.connect(DATABASE_URL)
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO shop_logs (date, shop_id, service, count)
+                    VALUES (%s, %s, %s, 1)
+                    ON CONFLICT (date, shop_id, service)
+                    DO UPDATE SET count = shop_logs.count + 1;
+                """, (today, shop_id, mode))
+                conn.commit()
+                cur.close()
+                conn.close()
+                print(f"📝 DBカウント更新: {today} / {shop_id} / {mode}")
+            except Exception as e:
+                print("❌ DB記録失敗 (record_shop_log_if_needed):", e)
+
+        with open("shop_logs.csv", "a") as log:
+            log.write(f"{shop_id},{mode},{today}\n")
+            print(f"🧮 CSVカウント記録: {shop_id},{mode},{today}")
+
+    except Exception as e:
+        print("⚠️ カウント記録エラー:", e)
+
+
+
+
 
 
 # --- 決済リンク生成ルート ---
