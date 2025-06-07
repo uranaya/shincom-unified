@@ -212,7 +212,14 @@ def create_payment_session(amount, uuid_str, return_url_thanks, shop_id, mode="s
 def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     uuid_str = str(uuid.uuid4())
     return_url_thanks = f"{BASE_URL}/thanks?uuid={uuid_str}"
-    amount = 1
+
+    # 💰 金額をモード・期間に応じて設定
+    if mode == "tarotmob":
+        amount = 500  # タロットは固定500円
+    elif full_year:
+        amount = 1000  # 通常鑑定
+    else:
+        amount = 500  # 簡易鑑定
 
     session_url, session_id = create_payment_session(
         amount=amount,
@@ -232,6 +239,7 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     resp = make_response(redirect(session_url))
     resp.set_cookie("uuid", uuid_str, max_age=600)
     return resp
+
 
 
 def get_uuid_and_mode_by_session_id(session_id):
