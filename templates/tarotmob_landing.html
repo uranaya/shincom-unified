@@ -1,10 +1,71 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>タロット占い | うらなや</title>
+  <meta charset="UTF-8">
+  <title>タロット占い | うらなや</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-size: 16px;
+      padding: 20px;
+      font-family: "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+      max-width: 700px;
+      margin: auto;
+      background: url("/static/bg_tarot.jpg") no-repeat center center fixed;
+      background-size: cover;
+      color: #f8f0f8;
+      text-shadow: 1px 1px 2px #000;
+    }
+
+    .container {
+      background: rgba(0, 0, 0, 0.75);
+      padding: 25px;
+      border-radius: 12px;
+    }
+
+    h1, h2 {
+      color: #ffd700;
+      text-align: center;
+      margin-bottom: 15px;
+    }
+
+    p, ol {
+      color: #eee;
+      margin-bottom: 15px;
+      line-height: 1.6;
+    }
+
+    ol {
+      padding-left: 20px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      color: white;
+      background-color: #8a2be2;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background-color: #5f1c91;
+    }
+
+    .footer-note {
+      text-align: center;
+      font-size: 12px;
+      color: #ccc;
+      margin-top: 20px;
+    }
+  </style>
 </head>
 <body>
+  <div class="container">
     <h1>ようこそ、うらなやのタロット占いへ</h1>
     <p>うらなやは、あなたの心に寄り添うオンライン占いサービスです。</p>
 
@@ -16,13 +77,16 @@
 
     <h2>📌 ご利用の流れ</h2>
     <ol>
-        <li>「鑑定へ」ボタンを押す</li>
-        <li>決済を完了する</li>
-        <li>自動的に鑑定が開始されます</li>
+      <li>「鑑定へ」ボタンを押す</li>
+      <li>決済を完了する</li>
+      <li>自動的に鑑定が開始されます</li>
     </ol>
 
     <form action="/generate_link_tarot/{{ shop_id }}" method="get">
-        <button type="submit">鑑定へ（決済に進む）</button>
+      <button type="submit">鑑定へ（決済に進む）</button>
     </form>
+
+    <div class="footer-note">※占い結果はPDFでダウンロードできます</div>
+  </div>
 </body>
 </html>
