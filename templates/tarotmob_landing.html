@@ -2,121 +2,88 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>タロット占い - うらなや監修</title>
+  <title>タロット占い - うらなや</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    html, body {
+    body {
       margin: 0;
-      padding: 0;
-      font-family: sans-serif;
-      background: url('/static/bg_tarot.jpg') no-repeat center center fixed;
+      font-family: "Helvetica Neue", sans-serif;
+      background: url("/static/bg_tarot.jpg") no-repeat center center fixed;
       background-size: cover;
       color: #fff;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      background-color: rgba(0,0,0,0.7);
-      padding: 20px;
-      border-radius: 10px;
-      margin-top: 30px;
-    }
-    .header {
       text-align: center;
     }
-    .header img {
-      width: 140px;
-      border-radius: 70px;
-      margin-bottom: 10px;
+    .overlay {
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+    .content {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .intro-img {
+      width: 180px;
+      border-radius: 50%;
+      margin-bottom: 20px;
+      box-shadow: 0 0 10px #000;
     }
     h1 {
-      margin: 10px 0;
-      font-size: 24px;
+      font-size: 28px;
+      margin-bottom: 10px;
     }
-    .section {
-      margin-top: 20px;
-      line-height: 1.6;
+    p {
+      font-size: 16px;
+      line-height: 1.7;
+      margin-bottom: 25px;
     }
-    .section h2 {
-      font-size: 18px;
-      margin-bottom: 8px;
-      border-bottom: 1px solid #888;
-      padding-bottom: 4px;
-    }
-    .button-area, .link-buttons {
-      text-align: center;
-      margin-top: 25px;
-    }
-    .button-area a, .link-buttons a {
+    .btn {
       display: inline-block;
-      background: #ffcc00;
-      color: #000;
+      background-color: #ff6699;
+      color: white;
       text-decoration: none;
-      padding: 14px 24px;
+      padding: 12px 24px;
       border-radius: 30px;
       font-weight: bold;
-      font-size: 16px;
-      margin: 6px;
+      margin: 10px 10px;
     }
-    .footer {
+    .btn:hover {
+      background-color: #ff3366;
+    }
+    footer {
+      margin-top: 40px;
       font-size: 12px;
-      text-align: center;
-      margin-top: 30px;
       color: #ccc;
     }
-    .footer a {
+    footer a {
       color: #ccc;
+      margin: 0 8px;
       text-decoration: underline;
-      margin: 0 5px;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <img src="/static/fortune_master.png" alt="うらなや">
-      <h1>うらなや監修・タロット占い</h1>
-      <p>自由な質問に、<br>あなただけのタロット鑑定を</p>
-    </div>
+  <div class="overlay">
+    <div class="content">
+      <img src="/static/fortune_master.png" alt="うらなや" class="intro-img">
+      <h1>タロット占い（1回500円）</h1>
+      <p>ご相談内容に応じて、タロットカードからのメッセージをお届けします。<br>
+      自由にご質問内容を入力でき、対面ではないからこその気軽さも魅力です。</p>
+      <p>このサービスは「うらなや」監修のもと運営されています。<br>
+      決済完了後、1回のみ鑑定が可能です。鑑定完了後は初期画面（このページ）に戻り、再利用には再決済が必要です。</p>
+      <p>※ご利用は18歳以上を推奨しています。未成年者のご利用には保護者の同意が必要です。<br>
+      ※占い結果はエンターテインメントとしてご活用ください。</p>
 
-    <div class="section">
-      <h2>サービスの特徴</h2>
-      <p>恋愛、仕事、人間関係など、<strong>あなたの自由な質問</strong>に合わせて、タロットが答えを導き出します。</p>
-      <p>経験豊富な「うらなや」監修のもと、<strong>わかりやすく丁寧な文章</strong>で結果をお届けします。</p>
-    </div>
+      <a class="btn" href="/generate_link_tarot/{{ shop_id }}">鑑定へ（お支払い）</a>
+      <a class="btn" href="https://uranaya.wixsite.com/uranaya/about" target="_blank">うらなや紹介</a>
+      <a class="btn" href="https://uranaya.wixsite.com/uranaya" target="_blank">対面申し込み</a>
+      <a class="btn" href="/static/sample_tarot.pdf" target="_blank">鑑定サンプルを見る</a>
 
-    <div class="section">
-      <h2>ご利用の流れ</h2>
-      <ol>
-        <li>「鑑定へ」ボタンからお支払いページへ</li>
-        <li>決済完了後、鑑定フォームが表示されます</li>
-        <li>質問を送信するとPDFで鑑定結果が届きます</li>
-      </ol>
-      <p><strong>※決済完了後に1回のみ鑑定可能です。再利用には再決済が必要です。</strong></p>
-    </div>
-
-    <div class="section">
-      <h2>注意事項</h2>
-      <ul>
-        <li>ご利用は18歳以上を推奨しています</li>
-        <li>未成年者は保護者の同意が必要です</li>
-        <li>占い結果はエンターテインメントとしてご活用ください</li>
-      </ul>
-    </div>
-
-    <div class="link-buttons">
-      <a href="https://uranaya.wixsite.com/uranaya" target="_blank">うらなやについて</a>
-      <a href="https://uranaya.wixsite.com/uranaya" target="_blank">対面鑑定を申し込む</a>
-      <a href="/static/sample_tarot.pdf" target="_blank">鑑定サンプルを見る</a>
-    </div>
-
-    <div class="button-area">
-      <a href="/generate_link_tarot/{{ shop_id }}">鑑定へ</a>
-    </div>
-
-    <div class="footer">
-      <a href="/kiyaku" target="_blank">利用規約</a>｜
-      <a href="/tokusho" target="_blank">特定商取引法</a>
+      <footer>
+        <a href="/kiyaku" target="_blank">利用規約</a>｜
+        <a href="/tokusho" target="_blank">特定商取引法</a>｜
+        <a href="/privacy" target="_blank">プライバシーポリシー</a>
+      </footer>
     </div>
   </div>
 </body>
