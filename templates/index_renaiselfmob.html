@@ -6,20 +6,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
+      margin: 0;
+      padding: 0;
       font-family: sans-serif;
-      margin: 0 auto;
-      max-width: 500px;
-      padding: 20px;
-      background: #f9f9f9;
+      background-image: url('/static/bg_tarot.jpg');
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      background-position: center;
     }
+
+    .form-wrapper {
+      background-color: rgba(255, 255, 255, 0.92);
+      max-width: 500px;
+      margin: auto;
+      padding: 20px;
+      box-sizing: border-box;
+      min-height: 100vh;
+    }
+
     h2 {
       text-align: center;
     }
+
     label {
       display: block;
       margin-top: 15px;
       font-weight: bold;
     }
+
     input[type="date"],
     input[type="text"],
     button {
@@ -29,6 +44,7 @@
       box-sizing: border-box;
       margin-top: 5px;
     }
+
     .submit-area {
       margin-top: 20px;
       text-align: center;
@@ -36,40 +52,42 @@
   </style>
 </head>
 <body>
-  <h2>💘 恋愛占いフォーム（決済完了後）</h2>
-  <form method="POST" onsubmit="disableSubmitButton()">
-    <label for="user_birth">あなたの生年月日</label>
-    <input type="date" id="user_birth" name="user_birth" required>
+  <div class="form-wrapper">
+    <h2>💘 恋愛占いフォーム（決済完了後）</h2>
+    <form method="POST" onsubmit="disableSubmitButton()">
+      <label for="user_birth">あなたの生年月日</label>
+      <input type="date" id="user_birth" name="user_birth" required>
 
-    <label for="partner_birth">お相手の生年月日（任意：おひとりの方、生年月日が分からない方は空欄で）</label>
-    <input type="date" id="partner_birth" name="partner_birth">
+      <label for="partner_birth">お相手の生年月日（任意：おひとりの方、生年月日が分からない方は空欄で）</label>
+      <input type="date" id="partner_birth" name="partner_birth">
 
-    <div class="submit-area">
-      <button type="submit" id="submitBtn">🔮 鑑定スタート</button>
-    </div>
-  </form>
+      <div class="submit-area">
+        <button type="submit" id="submitBtn">🔮 鑑定スタート</button>
+      </div>
+    </form>
 
-  <script>
-    function disableSubmitButton() {
-      const btn = document.getElementById("submitBtn");
-      btn.disabled = true;
-      btn.textContent = "鑑定中... 1分程度お待ちください";
-    }
-  </script>
+    <script>
+      function disableSubmitButton() {
+        const btn = document.getElementById("submitBtn");
+        btn.disabled = true;
+        btn.textContent = "鑑定中... 1分程度お待ちください";
+      }
+    </script>
 
-  <footer style="text-align:center; font-size:small; margin-top:40px; padding:20px; background-color:#f9f9f9;">
-    <p style="margin-bottom:10px;">
-      ご利用は18歳以上を推奨しています。未成年者のご利用は保護者の同意を前提とします。
-    </p>
-    <p style="margin-bottom:10px;">
-      お問い合わせ：<a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a> ／ TEL：090-7506-2065
-    </p>
-    <nav>
-      <a href="/tokutei" target="_blank" style="margin:0 10px;">特定商取引法に基づく表記</a> |
-      <a href="/privacy" target="_blank" style="margin:0 10px;">プライバシーポリシー</a> |
-      <a href="/terms" target="_blank" style="margin:0 10px;">利用規約</a>
-    </nav>
-    <p style="margin-top:10px; color:gray;">&copy; 2025 シン・コンピューター占い</p>
-  </footer>
+    <footer style="text-align:center; font-size:small; margin-top:40px; padding:20px; background-color:#f9f9f9;">
+      <p style="margin-bottom:10px;">
+        ご利用は18歳以上を推奨しています。未成年者のご利用は保護者の同意を前提とします。
+      </p>
+      <p style="margin-bottom:10px;">
+        お問い合わせ：<a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a> ／ TEL：090-7506-2065
+      </p>
+      <nav>
+        <a href="/tokutei" target="_blank" style="margin:0 10px;">特定商取引法に基づく表記</a> |
+        <a href="/privacy" target="_blank" style="margin:0 10px;">プライバシーポリシー</a> |
+        <a href="/terms" target="_blank" style="margin:0 10px;">利用規約</a>
+      </nav>
+      <p style="margin-top:10px; color:gray;">&copy; 2025 シン・コンピューター占い</p>
+    </footer>
+  </div>
 </body>
 </html>

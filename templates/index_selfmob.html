@@ -7,11 +7,25 @@
   <style>
     body {
       font-size: 16px;
-      padding: 10px;
       font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background-image: url('/static/bg_tarot.jpg');
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      background-position: center;
+    }
+
+    .content-wrapper {
+      background-color: rgba(255, 255, 255, 0.92);
       max-width: 600px;
       margin: auto;
+      padding: 20px;
+      box-sizing: border-box;
+      min-height: 100vh;
     }
+
     input, button, select {
       font-size: 16px;
       padding: 10px;
@@ -19,11 +33,13 @@
       width: 100%;
       box-sizing: border-box;
     }
+
     #video, #canvas {
       width: 100%;
       max-width: 400px;
       border: 1px solid #ccc;
     }
+
     #eto-display {
       font-size: 16px;
       margin-top: 5px;
@@ -33,20 +49,37 @@
   </style>
 </head>
 <body>
-  <h2>📸 手相撮影＆送信フォーム</h2>
+  <div class="content-wrapper">
+    <h2>📸 手相撮影＆送信フォーム</h2>
 
-  <video id="camera" autoplay playsinline></video>
-  <canvas id="canvas" style="display:none;"></canvas>
-  <button onclick="toggleCamera()">🔄 カメラ切替</button>
-  <button onclick="takePhoto()">📷 撮影</button>
+    <video id="camera" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <button onclick="toggleCamera()">🔄 カメラ切替</button>
+    <button onclick="takePhoto()">📷 撮影</button>
 
-  <label for="birthdate">生年月日：</label>
-  <input type="date" id="birthdate" required oninput="fetchEto()">
-  <div id="eto-display"></div>
+    <label for="birthdate">生年月日：</label>
+    <input type="date" id="birthdate" required oninput="fetchEto()">
+    <div id="eto-display"></div>
 
-  <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
+    <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
 
-  <form action="/logout"><button>ログアウト</button></form>
+    <form action="/logout"><button>ログアウト</button></form>
+
+    <footer style="text-align:center; font-size:small; margin-top:40px; padding:20px; background-color:#f9f9f9;">
+      <p style="margin-bottom:10px;">
+        ご利用は18歳以上を推奨しています。未成年者のご利用は保護者の同意を前提とします。
+      </p>
+      <p style="margin-bottom:10px;">
+        お問い合わせ：<a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a> ／ TEL：090-7506-2065
+      </p>
+      <nav>
+        <a href="/tokutei" target="_blank" style="margin:0 10px;">特定商取引法に基づく表記</a> |
+        <a href="/privacy" target="_blank" style="margin:0 10px;">プライバシーポリシー</a> |
+        <a href="/terms" target="_blank" style="margin:0 10px;">利用規約</a>
+      </nav>
+      <p style="margin-top:10px; color:gray;">&copy; 2025 シン・コンピューター占い</p>
+    </footer>
+  </div>
 
   <script>
     const video = document.getElementById("camera");
@@ -171,20 +204,5 @@
 
     window.onload = startCamera;
   </script>
-
-  <footer style="text-align:center; font-size:small; margin-top:40px; padding:20px; background-color:#f9f9f9;">
-    <p style="margin-bottom:10px;">
-      ご利用は18歳以上を推奨しています。未成年者のご利用は保護者の同意を前提とします。
-    </p>
-    <p style="margin-bottom:10px;">
-      お問い合わせ：<a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a> ／ TEL：090-7506-2065
-    </p>
-    <nav>
-      <a href="/tokutei" target="_blank" style="margin:0 10px;">特定商取引法に基づく表記</a> |
-      <a href="/privacy" target="_blank" style="margin:0 10px;">プライバシーポリシー</a> |
-      <a href="/terms" target="_blank" style="margin:0 10px;">利用規約</a>
-    </nav>
-    <p style="margin-top:10px; color:gray;">&copy; 2025 シン・コンピューター占い</p>
-  </footer>
 </body>
 </html>
