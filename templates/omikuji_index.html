@@ -17,8 +17,21 @@
       background-attachment: fixed;
       background-position: center;
       text-align: center;
-      padding: 50px;
+      padding: 30px 20px 80px;
     }
+
+    .main-title {
+      font-size: 2em;
+      font-weight: bold;
+      color: #111;
+      background-color: rgba(255, 255, 255, 0.75);
+      display: inline-block;
+      padding: 10px 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 6px rgba(0,0,0,0.2);
+      margin-bottom: 30px;
+    }
+
     .button {
       background-color: darkred;
       color: white;
@@ -27,19 +40,54 @@
       border: none;
       border-radius: 6px;
       cursor: pointer;
+      margin-bottom: 30px;
     }
+
     .button:hover {
       background-color: #aa0000;
     }
+
     #animation {
       display: none;
       margin-top: 20px;
+    }
+
+    .amazon-button {
+      display: inline-block;
+      background-color: #ffd700;
+      color: #000;
+      font-weight: bold;
+      font-size: 1.1em;
+      padding: 12px 20px;
+      border-radius: 12px;
+      text-decoration: none;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      max-width: 90%;
+      word-break: break-word;
+    }
+
+    @media (max-width: 768px) {
+      .main-title {
+        font-size: 1.5em;
+        padding: 8px 16px;
+      }
+
+      .button {
+        font-size: 1em;
+        padding: 12px 24px;
+        margin-bottom: 20px;
+      }
+
+      .amazon-button {
+        font-size: 1em;
+        padding: 10px 16px;
+      }
     }
   </style>
 
 </head>
 <body>
-  <h1>64卦おみくじ</h1>
+  <h1 class="main-title">64卦おみくじ</h1>
 
   <form id="omikujiForm" action="{{ url_for('result') }}" method="post" onsubmit="event.preventDefault(); drawOmikuji();">
     <button type="submit" class="button">おみくじを引く 🔮</button>
@@ -69,20 +117,8 @@
   </script>
 
   <!-- 🔮 Amazon 開運グッズボタン（スマホ対応） -->
-  <div style="text-align: center; margin: 40px auto;">
-    <a href="https://www.amazon.co.jp/s?k=開運グッズ&tag=sengo9-22" target="_blank" style="
-      display: inline-block;
-      background-color: #ffd700;
-      color: #000;
-      font-weight: bold;
-      font-size: 1.1em;
-      padding: 14px 28px;
-      border-radius: 12px;
-      text-decoration: none;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-      max-width: 90%;
-      word-break: break-word;
-    ">
+  <div style="text-align: center; margin-top: 30px;">
+    <a href="https://www.amazon.co.jp/s?k=開運グッズ&tag=sengo9-22" target="_blank" class="amazon-button">
       🛒 Amazonで開運グッズを探す
     </a>
   </div>
