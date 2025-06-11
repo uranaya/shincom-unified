@@ -35,7 +35,7 @@ import psycopg2
 # 料金設定（テスト中はここをいじるだけ）
 PRICE_MAP = {
     "tarotmob": 500,
-    "selfmob": 1,
+    "selfmob": 500,
     "selfmob_full": 1000,
     "renaiselfmob": 500,
     "renaiselfmob_full": 1000
