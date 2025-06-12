@@ -3,15 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <title>ログ一覧</title>
+  <style>
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1em;
+    }
+    th, td {
+      border: 1px solid #444;
+      padding: 8px;
+      text-align: center;
+    }
+    th a {
+      text-decoration: none;
+      color: inherit;
+    }
+    form {
+      margin-top: 1em;
+    }
+    .reset-button {
+      background-color: #e74c3c;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
   <h1>鑑定カウントログ</h1>
-  <table border="1">
+
+  <!-- リセットボタン -->
+  <form method="POST" action="{{ url_for('reset_shop_log') }}" onsubmit="return confirm('本当に全てのログを削除しますか？');">
+    <button type="submit" class="reset-button">📛 全リセット</button>
+  </form>
+
+  <!-- ログ一覧テーブル -->
+  <table>
     <tr>
-      <th>日付</th>
-      <th>店舗ID</th>
-      <th>サービス</th>
-      <th>件数</th>
+      {% for col in ['date', 'shop_id', 'service', 'count'] %}
+        <th>
+          <a href="{{ url_for('view_shop_log', sort=col, order='desc' if sort_column==col and sort_order=='asc' else 'asc') }}">
+            {{ col }}
+            {% if sort_column == col %}
+              {{ '▲' if sort_order == 'asc' else '▼' }}
+            {% endif %}
+          </a>
+        </th>
+      {% endfor %}
     </tr>
     {% for row in logs %}
     <tr>

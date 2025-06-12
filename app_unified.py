@@ -781,19 +781,44 @@ def view_pdf(filename):
 
 @app.route("/view_shop_log")
 def view_shop_log():
-    """shop_logsテーブルの内容を表示（管理用）"""
+    """shop_logsテーブルの内容を表示（ソート付き）"""
+    sort_column = request.args.get("sort", "date")
+    sort_order = request.args.get("order", "desc")
+
+    allowed = {"date", "shop_id", "service", "count"}
+    if sort_column not in allowed:
+        sort_column = "date"
+
     logs = []
     if DATABASE_URL:
         try:
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
-            cur.execute("SELECT date, shop_id, service, count FROM shop_logs ORDER BY date DESC;")
+            query = f"SELECT date, shop_id, service, count FROM shop_logs ORDER BY {sort_column} {sort_order};"
+            cur.execute(query)
             logs = cur.fetchall()
             cur.close()
             conn.close()
         except Exception as e:
             return f"エラー: {e}"
-    return render_template("shop_log.html", logs=logs)
+    return render_template("shop_log.html", logs=logs, sort_column=sort_column, sort_order=sort_order)
+
+
+@app.route("/reset_shop_log", methods=["POST"])
+def reset_shop_log():
+    if DATABASE_URL:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute("DELETE FROM shop_logs;")
+            conn.commit()
+            cur.close()
+            conn.close()
+            print("✅ shop_logs 全リセット完了")
+        except Exception as e:
+            return f"削除エラー: {e}"
+    return redirect(url_for("view_shop_log"))
+
 
 
 
