@@ -29,6 +29,16 @@
       font-size: 1em;
       cursor: pointer;
     }
+    .link-button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      font-size: 1em;
+      text-decoration: none;
+      display: inline-block;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -38,6 +48,9 @@
   <form method="POST" action="{{ url_for('reset_shop_log') }}" onsubmit="return confirm('本当に全てのログを削除しますか？');">
     <button type="submit" class="reset-button">📛 全リセット</button>
   </form>
+
+  <!-- 月別集計ページへのリンク -->
+  <a href="{{ url_for('view_shop_log_monthly') }}" class="link-button">📅 月別集計を見る</a>
 
   <!-- ログ一覧テーブル -->
   <table>

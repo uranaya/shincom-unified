@@ -804,6 +804,37 @@ def view_shop_log():
     return render_template("shop_log.html", logs=logs, sort_column=sort_column, sort_order=sort_order)
 
 
+@app.route("/view_shop_log_monthly")
+def view_shop_log_monthly():
+    """月ごと + shop_id + service ごとの集計"""
+    sort_column = request.args.get("sort", "month")
+    sort_order = request.args.get("order", "desc")
+    allowed = {"month", "shop_id", "service", "total"}
+    if sort_column not in allowed:
+        sort_column = "month"
+
+    logs = []
+    if DATABASE_URL:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            query = f"""
+                SELECT TO_CHAR(date, 'YYYY-MM') AS month, shop_id, service, SUM(count) AS total
+                FROM shop_logs
+                GROUP BY TO_CHAR(date, 'YYYY-MM'), shop_id, service
+                ORDER BY {sort_column} {sort_order};
+            """
+            cur.execute(query)
+            logs = cur.fetchall()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            return f"エラー: {e}"
+
+    return render_template("shop_log_monthly.html", logs=logs, sort_column=sort_column, sort_order=sort_order)
+
+
+
 @app.route("/reset_shop_log", methods=["POST"])
 def reset_shop_log():
     if DATABASE_URL:

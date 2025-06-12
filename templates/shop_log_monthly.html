@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>月別 店舗別サービス別集計</title>
+  <style>
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1em;
+    }
+    th, td {
+      border: 1px solid #444;
+      padding: 8px;
+      text-align: center;
+    }
+    th a {
+      text-decoration: none;
+      color: inherit;
+    }
+  </style>
+</head>
+<body>
+  <h1>📅 月別 × 店舗別 × サービス別 集計ログ</h1>
+
+  <table>
+    <tr>
+      {% for col in ['month', 'shop_id', 'service', 'total'] %}
+        <th>
+          <a href="{{ url_for('view_shop_log_monthly', sort=col, order='desc' if sort_column==col and sort_order=='asc' else 'asc') }}">
+            {{ col }}
+            {% if sort_column == col %}
+              {{ '▲' if sort_order == 'asc' else '▼' }}
+            {% endif %}
+          </a>
+        </th>
+      {% endfor %}
+    </tr>
+    {% for row in logs %}
+    <tr>
+      <td>{{ row[0] }}</td>
+      <td>{{ row[1] }}</td>
+      <td>{{ row[2] }}</td>
+      <td>{{ row[3] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</body>
+</html>
