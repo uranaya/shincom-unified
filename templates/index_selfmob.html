@@ -34,7 +34,14 @@
       box-sizing: border-box;
     }
 
-    #video, #canvas {
+    #video {
+      width: 100%;
+      max-height: 280px; /* ★ 撮影ボタンが画面内に収まるよう縦制限 */
+      object-fit: contain;
+      border: 1px solid #ccc;
+    }
+
+    #canvas {
       width: 100%;
       max-width: 400px;
       border: 1px solid #ccc;

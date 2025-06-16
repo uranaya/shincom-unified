@@ -23,7 +23,14 @@
       width: 100%;
       box-sizing: border-box;
     }
-    #video, #canvas {
+    #camera {
+      width: 100%;
+      max-width: 400px;
+      max-height: 280px; /* ⬅ 追加：縦方向制限 */
+      border: 1px solid #ccc;
+      object-fit: contain;
+    }
+    #canvas {
       width: 100%;
       max-width: 400px;
       border: 1px solid #ccc;
@@ -40,9 +47,10 @@
   <h2>📸 手相撮影＆送信フォーム</h2>
 
   <button onclick="toggleCamera()">🔄 カメラ切替</button>
+  <button onclick="takePhoto()">📷 撮影</button>
+
   <video id="camera" autoplay playsinline></video>
   <canvas id="canvas" style="display:none;"></canvas>
-  <button onclick="takePhoto()">📷 撮影</button>
 
   <label for="birthdate">生年月日：</label>
   <input type="date" id="birthdate" required oninput="fetchEto()">
