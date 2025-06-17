@@ -34,9 +34,21 @@
       box-sizing: border-box;
     }
 
+    .camera-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .camera-controls button {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+    }
+
     #video {
       width: 100%;
-      max-height: 280px; /* ★ 撮影ボタンが画面内に収まるよう縦制限 */
+      max-height: 240px; /* モバイルでの表示対応 */
       object-fit: contain;
       border: 1px solid #ccc;
     }
@@ -59,10 +71,13 @@
   <div class="content-wrapper">
     <h2>📸 手相撮影＆送信フォーム</h2>
 
+    <div class="camera-controls">
+      <button onclick="toggleCamera()">🔄 カメラ切替</button>
+      <button onclick="takePhoto()">📷 撮影</button>
+    </div>
+
     <video id="camera" autoplay playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
-    <button onclick="toggleCamera()">🔄 カメラ切替</button>
-    <button onclick="takePhoto()">📷 撮影</button>
 
     <label for="birthdate">生年月日：</label>
     <input type="date" id="birthdate" required oninput="fetchEto()">
