@@ -758,7 +758,7 @@ def preview(filename):
 
     # iPhoneまたはAndroidの簡易判定（必要に応じて拡張可）
     if "iphone" in user_agent or "android" in user_agent:
-        return redirect(url_for("view_file", filename=filename))
+        return redirect(url_for("view_pdf", filename=filename))
 
     referer = request.referrer or ""
     return render_template("fortune_pdf.html", filename=filename, referer=referer)
