@@ -59,10 +59,14 @@ def draw_palm_image(c, base64_image, width, y):
         img = ImageReader(io.BytesIO(image_data))
         img_width, img_height = img.getSize()
 
-        # アスペクト比を保ったまま拡大
-        scale = (width * 0.7) / img_width  # 横幅70%まで拡大
+        # アスペクト比を保ちつつ、A4用紙の高さの約30%に収まるよう縮小
+        max_height = 0.3 * A4[1]  # 高さ制限（A4用紙の30%）
+        scale_w = (width * 0.7) / img_width  # 横幅70%を基準
+        scale_h = max_height / img_height
+        scale = min(scale_w, scale_h)
+
         img_width *= scale
-        img_height *= scale  # ← 高さも等倍に（潰さない）
+        img_height *= scale
 
         x_center = (width - img_width) / 2
         y -= img_height + 5 * mm
@@ -72,6 +76,7 @@ def draw_palm_image(c, base64_image, width, y):
         print("Image decode error:", e)
 
     return y
+
 
 
 
