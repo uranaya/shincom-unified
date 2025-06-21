@@ -100,6 +100,14 @@
     <img src="/static/banner_uranaya.png" alt="鑑定バナー">
   </div>
 
+  <!-- 🔽 上部に追加入力 -->
+  <div class="button-area">
+    <a href="/generate_link/{{ shop_id }}" class="button">全体運（500円）</a>
+    <a href="/generate_link_full/{{ shop_id }}" class="button">全体運＋1年の運勢付き（1000円）</a><br />
+    <a href="/generate_link_renai/{{ shop_id }}" class="button">恋愛運（500円）</a>
+    <a href="/generate_link_renai_full/{{ shop_id }}" class="button">恋愛運＋1年の運勢付き（1000円）</a>
+  </div>
+
   <div class="intro">
     <h2>占い師「うらなや」監修</h2>
     <p>
@@ -112,50 +120,47 @@
   </div>
 
   <div class="section">
-  <h2>鑑定でわかること</h2>
-  <p>
-    あなたの手相画像と生年月日から、以下の内容をPDF鑑定書にまとめてお届けします。<br><br>
-    ・手相から導くあなたの魅力的な特徴（5項目）<br>
-    ・手相の総合アドバイス（自己理解・行動指針）<br>
-    ・日柱占いによる性格と、今月・来月の運勢<br>
-    ・ラッキーアイテム・ラッキーカラー・ラッキーデー・方位などの開運情報<br>
-    ・九星気学による吉方位（年・月）<br><br>
-    さらに、「1年の運勢付き」では月ごとの運勢を12か月分追加収録！<br>
-    印刷・保存も可能なPDF形式で鑑定結果をお届けします。
-  </p>
-  <h2>鑑定サンプルを見る</h2>
-  <p>
-    実際の鑑定結果（PDF）の一例をご覧いただけます。<br>
-    ※ 通常は2ページ構成ですが、以下のサンプルは<br>
-    　1年の運勢付き（4ページ）を掲載しています。
-  </p>
-  <ul>
-    <li>
-      <a href="/static/sample_fortune_shincom.pdf" target="_blank" style="color:#ffe066;">
-        ▶ 通常版（総合運・性格・月運）サンプルを見る
-      </a>
-    </li>
-    <li>
-      <a href="/static/sample_fortune_renai.pdf" target="_blank" style="color:#ffe066;">
-        ▶ 恋愛版（相性・恋愛運）サンプルを見る
-      </a>
-    </li>
-  </ul>
+    <h2>鑑定でわかること</h2>
+    <p>
+      あなたの手相画像と生年月日から、以下の内容をPDF鑑定書にまとめてお届けします。<br><br>
+      ・手相から導くあなたの魅力的な特徴（5項目）<br>
+      ・手相の総合アドバイス（自己理解・行動指針）<br>
+      ・日柱占いによる性格と、今月・来月の運勢<br>
+      ・ラッキーアイテム・ラッキーカラー・ラッキーデー・方位などの開運情報<br>
+      ・九星気学による吉方位（年・月）<br><br>
+      さらに、「1年の運勢付き」では月ごとの運勢を12か月分追加収録！<br>
+      印刷・保存も可能なPDF形式で鑑定結果をお届けします。
+    </p>
 
+    <h2>鑑定サンプルを見る</h2>
+    <p>
+      実際の鑑定結果（PDF）の一例をご覧いただけます。<br>
+      ※ 通常は2ページ構成ですが、以下のサンプルは<br>
+      　1年の運勢付き（4ページ）を掲載しています。
+    </p>
+    <ul>
+      <li>
+        <a href="/static/sample_fortune_shincom.pdf" target="_blank" style="color:#ffe066;">
+          ▶ 通常版（総合運・性格・月運）サンプルを見る
+        </a>
+      </li>
+      <li>
+        <a href="/static/sample_fortune_renai.pdf" target="_blank" style="color:#ffe066;">
+          ▶ 恋愛版（相性・恋愛運）サンプルを見る
+        </a>
+      </li>
+    </ul>
   </div>
 
-
-<div class="section">
-  <h2>お好きなメニューをお選びください</h2>
-  <div class="button-area">
-    <a href="/generate_link/{{ shop_id }}" class="button">全体運（500円）</a>
-    <a href="/generate_link_full/{{ shop_id }}" class="button">全体運＋1年の運勢付き（1000円）</a><br />
-    <a href="/generate_link_renai/{{ shop_id }}" class="button">恋愛運（500円）</a>
-    <a href="/generate_link_renai_full/{{ shop_id }}" class="button">恋愛運＋1年の運勢付き（1000円）</a>
+  <div class="section">
+    <h2>お好きなメニューをお選びください</h2>
+    <div class="button-area">
+      <a href="/generate_link/{{ shop_id }}" class="button">全体運（500円）</a>
+      <a href="/generate_link_full/{{ shop_id }}" class="button">全体運＋1年の運勢付き（1000円）</a><br />
+      <a href="/generate_link_renai/{{ shop_id }}" class="button">恋愛運（500円）</a>
+      <a href="/generate_link_renai_full/{{ shop_id }}" class="button">恋愛運＋1年の運勢付き（1000円）</a>
+    </div>
   </div>
-</div>
-
-
 
   <div class="section">
     <h2>お支払い後について</h2>
@@ -163,23 +168,20 @@
       決済完了後に1回のみ鑑定が可能です。鑑定完了後は初期画面（このページ）に戻り、再度のご利用には再決済が必要となります。
     </p>
 
-<h2>注意事項</h2>
-<ul>
-  <li>ご利用は<strong>18歳以上</strong>を推奨しています</li>
-  <li>未成年者のご利用には<strong>保護者の同意</strong>が必要です</li>
-  <li>占い結果はエンターテインメントとしてご活用ください</li>
-  <li><strong>決済後はブラウザを切り替えたり戻ったりなどの操作を行うとエラーの原因になる可能性があります。画面の指示に従ってお進みください</strong></li>
-  <li><strong>PDF出力に1分程度お待ちいただく形となります。焦らず他の操作を行わずにお待ちください</strong></li>
-</ul>
+    <h2>注意事項</h2>
+    <ul>
+      <li>ご利用は<strong>18歳以上</strong>を推奨しています</li>
+      <li>未成年者のご利用には<strong>保護者の同意</strong>が必要です</li>
+      <li>占い結果はエンターテインメントとしてご活用ください</li>
+      <li><strong>決済後はブラウザを切り替えたり戻ったりなどの操作を行うとエラーの原因になる可能性があります。画面の指示に従ってお進みください</strong></li>
+      <li><strong>PDF出力に1分程度お待ちいただく形となります。焦らず他の操作を行わずにお待ちください</strong></li>
+    </ul>
 
-
-<h2>PDFの保存・共有について</h2>
-<p>
-  鑑定結果のPDFをスマホ等で保存される際は、<strong>リンク共有ではなく、本体を端末に保存</strong>してからご活用ください。<br>
-  特に印刷やLINE等での送信時、<strong>PDFの本体を保存してからシェア</strong>していただくと、正しく表示・共有ができます。
-</p>
-
-
+    <h2>PDFの保存・共有について</h2>
+    <p>
+      鑑定結果のPDFをスマホ等で保存される際は、<strong>リンク共有ではなく、本体を端末に保存</strong>してからご活用ください。<br>
+      特に印刷やLINE等での送信時、<strong>PDFの本体を保存してからシェア</strong>していただくと、正しく表示・共有ができます。
+    </p>
   </div>
 
   <div class="section">
@@ -200,10 +202,16 @@
           ▶ 公式サイトを見る
         </a>
       </li>
+      <li>
+        <strong>GEEBA</strong><br>
+        山口県柳井市のエステティックサロン<br>
+        <a href="https://www.instagram.com/geeba2018/" target="_blank" style="color:#ffe066;">
+          ▶  Instagramページを見る
+        </a>
+      </li>
     </ul>
   </div>
 
-  
   <footer>
     <p>
       お問い合わせ：<a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a> ／
