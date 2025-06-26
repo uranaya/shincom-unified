@@ -46,11 +46,12 @@
 <body>
   <h2>📸 手相撮影＆送信フォーム</h2>
 
+  <canvas id="canvas" style="display:none;"></canvas>
+
   <button onclick="toggleCamera()">🔄 カメラ切替</button>
   <button onclick="takePhoto()">📷 撮影</button>
 
   <video id="camera" autoplay playsinline></video>
-  <canvas id="canvas" style="display:none;"></canvas>
 
   <label for="birthdate">生年月日：</label>
   <input type="date" id="birthdate" required oninput="fetchEto()">
