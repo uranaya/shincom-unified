@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>月別集計</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      font-size: 16px;
+      padding: 20px;
+      margin: 0;
+      max-width: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow-x: auto;
+      display: block;
+      margin-bottom: 30px;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    h3 {
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <h2>月別売上集計</h2>
+  {% for month, staff_data in data.items() %}
+    <h3>{{ month }}</h3>
+    <table>
+      <tr><th>店員</th><th>方法</th><th>合計金額</th></tr>
+      {% for (staff, method), total in staff_data.items() %}
+      <tr>
+        <td>{{ staff }}</td>
+        <td>{{ method }}</td>
+        <td>{{ total }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% endfor %}
+</body>
+</html>

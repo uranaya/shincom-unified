@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>売上入力</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      font-size: 16px;
+      padding: 20px;
+      margin: 0;
+      max-width: 500px;
+      margin: auto;
+    }
+    label, select, input, button {
+      display: block;
+      width: 100%;
+      margin-bottom: 15px;
+      font-size: 16px;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>売上入力</h2>
+  <form method="post">
+    <label>店員名:</label>
+    <select name="staff">
+      <option>HIROMI</option>
+      <option>美帆</option>
+      <option>あい</option>
+      <option>ゆかり</option>
+      <option>まつばら</option>
+      <option>月のかけら</option>
+      <option>金子美月</option>
+      <option>水木杏香</option>
+      <option>幽香</option>
+      <option>蛍石</option>
+      <option>うらなや</option>
+    </select>
+    <label>鑑定方法:</label>
+    <select name="method">
+      <option>対面</option>
+      <option>コンピューター</option>
+      <option>現金外（クレカQR)</option>
+    </select>
+    <label>金額:</label>
+    <input type="number" name="amount">
+    <button type="submit">登録</button>
+  </form>
+</body>
+</html>

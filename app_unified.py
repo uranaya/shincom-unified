@@ -27,6 +27,8 @@ from prompt_utils import extract_prompts_from_result
 from tarot_fortune_logic import generate_tarot_fortune
 from pdf_generator_tarot import create_pdf_tarot
 
+from collections import defaultdict
+
 import sqlite3
 import threading
 import psycopg2
@@ -72,6 +74,8 @@ if DATABASE_URL:
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
+
+        # shop_logs テーブル（店舗別カウント）
         cur.execute("""
             CREATE TABLE IF NOT EXISTS shop_logs (
                 date DATE,
@@ -81,6 +85,8 @@ if DATABASE_URL:
                 PRIMARY KEY (date, shop_id, service)
             );
         """)
+
+        # webhook_events テーブル（KOMOJU決済記録）
         cur.execute("""
             CREATE TABLE IF NOT EXISTS webhook_events (
                 uuid TEXT PRIMARY KEY,
@@ -89,13 +95,27 @@ if DATABASE_URL:
                 date DATE
             );
         """)
+
+        # ✅ sales テーブル（レジ用売上記録）
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sales (
+                id SERIAL PRIMARY KEY,
+                date DATE DEFAULT CURRENT_DATE,
+                staff_name TEXT,
+                method TEXT,
+                amount INTEGER
+            );
+        """)
+
         conn.commit()
         cur.close()
         conn.close()
+        print("✅ データベース初期化完了（shop_logs, webhook_events, sales）")
     except Exception as e:
         print("❌ DB初期化エラー:", e)
 else:
     print("⚠️ DATABASE_URL が未設定。ローカル実行ではDB非使用。")
+
 
 
 # Background thread task to generate PDF and handle post-processing
@@ -1213,3 +1233,98 @@ def webhook_tarotmob():
         f.write(f"{uuid_str},1,tarotmob\n")
     return "OK", 200
 
+
+
+
+
+
+@app.route("/regi", methods=["GET", "POST"])
+def regi_input_form():
+    if request.method == "POST":
+        staff = request.form.get("staff")
+        method = request.form.get("method")
+        amount = request.form.get("amount")
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO sales (staff_name, method, amount) VALUES (%s, %s, %s);",
+                (staff, method, amount)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            return f"❌ DBエラー: {e}", 500
+        return redirect(url_for('regi_input_form'))
+    return render_template("input.html")
+
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login_sales():
+    if request.method == 'POST':
+        if request.form['password'] == 'admin123':  # パスワード変更可
+            session['admin'] = True
+            return redirect(url_for('admin_dashboard_sales'))
+    return render_template('login_regi.html')
+
+
+@app.route('/admin')
+def admin_dashboard_sales():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login_sales'))
+    try:
+        today = datetime.today().date()
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("SELECT staff_name, method, amount FROM sales WHERE date = %s;", (today,))
+        daily_sales = cur.fetchall()
+        total_today = sum(s[2] for s in daily_sales)
+        cur.close()
+        conn.close()
+    except Exception as e:
+        return f"❌ DB取得エラー: {e}", 500
+    return render_template("admin.html", sales=daily_sales, total=total_today)
+
+
+@app.route('/admin/monthly')
+def monthly_summary_sales():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login_sales'))
+    monthly_data = defaultdict(lambda: defaultdict(int))
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("SELECT date, staff_name, method, amount FROM sales;")
+        all_sales = cur.fetchall()
+        for date_obj, staff_name, method, amount in all_sales:
+            key = date_obj.strftime('%Y-%m')
+            monthly_data[key][(staff_name, method)] += amount
+        cur.close()
+        conn.close()
+    except Exception as e:
+        return f"❌ 集計エラー: {e}", 500
+    return render_template("monthly.html", data=monthly_data)
+
+
+@app.route('/admin/export', methods=['POST'])
+def export_sales_csv():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login_sales'))
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['日付', '店員', '方法', '金額'])  # ヘッダー
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("SELECT date, staff_name, method, amount FROM sales ORDER BY date;")
+        for row in cur.fetchall():
+            writer.writerow([row[0].strftime('%Y-%m-%d'), row[1], row[2], row[3]])
+        cur.close()
+        conn.close()
+    except Exception as e:
+        return f"❌ エクスポートエラー: {e}", 500
+    response = make_response(output.getvalue())
+    response.headers['Content-Disposition'] = 'attachment; filename=sales_backup.csv'
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    return response

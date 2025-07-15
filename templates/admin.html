@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>本日の売上</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      font-size: 16px;
+      padding: 20px;
+      margin: 0;
+      max-width: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow-x: auto;
+      display: block;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    button {
+      padding: 10px;
+      font-size: 16px;
+      width: 100%;
+    }
+    a {
+      display: inline-block;
+      margin-top: 20px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h2>本日の売上</h2>
+  <p>合計金額: {{ total }}円</p>
+  <table>
+    <tr><th>日付</th><th>店員</th><th>方法</th><th>金額</th></tr>
+    {% for s in sales %}
+    <tr>
+      <td>{{ s.date }}</td>
+      <td>{{ s.staff_name }}</td>
+      <td>{{ s.method }}</td>
+      <td>{{ s.amount }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <a href="/admin/monthly">月別集計へ</a>
+
+  <form method="post" action="/admin/export" style="margin-top: 20px;">
+    <button type="submit">📁 CSV出力（バックアップ）</button>
+  </form>
+</body>
+</html>
