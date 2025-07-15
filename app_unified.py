@@ -1276,18 +1276,33 @@ def admin_login_sales():
 def admin_dashboard_sales():
     if not session.get('admin'):
         return redirect(url_for('admin_login_sales'))
+
     try:
-        today = datetime.today().date()
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
-        cur.execute("SELECT staff_name, method, amount FROM sales WHERE date = %s;", (today,))
-        daily_sales = cur.fetchall()
-        total_today = sum(s[2] for s in daily_sales)
+
+        # ✅ 列名を取得して値にマッピング
+        cur.execute("""
+            SELECT date, staff_name, method, amount
+            FROM sales
+            WHERE date = CURRENT_DATE
+            ORDER BY date DESC;
+        """)
+        rows = cur.fetchall()
+        sales = [
+            {"date": r[0].strftime('%Y-%m-%d'), "staff_name": r[1], "method": r[2], "amount": r[3]}
+            for r in rows
+        ]
+        total_today = sum(r["amount"] for r in sales)
+
         cur.close()
         conn.close()
+
     except Exception as e:
         return f"❌ DB取得エラー: {e}", 500
-    return render_template("admin.html", sales=daily_sales, total=total_today)
+
+    return render_template("admin.html", sales=sales, total=total_today)
+
 
 
 @app.route('/admin/monthly')
