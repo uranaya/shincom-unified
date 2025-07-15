@@ -30,6 +30,13 @@
 </head>
 <body>
   <h2>売上入力</h2>
+
+  {% if success %}
+    <script>
+      alert("✅ 登録が完了しました");
+    </script>
+  {% endif %}
+
   <form method="post">
     <label>店員名:</label>
     <select name="staff">
@@ -42,6 +49,7 @@
       <option>金子美月</option>
       <option>水木杏香</option>
       <option>幽香</option>
+      <option>優芳</option>
       <option>蛍石</option>
       <option>うらなや</option>
     </select>

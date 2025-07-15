@@ -1256,8 +1256,11 @@ def regi_input_form():
             conn.close()
         except Exception as e:
             return f"❌ DBエラー: {e}", 500
-        return redirect(url_for('regi_input_form'))
-    return render_template("input.html")
+        return redirect(url_for('regi_input_form', success=1))
+
+    success = request.args.get("success") == "1"
+    return render_template("input.html", success=success)
+
 
 
 @app.route('/admin/login', methods=['GET', 'POST'])
