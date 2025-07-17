@@ -40,7 +40,7 @@ PRICE_MAP = {
     "selfmob": 550,
     "selfmob_full": 1100,
     "renaiselfmob": 550,
-    "renaiselfmob_full": 1
+    "renaiselfmob_full": 1100
 }
 
 
