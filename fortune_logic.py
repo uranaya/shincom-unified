@@ -273,6 +273,8 @@ def generate_fortune(image_data, birthdate, kyusei_text):
     return palm_titles, palm_texts, shichu_result_raw, iching_result, lucky_lines
 
 
+
+
 def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = 'a4') -> dict:
     from datetime import datetime
     from dateutil.relativedelta import relativedelta
@@ -281,9 +283,18 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     from nicchu_utils import get_nicchu_eto
     from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
     from yearly_love_fortune_utils import generate_yearly_love_fortune
+    from iching_utils import get_iching_advice  # 忘れずに
 
     user_eto = get_nicchu_eto(user_birth)
-    partner_eto = get_nicchu_eto(partner_birth) if partner_birth else None
+
+    # partner_birth が未入力や不正な場合に備える
+    partner_eto = None
+    if partner_birth:
+        try:
+            partner_eto = get_nicchu_eto(partner_birth)
+        except Exception as e:
+            print(f"⚠️ partner_eto 取得エラー: {e}")
+            partner_eto = None
 
     try:
         if partner_eto:
@@ -413,7 +424,6 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         except Exception as e:
             print(f"❌ 年運取得失敗: {e}")
 
-    # 年齢・方位計算して恋愛用ラッキー情報生成
     try:
         birth_date_obj = datetime.strptime(user_birth, "%Y-%m-%d")
         age = datetime.today().year - birth_date_obj.year - ((datetime.today().month, datetime.today().day) < (birth_date_obj.month, birth_date_obj.day))
@@ -427,14 +437,14 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     return {
         "texts": {
             "compatibility": comp_text,
-            "overall_love_fortune": "" if partner_birth else future_text,
+            "overall_love_fortune": "" if partner_eto else future_text,
             "year_love": year_love,
             "month_love": month_love,
             "next_month_love": next_month_love,
         },
         "titles": {
             "compatibility": "相性診断",
-            "overall_love_fortune": "相手の気持ちと今後の展開" if partner_birth else "理想の相手像と出会いのチャンス",
+            "overall_love_fortune": "相手の気持ちと今後の展開" if partner_eto else "理想の相手像と出会いのチャンス",
             "year_love": f"{this_year}年の恋愛運",
             "month_love": f"{this_month}月の恋愛運",
             "next_month_love": f"{next_month}月の恋愛運",
