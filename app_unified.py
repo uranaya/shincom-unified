@@ -702,8 +702,12 @@ def renaiselfmob_uuid(uuid_str):
     lines = []
     try:
         with open(USED_UUID_FILE, "r") as f:
-            lines = [line.strip().split(",") for line in f if line.strip()]
-        for uid, flag, mode, shop_id in lines:
+            lines = [line.strip() for line in f if line.strip()]
+        for line in lines:
+            parts = line.strip().split(",", 3)
+            if len(parts) < 4:
+                continue
+            uid, flag, mode, shop_id = parts
             if uid == uuid_str:
                 full_year = mode.endswith("_full")
                 break
@@ -715,13 +719,10 @@ def renaiselfmob_uuid(uuid_str):
     if request.method == "POST":
         try:
             user_birth = request.form.get("user_birth")
-            partner_birth = request.form.get("partner_birth", "").strip()
-            if not partner_birth:
-                partner_birth = None
+            partner_birth = request.form.get("partner_birth")
             if not user_birth or not isinstance(user_birth, str):
                 return "生年月日が不正です", 400
 
-            # 🎯 正しく texts/titles を含んだ構造で取得
             now = datetime.now()
             target1 = now.replace(day=15)
             if now.day >= 20:
@@ -770,6 +771,7 @@ def renaiselfmob_uuid(uuid_str):
             return "処理中にエラーが発生しました", 500
 
     return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
+
 
 
 
