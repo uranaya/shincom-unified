@@ -283,7 +283,6 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     from nicchu_utils import get_nicchu_eto
     from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
     from yearly_love_fortune_utils import generate_yearly_love_fortune
-    from iching_utils import get_iching_advice  # 忘れずに
 
     user_eto = get_nicchu_eto(user_birth)
 
