@@ -715,7 +715,9 @@ def renaiselfmob_uuid(uuid_str):
     if request.method == "POST":
         try:
             user_birth = request.form.get("user_birth")
-            partner_birth = request.form.get("partner_birth")
+            partner_birth = request.form.get("partner_birth", "").strip()
+            if not partner_birth:
+                partner_birth = None
             if not user_birth or not isinstance(user_birth, str):
                 return "生年月日が不正です", 400
 
