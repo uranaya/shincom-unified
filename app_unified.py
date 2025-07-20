@@ -1024,9 +1024,12 @@ def renai():
         filename = f"renai_{uuid.uuid4()}.pdf"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         create_pdf_unified(filepath, result_data, "renai", size=size.lower(), include_yearly=include_yearly)
-        return send_file(filepath, as_attachment=True)
+
+        # ✅ PDFを直接ダウンロードではなくプレビュー表示へ変更
+        return redirect(url_for("preview", filename=filename))
 
     return render_template("renai_form.html")
+
 
 
 @app.route("/selfmob", methods=["GET"])
