@@ -5,6 +5,7 @@ import json
 import random
 import requests
 import traceback
+import io
 from datetime import datetime
 from urllib.parse import quote
 from sqlalchemy import create_engine, text
