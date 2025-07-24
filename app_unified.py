@@ -29,6 +29,7 @@ from tarot_fortune_logic import generate_tarot_fortune
 from pdf_generator_tarot import create_pdf_tarot
 
 from collections import defaultdict
+from flask import send_from_directory
 
 import sqlite3
 import threading
@@ -1354,3 +1355,10 @@ def export_sales_csv():
     response.headers['Content-Disposition'] = 'attachment; filename=sales_backup.csv'
     response.headers['Content-Type'] = 'text/csv; charset=utf-8'
     return response
+
+
+
+
+@app.route('/selfmob/google808abc9a83ba5e55.html')
+def google_verification_file():
+    return send_from_directory('static', 'google808abc9a83ba5e55.html')
