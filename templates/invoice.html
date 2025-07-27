@@ -35,36 +35,29 @@
     {% endfor %}
   </div>
 
-  <table>
+<table>
+  <tr>
+    <th>占い師</th>
+    <th>対面売上</th>
+    <th>コンピューター売上</th>
+    <th>現金外売上</th>
+    <th>合計（現金外除外）</th>
+    <th>出店日数</th>
+    <th>1日平均</th>
+  </tr>
+  {% for staff, data in details.items() %}
     <tr>
-      <th>占い師</th>
-      <th>対面売上</th>
-      <th>コンピューター売上</th>
-      <th>現金外売上</th>
-      <th>合計</th>
-      <th>出店日数</th>
-      <th>1日平均</th>
+      <td>{{ staff }}</td>
+      <td>{{ data.methods.get('対面', 0) }}</td>
+      <td>{{ data.methods.get('コンピューター', 0) }}</td>
+      <td>{{ data.cashless_total }}</td>
+      <td>{{ data.total }}</td>
+      <td>{{ data.visit_days }}</td>
+      <td>{{ data.avg_sales }}</td>
     </tr>
-    {% for staff, data in details.items() %}
-      <tr>
-        <td>{{ staff }}</td>
-        <td>{{ data.methods.get('対面', 0) }}</td>
-        <td>{{ data.methods.get('コンピューター', 0) }}</td>
-        <td>
-          {% set cashless = 0 %}
-          {% for key, val in data.methods.items() %}
-            {% if "現金外" in key %}
-              {% set cashless = cashless + val %}
-            {% endif %}
-          {% endfor %}
-          {{ cashless }}
-        </td>
-        <td>{{ data.total }}</td>
-        <td>{{ data.visit_days }}</td>
-        <td>{{ data.avg_sales }}</td>
-      </tr>
-    {% endfor %}
-  </table>
+  {% endfor %}
+</table>
+
 
   <p>対面合計：{{ total_taiken }}円</p>
   <p>コンピューター合計：{{ total_pc }}円</p>

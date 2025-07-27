@@ -1479,7 +1479,6 @@ def admin_invoice():
     if not session.get('admin'):
         return redirect(url_for('admin_login_sales'))
 
-    # 指定月
     month = request.args.get('month', datetime.today().strftime('%Y-%m'))
     month_start = month + "-01"
     month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
@@ -1503,12 +1502,22 @@ def admin_invoice():
 
         for staff, method, total in rows:
             if staff not in details:
-                details[staff] = {"methods": {}, "total": 0, "visit_days": 0, "avg_sales": 0}
+                details[staff] = {
+                    "methods": {},
+                    "total": 0,          # 対面＋コンピューターの合計
+                    "cashless_total": 0, # 現金外のみ
+                    "visit_days": 0,
+                    "avg_sales": 0
+                }
             details[staff]["methods"][method] = total
-            details[staff]["total"] += total
             staff_list.add(staff)
 
-        # 出店日数と平均売上を各スタッフごとに追加計算
+            if method == "対面" or method == "コンピューター":
+                details[staff]["total"] += total
+            elif "現金外" in method:
+                details[staff]["cashless_total"] += total
+
+        # 出店日数と1日平均売上（現金外は除外）
         for staff in staff_list:
             cur.execute("""
                 SELECT COUNT(DISTINCT date)
@@ -1516,19 +1525,15 @@ def admin_invoice():
                 WHERE date >= %s AND date < %s AND staff_name = %s;
             """, (month_start, month_end, staff))
             visit_days = cur.fetchone()[0]
-
             details[staff]["visit_days"] = visit_days
             details[staff]["avg_sales"] = (
                 int(details[staff]["total"] / visit_days) if visit_days > 0 else 0
             )
 
-        # 全体集計
+        # 全体集計（現金外除外）
         total_taiken = sum(details[s]["methods"].get("対面", 0) for s in details)
         total_pc = sum(details[s]["methods"].get("コンピューター", 0) for s in details)
-        total_cashless = sum(
-            sum(val for key, val in details[s]["methods"].items() if "現金外" in key)
-            for s in details
-        )
+        total_cashless = sum(details[s]["cashless_total"] for s in details)
 
         store_fee = total_taiken * 0.30 + total_pc * 0.50
         store_fee_tax = int(store_fee * 1.10)
@@ -1552,6 +1557,7 @@ def admin_invoice():
         store_fee_tax=store_fee_tax,
         final_invoice=final_invoice
     )
+
 
 
 
