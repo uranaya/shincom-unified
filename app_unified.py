@@ -1610,33 +1610,47 @@ def import_sales_csv():
         if file.filename == '':
             return "❌ ファイル名が空です", 400
 
-        # CSVを読み込んでDBに挿入
         try:
-            csv_reader = csv.reader(TextIOWrapper(file, encoding='utf-8'))
-            header = next(csv_reader)  # ヘッダー行をスキップ
-
+            # Shift_JISで読み込み
+            csv_reader = csv.DictReader(TextIOWrapper(file, encoding='shift_jis'))
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
 
-            count = 0
+            inserted = 0
+            skipped = 0
             for row in csv_reader:
-                # CSVフォーマット例：date,staff_name,method,amount
+                date_val = row['日付']
+                staff_val = row['店員']
+                method_val = row['方法']
+                amount_val = int(row['金額'])
+
+                # 重複チェック
                 cur.execute("""
-                    INSERT INTO sales (date, staff_name, method, amount)
-                    VALUES (%s, %s, %s, %s);
-                """, (row[0], row[1], row[2], int(row[3])))
-                count += 1
+                    SELECT COUNT(*) FROM sales
+                    WHERE date = %s AND staff_name = %s AND method = %s AND amount = %s;
+                """, (date_val, staff_val, method_val, amount_val))
+                exists = cur.fetchone()[0]
+
+                if exists == 0:
+                    # 新規データを挿入
+                    cur.execute("""
+                        INSERT INTO sales (date, staff_name, method, amount)
+                        VALUES (%s, %s, %s, %s);
+                    """, (date_val, staff_val, method_val, amount_val))
+                    inserted += 1
+                else:
+                    skipped += 1
 
             conn.commit()
             cur.close()
             conn.close()
 
-            return f"✅ {count} 件のデータを追加しました"
+            return f"✅ インポート完了: {inserted} 件追加, {skipped} 件スキップしました"
+
         except Exception as e:
             return f"❌ インポートエラー: {e}", 500
 
     return render_template("import_csv.html")
-
 
 
 
