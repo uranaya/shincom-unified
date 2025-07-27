@@ -35,6 +35,14 @@
       display: inline-block;
       margin-top: 20px;
       font-size: 16px;
+      text-decoration: none;
+      padding: 8px 12px;
+      background-color: #2196F3;
+      color: white;
+      border-radius: 4px;
+    }
+    a:hover {
+      background-color: #0b7dda;
     }
   </style>
 </head>
@@ -53,8 +61,12 @@
     {% endfor %}
   </table>
 
-  <a href="/admin/monthly">月別集計へ</a>
+  <!-- 月別集計リンク -->
+  <a href="/admin/monthly">📊 月別集計へ</a>
+  <!-- 日別集計リンク -->
+  <a href="/admin/daily?date={{ current_date }}">📅 日別売上（修正）へ</a>
 
+  <!-- CSV出力 -->
   <form method="post" action="/admin/export" style="margin-top: 20px;">
     <button type="submit">📁 CSV出力（バックアップ）</button>
   </form>

@@ -1372,6 +1372,8 @@ def export_sales_csv():
     return response
 
 
+
+
 @app.route('/admin/daily', methods=['GET'])
 def view_sales_by_day():
     if not session.get('admin'):
@@ -1466,6 +1468,8 @@ def edit_sale(sales_id):
 
 
 
+
+
 @app.route('/admin/invoice', methods=['GET'])
 def admin_invoice():
     if not session.get('admin'):
@@ -1535,7 +1539,10 @@ def admin_invoice_staff():
         return redirect(url_for('admin_login_sales'))
 
     month = request.args.get('month', datetime.today().strftime('%Y-%m'))
-    staff = request.args.get('staff')  # 占い師名
+    staff = request.args.get('staff')
+    if not staff:
+        return "占い師を指定してください", 400
+
     month_start = month + "-01"
     month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
 
@@ -1563,9 +1570,10 @@ def admin_invoice_staff():
             elif "現金外" in method:
                 total_cashless += total
 
+        # 出店料計算
         store_fee = total_taiken * 0.30 + total_pc * 0.50
-        store_fee_tax = int(store_fee * 1.10)
-        final_invoice = store_fee_tax - total_cashless
+        store_fee_tax = int(store_fee * 1.10)  # 消費税10%
+        final_invoice = store_fee_tax - total_cashless  # 正確な請求額
 
     except Exception as e:
         return f"❌ 集計エラー: {e}", 500
