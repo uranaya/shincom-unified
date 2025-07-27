@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ month }} {{ staff }} 請求書</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      margin: 0;
+      max-width: 700px;
+      margin: auto;
+      font-size: 16px;
+    }
+    h2 {
+      margin-bottom: 20px;
+    }
+    .invoice-summary p {
+      margin: 5px 0;
+    }
+    .total {
+      font-weight: bold;
+      font-size: 18px;
+      margin-top: 15px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-top: 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    @media print {
+      button { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <h2>{{ month }} {{ staff }} 請求書</h2>
+
+  <table>
+    <tr>
+      <th>項目</th>
+      <th>金額 (円)</th>
+    </tr>
+    <tr>
+      <td>対面合計</td>
+      <td>{{ total_taiken }}</td>
+    </tr>
+    <tr>
+      <td>コンピューター合計</td>
+      <td>{{ total_pc }}</td>
+    </tr>
+    <tr>
+      <td>現金外合計</td>
+      <td>{{ total_cashless }}</td>
+    </tr>
+    <tr>
+      <td>出店料（税抜）</td>
+      <td>{{ store_fee | round(0) }}</td>
+    </tr>
+    <tr>
+      <td>出店料（税込10％）</td>
+      <td>{{ store_fee_tax }}</td>
+    </tr>
+    <

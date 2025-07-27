@@ -1471,7 +1471,7 @@ def admin_invoice():
     if not session.get('admin'):
         return redirect(url_for('admin_login_sales'))
 
-    # 指定月（例：2025-07）を取得
+    # 指定月（例：2025-07）
     month = request.args.get('month', datetime.today().strftime('%Y-%m'))
     month_start = month + "-01"
     month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
@@ -1490,14 +1490,16 @@ def admin_invoice():
         cur.close()
         conn.close()
 
-        # 集計用辞書
+        # 集計
         details = []
+        staff_list = set()
         total_taiken = 0
         total_pc = 0
         total_cashless = 0
 
         for staff, method, total in rows:
             details.append({"staff": staff, "method": method, "total": total})
+            staff_list.add(staff)
             if method == "対面":
                 total_taiken += total
             elif method == "コンピューター":
@@ -1516,6 +1518,7 @@ def admin_invoice():
     return render_template("invoice.html",
                            month=month,
                            details=details,
+                           staff_list=sorted(staff_list),
                            total_taiken=total_taiken,
                            total_pc=total_pc,
                            total_cashless=total_cashless,
@@ -1524,6 +1527,60 @@ def admin_invoice():
                            final_invoice=final_invoice)
 
 
+
+
+@app.route('/admin/invoice_staff')
+def admin_invoice_staff():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login_sales'))
+
+    month = request.args.get('month', datetime.today().strftime('%Y-%m'))
+    staff = request.args.get('staff')  # 占い師名
+    month_start = month + "-01"
+    month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT method, SUM(amount)
+            FROM sales
+            WHERE date >= %s AND date < %s AND staff_name = %s
+            GROUP BY method;
+        """, (month_start, month_end, staff))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        total_taiken = 0
+        total_pc = 0
+        total_cashless = 0
+        for method, total in rows:
+            if method == "対面":
+                total_taiken += total
+            elif method == "コンピューター":
+                total_pc += total
+            elif "現金外" in method:
+                total_cashless += total
+
+        store_fee = total_taiken * 0.30 + total_pc * 0.50
+        store_fee_tax = int(store_fee * 1.10)
+        final_invoice = store_fee_tax - total_cashless
+
+    except Exception as e:
+        return f"❌ 集計エラー: {e}", 500
+
+    return render_template(
+        "invoice_staff.html",
+        month=month,
+        staff=staff,
+        total_taiken=total_taiken,
+        total_pc=total_pc,
+        total_cashless=total_cashless,
+        store_fee=store_fee,
+        store_fee_tax=store_fee_tax,
+        final_invoice=final_invoice
+    )
 
 
 
