@@ -1379,7 +1379,9 @@ def view_sales_by_day():
     if not session.get('admin'):
         return redirect(url_for('admin_login_sales'))
 
-    date_str = request.args.get('date', datetime.today().strftime('%Y-%m-%d'))
+    date_str = request.args.get('date')
+    if not date_str:  # None または "" の場合
+        date_str = datetime.today().strftime('%Y-%m-%d')
 
     try:
         conn = psycopg2.connect(DATABASE_URL)
@@ -1399,11 +1401,11 @@ def view_sales_by_day():
             for r in rows
         ]
         total = sum(r["amount"] for r in sales)
-
     except Exception as e:
         return f"❌ DBエラー: {e}", 500
 
     return render_template("admin_daily.html", sales=sales, date=date_str, total=total)
+
 
 
 
