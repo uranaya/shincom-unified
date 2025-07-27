@@ -1,8 +1,64 @@
-<h2>取引修正</h2>
-<form method="post">
-  <input type="hidden" name="date" value="{{ sale.date }}">
-  店員名: <input type="text" name="staff" value="{{ sale.staff_name }}"><br>
-  方法: <input type="text" name="method" value="{{ sale.method }}"><br>
-  金額: <input type="number" name="amount" value="{{ sale.amount }}"><br>
-  <button type="submit">修正</button>
-</form>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>取引修正</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      font-size: 16px;
+      padding: 20px;
+      margin: 0;
+      max-width: 500px;
+      margin: auto;
+    }
+    label, select, input, button {
+      display: block;
+      width: 100%;
+      margin-bottom: 15px;
+      font-size: 16px;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #2196F3;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0b7dda;
+    }
+  </style>
+</head>
+<body>
+  <h2>取引修正</h2>
+
+  <form method="post">
+    <input type="hidden" name="date" value="{{ sale.date }}">
+
+    <label>占い師:</label>
+    <select name="staff">
+      {% for s in staff_list %}
+        <option value="{{ s }}" {% if s == sale.staff_name %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+
+    <label>鑑定方法:</label>
+    <select name="method">
+      {% for m in method_list %}
+        <option value="{{ m }}" {% if m == sale.method %}selected{% endif %}>{{ m }}</option>
+      {% endfor %}
+    </select>
+
+    <label>金額:</label>
+    <input type="number" name="amount" value="{{ sale.amount }}">
+
+    <button type="submit">修正する</button>
+  </form>
+
+  <p><a href="{{ url_for('view_sales_by_day', date=sale.date) }}">← 日別一覧へ戻る</a></p>
+</body>
+</html>
+

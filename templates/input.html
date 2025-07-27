@@ -25,6 +25,10 @@
       background-color: #4CAF50;
       color: white;
       border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
     }
   </style>
 </head>
@@ -40,27 +44,21 @@
   <form method="post">
     <label>店員名:</label>
     <select name="staff">
-      <option>HIROMI</option>
-      <option>美帆</option>
-      <option>あい</option>
-      <option>ゆかり</option>
-      <option>まつばら</option>
-      <option>月のかけら</option>
-      <option>金子美月</option>
-      <option>水木杏香</option>
-      <option>幽香</option>
-      <option>優芳</option>
-      <option>蛍石</option>
-      <option>うらなや</option>
+      {% for s in staff_list %}
+        <option value="{{ s }}">{{ s }}</option>
+      {% endfor %}
     </select>
+
     <label>鑑定方法:</label>
     <select name="method">
-      <option>対面</option>
-      <option>コンピューター</option>
-      <option>現金外（クレカQR)</option>
+      {% for m in method_list %}
+        <option value="{{ m }}">{{ m }}</option>
+      {% endfor %}
     </select>
+
     <label>金額:</label>
     <input type="number" name="amount">
+
     <button type="submit">登録</button>
   </form>
 </body>

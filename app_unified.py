@@ -1245,6 +1245,15 @@ def webhook_tarotmob():
 
 
 
+# 占い師・鑑定方法の選択肢（input.htmlと同じ構成に統一）
+STAFF_LIST = [
+    "HIROMI", "美帆", "あい", "ゆかり", "まつばら",
+    "月のかけら", "金子美月", "水木杏香", "幽香", "優芳",
+    "蛍石", "うらなや"
+]
+
+METHOD_LIST = ["対面", "コンピューター", "現金外（クレカQR)"]
+
 
 
 @app.route("/regi", methods=["GET", "POST"])
@@ -1268,7 +1277,8 @@ def regi_input_form():
         return redirect(url_for('regi_input_form', success=1))
 
     success = request.args.get("success") == "1"
-    return render_template("input.html", success=success)
+    return render_template("input.html", success=success, staff_list=STAFF_LIST, method_list=METHOD_LIST)
+
 
 
 
@@ -1389,6 +1399,9 @@ def view_sales_by_day():
     return render_template("admin_daily.html", sales=sales, date=date_str, total=total)
 
 
+
+
+
 @app.route('/admin/edit/<int:sales_id>', methods=['GET', 'POST'])
 def edit_sale(sales_id):
     if not session.get('admin'):
@@ -1429,14 +1442,22 @@ def edit_sale(sales_id):
             return "該当データが見つかりません", 404
 
         sale = {
-            "id": row[0], "date": row[1].strftime('%Y-%m-%d'),
-            "staff_name": row[2], "method": row[3], "amount": row[4]
+            "id": row[0],
+            "date": row[1].strftime('%Y-%m-%d'),
+            "staff_name": row[2],
+            "method": row[3],
+            "amount": row[4]
         }
 
     except Exception as e:
         return f"❌ 読み込みエラー: {e}", 500
 
-    return render_template("edit_sale.html", sale=sale)
+    return render_template(
+        "edit_sale.html",
+        sale=sale,
+        staff_list=STAFF_LIST,
+        method_list=METHOD_LIST
+    )
 
 
 
