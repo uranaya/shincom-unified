@@ -1479,7 +1479,7 @@ def admin_invoice():
     if not session.get('admin'):
         return redirect(url_for('admin_login_sales'))
 
-    # 指定月（例：2025-07）
+    # 指定月
     month = request.args.get('month', datetime.today().strftime('%Y-%m'))
     month_start = month + "-01"
     month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
@@ -1487,6 +1487,8 @@ def admin_invoice():
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
+
+        # 占い師ごと・方法ごとの売上合計
         cur.execute("""
             SELECT staff_name, method, SUM(amount)
             FROM sales
@@ -1495,44 +1497,61 @@ def admin_invoice():
             ORDER BY staff_name, method;
         """, (month_start, month_end))
         rows = cur.fetchall()
-        cur.close()
-        conn.close()
 
-        # 集計
-        details = []
+        details = {}
         staff_list = set()
-        total_taiken = 0
-        total_pc = 0
-        total_cashless = 0
 
         for staff, method, total in rows:
-            details.append({"staff": staff, "method": method, "total": total})
+            if staff not in details:
+                details[staff] = {"methods": {}, "total": 0, "visit_days": 0, "avg_sales": 0}
+            details[staff]["methods"][method] = total
+            details[staff]["total"] += total
             staff_list.add(staff)
-            if method == "対面":
-                total_taiken += total
-            elif method == "コンピューター":
-                total_pc += total
-            elif "現金外" in method:
-                total_cashless += total
 
-        # 出店料計算
+        # 出店日数と平均売上を各スタッフごとに追加計算
+        for staff in staff_list:
+            cur.execute("""
+                SELECT COUNT(DISTINCT date)
+                FROM sales
+                WHERE date >= %s AND date < %s AND staff_name = %s;
+            """, (month_start, month_end, staff))
+            visit_days = cur.fetchone()[0]
+
+            details[staff]["visit_days"] = visit_days
+            details[staff]["avg_sales"] = (
+                int(details[staff]["total"] / visit_days) if visit_days > 0 else 0
+            )
+
+        # 全体集計
+        total_taiken = sum(details[s]["methods"].get("対面", 0) for s in details)
+        total_pc = sum(details[s]["methods"].get("コンピューター", 0) for s in details)
+        total_cashless = sum(
+            sum(val for key, val in details[s]["methods"].items() if "現金外" in key)
+            for s in details
+        )
+
         store_fee = total_taiken * 0.30 + total_pc * 0.50
-        store_fee_tax = int(store_fee * 1.10)  # 消費税10%
+        store_fee_tax = int(store_fee * 1.10)
         final_invoice = store_fee_tax - total_cashless
+
+        cur.close()
+        conn.close()
 
     except Exception as e:
         return f"❌ 集計エラー: {e}", 500
 
-    return render_template("invoice.html",
-                           month=month,
-                           details=details,
-                           staff_list=sorted(staff_list),
-                           total_taiken=total_taiken,
-                           total_pc=total_pc,
-                           total_cashless=total_cashless,
-                           store_fee=store_fee,
-                           store_fee_tax=store_fee_tax,
-                           final_invoice=final_invoice)
+    return render_template(
+        "invoice.html",
+        month=month,
+        details=details,
+        staff_list=sorted(staff_list),
+        total_taiken=total_taiken,
+        total_pc=total_pc,
+        total_cashless=total_cashless,
+        store_fee=store_fee,
+        store_fee_tax=store_fee_tax,
+        final_invoice=final_invoice
+    )
 
 
 

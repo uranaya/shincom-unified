@@ -7,7 +7,7 @@
   <style>
     body { font-family: sans-serif; padding: 20px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
     th { background-color: #f0f0f0; }
     .total { font-weight: bold; margin-top: 20px; }
     button { padding: 10px 15px; font-size: 16px; }
@@ -20,9 +20,7 @@
       text-decoration: none;
       border-radius: 4px;
     }
-    .staff-links a:hover {
-      background-color: #0b7dda;
-    }
+    .staff-links a:hover { background-color: #0b7dda; }
   </style>
 </head>
 <body>
@@ -38,12 +36,32 @@
   </div>
 
   <table>
-    <tr><th>占い師</th><th>鑑定方法</th><th>売上合計 (円)</th></tr>
-    {% for d in details %}
+    <tr>
+      <th>占い師</th>
+      <th>対面売上</th>
+      <th>コンピューター売上</th>
+      <th>現金外売上</th>
+      <th>合計</th>
+      <th>出店日数</th>
+      <th>1日平均</th>
+    </tr>
+    {% for staff, data in details.items() %}
       <tr>
-        <td>{{ d.staff }}</td>
-        <td>{{ d.method }}</td>
-        <td>{{ d.total }}</td>
+        <td>{{ staff }}</td>
+        <td>{{ data.methods.get('対面', 0) }}</td>
+        <td>{{ data.methods.get('コンピューター', 0) }}</td>
+        <td>
+          {% set cashless = 0 %}
+          {% for key, val in data.methods.items() %}
+            {% if "現金外" in key %}
+              {% set cashless = cashless + val %}
+            {% endif %}
+          {% endfor %}
+          {{ cashless }}
+        </td>
+        <td>{{ data.total }}</td>
+        <td>{{ data.visit_days }}</td>
+        <td>{{ data.avg_sales }}</td>
       </tr>
     {% endfor %}
   </table>
