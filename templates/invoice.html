@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ month }} 請求書</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f0f0f0; }
+    .total { font-weight: bold; }
+    button { padding: 10px 15px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h2>{{ month }} 請求書</h2>
+
+  <table>
+    <tr><th>占い師</th><th>鑑定方法</th><th>売上合計 (円)</th></tr>
+    {% for d in details %}
+      <tr>
+        <td>{{ d.staff }}</td>
+        <td>{{ d.method }}</td>
+        <td>{{ d.total }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+
+  <p>対面合計：{{ total_taiken }}円</p>
+  <p>コンピューター合計：{{ total_pc }}円</p>
+  <p>現金外合計：{{ total_cashless }}円</p>
+  <p>出店料（税抜）：{{ store_fee | round(0) }}円</p>
+  <p>出店料（税込10％）：{{ store_fee_tax }}円</p>
+  <p class="total">請求額（現金外差引後）：{{ final_invoice }}円</p>
+
+  <button onclick="window.print()">印刷</button>
+</body>
+</html>

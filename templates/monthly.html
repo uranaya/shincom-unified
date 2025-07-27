@@ -29,13 +29,32 @@
     }
     h3 {
       margin-top: 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn-invoice {
+      padding: 6px 12px;
+      background-color: #2196F3;
+      color: white;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      font-size: 14px;
+      border-radius: 4px;
+    }
+    .btn-invoice:hover {
+      background-color: #0b7dda;
     }
   </style>
 </head>
 <body>
   <h2>月別売上集計</h2>
   {% for month, staff_data in data.items() %}
-    <h3>{{ month }}</h3>
+    <h3>
+      <span>{{ month }}</span>
+      <a class="btn-invoice" href="{{ url_for('admin_invoice', month=month) }}" target="_blank">請求書作成</a>
+    </h3>
     <table>
       <tr><th>店員</th><th>方法</th><th>合計金額</th></tr>
       {% for (staff, method), total in staff_data.items() %}
