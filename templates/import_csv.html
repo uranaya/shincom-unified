@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSVインポート</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    input[type="file"] { margin-bottom: 15px; }
+    button { padding: 8px 15px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #45a049; }
+  </style>
+</head>
+<body>
+  <h2>過去CSVデータの取り込み</h2>
+  <form method="POST" enctype="multipart/form-data">
+    <input type="file" name="csv_file" accept=".csv" required>
+    <button type="submit">インポート</button>
+  </form>
+  <p><a href="/admin">← 管理画面に戻る</a></p>
+</body>
+</html>

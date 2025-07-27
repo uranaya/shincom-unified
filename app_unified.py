@@ -6,6 +6,8 @@ import random
 import requests
 import traceback
 import io
+import csv
+from io import TextIOWrapper
 from datetime import datetime
 from urllib.parse import quote
 from sqlalchemy import create_engine, text
@@ -1591,6 +1593,50 @@ def admin_invoice_staff():
         store_fee_tax=store_fee_tax,
         final_invoice=final_invoice
     )
+
+
+
+
+
+@app.route('/admin/import_csv', methods=['GET', 'POST'])
+def import_sales_csv():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login_sales'))
+
+    if request.method == 'POST':
+        if 'csv_file' not in request.files:
+            return "❌ CSVファイルが選択されていません", 400
+        file = request.files['csv_file']
+        if file.filename == '':
+            return "❌ ファイル名が空です", 400
+
+        # CSVを読み込んでDBに挿入
+        try:
+            csv_reader = csv.reader(TextIOWrapper(file, encoding='utf-8'))
+            header = next(csv_reader)  # ヘッダー行をスキップ
+
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+
+            count = 0
+            for row in csv_reader:
+                # CSVフォーマット例：date,staff_name,method,amount
+                cur.execute("""
+                    INSERT INTO sales (date, staff_name, method, amount)
+                    VALUES (%s, %s, %s, %s);
+                """, (row[0], row[1], row[2], int(row[3])))
+                count += 1
+
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            return f"✅ {count} 件のデータを追加しました"
+        except Exception as e:
+            return f"❌ インポートエラー: {e}", 500
+
+    return render_template("import_csv.html")
+
 
 
 
