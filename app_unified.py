@@ -1357,6 +1357,88 @@ def export_sales_csv():
     return response
 
 
+@app.route('/admin/daily', methods=['GET'])
+def view_sales_by_day():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login_sales'))
+
+    date_str = request.args.get('date', datetime.today().strftime('%Y-%m-%d'))
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, date, staff_name, method, amount
+            FROM sales
+            WHERE date = %s
+            ORDER BY id;
+        """, (date_str,))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        sales = [
+            {"id": r[0], "date": r[1], "staff_name": r[2], "method": r[3], "amount": r[4]}
+            for r in rows
+        ]
+        total = sum(r["amount"] for r in sales)
+
+    except Exception as e:
+        return f"❌ DBエラー: {e}", 500
+
+    return render_template("admin_daily.html", sales=sales, date=date_str, total=total)
+
+
+@app.route('/admin/edit/<int:sales_id>', methods=['GET', 'POST'])
+def edit_sale(sales_id):
+    if not session.get('admin'):
+        return redirect(url_for('admin_login_sales'))
+
+    if request.method == 'POST':
+        staff = request.form.get('staff')
+        method = request.form.get('method')
+        amount = request.form.get('amount')
+        date = request.form.get('date')
+
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE sales
+                SET staff_name = %s, method = %s, amount = %s
+                WHERE id = %s;
+            """, (staff, method, amount, sales_id))
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            return f"❌ 修正エラー: {e}", 500
+
+        return redirect(url_for('view_sales_by_day', date=date))
+
+    # GET: 既存データ読み込み
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("SELECT id, date, staff_name, method, amount FROM sales WHERE id = %s;", (sales_id,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if not row:
+            return "該当データが見つかりません", 404
+
+        sale = {
+            "id": row[0], "date": row[1].strftime('%Y-%m-%d'),
+            "staff_name": row[2], "method": row[3], "amount": row[4]
+        }
+
+    except Exception as e:
+        return f"❌ 読み込みエラー: {e}", 500
+
+    return render_template("edit_sale.html", sale=sale)
+
+
 
 
 @app.route('/selfmob/google808abc9a83ba5e55.html')

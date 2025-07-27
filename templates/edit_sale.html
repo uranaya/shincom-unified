@@ -1,0 +1,8 @@
+<h2>取引修正</h2>
+<form method="post">
+  <input type="hidden" name="date" value="{{ sale.date }}">
+  店員名: <input type="text" name="staff" value="{{ sale.staff_name }}"><br>
+  方法: <input type="text" name="method" value="{{ sale.method }}"><br>
+  金額: <input type="number" name="amount" value="{{ sale.amount }}"><br>
+  <button type="submit">修正</button>
+</form>

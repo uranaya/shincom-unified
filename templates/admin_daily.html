@@ -1,0 +1,18 @@
+<h2>{{ date }} の売上一覧</h2>
+<p>合計金額: {{ total }} 円</p>
+<table border="1">
+  <tr><th>時間</th><th>店員</th><th>方法</th><th>金額</th><th>操作</th></tr>
+  {% for sale in sales %}
+  <tr>
+    <td>{{ sale.date }}</td>
+    <td>{{ sale.staff_name }}</td>
+    <td>{{ sale.method }}</td>
+    <td>{{ sale.amount }}</td>
+    <td><a href="{{ url_for('edit_sale', sales_id=sale.id) }}">修正</a></td>
+  </tr>
+  {% endfor %}
+</table>
+<form method="get">
+  <input type="date" name="date" value="{{ date }}">
+  <button type="submit">表示</button>
+</form>
