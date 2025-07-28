@@ -1687,8 +1687,9 @@ def import_sales_csv():
 
 def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, total_cashless,
                          store_fee, store_fee_tax, final_invoice, daily_details):
+
     # 日本語フォント登録
-    pdfmetrics.registerFont(TTFont('IPAexGothic', 'static/ipaexg.ttf'))
+    pdfmetrics.registerFont(TTFont('IPAexGothic', 'static/fonts/ipaexg.ttf'))
 
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
@@ -1697,11 +1698,25 @@ def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, tota
     c.setFont("IPAexGothic", 18)
     c.drawString(20 * mm, height - 20 * mm, f"{month} {staff} 請求書")
 
-    c.setFont("IPAexGothic", 10)
-    c.drawString(20 * mm, height - 30 * mm, "発行者：シン・コンピューター占い")
-    c.drawString(20 * mm, height - 35 * mm, "適格請求書発行事業者登録番号：＿＿＿＿＿＿＿＿＿＿＿＿")
+    # 会社情報
+    c.setFont("IPAexGothic", 9)
+    company_info = [
+        "〒756-0817 山口県山陽小野田市大字小野田７３０番地２",
+        "合同会社むすび家プランニング",
+        "代表社員　新保　保（しんぽ　たもつ）",
+        "TEL: 090-7506-2065",
+        "Email: musubiya.planning@gmail.com"
+    ]
+    y_info = height - 35 * mm
+    for line in company_info:
+        c.drawString(20 * mm, y_info, line)
+        y_info -= 5 * mm
 
-    y = height - 50 * mm
+    c.drawString(20 * mm, y_info, "適格請求書発行事業者登録番号：＿＿＿＿＿＿＿＿＿＿＿＿")
+
+    # 売上・請求額
+    y = height - 70 * mm
+    c.setFont("IPAexGothic", 10)
     rows = [
         ("対面売上合計", total_taiken),
         ("コンピューター売上合計", total_pc),
@@ -1715,13 +1730,12 @@ def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, tota
         c.drawRightString(180 * mm, y, f"{value} 円")
         y -= 10 * mm
 
-    # 日別内訳タイトル
+    # 日別内訳
     y -= 10 * mm
     c.setFont("IPAexGothic", 12)
     c.drawString(20 * mm, y, "【日別内訳】")
     y -= 8 * mm
 
-    # ヘッダ行
     c.setFont("IPAexGothic", 10)
     c.drawString(20 * mm, y, "日付")
     c.drawString(70 * mm, y, "対面")
@@ -1731,21 +1745,34 @@ def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, tota
     c.line(20 * mm, y, 180 * mm, y)
     y -= 6 * mm
 
-    # 明細
     for date_str, amounts in daily_details.items():
         c.drawString(20 * mm, y, date_str)
         c.drawRightString(90 * mm, y, str(amounts.get("対面", 0)))
         c.drawRightString(130 * mm, y, str(amounts.get("コンピューター", 0)))
         c.drawRightString(170 * mm, y, str(amounts.get("現金外", 0)))
         y -= 6 * mm
-
-        # ページ切り替え
-        if y < 20 * mm:
+        if y < 40 * mm:
             c.showPage()
             c.setFont("IPAexGothic", 10)
             y = height - 20 * mm
 
+    # 振込先情報
+    y -= 10 * mm
+    c.setFont("IPAexGothic", 11)
+    c.drawString(20 * mm, y, "【振込先】")
+    y -= 6 * mm
+    bank_info = [
+        "山口銀行　西ノ浜　普通　5016837",
+        "ゆうちょ　15580-30544691",
+        "PayPay　005-6931827",
+        "西京銀行　日の出　普通　2055422"
+    ]
+    for line in bank_info:
+        c.drawString(25 * mm, y, line)
+        y -= 6 * mm
+
     c.save()
+
 
 
 
