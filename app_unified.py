@@ -21,6 +21,10 @@ from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicc
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
 from fortune_logic import generate_renai_fortune
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+
 
 from aura_fortune_utils import generate_aura_fortune
 from aura_image_utils import generate_aura_image
@@ -1676,6 +1680,80 @@ def import_sales_csv():
             return f"❌ インポートエラー: {e}", 500
 
     return render_template("import_csv.html")
+
+
+
+
+def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, total_cashless, store_fee, store_fee_tax, final_invoice):
+    c = canvas.Canvas(output_path, pagesize=A4)
+    width, height = A4
+
+    # タイトル
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(20*mm, height - 20*mm, f"{month} {staff} 請求書")
+
+    c.setFont("Helvetica", 10)
+    c.drawString(20*mm, height - 30*mm, "発行者：シン・コンピューター占い")
+    c.drawString(20*mm, height - 35*mm, "適格請求書発行事業者登録番号：＿＿＿＿＿＿＿＿＿＿＿＿")
+
+    y = height - 50*mm
+    rows = [
+        ("対面売上合計", total_taiken),
+        ("コンピューター売上合計", total_pc),
+        ("現金外合計", total_cashless),
+        ("出店料（税抜）", round(store_fee)),
+        ("出店料（税込10％）", store_fee_tax),
+        ("請求額（現金外差引後）", final_invoice),
+    ]
+    for label, value in rows:
+        c.drawString(20*mm, y, label)
+        c.drawRightString(180*mm, y, f"{value} 円")
+        y -= 10*mm
+
+    c.save()
+
+
+@app.route('/admin/invoice_staff_pdf')
+def admin_invoice_staff_pdf():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login_sales'))
+
+    month = request.args.get('month', datetime.today().strftime('%Y-%m'))
+    staff = request.args.get('staff')
+    if not staff:
+        return "占い師を指定してください", 400
+
+    month_start = month + "-01"
+    month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT method, SUM(amount)
+            FROM sales
+            WHERE date >= %s AND date < %s AND staff_name = %s
+            GROUP BY method;
+        """, (month_start, month_end, staff))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        total_taiken = sum(total for method, total in rows if method == "対面")
+        total_pc = sum(total for method, total in rows if method == "コンピューター")
+        total_cashless = sum(total for method, total in rows if "現金外" in method)
+        store_fee = total_taiken * 0.30 + total_pc * 0.50
+        store_fee_tax = int(store_fee * 1.10)
+        final_invoice = store_fee_tax - total_cashless
+
+        # PDF生成
+        pdf_path = os.path.join(UPLOAD_FOLDER, f"invoice_{staff}_{month}.pdf")
+        generate_invoice_pdf(pdf_path, month, staff, total_taiken, total_pc, total_cashless, store_fee, store_fee_tax, final_invoice)
+        return send_file(pdf_path, as_attachment=True, mimetype='application/pdf')
+
+    except Exception as e:
+        return f"❌ PDF生成エラー: {e}", 500
+
 
 
 
