@@ -1689,7 +1689,7 @@ def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, tota
                          store_fee, store_fee_tax, final_invoice, daily_details):
 
     # 日本語フォント登録
-    pdfmetrics.registerFont(TTFont('IPAexGothic', 'static/fonts/ipaexg.ttf'))
+    pdfmetrics.registerFont(TTFont('IPAexGothic', 'static/ipaexg.ttf'))
 
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
