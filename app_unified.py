@@ -24,6 +24,8 @@ from fortune_logic import generate_renai_fortune
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 
 from aura_fortune_utils import generate_aura_fortune
@@ -1685,14 +1687,18 @@ def import_sales_csv():
 
 
 def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, total_cashless, store_fee, store_fee_tax, final_invoice):
+
+    # 日本語フォント登録
+    pdfmetrics.registerFont(TTFont('IPAexGothic', 'static/fonts/ipaexg.ttf'))
+
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
 
     # タイトル
-    c.setFont("Helvetica-Bold", 18)
+    c.setFont("IPAexGothic", 18)
     c.drawString(20*mm, height - 20*mm, f"{month} {staff} 請求書")
 
-    c.setFont("Helvetica", 10)
+    c.setFont("IPAexGothic", 10)
     c.drawString(20*mm, height - 30*mm, "発行者：シン・コンピューター占い")
     c.drawString(20*mm, height - 35*mm, "適格請求書発行事業者登録番号：＿＿＿＿＿＿＿＿＿＿＿＿")
 
@@ -1711,6 +1717,7 @@ def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, tota
         y -= 10*mm
 
     c.save()
+
 
 
 @app.route('/admin/invoice_staff_pdf')
