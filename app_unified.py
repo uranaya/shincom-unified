@@ -1685,9 +1685,8 @@ def import_sales_csv():
 
 
 
-
-def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, total_cashless, store_fee, store_fee_tax, final_invoice):
-
+def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, total_cashless,
+                         store_fee, store_fee_tax, final_invoice, daily_details):
     # 日本語フォント登録
     pdfmetrics.registerFont(TTFont('IPAexGothic', 'static/ipaexg.ttf'))
 
@@ -1696,13 +1695,13 @@ def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, tota
 
     # タイトル
     c.setFont("IPAexGothic", 18)
-    c.drawString(20*mm, height - 20*mm, f"{month} {staff} 請求書")
+    c.drawString(20 * mm, height - 20 * mm, f"{month} {staff} 請求書")
 
     c.setFont("IPAexGothic", 10)
-    c.drawString(20*mm, height - 30*mm, "発行者：シン・コンピューター占い")
-    c.drawString(20*mm, height - 35*mm, "適格請求書発行事業者登録番号：＿＿＿＿＿＿＿＿＿＿＿＿")
+    c.drawString(20 * mm, height - 30 * mm, "発行者：シン・コンピューター占い")
+    c.drawString(20 * mm, height - 35 * mm, "適格請求書発行事業者登録番号：＿＿＿＿＿＿＿＿＿＿＿＿")
 
-    y = height - 50*mm
+    y = height - 50 * mm
     rows = [
         ("対面売上合計", total_taiken),
         ("コンピューター売上合計", total_pc),
@@ -1712,11 +1711,42 @@ def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, tota
         ("請求額（現金外差引後）", final_invoice),
     ]
     for label, value in rows:
-        c.drawString(20*mm, y, label)
-        c.drawRightString(180*mm, y, f"{value} 円")
-        y -= 10*mm
+        c.drawString(20 * mm, y, label)
+        c.drawRightString(180 * mm, y, f"{value} 円")
+        y -= 10 * mm
+
+    # 日別内訳タイトル
+    y -= 10 * mm
+    c.setFont("IPAexGothic", 12)
+    c.drawString(20 * mm, y, "【日別内訳】")
+    y -= 8 * mm
+
+    # ヘッダ行
+    c.setFont("IPAexGothic", 10)
+    c.drawString(20 * mm, y, "日付")
+    c.drawString(70 * mm, y, "対面")
+    c.drawString(110 * mm, y, "コンピューター")
+    c.drawString(150 * mm, y, "現金外")
+    y -= 6 * mm
+    c.line(20 * mm, y, 180 * mm, y)
+    y -= 6 * mm
+
+    # 明細
+    for date_str, amounts in daily_details.items():
+        c.drawString(20 * mm, y, date_str)
+        c.drawRightString(90 * mm, y, str(amounts.get("対面", 0)))
+        c.drawRightString(130 * mm, y, str(amounts.get("コンピューター", 0)))
+        c.drawRightString(170 * mm, y, str(amounts.get("現金外", 0)))
+        y -= 6 * mm
+
+        # ページ切り替え
+        if y < 20 * mm:
+            c.showPage()
+            c.setFont("IPAexGothic", 10)
+            y = height - 20 * mm
 
     c.save()
+
 
 
 
@@ -1736,6 +1766,8 @@ def admin_invoice_staff_pdf():
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
+
+        # 月合計
         cur.execute("""
             SELECT method, SUM(amount)
             FROM sales
@@ -1743,8 +1775,6 @@ def admin_invoice_staff_pdf():
             GROUP BY method;
         """, (month_start, month_end, staff))
         rows = cur.fetchall()
-        cur.close()
-        conn.close()
 
         total_taiken = sum(total for method, total in rows if method == "対面")
         total_pc = sum(total for method, total in rows if method == "コンピューター")
@@ -1753,13 +1783,35 @@ def admin_invoice_staff_pdf():
         store_fee_tax = int(store_fee * 1.10)
         final_invoice = store_fee_tax - total_cashless
 
+        # 日別内訳
+        cur.execute("""
+            SELECT date, method, SUM(amount)
+            FROM sales
+            WHERE date >= %s AND date < %s AND staff_name = %s
+            GROUP BY date, method
+            ORDER BY date, method;
+        """, (month_start, month_end, staff))
+        daily_rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        daily_details = {}
+        for date, method, total in daily_rows:
+            date_str = date.strftime("%Y-%m-%d")
+            if date_str not in daily_details:
+                daily_details[date_str] = {"対面": 0, "コンピューター": 0, "現金外": 0}
+            daily_details[date_str][method] = total
+
         # PDF生成
         pdf_path = os.path.join(UPLOAD_FOLDER, f"invoice_{staff}_{month}.pdf")
-        generate_invoice_pdf(pdf_path, month, staff, total_taiken, total_pc, total_cashless, store_fee, store_fee_tax, final_invoice)
+        generate_invoice_pdf(pdf_path, month, staff, total_taiken, total_pc,
+                             total_cashless, store_fee, store_fee_tax, final_invoice, daily_details)
+
         return send_file(pdf_path, as_attachment=True, mimetype='application/pdf')
 
     except Exception as e:
         return f"❌ PDF生成エラー: {e}", 500
+
 
 
 
