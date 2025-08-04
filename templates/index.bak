@@ -26,7 +26,7 @@
     #camera {
       width: 100%;
       max-width: 400px;
-      max-height: 280px; /* ⬅ 追加：縦方向制限 */
+      max-height: 280px;
       border: 1px solid #ccc;
       object-fit: contain;
     }
@@ -41,6 +41,16 @@
       margin-bottom: 10px;
       color: #444;
     }
+    .wareki-group {
+      display: flex;
+      justify-content: space-between;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+    .wareki-group input, .wareki-group select {
+      width: 30%;
+      padding: 8px;
+    }
   </style>
 </head>
 <body>
@@ -53,9 +63,22 @@
 
   <video id="camera" autoplay playsinline></video>
 
-  <label for="birthdate">生年月日：</label>
+  <label for="birthdate">生年月日（西暦）：</label>
   <input type="date" id="birthdate" required oninput="fetchEto()">
   <div id="eto-display"></div>
+
+  <label>生年月日（和暦で入力）：</label>
+  <div class="wareki-group">
+    <select id="era">
+      <option value="令和">令和</option>
+      <option value="平成">平成</option>
+      <option value="昭和">昭和</option>
+    </select>
+    <input type="number" id="era-year" placeholder="年" min="1">
+    <input type="number" id="month" placeholder="月" min="1" max="12">
+    <input type="number" id="day" placeholder="日" min="1" max="31">
+  </div>
+  <button onclick="convertWarekiToSeireki()">⬅ 和暦 → 西暦に反映</button>
 
   <div style="margin: 10px 0;">
     <input type="checkbox" id="full_year" name="full_year" value="yes" style="margin-right: 8px; vertical-align: middle;">
@@ -63,7 +86,7 @@
   </div>
 
   <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
-
+  <a href="/renai" style="display:block; text-align:center; margin:10px 0;">💘 恋愛占いはこちら</a>
   <form action="/logout"><button>ログアウト</button></form>
 
   <script>
@@ -100,6 +123,28 @@
       ctx.drawImage(video, 0, 0, width, height);
       canvas.style.display = "block";
       alert("📷 撮影完了しました！");
+    }
+
+    function convertWarekiToSeireki() {
+      const era = document.getElementById("era").value;
+      const eraYear = parseInt(document.getElementById("era-year").value);
+      const month = parseInt(document.getElementById("month").value);
+      const day = parseInt(document.getElementById("day").value);
+
+      if (!eraYear || !month || !day) {
+        alert("和暦の年・月・日をすべて入力してください。");
+        return;
+      }
+
+      let offset = 0;
+      if (era === "令和") offset = 2018;
+      else if (era === "平成") offset = 1988;
+      else if (era === "昭和") offset = 1925;
+
+      const year = offset + eraYear;
+      const formatted = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      document.getElementById("birthdate").value = formatted;
+      fetchEto();
     }
 
     async function fetchEto() {
