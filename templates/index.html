@@ -153,6 +153,25 @@
       if ((month === 1 && day >= 21) || (month === 2 && day <= 18)) return "水瓶座";
       if ((month === 2 && day >= 19) || (month === 3 && day <= 20)) return "魚座";
       return "";
+
+
+    function getTenchusatsuStatus(nicchuEto, currentYearEto) {
+  const etoTenchusatsuMap = {
+    "子": ["午", "未"], "丑": ["未", "申"], "寅": ["申", "酉"], "卯": ["酉", "戌"],
+    "辰": ["戌", "亥"], "巳": ["亥", "子"], "午": ["子", "丑"], "未": ["丑", "寅"],
+    "申": ["寅", "卯"], "酉": ["卯", "辰"], "戌": ["辰", "巳"], "亥": ["巳", "午"]
+  };
+  const subject = nicchuEto.slice(1);  // 日柱の地支
+  const target = currentYearEto.slice(1);  // 年柱の地支
+  if (etoTenchusatsuMap[subject]?.includes(target)) {
+    return "🌑 今年は天中殺の年です";
+  } else {
+    return "☀️ 今年は天中殺ではありません";
+  }
+}
+
+
+
     }
 
     async function fetchEto() {
@@ -202,9 +221,24 @@
 
           const number = etoOrderMap[data.eto];
           const animal = animal60[number - 1];
-          etoDisplay.textContent = `あなたの干支：${data.eto}（${number}番）／ 動物占い：${animal} ／ 本命星：${data.honmeisei}`;
+
+
+  // 天中殺判定用に今年の年干支（甲子〜癸亥）を算出
+  const eto60keys = Object.keys(etoOrderMap); // 甲子〜癸亥の配列
+  const currentYear = new Date().getFullYear();
+  const currentYearEto = eto60keys[(currentYear - 1984) % 60]; // 1984年は甲子
+  const tenchusatsu = getTenchusatsuStatus(data.eto, currentYearEto);
+
+
+
+          etoDisplay.textContent = `あなたの干支：${data.eto}（${number}番）／ 動物占い：${animal} ／ 本命星：${data.honmeisei}／ 天中殺：${tenchusatsu}`;
         } else {
-          etoDisplay.textContent = "⚠️ 情報の取得に失敗しました";
+          etoDisplay.textContent = "⚠️ 情報の取得に失敗しました";  // 天中殺判定用に今年の年干支（甲子〜癸亥）を算出
+  const eto60keys = Object.keys(etoOrderMap); // 甲子〜癸亥の配列
+  const currentYear = new Date().getFullYear();
+  const currentYearEto = eto60keys[(currentYear - 1984) % 60]; // 1984年は甲子
+  const tenchusatsu = getTenchusatsuStatus(data.eto, currentYearEto);
+
         }
       } catch (error) {
         etoDisplay.textContent = "⚠️ 通信エラー: " + error.message;
