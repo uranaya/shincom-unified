@@ -262,7 +262,7 @@ function getTenchusatsuStatus(nicchuEto, currentYearEto) {
 
 
 
-          etoDisplay.textContent = `あなたの干支：${data.eto}（${number}番）／ 動物占い：${animal} ／ 本命星：${data.honmeisei}／ 天中殺：${tenchusatsu}`;
+          etoDisplay.textContent = `あなたの干支：${data.eto}（${number}番）／ 動物占い：${animal} ／ 本命星：${data.honmeisei}／ 日干支空亡：${tenchusatsu}`;
         } else {
           etoDisplay.textContent = "⚠️ 情報の取得に失敗しました";  // 天中殺判定用に今年の年干支（甲子〜癸亥）を算出
         }
