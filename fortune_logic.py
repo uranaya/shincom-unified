@@ -1,6 +1,7 @@
 import openai
 import os
 import re
+import hashlib, random
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from tesou import tesou_names, tesou_descriptions
@@ -219,6 +220,143 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 
 
+
+def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str):
+    """
+    九星の直接連想（色=紫/数=9/火曜…）を避け、
+    数秘(ライフパス) + タロット一枚引き + 易(八卦) + 色彩心理 をミックスして
+    「◆ アイテム／カラー／ナンバー／フード／デー」を1行で返す（リスト1要素）。
+    出力は GPT 非依存で安定。seed は birthdate と 当年当月で擬似ランダム化。
+    """
+    from datetime import datetime
+
+    # ---- 1) 擬似ランダム seed（誕生日×当年当月で月替わりに変化）----
+    today = datetime.today()
+    seed_base = f"{birthdate}-{today.year}-{today.month}"
+    seed = int(hashlib.sha256(seed_base.encode()).hexdigest(), 16) % (2**32)
+    rng = random.Random(seed)
+
+    # ---- 2) 数秘：ライフパス（1〜9）----
+    def lifepath(date_str: str) -> int:
+        digits = [int(ch) for ch in date_str if ch.isdigit()]
+        s = sum(digits)
+        while s > 9:
+            s = sum(int(d) for d in str(s))
+        return max(1, min(9, s))
+    lp = lifepath(birthdate)  # 1..9
+
+    # ---- 3) タロット（大アルカナ）一枚引き + 惑星/曜日 + 色の示唆 ----
+    # 惑星→曜日対応：Sun=日, Moon=月, Mars=火, Mercury=水, Jupiter=木, Venus=金, Saturn=土
+    tarot_deck = [
+        ("The Fool", "Uranus", "自由/風", ["白", "ライム", "ターコイズ"]),
+        ("The Magician", "Mercury", "創造/知", ["黄", "ライトグレー", "シルバー"]),
+        ("The High Priestess", "Moon", "直感/内省", ["群青", "オフホワイト", "パール"]),
+        ("The Empress", "Venus", "実り/美", ["ピンク", "オリーブ", "アプリコット"]),
+        ("The Emperor", "Mars", "意志/統率", ["赤", "黒", "ボルドー"]),
+        ("The Hierophant", "Venus", "価値/伝統", ["ベージュ", "グリーン", "ココア"]),
+        ("The Lovers", "Mercury", "選択/調和", ["ライトピンク", "ミント", "コーラル"]),
+        ("The Chariot", "Moon", "前進/勝利", ["ネイビー", "ホワイト", "メタリック"]),
+        ("Strength", "Sun", "勇気/自己肯定", ["ゴールド", "サンイエロー", "キャメル"]),
+        ("The Hermit", "Mercury", "洞察/学び", ["チャコール", "カーキ", "ティール"]),
+        ("Wheel of Fortune", "Jupiter", "転機/拡大", ["ロイヤルブルー", "サファイア", "群青"]),
+        ("Justice", "Venus", "均衡/公正", ["エメラルド", "グレージュ", "ホワイト"]),
+        ("The Hanged Man", "Neptune", "視点転換/献身", ["アクア", "ラベンダー", "スモーキーブルー"]),
+        ("Death", "Mars", "刷新/再生", ["バーガンディ", "スレートグレー", "ダークグリーン"]),
+        ("Temperance", "Jupiter", "調整/中庸", ["スカイブルー", "ペールオレンジ", "セージ"]),
+        ("The Devil", "Saturn", "執着/制御", ["ダークブラウン", "グラファイト", "モスグリーン"]),
+        ("The Tower", "Mars", "突破/再構成", ["クリムゾン", "チャコール", "アイアンブルー"]),
+        ("The Star", "Saturn", "希望/透明感", ["アイスブルー", "シルバー", "パステル"]),
+        ("The Moon", "Moon", "感受性/夢", ["パールホワイト", "ブルーグレー", "ミッドナイトブルー"]),
+        ("The Sun", "Sun", "祝福/活力", ["サンフラワー", "オレンジ", "アンバー"]),
+        ("Judgement", "Pluto", "覚醒/再起", ["ホワイト", "スカーレット", "スカイグレー"]),
+        ("The World", "Saturn", "完成/統合", ["ピーコックグリーン", "ディープブルー", "サンド"])
+    ]
+    card = rng.choice(tarot_deck)
+    card_name, planet, card_color_candidates = card
+
+    weekday_map = {
+        "Sun": "日曜日", "Moon": "月曜日", "Mars": "火曜日",
+        "Mercury": "水曜日", "Jupiter": "木曜日",
+        "Venus": "金曜日", "Saturn": "土曜日",
+        # Neptune/Pluto/Uranus は雰囲気近い曜日に寄せる
+        "Neptune": "木曜日", "Pluto": "土曜日", "Uranus": "水曜日"
+    }
+    tarot_weekday = weekday_map.get(planet, "金曜日")
+
+    # ---- 4) 易（八卦）→ 色×食材の傾向 ----
+    trigrams = [
+        ("乾", "天", "金", ["白", "シルバー"], ["ナッツ", "白身魚", "大根"]),
+        ("兌", "沢", "金", ["ミルキー", "ピンク"], ["乳製品", "ヨーグルト", "桃"]),
+        ("離", "火", "火", ["オレンジ", "朱"], ["スパイス", "トマト", "唐辛子"]),
+        ("震", "雷", "木", ["ライム", "若草"], ["香草", "枝豆", "青菜"]),
+        ("巽", "風", "木", ["ミント", "ターコイズ"], ["ハーブティー", "緑茶", "きのこ"]),
+        ("坎", "水", "水", ["青", "ネイビー"], ["海藻", "貝類", "寒天"]),
+        ("艮", "山", "土", ["ベージュ", "オークル"], ["根菜", "芋", "味噌"]),
+        ("坤", "地", "土", ["アース", "モカ"], ["穀類", "きなこ", "パン"])
+    ]
+    trig = rng.choice(trigrams)
+    trig_name, trig_nature, wu_xing, trig_colors = trig
+
+    # ---- 5) アイテム候補（タロット×色彩心理×手堅い雑貨）----
+    item_pool = {
+        "The Magician": ["高機能ペン", "小型ガジェット", "カードケース"],
+        "The High Priestess": ["ノート", "アロマストーン", "静かな読書時間のしおり"],
+        "The Empress": ["フラワー雑貨", "リップバーム", "ハンドクリーム"],
+        "The Emperor": ["手帳カバー", "革財布", "名刺入れ"],
+        "The Hierophant": ["万年筆", "御守り", "レザーしおり"],
+        "The Lovers": ["ペアマグ", "ハートチャーム", "香水"],
+        "The Chariot": ["スニーカー", "トラベルポーチ", "スポーツタオル"],
+        "Strength": ["トレーニングバンド", "蜂蜜飴", "カフェタンブラー"],
+        "The Hermit": ["読書灯", "ルーペ", "上質ノート"],
+        "Wheel of Fortune": ["腕時計", "キーホルダー", "ラッキーチャーム"],
+        "Justice": ["バランスボード", "スケール柄グッズ", "スクエアトート"],
+        "The Hanged Man": ["アイピロー", "ストレッチポール", "アロマオイル"],
+        "Death": ["断捨離用ボックス", "新品タオル", "新しい歯ブラシ"],
+        "Temperance": ["ブレンドティー", "保温ボトル", "整う入浴剤"],
+        "The Devil": ["カカオ高配チョコ", "アロマキャンドル", "レザーブレス"],
+        "The Tower": ["スマホ充電器", "耐衝撃ケース", "貼るカイロ"],
+        "The Star": ["星座チャーム", "ミスト化粧水", "クリアポーチ"],
+        "The Moon": ["アロマディフューザー", "ムーンモチーフ雑貨", "柔軟剤"],
+        "The Sun": ["サングラス", "ビタミンCタブレット", "明るいマグ"],
+        "Judgement": ["ホイッスル", "目覚まし時計", "ホワイトノート"],
+        "The World": ["地球柄ノート", "パスポートケース", "トラベルタグ"],
+        "The Fool": ["小さなバックパック", "ピンバッジ", "スカーフ"]
+    }
+    item_candidates = item_pool.get(card_name, ["キーホルダー", "ノート", "トートバッグ"])
+    item = rng.choice(item_candidates)
+
+    # ---- 6) カラー決定：タロット色候補 × 易の色候補 → 重複避けて一つ ----
+    color_candidates = list({*card_color_candidates, *trig_colors})
+    # 九星の直接連想を避ける：典型ワードの抑制（紫/パープル/9/火曜）
+    filtered = [c for c in color_candidates if "紫" not in c and "パープル" not in c]
+    color = rng.choice(filtered if filtered else color_candidates)
+
+    # ---- 7) ナンバー：ライフパス寄り + 予備でランダム、ただし9ばかりを回避 ----
+    number = lp
+    if number == 9 and rng.random() < 0.5:
+        number = rng.choice([1,2,3,4,5,6,7,8])
+
+    # ---- 8) フード：八卦(五行)から連想 ----
+    food_map = {
+        "木": ["バジル", "ほうれん草", "枝豆", "抹茶", "グリーンスムージー"],
+        "火": ["カレー", "トマトスープ", "唐辛子せんべい", "チリビーンズ", "生姜湯"],
+        "土": ["さつまいも", "かぼちゃ", "雑穀ごはん", "味噌汁", "おにぎり"],
+        "金": ["白身魚", "ヨーグルト", "梨", "ナッツ", "豆腐"],
+        "水": ["わかめ", "しじみ汁", "寒天", "ところてん", "昆布だし"]
+    }
+    food_candidates = food_map.get(wu_xing, ["季節の果物", "ナッツ", "スープ"])
+    food = rng.choice(food_candidates)
+
+    # ---- 9) デー（曜日）：タロットの惑星由来 ----
+    day = tarot_weekday
+
+    # ---- 10) 最終1行フォーマットで返す ----
+    line = f"◆ アイテム：{item}　　◆ カラー：{color}　　◆ ナンバー：{number}　　◆ フード：{food}　　◆ デー：{day}"
+    return [line]
+
+
+
+
 def generate_fortune(image_data, birthdate, kyusei_text):
     import re
     palm_result = analyze_palm(image_data)
@@ -226,7 +364,7 @@ def generate_fortune(image_data, birthdate, kyusei_text):
     iching_result = get_iching_advice()
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
-    raw_lucky_info = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text)
+    raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text)
 
     lucky_lines = []
     try:

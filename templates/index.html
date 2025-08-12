@@ -48,6 +48,11 @@
       padding: 8px;
     }
   </style>
+
+  <!-- 🔊 効果音（静的配信） -->
+  <audio id="shutterSound" src="/static/shutter.mp3" preload="auto"></audio>
+  <audio id="clickSound"   src="/static/click.mp3"   preload="auto"></audio>
+  <audio id="chimeSound"   src="/static/chime.mp3"   preload="auto"></audio>
 </head>
 <body>
   <h2>📸 手相撮影＆送信フォーム</h2>
@@ -107,7 +112,17 @@
       startCamera();
     }
 
+    // 🔊 撮影時：シャッター音
     function takePhoto() {
+      const shutter = document.getElementById("shutterSound");
+      if (shutter) {
+        try {
+          shutter.currentTime = 0;
+          const p = shutter.play();
+          if (p && typeof p.then === "function") p.catch(()=>{});
+        } catch (_) {}
+      }
+
       const width = 600;
       const height = video.videoHeight * (600 / video.videoWidth);
       canvas.width = width;
@@ -153,57 +168,52 @@
       if ((month === 1 && day >= 21) || (month === 2 && day <= 18)) return "水瓶座";
       if ((month === 2 && day >= 19) || (month === 3 && day <= 20)) return "魚座";
       return "";
-}
+    }
 
+    function getCurrentYearEtoAccurate() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const springStart = new Date(`${year}-02-04`);
+      const eto60keys = Object.keys({
+        "甲子":1,"乙丑":2,"丙寅":3,"丁卯":4,"戊辰":5,"己巳":6,"庚午":7,"辛未":8,"壬申":9,"癸酉":10,
+        "甲戌":11,"乙亥":12,"丙子":13,"丁丑":14,"戊寅":15,"己卯":16,"庚辰":17,"辛巳":18,"壬午":19,"癸未":20,
+        "甲申":21,"乙酉":22,"丙戌":23,"丁亥":24,"戊子":25,"己丑":26,"庚寅":27,"辛卯":28,"壬辰":29,"癸巳":30,
+        "甲午":31,"乙未":32,"丙申":33,"丁酉":34,"戊戌":35,"己亥":36,"庚子":37,"辛丑":38,"壬寅":39,"癸卯":40,
+        "甲辰":41,"乙巳":42,"丙午":43,"丁未":44,"戊申":45,"己酉":46,"庚戌":47,"辛亥":48,"壬子":49,"癸丑":50,
+        "甲寅":51,"乙卯":52,"丙辰":53,"丁巳":54,"戊午":55,"己未":56,"庚申":57,"辛酉":58,"壬戌":59,"癸亥":60
+      });
+      const baseYear = 1984; // 甲子
+      const etoIndex = ((now < springStart ? year - 1 : year) - baseYear) % 60;
+      return eto60keys[etoIndex];
+    }
 
-function getCurrentYearEtoAccurate() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const springStart = new Date(`${year}-02-04`);
-  const eto60keys = Object.keys({
-    "甲子":1,"乙丑":2,"丙寅":3,"丁卯":4,"戊辰":5,"己巳":6,"庚午":7,"辛未":8,"壬申":9,"癸酉":10,
-    "甲戌":11,"乙亥":12,"丙子":13,"丁丑":14,"戊寅":15,"己卯":16,"庚辰":17,"辛巳":18,"壬午":19,"癸未":20,
-    "甲申":21,"乙酉":22,"丙戌":23,"丁亥":24,"戊子":25,"己丑":26,"庚寅":27,"辛卯":28,"壬辰":29,"癸巳":30,
-    "甲午":31,"乙未":32,"丙申":33,"丁酉":34,"戊戌":35,"己亥":36,"庚子":37,"辛丑":38,"壬寅":39,"癸卯":40,
-    "甲辰":41,"乙巳":42,"丙午":43,"丁未":44,"戊申":45,"己酉":46,"庚戌":47,"辛亥":48,"壬子":49,"癸丑":50,
-    "甲寅":51,"乙卯":52,"丙辰":53,"丁巳":54,"戊午":55,"己未":56,"庚申":57,"辛酉":58,"壬戌":59,"癸亥":60
-  });
-  const baseYear = 1984; // 甲子
-  const etoIndex = ((now < springStart ? year - 1 : year) - baseYear) % 60;
-  return eto60keys[etoIndex];
-}
+    function getTenchusatsuStatus(nicchuEto, currentYearEto) {
+      const tenchusatsuMap = {
+        "甲子": ["戌", "亥"], "乙丑": ["戌", "亥"], "丙寅": ["申", "酉"], "丁卯": ["申", "酉"],
+        "戊辰": ["午", "未"], "己巳": ["午", "未"], "庚午": ["辰", "巳"], "辛未": ["辰", "巳"],
+        "壬申": ["寅", "卯"], "癸酉": ["寅", "卯"], "甲戌": ["子", "丑"], "乙亥": ["子", "丑"],
+        "丙子": ["戌", "亥"], "丁丑": ["戌", "亥"], "戊寅": ["申", "酉"], "己卯": ["申", "酉"],
+        "庚辰": ["午", "未"], "辛巳": ["午", "未"], "壬午": ["辰", "巳"], "癸未": ["辰", "巳"],
+        "甲申": ["寅", "卯"], "乙酉": ["寅", "卯"], "丙戌": ["子", "丑"], "丁亥": ["子", "丑"],
+        "戊子": ["戌", "亥"], "己丑": ["戌", "亥"], "庚寅": ["申", "酉"], "辛卯": ["申", "酉"],
+        "壬辰": ["午", "未"], "癸巳": ["午", "未"], "甲午": ["辰", "巳"], "乙未": ["辰", "巳"],
+        "丙申": ["寅", "卯"], "丁酉": ["寅", "卯"], "戊戌": ["子", "丑"], "己亥": ["子", "丑"],
+        "庚子": ["戌", "亥"], "辛丑": ["戌", "亥"], "壬寅": ["申", "酉"], "癸卯": ["申", "酉"],
+        "甲辰": ["午", "未"], "乙巳": ["午", "未"], "丙午": ["辰", "巳"], "丁未": ["辰", "巳"],
+        "戊申": ["寅", "卯"], "己酉": ["寅", "卯"], "庚戌": ["子", "丑"], "辛亥": ["子", "丑"],
+        "壬子": ["戌", "亥"], "癸丑": ["戌", "亥"], "甲寅": ["申", "酉"], "乙卯": ["申", "酉"],
+        "丙辰": ["午", "未"], "丁巳": ["午", "未"], "戊午": ["辰", "巳"], "己未": ["辰", "巳"],
+        "庚申": ["寅", "卯"], "辛酉": ["寅", "卯"], "壬戌": ["子", "丑"], "癸亥": ["子", "丑"]
+      };
 
-
-function getTenchusatsuStatus(nicchuEto, currentYearEto) {
-  // 日柱60干支に対応する天中殺（空亡）地支セット
-  const tenchusatsuMap = {
-    "甲子": ["戌", "亥"], "乙丑": ["戌", "亥"], "丙寅": ["申", "酉"], "丁卯": ["申", "酉"],
-    "戊辰": ["午", "未"], "己巳": ["午", "未"], "庚午": ["辰", "巳"], "辛未": ["辰", "巳"],
-    "壬申": ["寅", "卯"], "癸酉": ["寅", "卯"], "甲戌": ["子", "丑"], "乙亥": ["子", "丑"],
-    "丙子": ["戌", "亥"], "丁丑": ["戌", "亥"], "戊寅": ["申", "酉"], "己卯": ["申", "酉"],
-    "庚辰": ["午", "未"], "辛巳": ["午", "未"], "壬午": ["辰", "巳"], "癸未": ["辰", "巳"],
-    "甲申": ["寅", "卯"], "乙酉": ["寅", "卯"], "丙戌": ["子", "丑"], "丁亥": ["子", "丑"],
-    "戊子": ["戌", "亥"], "己丑": ["戌", "亥"], "庚寅": ["申", "酉"], "辛卯": ["申", "酉"],
-    "壬辰": ["午", "未"], "癸巳": ["午", "未"], "甲午": ["辰", "巳"], "乙未": ["辰", "巳"],
-    "丙申": ["寅", "卯"], "丁酉": ["寅", "卯"], "戊戌": ["子", "丑"], "己亥": ["子", "丑"],
-    "庚子": ["戌", "亥"], "辛丑": ["戌", "亥"], "壬寅": ["申", "酉"], "癸卯": ["申", "酉"],
-    "甲辰": ["午", "未"], "乙巳": ["午", "未"], "丙午": ["辰", "巳"], "丁未": ["辰", "巳"],
-    "戊申": ["寅", "卯"], "己酉": ["寅", "卯"], "庚戌": ["子", "丑"], "辛亥": ["子", "丑"],
-    "壬子": ["戌", "亥"], "癸丑": ["戌", "亥"], "甲寅": ["申", "酉"], "乙卯": ["申", "酉"],
-    "丙辰": ["午", "未"], "丁巳": ["午", "未"], "戊午": ["辰", "巳"], "己未": ["辰", "巳"],
-    "庚申": ["寅", "卯"], "辛酉": ["寅", "卯"], "壬戌": ["子", "丑"], "癸亥": ["子", "丑"]
-  };
-
-  const currentYearChishi = currentYearEto.slice(1); // 年干支の地支（例：辰）
-  const tcs = tenchusatsuMap[nicchuEto];
-  if (tcs && tcs.includes(currentYearChishi)) {
-    return `🌑 今年は天中殺の年です（${tcs.join("・")}）`;
-  } else {
-    return "☀️ 今年は天中殺ではありません";
-  }
-}
-
-
+      const currentYearChishi = currentYearEto.slice(1);
+      const tcs = tenchusatsuMap[nicchuEto];
+      if (tcs && tcs.includes(currentYearChishi)) {
+        return `🌑 今年は天中殺の年です（${tcs.join("・")}）`;
+      } else {
+        return "☀️ 今年は天中殺ではありません";
+      }
+    }
 
     async function fetchEto() {
       const birthdate = document.getElementById("birthdate").value;
@@ -236,42 +246,47 @@ function getTenchusatsuStatus(nicchuEto, currentYearEto) {
         if (data.eto && data.honmeisei) {
           const etoOrderMap = {"甲子":1,"乙丑":2,"丙寅":3,"丁卯":4,"戊辰":5,"己巳":6,"庚午":7,"辛未":8,"壬申":9,"癸酉":10,"甲戌":11,"乙亥":12,"丙子":13,"丁丑":14,"戊寅":15,"己卯":16,"庚辰":17,"辛巳":18,"壬午":19,"癸未":20,"甲申":21,"乙酉":22,"丙戌":23,"丁亥":24,"戊子":25,"己丑":26,"庚寅":27,"辛卯":28,"壬辰":29,"癸巳":30,"甲午":31,"乙未":32,"丙申":33,"丁酉":34,"戊戌":35,"己亥":36,"庚子":37,"辛丑":38,"壬寅":39,"癸卯":40,"甲辰":41,"乙巳":42,"丙午":43,"丁未":44,"戊申":45,"己酉":46,"庚戌":47,"辛亥":48,"壬子":49,"癸丑":50,"甲寅":51,"乙卯":52,"丙辰":53,"丁巳":54,"戊午":55,"己未":56,"庚申":57,"辛酉":58,"壬戌":59,"癸亥":60};
           const animal60 = [
-  "長距離ランナーのチータ", "社交家のたぬき", "落ち着きのない猿", "フットワークの軽い子守熊", "面倒見のいい黒ひょう",
-  "愛情あふれる虎", "全力疾走するチータ", "磨き上げられたたぬき", "大きな志をもった猿", "母性豊かな子守熊",
-  "正直なこじか", "人気者のゾウ", "ネアカの狼", "協調性のないひつじ", "どっしりとした猿", "コアラのなかの子守熊",
-  "強い意志をもったこじか", "デリケートなゾウ", "放浪の狼", "物静かなひつじ", "落ち着きのあるペガサス",
-  "強靭な翼をもつペガサス", "無邪気なひつじ", "クリエイティブな狼", "穏やかな狼", "粘り強いひつじ",
-  "波乱に満ちたペガサス", "優雅なペガサス", "チャレンジ精神旺盛なひつじ", "順応性のある狼",
-  "リーダーとなるゾウ", "しっかり者のこじか", "活動的な子守熊", "気分屋の猿", "頼られると嬉しいひつじ",
-  "好感のもたれる狼", "まっしぐらに突き進むゾウ", "華やかなこじか", "夢とロマンの子守熊", "尽す猿",
-  "大器晩成のたぬき", "足腰の強いチータ", "動きまわる虎", "情熱的な黒ひょう", "サービス精神旺盛な子守熊",
-  "守りの猿", "人間味あふれるたぬき", "品格のあるチータ", "ゆったりとした悠然の虎", "落ち込みの激しい黒ひょう",
-  "我が道を行くライオン", "統率力のあるライオン", "感情豊かな黒ひょう", "楽天的な虎", "パワフルな虎",
-  "気どらない黒ひょう", "感情的なライオン", "傷つきやすいライオン", "束縛を嫌う黒ひょう", "慈悲深い虎"
-];
+            "長距離ランナーのチータ", "社交家のたぬき", "落ち着きのない猿", "フットワークの軽い子守熊", "面倒見のいい黒ひょう",
+            "愛情あふれる虎", "全力疾走するチータ", "磨き上げられたたぬき", "大きな志をもった猿", "母性豊かな子守熊",
+            "正直なこじか", "人気者のゾウ", "ネアカの狼", "協調性のないひつじ", "どっしりとした猿", "コアラのなかの子守熊",
+            "強い意志をもったこじか", "デリケートなゾウ", "放浪の狼", "物静かなひつじ", "落ち着きのあるペガサス",
+            "強靭な翼をもつペガサス", "無邪気なひつじ", "クリエイティブな狼", "穏やかな狼", "粘り強いひつじ",
+            "波乱に満ちたペガサス", "優雅なペガサス", "チャレンジ精神旺盛なひつじ", "順応性のある狼",
+            "リーダーとなるゾウ", "しっかり者のこじか", "活動的な子守熊", "気分屋の猿", "頼られると嬉しいひつじ",
+            "好感のもたれる狼", "まっしぐらに突き進むゾウ", "華やかなこじか", "夢とロマンの子守熊", "尽す猿",
+            "大器晩成のたぬき", "足腰の強いチータ", "動きまわる虎", "情熱的な黒ひょう", "サービス精神旺盛な子守熊",
+            "守りの猿", "人間味あふれるたぬき", "品格のあるチータ", "ゆったりとした悠然の虎", "落ち込みの激しい黒ひょう",
+            "我が道を行くライオン", "統率力のあるライオン", "感情豊かな黒ひょう", "楽天的な虎", "パワフルな虎",
+            "気どらない黒ひょう", "感情的なライオン", "傷つきやすいライオン", "束縛を嫌う黒ひょう", "慈悲深い虎"
+          ];
 
           const number = etoOrderMap[data.eto];
           const animal = animal60[number - 1];
 
-
-  // 天中殺判定用に今年の年干支（甲子〜癸亥）を算出
-  const eto60keys = Object.keys(etoOrderMap); // 甲子〜癸亥の配列
-  const currentYear = new Date().getFullYear();
-  const currentYearEto = getCurrentYearEtoAccurate(); // ✅ OK
-  const tenchusatsu = getTenchusatsuStatus(data.eto, currentYearEto);
-
-
+          const currentYearEto = getCurrentYearEtoAccurate();
+          const tenchusatsu = getTenchusatsuStatus(data.eto, currentYearEto);
 
           etoDisplay.textContent = `あなたの干支：${data.eto}（${number}番）／ 動物占い：${animal} ／ 本命星：${data.honmeisei}／ 日干支空亡：${tenchusatsu}`;
         } else {
-          etoDisplay.textContent = "⚠️ 情報の取得に失敗しました";  // 天中殺判定用に今年の年干支（甲子〜癸亥）を算出
+          etoDisplay.textContent = "⚠️ 情報の取得に失敗しました";
         }
       } catch (error) {
         etoDisplay.textContent = "⚠️ 通信エラー: " + error.message;
       }
     }
 
+    // 🔊 送信時：クリック音 → PDF生成処理 → 完了時：チャイム → リダイレクト
     async function submitForm() {
+      // 送信ボタンクリック音
+      const click = document.getElementById("clickSound");
+      if (click) {
+        try {
+          click.currentTime = 0;
+          const p = click.play();
+          if (p && typeof p.then === "function") p.catch(()=>{});
+        } catch (_) {}
+      }
+
       const birthdate = document.getElementById("birthdate").value;
       const imageData = canvas.toDataURL("image/png");
       const fullYear = document.getElementById("full_year").checked;
@@ -296,12 +311,27 @@ function getTenchusatsuStatus(nicchuEto, currentYearEto) {
         });
         const result = await response.json();
         if (result.redirect_url) {
+          // 完了チャイム（短時間待ってから遷移）
+          const chime = document.getElementById("chimeSound");
+          try {
+            chime.currentTime = 0;
+            const playPromise = chime.play();
+            if (playPromise && typeof playPromise.then === "function") {
+              await Promise.race([
+                playPromise.catch(()=>{}),
+                new Promise(res => setTimeout(res, 700))
+              ]);
+            }
+          } catch (_) {}
           window.location.href = result.redirect_url;
         } else {
           alert("PDF生成後のリダイレクトが取得できませんでした");
         }
       } catch (error) {
         alert("送信エラー: " + error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "送信してPDF生成";
       }
     }
 
