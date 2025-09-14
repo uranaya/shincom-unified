@@ -266,7 +266,7 @@
           const currentYearEto = getCurrentYearEtoAccurate();
           const tenchusatsu = getTenchusatsuStatus(data.eto, currentYearEto);
 
-          etoDisplay.textContent = `あなたの干支：${data.eto}（${number}番）／ 動物占い：${animal} ／ 本命星：${data.honmeisei}／ 日干支空亡：${tenchusatsu}`;
+          etoDisplay.textContent = `あなたの干支：${data.eto}（${number}番）／ 動物占い：${animal} ／ 本命星：${data.honmeisei}`;
         } else {
           etoDisplay.textContent = "⚠️ 情報の取得に失敗しました";
         }
