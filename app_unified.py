@@ -1860,6 +1860,100 @@ def admin_invoice_staff_pdf():
 
 
 
+@app.route('/admin/sales_add_missing', methods=['GET', 'POST'])
+def admin_sales_add_missing():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login_sales'))
+
+    # ① 画面表示：簡易フォーム
+    if request.method == 'GET':
+        # クイックに使える軽量フォーム（テンプレート追加不要）
+        return render_template_string("""
+        <!doctype html>
+        <html>
+        <head><meta charset="utf-8"><title>打ち忘れ追加</title>
+        <style>
+            body { font-family: sans-serif; padding: 16px; }
+            form { max-width: 480px; display: grid; gap: 12px; }
+            label { font-weight: 600; }
+            input, select { padding: 8px; font-size: 14px; }
+            .row { display: grid; gap: 4px; }
+            .actions { display: flex; gap: 8px; }
+        </style>
+        </head>
+        <body>
+            <h1>打ち忘れ追加</h1>
+            <form method="post">
+                <div class="row">
+                    <label>日付 (YYYY-MM-DD)</label>
+                    <input type="date" name="date" required>
+                </div>
+                <div class="row">
+                    <label>占い師（staff_name）</label>
+                    <input type="text" name="staff_name" required>
+                </div>
+                <div class="row">
+                    <label>方法（method）</label>
+                    <select name="method" required>
+                        <option value="対面">対面</option>
+                        <option value="コンピューター">コンピューター</option>
+                        <option value="現金外（クレカQR）">現金外（クレカQR）</option>
+                    </select>
+                </div>
+                <div class="row">
+                    <label>金額（円）</label>
+                    <input type="number" name="amount" min="1" step="1" required>
+                </div>
+                <div class="actions">
+                    <button type="submit">追加する</button>
+                    <a href="{{ url_for('admin_invoice_staff') }}">請求集計へ戻る</a>
+                </div>
+            </form>
+        </body>
+        </html>
+        """)
+
+    # ② POST：1行を sales に挿入（既存集計に反映）
+    date_str = request.form.get('date', '').strip()
+    staff_name = request.form.get('staff_name', '').strip()
+    method = request.form.get('method', '').strip()
+    amount_str = request.form.get('amount', '').strip()
+
+    # 入力バリデーション（最小限）
+    if not date_str or not staff_name or not method or not amount_str:
+        return "❌ 必須項目が未入力です。", 400
+    try:
+        # 日付フォーマット確認（YYYY-MM-DD）
+        _ = datetime.strptime(date_str, "%Y-%m-%d")
+        amount = int(amount_str)
+        if amount <= 0:
+            return "❌ 金額は正の整数で入力してください。", 400
+    except Exception:
+        return "❌ 入力形式を確認してください。（日付 or 金額）", 400
+
+    # method の正規化（①で定義済みの normalize_method を活用）
+    method = normalize_method(method)
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        # sales(date, method, amount, staff_name) を前提（既存スキーマに合わせる）
+        cur.execute("""
+            INSERT INTO sales (date, method, amount, staff_name)
+            VALUES (%s, %s, %s, %s);
+        """, (date_str, method, amount, staff_name))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        return f"❌ 追加に失敗しました: {e}", 500
+
+    # 追加後は同月の請求画面へリダイレクト（使い勝手重視）
+    month = date_str[:7]  # "YYYY-MM"
+    return redirect(url_for('admin_invoice_staff', month=month, staff=staff_name))
+
+
+
 
 
 @app.route('/selfmob/google808abc9a83ba5e55.html')
