@@ -1262,6 +1262,15 @@ STAFF_LIST = [
 
 METHOD_LIST = ["対面", "コンピューター", "現金外（クレカQR)"]
 
+def normalize_method(method: str) -> str:
+    """DBに入っている '現金外（クレカQR）' などをPDF集計用に正規化"""
+    if method == "対面":
+        return "対面"
+    if method == "コンピューター":
+        return "コンピューター"
+    if "現金外" in method:
+        return "現金外"
+    return method or ""
 
 
 @app.route("/regi", methods=["GET", "POST"])
@@ -1597,15 +1606,19 @@ def admin_invoice_staff():
         total_taiken = 0
         total_pc = 0
         total_cashless = 0
-        for method, total in rows:
-            if method == "対面":
-                total_taiken += total
-            elif method == "コンピューター":
-                total_pc += total
-            elif "現金外" in method:
-                total_cashless += total
 
-        # 出店料計算
+        # ①の normalize_method を使用（関数内で再定義しません）
+        for method, total in rows:
+            cat = normalize_method(method)
+            if cat == "対面":
+                total_taiken += total
+            elif cat == "コンピューター":
+                total_pc += total
+            elif cat == "現金外":
+                total_cashless += total
+            # 想定外カテゴリは現状ロジックでは集計対象外
+
+        # 出店料計算（既存ロジックのまま）
         store_fee = total_taiken * 0.30 + total_pc * 0.50
         store_fee_tax = int(store_fee * 1.10)  # 消費税10%
         final_invoice = store_fee_tax - total_cashless  # 正確な請求額
@@ -1827,7 +1840,12 @@ def admin_invoice_staff_pdf():
             date_str = date.strftime("%Y-%m-%d")
             if date_str not in daily_details:
                 daily_details[date_str] = {"対面": 0, "コンピューター": 0, "現金外": 0}
-            daily_details[date_str][method] = total
+
+            # ①で定義済みの正規化関数を使用して列ズレを防止
+            cat = normalize_method(method)
+            if cat not in daily_details[date_str]:
+                daily_details[date_str][cat] = 0
+            daily_details[date_str][cat] += total
 
         # PDF生成
         pdf_path = os.path.join(UPLOAD_FOLDER, f"invoice_{staff}_{month}.pdf")
@@ -1838,6 +1856,7 @@ def admin_invoice_staff_pdf():
 
     except Exception as e:
         return f"❌ PDF生成エラー: {e}", 500
+
 
 
 
