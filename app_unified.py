@@ -12,7 +12,7 @@ from datetime import datetime
 from urllib.parse import quote
 from sqlalchemy import create_engine, text
 import csv
-from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response
+from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response,render_template_string
 from fortune_logic import generate_fortune
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
