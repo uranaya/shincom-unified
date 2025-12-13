@@ -28,6 +28,63 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 
+# --- 星座・干支番号・動物占い（PDF用共通ロジック） ---
+
+# 60干支の並び順に対応する番号マップ（1〜60）
+ETO_ORDER_MAP = {
+    "甲子": 1, "乙丑": 2, "丙寅": 3, "丁卯": 4, "戊辰": 5, "己巳": 6, "庚午": 7, "辛未": 8, "壬申": 9, "癸酉": 10,
+    "甲戌": 11, "乙亥": 12, "丙子": 13, "丁丑": 14, "戊寅": 15, "己卯": 16, "庚辰": 17, "辛巳": 18, "壬午": 19, "癸未": 20,
+    "甲申": 21, "乙酉": 22, "丙戌": 23, "丁亥": 24, "戊子": 25, "己丑": 26, "庚寅": 27, "辛卯": 28, "壬辰": 29, "癸巳": 30,
+    "甲午": 31, "乙未": 32, "丙申": 33, "丁酉": 34, "戊戌": 35, "己亥": 36, "庚子": 37, "辛丑": 38, "壬寅": 39, "癸卯": 40,
+    "甲辰": 41, "乙巳": 42, "丙午": 43, "丁未": 44, "戊申": 45, "己酉": 46, "庚戌": 47, "辛亥": 48, "壬子": 49, "癸丑": 50,
+    "甲寅": 51, "乙卯": 52, "丙辰": 53, "丁巳": 54, "戊午": 55, "己未": 56, "庚申": 57, "辛酉": 58, "壬戌": 59, "癸亥": 60,
+}
+
+# 動物占い60分類（index: 干支番号-1）
+ANIMAL60 = [
+    "長距離ランナーのチータ", "社交家のたぬき", "落ち着きのない猿", "フットワークの軽い子守熊", "面倒見のいい黒ひょう",
+    "愛情あふれる虎", "全力疾走するチータ", "磨き上げられたたぬき", "大きな志をもった猿", "母性豊かな子守熊",
+    "正直なこじか", "人気者のゾウ", "ネアカの狼", "協調性のないひつじ", "どっしりとした猿", "コアラのなかの子守熊",
+    "強い意志をもったこじか", "デリケートなゾウ", "放浪の狼", "物静かなひつじ", "落ち着きのあるペガサス",
+    "強靭な翼をもつペガサス", "無邪気なひつじ", "クリエイティブな狼", "穏やかな狼", "粘り強いひつじ",
+    "波乱に満ちたペガサス", "優雅なペガサス", "チャレンジ精神旺盛なひつじ", "順応性のある狼",
+    "リーダーとなるゾウ", "しっかり者のこじか", "活動的な子守熊", "気分屋の猿", "頼られると嬉しいひつじ",
+    "好感のもたれる狼", "まっしぐらに突き進むゾウ", "華やかなこじか", "夢とロマンの子守熊", "尽す猿",
+    "大器晩成のたぬき", "足腰の強いチータ", "動きまわる虎", "情熱的な黒ひょう", "サービス精神旺盛な子守熊",
+    "守りの猿", "人間味あふれるたぬき", "品格のあるチータ", "ゆったりとした悠然の虎", "落ち込みの激しい黒ひょう",
+    "我が道を行くライオン", "統率力のあるライオン", "感情豊かな黒ひょう", "楽天的な虎", "パワフルな虎",
+    "気どらない黒ひょう", "感情的なライオン", "傷つきやすいライオン", "束縛を嫌う黒ひょう", "慈悲深い虎",
+]
+
+
+def get_zodiac_sign(month: int, day: int) -> str:
+    """西洋12星座（フロントの getZodiacSign と同じ境界）"""
+    if (month == 3 and day >= 21) or (month == 4 and day <= 19):
+        return "牡羊座"
+    if (month == 4 and day >= 20) or (month == 5 and day <= 20):
+        return "牡牛座"
+    if (month == 5 and day >= 21) or (month == 6 and day <= 21):
+        return "双子座"
+    if (month == 6 and day >= 22) or (month == 7 and day <= 22):
+        return "蟹座"
+    if (month == 7 and day >= 23) or (month == 8 and day <= 22):
+        return "獅子座"
+    if (month == 8 and day >= 23) or (month == 9 and day <= 22):
+        return "乙女座"
+    if (month == 9 and day >= 23) or (month == 10 and day <= 23):
+        return "天秤座"
+    if (month == 10 and day >= 24) or (month == 11 and day <= 22):
+        return "蠍座"
+    if (month == 11 and day >= 23) or (month == 12 and day <= 21):
+        return "射手座"
+    if (month == 12 and day >= 22) or (month == 1 and day <= 20):
+        return "山羊座"
+    if (month == 1 and day >= 21) or (month == 2 and day <= 18):
+        return "水瓶座"
+    return "魚座"
+
+
+
 from aura_fortune_utils import generate_aura_fortune
 from aura_image_utils import generate_aura_image
 from pdf_generator_aura import create_aura_pdf
@@ -927,6 +984,17 @@ def ten_shincom():
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
             eto = get_nicchu_eto(birthdate)
+            # 生年月日から星座・干支番号・動物占い・本命星を算出（PDF用）
+            zodiac = get_zodiac_sign(month, day)
+            eto_number = ETO_ORDER_MAP.get(eto)
+            animal = ""
+            if eto_number is not None and 1 <= eto_number <= len(ANIMAL60):
+                animal = ANIMAL60[eto_number - 1]
+            try:
+                honmeisei = get_honmeisei(year, month, day)
+            except Exception as e:
+                print("❌ 本命星取得エラー:", e)
+                honmeisei = ""
             palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text)
             summary_text = ""
             if len(palm_texts) == 6:
@@ -959,6 +1027,11 @@ def ten_shincom():
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
                 "birthdate": birthdate,
+                "zodiac": zodiac,
+                "eto": eto,
+                "eto_number": eto_number,
+                "animal": animal,
+                "honmeisei": honmeisei,
                 "palm_result": "\n".join(palm_texts),
                 "shichu_result": shichu_result,
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
@@ -1973,5 +2046,6 @@ def admin_sales_add_missing():
 @app.route('/selfmob/google808abc9a83ba5e55.html')
 def google_verification_file():
     return send_from_directory('static', 'google808abc9a83ba5e55.html')
+
 
 

@@ -153,6 +153,46 @@ def draw_shincom_a4(c, data, include_yearly=False):
     y = draw_header(c, width, margin, y)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
+    # 生年月日・星座・干支・動物占い・本命星（手相画像の直下に表示）
+    birthdate = data.get("birthdate")
+    zodiac = data.get("zodiac")
+    eto = data.get("eto")
+    eto_number = data.get("eto_number")
+    animal = data.get("animal")
+    honmeisei = data.get("honmeisei")
+
+    info_lines = []
+
+    # 1行目：生年月日＋星座
+    line1_parts = []
+    if birthdate:
+        line1_parts.append(f"生年月日：{birthdate}")
+    if zodiac:
+        line1_parts.append(f"星座：{zodiac}")
+    if line1_parts:
+        info_lines.append(" / ".join(line1_parts))
+
+    # 2行目：干支番号＋動物占い＋本命星
+    line2_parts = []
+    if eto:
+        if eto_number:
+            line2_parts.append(f"干支：{eto}（{eto_number}番）")
+        else:
+            line2_parts.append(f"干支：{eto}")
+    if animal:
+        line2_parts.append(f"動物占い：{animal}")
+    if honmeisei:
+        line2_parts.append(f"本命星：{honmeisei}")
+    if line2_parts:
+        info_lines.append(" / ".join(line2_parts))
+
+    if info_lines:
+        c.setFont(FONT_NAME, 11)
+        for line in info_lines:
+            c.drawString(margin, y, line)
+            y -= 5 * mm
+        y -= 3 * mm
+
     # 手相3項目（1ページ目）
     c.setFont(FONT_NAME, 12)
     for i in range(3):
