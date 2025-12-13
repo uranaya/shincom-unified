@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>姓名判断レポート作成</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", sans-serif;
+            background: #f7f7f9;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 640px;
+            margin: 24px auto;
+            background: #ffffff;
+            padding: 24px 20px 28px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        }
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+        p.desc {
+            font-size: 0.9rem;
+            color: #555;
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.2rem;
+        }
+        .field {
+            margin-bottom: 1rem;
+        }
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 60px;
+        }
+        .hint {
+            font-size: 0.75rem;
+            color: #777;
+            margin-top: 0.2rem;
+        }
+        .btn-area {
+            text-align: center;
+            margin-top: 1.4rem;
+        }
+        button {
+            background: #222;
+            color: #fff;
+            border: none;
+            border-radius: 999px;
+            padding: 10px 26px;
+            font-size: 0.95rem;
+            cursor: pointer;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>姓名判断レポート作成</h1>
+    <p class="desc">
+        お名前と入れたい漢字を入力すると、<br>
+        五運の鑑定と改名案・子どもの名前・相性の良い名前を<br>
+        A4レポートとしてPDF出力します。
+    </p>
+    <form method="post" action="/namefortune/run">
+        <div class="field">
+            <label for="full_name">名前（必須）</label>
+            <input type="text" id="full_name" name="full_name" placeholder="例）山田太郎" required>
+        </div>
+
+        <div class="field">
+            <label for="reading">よみ（任意）</label>
+            <input type="text" id="reading" name="reading" placeholder="例）やまだ たろう">
+            <div class="hint">ひらがな・カタカナなど、読み方をそのまま入力してください。</div>
+        </div>
+
+        <div class="field">
+            <label for="kanji_candidates">入れたい漢字（任意・複数可）</label>
+            <input type="text" id="kanji_candidates" name="kanji_candidates" placeholder="例）翔 結 愛 悠">
+            <div class="hint">スペース・読点・カンマで区切って複数入力できます。</div>
+        </div>
+
+        <div class="field">
+            <label for="gender">性別（任意）</label>
+            <select id="gender" name="gender">
+                <option value="">未選択</option>
+                <option value="male">男性</option>
+                <option value="female">女性</option>
+            </select>
+            <div class="hint">子どもの名前の傾向などに反映されます。（未選択でもOK）</div>
+        </div>
+
+        <div class="btn-area">
+            <button type="submit">PDFレポートを作成する</button>
+        </div>
+    </form>
+</div>
+</body>
+</html>

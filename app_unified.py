@@ -1973,3 +1973,76 @@ def admin_sales_add_missing():
 @app.route('/selfmob/google808abc9a83ba5e55.html')
 def google_verification_file():
     return send_from_directory('static', 'google808abc9a83ba5e55.html')
+
+
+
+
+from namefortune_utils import (
+    NameFortuneInput,
+    get_kanji_strokes_dict,
+    split_name,
+    calculate_goun,
+    generate_name_fortune_text,
+)
+from pdf_namefortune import create_namefortune_pdf
+from io import BytesIO
+
+@app.route("/namefortune", methods=["GET"])
+def namefortune_index():
+    return render_template("namefortune/index.html")
+
+@app.route("/namefortune/run", methods=["POST"])
+def namefortune_run():
+    full_name = request.form.get("full_name", "").strip()
+    reading = request.form.get("reading", "").strip()
+    kanji_raw = request.form.get("kanji_candidates", "").strip()
+    gender = request.form.get("gender") or None
+
+    if not full_name:
+        return "名前を入力してください", 400
+
+    kanji_list = []
+    if kanji_raw:
+        tmp = kanji_raw.replace("、", " ").replace(",", " ")
+        kanji_list = [x.strip() for x in tmp.split() if x.strip()]
+
+    family, given = split_name(full_name)
+    strokes_dict = get_kanji_strokes_dict()
+
+    nfi = NameFortuneInput(
+        full_name=full_name,
+        reading=reading,
+        kanji_candidates=kanji_list,
+        gender=gender,
+        family_name=family,
+        given_name=given,
+    )
+    nfi = calculate_goun(nfi, strokes_dict)
+
+    fortune_text = generate_name_fortune_text(nfi)
+
+    pdf_buffer = BytesIO()
+    data_dict = {
+        "full_name": nfi.full_name,
+        "reading": nfi.reading,
+        "kanji_candidates": nfi.kanji_candidates,
+        "tenkaku": nfi.tenkaku,
+        "jinkaku": nfi.jinkaku,
+        "chikaku": nfi.chikaku,
+        "gaikaku": nfi.gaikaku,
+        "soukaku": nfi.soukaku,
+    }
+    tmp_path = "namefortune_tmp.pdf"
+    create_namefortune_pdf(tmp_path, data_dict, fortune_text)
+    with open(tmp_path, "rb") as f:
+        pdf_buffer.write(f.read())
+    os.remove(tmp_path)
+    pdf_buffer.seek(0)
+
+    filename = f"namefortune_{full_name}.pdf"
+    return send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename,
+    )
