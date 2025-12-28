@@ -520,36 +520,42 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         if today.day >= 20:
             base += relativedelta(months=1)
 
-        this_year = base.year          # 「今年」＝基準月の年
-        this_month = base.month        # 「今月」＝基準月の月
+        # 「今年」「今月」はこの基準月に揃える
+        this_year = base.year           # 例：2025-12-28 なら 2026 年
+        this_month = base.month         # 例：同上なら 1 月
 
-        next_month_date = base + relativedelta(months=1)
-        next_month = next_month_date.month
-        next_year = next_month_date.year
+        # 来月分
+        next_base = base + relativedelta(months=1)
+        next_year = next_base.year
+        next_month = next_base.month
 
+        # 通変星（年・今月・来月）
         tsuhen_year = get_tsuhensei_for_year(user_birth, this_year)
         tsuhen_month = get_tsuhensei_for_date(user_birth, this_year, this_month)
-        # ★ 来月分の通変星（未定義だったため追加）
-        tsuhen_next = get_tsuhensei_for_date(user_birth, next_year, next_month)
+        tsuhen_next_month = get_tsuhensei_for_date(user_birth, next_year, next_month)
 
+        # 今年の恋愛運
         prompt_year = f"""あなたは四柱推命の専門家です。
 - 日柱: {user_eto}
 - 年の通変星: {tsuhen_year}
 - 月の通変星: {tsuhen_month}
 今年（{this_year}年）の恋愛運について、出会いや進展、距離の縮まり方などに触れて200文字でやさしく教えてください。主語は「あなた」。"""
 
+        # 今月の恋愛運
         prompt_month = f"""あなたは四柱推命の専門家です。
 - 日柱: {user_eto}
 - 年の通変星: {tsuhen_year}
 - 月の通変星: {tsuhen_month}
 今月（{this_month}月）の恋愛運を150文字でやさしく教えてください。"""
 
+        # 来月の恋愛運
         prompt_next = f"""あなたは四柱推命の専門家です。
 - 日柱: {user_eto}
 - 年の通変星: {tsuhen_year}
-- 月の通変星: {tsuhen_next}
+- 月の通変星: {tsuhen_next_month}
 来月（{next_month}月）の恋愛運を150文字でやさしく教えてください。"""
 
+        # GPT 呼び出し
         year_love = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_year}],
@@ -567,8 +573,11 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
             messages=[{"role": "user", "content": prompt_next}],
             max_tokens=400
         ).choices[0].message.content.strip()
+
     except Exception as e:
+        print("❌ 恋愛運取得エラー:", e)
         year_love = month_love = next_month_love = f"（恋愛運取得エラー: {e}）"
+
 
     # 年運（12か月分）の恋愛運
     yearly_love_fortunes = None
