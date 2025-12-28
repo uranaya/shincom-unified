@@ -51,8 +51,6 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
     return y
 
 
-
-
 def draw_palm_image(c, base64_image, width, y):
     try:
         image_data = base64.b64decode(base64_image.split(',')[1])
@@ -78,9 +76,11 @@ def draw_palm_image(c, base64_image, width, y):
     return y
 
 
-
-
+# =========================
+# 恋愛版 年運ページ（A4）
+# =========================
 def draw_yearly_pages_renai_a4(c, yearly):
+    """恋愛版 A4：年運＋12か月恋愛運を、テキスト量に応じて自動で複数ページに描画する。"""
     width, height = A4
     margin = 20 * mm
     top = height - 30 * mm
@@ -108,25 +108,26 @@ def draw_yearly_pages_renai_a4(c, yearly):
         y -= 3 * mm
         return y
 
+    # 年運 → 12か月分の順に描画
     c.showPage()
     y = top
-    y = draw_text_block(yearly.get("year_label",""), yearly.get("year_text",""), y)
+    y = draw_text_block(yearly.get("year_label", ""), yearly.get("year_text", ""), y)
     for month in yearly.get("months", []):
-    y = draw_text_block(
-        month.get("label",""),
-        month.get("text",""),
-        y
-    )
+        y = draw_text_block(month.get("label", ""), month.get("text", ""), y)
 
 
-
+# =========================
+# 恋愛版 年運ページ（B4）
+# =========================
 def draw_yearly_pages_renai_b4(c, yearly):
+    """恋愛版 B4：年運＋12か月恋愛運を、テキスト量に応じて自動で複数ページに描画する。"""
     width, height = B4
     margin = 20 * mm
     top = height - 30 * mm
     bottom = 30 * mm
 
     def draw_text_block(title, text, y):
+        # 必要ならページを切り替え
         if y < bottom + 18 * mm:
             c.showPage()
             y = top
@@ -147,15 +148,12 @@ def draw_yearly_pages_renai_b4(c, yearly):
         y -= 4 * mm
         return y
 
+    # 年運 → 12か月分の順に描画
     c.showPage()
     y = top
-    y = draw_text_block(yearly["year_label"], yearly["year_text"])
-    for month in yearly["months"]:
-        y = draw_text_block(month["label"], month["text"], y)
-
-
-
-
+    y = draw_text_block(yearly.get("year_label", ""), yearly.get("year_text", ""), y)
+    for month in yearly.get("months", []):
+        y = draw_text_block(month.get("label", ""), month.get("text", ""), y)
 
 
 def draw_shincom_a4(c, data, include_yearly=False):
@@ -256,7 +254,6 @@ def draw_shincom_a4(c, data, include_yearly=False):
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
 
 
-
 def draw_shincom_b4(c, data, include_yearly=False):
     width, height = B4
     margin = 20 * mm
@@ -289,6 +286,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         c.setFont(FONT_NAME, 14)
 
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
+
         wrap_len = 40 if 'month' in key else 45
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
@@ -307,7 +305,6 @@ def draw_shincom_b4(c, data, include_yearly=False):
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])
-
 
 
 def draw_yearly_pages_shincom_a4(c, yearly):
@@ -370,8 +367,6 @@ def draw_yearly_pages_shincom_b4(c, yearly):
     y = height - 30 * mm
     for month in yearly["months"][6:]:
         draw_text_block(month["label"], month["text"])
-
-
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
@@ -440,9 +435,6 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             draw_yearly_pages_renai_a4(c, data["yearly_love_fortunes"])
         else:
             draw_yearly_pages_renai_b4(c, data["yearly_love_fortunes"])
-
-
-
 
 
 def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
