@@ -15,17 +15,13 @@ def _ask_openai(prompt: str, max_tokens: int = 200, temperature: float = 0.7) ->
     OpenAI ChatCompletion のラッパ。
     必要に応じて今後も使えるように残しておく。
     """
-    model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
-    res = openai.ChatCompletion.create(
-        model=model,
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
         max_tokens=max_tokens,
         temperature=temperature,
-        messages=[
-            {"role": "system", "content": "あなたは四柱推命と恋愛心理に詳しいプロの占い師です。"},
-            {"role": "user", "content": prompt},
-        ],
     )
-    return res.choices[0].message.content.strip()
+    return response.choices[0].message.content.strip()
 
 
 def _truncate(text: str, limit: int = MAX_CHAR) -> str:
@@ -44,7 +40,7 @@ def _truncate(text: str, limit: int = MAX_CHAR) -> str:
 def generate_yearly_love_fortune(user_birth: str, now: datetime):
     nicchu = get_nicchu_eto(user_birth)
 
-    # ★ 20日境：基準月 base
+    # ★ 20日境：基準月 base を決める
     base = now.replace(day=15)
     if now.day >= 20:
         base += relativedelta(months=1)
@@ -62,16 +58,11 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
 条件：
 - 占い用語（例：比肩、傷官など）や干支名は文章に出さず、
   その意味を自然な日本語に置き換えてください
+- 必ず文を途中で切らず、句点「。」で終わらせてください
 - 主語は「あなた」
-- 現実的かつ印象に残るアドバイスとしてください
+- 前向きだが現実的な内容にし、行動や心構えの指針になるように
 """.strip()
-
-    year_fortune = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt_year}],
-        max_tokens=150,
-        temperature=0.8
-    ).choices[0].message.content.strip()
+    year_fortune = _ask_openai(prompt_year, max_tokens=200, temperature=0.8)
 
     # ★ 基準月 base から 12ヶ月分
     month_fortunes = []
@@ -92,16 +83,11 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
 - 主語は「あなた」
 - 占い用語（例：偏印、正官など）や干支名は出さず、
   意味に沿った自然な表現にしてください
-- 現実味のある恋愛展開や気持ちの動きを含めてください
-- 毎月の変化が感じられるようにしてください
+- 必ず文を途中で切らず、句点「。」で終わらせてください
+- 現実味のある前向きな内容で、具体的な行動や心構えに触れてください
 """.strip()
 
-        text = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt_month}],
-            max_tokens=150,
-            temperature=0.9
-        ).choices[0].message.content.strip()
+        text = _ask_openai(prompt_month, max_tokens=200, temperature=0.9)
 
         month_fortunes.append({
             "label": f"{y}年{m}月の恋愛運",

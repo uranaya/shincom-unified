@@ -454,7 +454,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 - あなたの日柱: {user_eto}
 - お相手の日柱: {partner_eto}
 
-お相手の気持ちと今後の展開について、200文字で教えてください。"""
+この2人の今後の恋の展開について、200文字で教えてください。"""
         else:
             prompt_comp = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}
@@ -501,22 +501,21 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 ・現実的で誠実だが希望が持てる言葉で  
 ・一般論や抽象的な助言ではなく、読み手に刺さるような内容にする
 """
-
             topic_text = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": topic_prompt}],
-                max_tokens=600,
+                max_tokens=400,
                 temperature=0.9
             ).choices[0].message.content.strip()
-
             topic_sections.append({"title": topic, "content": topic_text})
         except Exception as e:
             topic_sections.append({"title": topic, "content": f"（この項目の取得エラー: {e}）"})
 
+    # ★ 「今年・今月・来月」の恋愛運（20日境のロジックに合わせる）
     try:
         today = datetime.today()
 
-        # ★ 20日境：基準月 base を決める
+        # 20日境で基準月 base を決める
         base = today.replace(day=15)
         if today.day >= 20:
             base += relativedelta(months=1)
@@ -530,7 +529,8 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 
         tsuhen_year = get_tsuhensei_for_year(user_birth, this_year)
         tsuhen_month = get_tsuhensei_for_date(user_birth, this_year, this_month)
-
+        # ★ 来月分の通変星（未定義だったため追加）
+        tsuhen_next = get_tsuhensei_for_date(user_birth, next_year, next_month)
 
         prompt_year = f"""あなたは四柱推命の専門家です。
 - 日柱: {user_eto}
@@ -570,28 +570,26 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     except Exception as e:
         year_love = month_love = next_month_love = f"（恋愛運取得エラー: {e}）"
 
+    # ★ 1年分の恋愛運（必要なときだけ）
     yearly_love_fortunes = {}
     if include_yearly:
         try:
-            yearly_love_fortunes = generate_yearly_love_fortune(user_birth, datetime.now())
-            print("✅ 年運データ取得:", yearly_love_fortunes)
+            yearly_love_fortunes = generate_yearly_love_fortune(user_birth, today)
         except Exception as e:
-            print(f"❌ 年運取得失敗: {e}")
+            yearly_love_fortunes = {
+                "year_label": "年運取得エラー",
+                "year_text": f"（年運取得時にエラーが発生しました: {e}）",
+                "months": []
+            }
 
-    try:
-        birth_date_obj = datetime.strptime(user_birth, "%Y-%m-%d")
-        age = datetime.today().year - birth_date_obj.year - ((datetime.today().month, datetime.today().day) < (birth_date_obj.month, birth_date_obj.day))
-        kyusei_text = generate_lucky_direction(user_birth, datetime.today().date())
-        lucky_info = generate_lucky_renai_info(user_eto, user_birth, age, year_love, kyusei_text)
-    except Exception as e:
-        print("❌ 恋愛ラッキー情報取得失敗:", e)
-        lucky_info = []
-        kyusei_text = ""
+    # ラッキー情報（恋愛専用）＋九星の吉方位
+    lucky_info = generate_lucky_renai_info(user_birth)
+    kyusei_text = generate_lucky_direction(user_birth)
 
     return {
         "texts": {
             "compatibility": comp_text,
-            "overall_love_fortune": "" if partner_eto else future_text,
+            "overall_love_fortune": future_text,
             "year_love": year_love,
             "month_love": month_love,
             "next_month_love": next_month_love,
