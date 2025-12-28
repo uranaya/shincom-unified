@@ -42,28 +42,16 @@ def _truncate(text: str, limit: int = MAX_CHAR) -> str:
 
 
 def generate_yearly_love_fortune(user_birth: str, now: datetime):
-    """
-    恋愛版の年運＋12ヶ月分の恋愛運を生成する。
-
-    - 年ラベルは「基準月の年」
-    - 月運は「基準月」から 12 ヶ月分
-      （基準月 = 今日が 20 日以上なら翌月、それ以外は当月。day=15 に揃える）
-    """
-    # 日柱・本命星など基礎データ
     nicchu = get_nicchu_eto(user_birth)
-    born = datetime.strptime(user_birth, "%Y-%m-%d")
-    honmeisei = get_honmeisei(born.year, born.month, born.day)
 
-    # ⭐ ここを「20日境」に合わせる
+    # ★ 20日境：基準月 base
     base = now.replace(day=15)
     if now.day >= 20:
-        base = base + relativedelta(months=1)
+        base += relativedelta(months=1)
 
-    # 年ラベルは基準月の年
     target_year = base.year
     tsuhen_year = get_tsuhensei_for_year(user_birth, target_year)
 
-    # ===== 年運（総合） =====
     prompt_year = f"""
 あなたは恋愛占いの専門家です。
 以下の情報をもとに、{target_year}年の恋愛傾向を100文字以内で表現してください。
@@ -78,19 +66,19 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
 - 現実的かつ印象に残るアドバイスとしてください
 """.strip()
 
-    year_raw = _ask_openai(prompt_year, max_tokens=150, temperature=0.8)
-    year_fortune = _truncate(year_raw, MAX_CHAR)
+    year_fortune = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt_year}],
+        max_tokens=150,
+        temperature=0.8
+    ).choices[0].message.content.strip()
 
-    # ===== 月運（基準月から 12 ヶ月分） =====
+    # ★ 基準月 base から 12ヶ月分
     month_fortunes = []
-
     for i in range(12):
         target = base + relativedelta(months=i)
         y, m = target.year, target.month
-
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
-        # いまはプロンプトには使っていないが、将来の拡張用に取得だけしておく
-        _dirs = get_directions(y, m, honmeisei)
 
         prompt_month = f"""
 あなたは恋愛占いの専門家です。
@@ -108,18 +96,20 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
 - 毎月の変化が感じられるようにしてください
 """.strip()
 
-        text_raw = _ask_openai(prompt_month, max_tokens=150, temperature=0.9)
-        text = _truncate(text_raw, MAX_CHAR)
+        text = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt_month}],
+            max_tokens=150,
+            temperature=0.9
+        ).choices[0].message.content.strip()
 
-        month_fortunes.append(
-            {
-                "label": f"{y}年{m}月の恋愛運",
-                "text": text,
-            }
-        )
+        month_fortunes.append({
+            "label": f"{y}年{m}月の恋愛運",
+            "text": text
+        })
 
     return {
         "year_label": f"{target_year}年の総合運",
         "year_text": year_fortune,
-        "months": month_fortunes,
+        "months": month_fortunes
     }

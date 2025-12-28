@@ -19,12 +19,15 @@ def get_shichu_fortune(birthdate):
     eto = get_nicchu_eto(birthdate)
     try:
         today = datetime.today()
-        this_year = today.year
 
+        # ★ 20日境の基準月ロジック
         target1 = today.replace(day=15)
         if today.day >= 20:
             target1 += relativedelta(months=1)
         target2 = target1 + relativedelta(months=1)
+
+        # 「今年」は基準月の年に合わせる
+        this_year = target1.year
 
         tsuhen_year = get_tsuhensei_for_year(birthdate, this_year)
         tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
@@ -47,7 +50,6 @@ def get_shichu_fortune(birthdate):
 
 出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。
 """
-
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -67,33 +69,20 @@ def get_shichu_fortune(birthdate):
             return result
         except json.JSONDecodeError:
             print("❌ GPTが正しいJSONを返しませんでした")
-            raise ValueError("四柱推命レスポンスがJSON形式ではありません")
-
+            return {
+                "personality": "取得できませんでした",
+                "year_fortune": f"{this_year}年の運勢は取得できませんでした",
+                "month_fortune": f"{target1.year}年{target1.month}月の運勢は取得できませんでした",
+                "next_month_fortune": f"{target2.year}年{target2.month}月の運勢は取得できませんでした"
+            }
     except Exception as e:
-        print("❌ 四柱推命取得失敗:", e)
+        print("❌ get_shichu_fortune エラー:", e)
         return {
             "personality": "取得できませんでした",
-            "year_fortune": f"{this_year}年の運勢は取得できませんでした",
-            "month_fortune": f"{target1.year}年{target1.month}月の運勢は取得できませんでした",
-            "next_month_fortune": f"{target2.year}年{target2.month}月の運勢は取得できませんでした"
+            "year_fortune": "今年の運勢は取得できませんでした",
+            "month_fortune": "今月の運勢は取得できませんでした",
+            "next_month_fortune": "来月の運勢は取得できませんでした"
         }
-
-
-    except Exception as e:
-        print("❌ 四柱推命取得失敗:", e)
-        return f"""■ 性格
-取得できませんでした
-■ {this_year}年の運勢
-取得できませんでした
-■ {target1.year}年{target1.month}月の運勢
-取得できませんでした
-■ {target2.year}年{target2.month}月の運勢
-取得できませんでした"""
-
-
-    except Exception as e:
-        print("❌ 四柱推命取得失敗:", e)
-        return f"""■ 性格\n取得できませんでした\n■ {this_year}年の運勢\n取得できませんでした\n■ {target1.year}年{target1.month}月の運勢\n取得できませんでした\n■ {target2.year}年{target2.month}月の運勢\n取得できませんでした"""
 
 
 
@@ -526,15 +515,22 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 
     try:
         today = datetime.today()
-        this_year = today.year
-        this_month = today.month
-        next_month_date = today.replace(day=15) + relativedelta(months=1)
+
+        # ★ 20日境：基準月 base を決める
+        base = today.replace(day=15)
+        if today.day >= 20:
+            base += relativedelta(months=1)
+
+        this_year = base.year          # 「今年」＝基準月の年
+        this_month = base.month        # 「今月」＝基準月の月
+
+        next_month_date = base + relativedelta(months=1)
         next_month = next_month_date.month
         next_year = next_month_date.year
 
         tsuhen_year = get_tsuhensei_for_year(user_birth, this_year)
         tsuhen_month = get_tsuhensei_for_date(user_birth, this_year, this_month)
-        tsuhen_next = get_tsuhensei_for_date(user_birth, next_year, next_month)
+
 
         prompt_year = f"""あなたは四柱推命の専門家です。
 - 日柱: {user_eto}

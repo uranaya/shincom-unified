@@ -30,26 +30,14 @@ def _ask_openai(prompt: str, retries=3, delay=2) -> str:
 
 
 def generate_yearly_fortune(user_birth: str, now: datetime):
-    """
-    通常版（shincom）の「年運＋12か月分の運勢」を生成する。
-
-    - 基準月:
-        today の day が 20 日未満 → 当月の 15 日
-        today の day が 20 日以上 → 翌月の 15 日
-      （= 20 日を境に「来月スタート」に切り替わる）
-    - 年ラベル:
-        基準月の year
-    - 月運:
-        基準月から 12 か月分を順番に生成
-    """
     nicchu = get_nicchu_eto(user_birth)
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
 
-    # ⭐ 20日境の基準月ロジック
+    # ★ 20日境の基準月 base
     base = now.replace(day=15)
     if now.day >= 20:
-        base = base + relativedelta(months=1)
+        base += relativedelta(months=1)
 
     # 年ラベルは基準月の年
     target_year = base.year
@@ -72,13 +60,13 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
 """.strip()
     year_fortune = _ask_openai(prompt_year)
 
-    # Monthly fortunes for 12 months starting from the base month
+    # ★ 基準月 base から 12か月分
     month_fortunes = []
     for i in range(12):
         target = base + relativedelta(months=i)
         y, m = target.year, target.month
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
-        dirs = get_directions(y, m, honmeisei)  # 将来拡張用に取得しておく（未使用）
+        dirs = get_directions(y, m, honmeisei)
 
         prompt_month = f"""
 あなたは占いの専門家です。
