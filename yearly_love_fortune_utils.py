@@ -4,11 +4,11 @@ from dateutil.relativedelta import relativedelta
 from nicchu_utils import get_nicchu_eto
 from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 
-# 月運テキストの最大文字数（全角ベース想定）
+# 月運テキストの最大文字数（将来使うかもしれないので残しておく）
 MAX_CHAR = 110
 
 
-def _ask_openai(prompt: str, max_tokens: int = 200, temperature: float = 0.7) -> str:
+def _ask_openai(prompt: str, max_tokens: int = 400, temperature: float = 0.7) -> str:
     """
     OpenAI ChatCompletion の簡易ラッパ。
     """
@@ -23,28 +23,22 @@ def _ask_openai(prompt: str, max_tokens: int = 200, temperature: float = 0.7) ->
 
 def _truncate(text: str, limit: int = MAX_CHAR) -> str:
     """
-    文章が途中で切れて PDF に出ない問題を避けるため、
-    指定文字数以内かつ「最後の '。' まで」で丸める。
+    ★仕様変更：
+    恋愛年運の月ごとの文章は「全文を PDF に出力する」方針。
+    長さによるカットは行わず、改行除去と末尾の句点整形のみ行う。
     """
     if not text:
         return ""
 
-    t = text.strip().replace("\n", "")
-    if len(t) <= limit:
-        # もとの文章が十分短ければそのまま。
-        return t
+    # 改行を取り除き、前後の空白をトリム
+    t = str(text).strip().replace("\r\n", "").replace("\r", "").replace("\n", "")
 
-    # いったん limit で切る
-    snippet = t[:limit]
-    # 最後の「。」の位置を探す
-    last_period = snippet.rfind("。")
-    if last_period != -1 and last_period >= int(limit * 0.5):
-        # そこまでを採用（文の途中で終わらない）
-        return snippet[: last_period + 1]
+    # 末尾が「。」で終わるようにだけ整える
+    t = t.rstrip()
+    if not t.endswith("。"):
+        t = t.rstrip("。") + "。"
 
-    # 「。」が見つからない／かなり手前しかない場合は、
-    # 末尾に安全の「。」を付けて返す
-    return snippet.rstrip("。") + "。"
+    return t
 
 
 def generate_yearly_love_fortune(user_birth: str, now: datetime):
@@ -53,6 +47,8 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
 
     - 基準月は「20日境」で、now の 20 日以降なら翌月スタート
     - 年運テキスト + 12 ヶ月分の恋愛運テキストを返す
+    - 2025-12-28 時点なら、基準月は 2026-01、12ヶ月は
+      2026年1月〜12月 までが出力される
     """
     nicchu = get_nicchu_eto(user_birth)
 
@@ -77,47 +73,42 @@ def generate_yearly_love_fortune(user_birth: str, now: datetime):
 - 占い用語（例：比肩、傷官など）や干支名は文章に出さず、
   その意味を自然な日本語に置き換えてください
 - 主語は「あなた」
-- 現実的かつ前向きで、行動のヒントになる内容にしてください
-- 必ず文末は「。」で終わる1段落とし、途中で文を切らないでください
+- 前向きでやさしいトーン
+- ネガティブなことに触れる場合も、最後は希望が持てる締めくくりにしてください
 """.strip()
 
-    year_fortune = _ask_openai(
-        prompt_year,
-        max_tokens=200,
-        temperature=0.8,
-    ).strip()
+    year_fortune_raw = _ask_openai(prompt_year, max_tokens=260)
+    year_fortune = _truncate(year_fortune_raw)
 
-    # ★ 基準月 base から 12ヶ月分
+    # 12ヶ月分の月別恋愛運
     month_fortunes = []
+
     for i in range(12):
         target = base + relativedelta(months=i)
-        y, m = target.year, target.month
+        y = target.year
+        m = target.month
 
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
 
         prompt_month = f"""
 あなたは恋愛占いの専門家です。
 以下の情報をもとに、{y}年{m}月の恋愛運を
-80〜100文字程度で1段落にまとめてください。
+150〜220文字程度で1段落で教えてください。
 
 - 日柱: {nicchu}
 - 年の通変星: {tsuhen_year}
 - 月の通変星: {tsuhen_month}
 
 条件：
+- 占い用語（例：比肩、傷官など）や干支名は文章に出さず、
+  その意味を現実的な日本語に置き換えてください
 - 主語は「あなた」
-- 占い用語（例：偏印、正官など）や干支名は出さず、
-  意味に沿った自然な表現にしてください
-- 現実味のある恋愛展開や気持ちの動きを含めてください
-- 毎月の変化（テンション・出会い・進展のしやすさなど）が感じられるようにしてください
-- 必ず文末は「。」で終わる1段落とし、途中で文を切らないでください
+- 出会い・進展・距離感・気をつけるポイントなどに触れてください
+- 前向きでやさしいトーン
+- 文末は「〜でしょう。」「〜していきましょう。」など、日本語として自然に完結させてください
 """.strip()
 
-        raw_text = _ask_openai(
-            prompt_month,
-            max_tokens=180,
-            temperature=0.8,
-        )
+        raw_text = _ask_openai(prompt_month, max_tokens=260)
         text = _truncate(raw_text, MAX_CHAR)
 
         month_fortunes.append(
