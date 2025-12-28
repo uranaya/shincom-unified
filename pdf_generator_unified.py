@@ -110,9 +110,14 @@ def draw_yearly_pages_renai_a4(c, yearly):
 
     c.showPage()
     y = top
-    y = draw_text_block(yearly["year_label"], yearly["year_text"])
-    for month in yearly["months"]:
-        y = draw_text_block(month["label"], month["text"], y)
+    y = draw_text_block(yearly.get("year_label",""), yearly.get("year_text",""), y)
+    for month in yearly.get("months", []):
+    y = draw_text_block(
+        month.get("label",""),
+        month.get("text",""),
+        y
+    )
+
 
 
 def draw_yearly_pages_renai_b4(c, yearly):
