@@ -570,33 +570,60 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     except Exception as e:
         year_love = month_love = next_month_love = f"（恋愛運取得エラー: {e}）"
 
-    # ★ 1年分の恋愛運（必要なときだけ）
-    yearly_love_fortunes = {}
+    # 年運（12か月分）の恋愛運
+    yearly_love_fortunes = None
     if include_yearly:
         try:
-            yearly_love_fortunes = generate_yearly_love_fortune(user_birth, today)
+            yearly_love_fortunes = generate_yearly_love_fortune(
+                user_birth,
+                datetime.now()
+            )
+            print("✅ 年運データ取得:", yearly_love_fortunes)
         except Exception as e:
-            yearly_love_fortunes = {
-                "year_label": "年運取得エラー",
-                "year_text": f"（年運取得時にエラーが発生しました: {e}）",
-                "months": []
-            }
+            print(f"❌ 年運取得失敗: {e}")
+            yearly_love_fortunes = None
 
-    # ラッキー情報（恋愛専用）＋九星の吉方位
-    lucky_info = generate_lucky_renai_info(user_birth)
-    kyusei_text = generate_lucky_direction(user_birth)
+    # ラッキー情報＆吉方位（恋愛版）
+    try:
+        birth_date_obj = datetime.strptime(user_birth, "%Y-%m-%d")
+        today = datetime.today()
+        age = today.year - birth_date_obj.year - (
+            (today.month, today.day) < (birth_date_obj.month, birth_date_obj.day)
+        )
+
+        # 九星気学の吉方位テキスト（今年・今月・来月をまとめている既存関数）
+        kyusei_text = generate_lucky_direction(
+            user_birth,
+            today.date()
+        )
+
+        # 恋愛専用ラッキー情報生成
+        lucky_info = generate_lucky_renai_info(
+            user_eto,       # nicchu_eto
+            user_birth,     # birthdate
+            age,            # age
+            year_love,      # 「今年の恋愛運」本文を shichu_result として流用
+            kyusei_text,    # 九星の吉方位テキスト
+        )
+    except Exception as e:
+        print("❌ 恋愛ラッキー情報取得失敗:", e)
+        lucky_info = []
 
     return {
         "texts": {
-            "compatibility": comp_text,
-            "overall_love_fortune": future_text,
+            "compatibility": compatibility_text,
+            "overall_love_fortune": overall_love_fortune,
             "year_love": year_love,
             "month_love": month_love,
             "next_month_love": next_month_love,
         },
         "titles": {
             "compatibility": "相性診断",
-            "overall_love_fortune": "相手の気持ちと今後の展開" if partner_eto else "理想の相手像と出会いのチャンス",
+            "overall_love_fortune": (
+                "相手の気持ちと今後の展開"
+                if partner_eto
+                else "理想の相手像と出会いのチャンス"
+            ),
             "year_love": f"{this_year}年の恋愛運",
             "month_love": f"{this_month}月の恋愛運",
             "next_month_love": f"{next_month}月の恋愛運",
@@ -604,5 +631,5 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         "themes": topic_sections,
         "lucky_info": lucky_info,
         "lucky_direction": kyusei_text,
-        "yearly_love_fortunes": yearly_love_fortunes
+        "yearly_love_fortunes": yearly_love_fortunes,
     }
