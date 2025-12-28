@@ -9,6 +9,7 @@ import time
 
 MAX_CHAR = 120  # Max characters for monthly fortune
 
+
 def _ask_openai(prompt: str, retries=3, delay=2) -> str:
     for attempt in range(retries):
         try:
@@ -27,16 +28,31 @@ def _ask_openai(prompt: str, retries=3, delay=2) -> str:
             time.sleep(delay)
     return "取得に失敗しました（OpenAI APIエラー）"
 
+
 def generate_yearly_fortune(user_birth: str, now: datetime):
     """
-    Generate a detailed fortune for the year and each month (12 months starting this month) for normal fortune mode.
-    Returns a dict with a year fortune and a list of month fortunes.
+    通常版（shincom）の「年運＋12か月分の運勢」を生成する。
+
+    - 基準月:
+        today の day が 20 日未満 → 当月の 15 日
+        today の day が 20 日以上 → 翌月の 15 日
+      （= 20 日を境に「来月スタート」に切り替わる）
+    - 年ラベル:
+        基準月の year
+    - 月運:
+        基準月から 12 か月分を順番に生成
     """
     nicchu = get_nicchu_eto(user_birth)
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
-    # Determine target year (if current month is December, target next year for "year fortune")
-    target_year = now.year + 1 if now.month == 12 else now.year
+
+    # ⭐ 20日境の基準月ロジック
+    base = now.replace(day=15)
+    if now.day >= 20:
+        base = base + relativedelta(months=1)
+
+    # 年ラベルは基準月の年
+    target_year = base.year
 
     # Year fortune prompt
     tsuhen_year = get_tsuhensei_for_year(user_birth, target_year)
@@ -56,13 +72,14 @@ def generate_yearly_fortune(user_birth: str, now: datetime):
 """.strip()
     year_fortune = _ask_openai(prompt_year)
 
-    # Monthly fortunes for 12 months starting current month
+    # Monthly fortunes for 12 months starting from the base month
     month_fortunes = []
     for i in range(12):
-        target = now.replace(day=15) + relativedelta(months=i)
+        target = base + relativedelta(months=i)
         y, m = target.year, target.month
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
-        dirs = get_directions(y, m, honmeisei)
+        dirs = get_directions(y, m, honmeisei)  # 将来拡張用に取得しておく（未使用）
+
         prompt_month = f"""
 あなたは占いの専門家です。
 以下の情報をもとに、{y}年{m}月の運気を自然な日本語で約120文字以内にまとめてください。
