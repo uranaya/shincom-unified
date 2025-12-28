@@ -171,17 +171,28 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
 def get_kyusei_fortune(year: int, month: int, day: int) -> str:
     """九星気学の2行テキストを生成する。"""
     try:
+        # 生年月日から本命星を取得
         honmeisei = get_honmeisei(year, month, day)
-        now = datetime.now()
-        next_month = (now.replace(day=1) + relativedelta(months=1))
 
-        directions_year = get_directions(now.year, 0, honmeisei)
-        directions_this_month = get_directions(now.year, now.month, honmeisei)
+        # 今日の日付を基準に、「20日以降は翌月ベース」で年・月を判定する
+        now = datetime.now()
+        base = now
+        if base.day >= 20:
+            base = base + relativedelta(months=1)
+
+        # 基準月の翌月
+        next_month = base + relativedelta(months=1)
+
+        # 年盤：base.year
+        directions_year = get_directions(base.year, 0, honmeisei)
+        # 今月：base.year / base.month
+        directions_this_month = get_directions(base.year, base.month, honmeisei)
+        # 来月：next_month.year / next_month.month
         directions_next_month = get_directions(next_month.year, next_month.month, honmeisei)
 
         return (
             f"あなたの本命星は「{honmeisei}」です。\n"
-            f"{now.year}年の吉方位：{directions_year['good']}　"
+            f"{base.year}年の吉方位：{directions_year['good']}　"
             f"今月：{directions_this_month['good']}　"
             f"来月：{directions_next_month['good']} です。"
         )

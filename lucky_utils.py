@@ -1,4 +1,5 @@
 import datetime
+from dateutil.relativedelta import relativedelta   # ★ この行を追加
 from kyusei_utils import get_honmeisei, get_directions
 import openai
 import os
@@ -41,23 +42,42 @@ def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, 
 
 
 def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
+    """
+    九星気学に基づく吉方位テキストを生成する。
+    today の「20日以降」は翌月を「今月」とみなして計算する。
+    """
+    # 生年月日のパース
     try:
-        bd = (birthdate if isinstance(birthdate, datetime.date) 
-              else datetime.datetime.strptime(birthdate, "%Y-%m-%d").date())
+        bd = (
+            birthdate
+            if isinstance(birthdate, datetime.date)
+            else datetime.datetime.strptime(birthdate, "%Y-%m-%d").date()
+        )
     except Exception as e:
-        bd = today
+        print("⚠️ generate_lucky_direction birthdate parse error:", e)
+        bd = today if isinstance(today, datetime.date) else datetime.date.today()
 
+    # today を date 型に正規化
+    base = today.date() if isinstance(today, datetime.datetime) else today
+
+    # 20日以降は翌月ベース
+    if base.day >= 20:
+        base = base + relativedelta(months=1)
+
+    # 本命星を取得
     honmeisei = get_honmeisei(bd.year, bd.month, bd.day)
-    dir_year = get_directions(today.year, 0, honmeisei)
-    dir_now = get_directions(today.year, today.month, honmeisei)
-    next_month_date = today + datetime.timedelta(days=30)
+
+    # 年盤（base.year）、今月（base.month）、来月（base.month+1）
+    dir_year = get_directions(base.year, 0, honmeisei)
+    dir_now = get_directions(base.year, base.month, honmeisei)
+    next_month_date = base + relativedelta(months=1)
     dir_next = get_directions(next_month_date.year, next_month_date.month, honmeisei)
 
     good_dir_year = dir_year.get("good", "不明")
     good_dir_now = dir_now.get("good", "不明")
     good_dir_next = dir_next.get("good", "不明")
 
-    return f"{today.year}年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。"
+    return f"{base.year}年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。"
 
 
 

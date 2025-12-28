@@ -81,67 +81,86 @@ def draw_palm_image(c, base64_image, width, y):
 
 
 def draw_yearly_pages_renai_a4(c, yearly):
+    """恋愛版（A4）の年運＋12ヶ月ページを描画する。
+
+    ページ数は自動で増える仕様とし、1 ブロック（タイトル＋本文）が
+    下端を超えそうになったら新しいページへ送る。
+    """
     width, height = A4
     margin = 20 * mm
-    y = height - 30 * mm
+    top = height - 30 * mm
+    bottom = 30 * mm
+    y = top
 
     def draw_text_block(title, text):
         nonlocal y
+        # タイトル行＋本文1行分の余白が無ければ改ページ
+        if y < bottom + 15 * mm:
+            c.showPage()
+            y = top
+
+        # タイトル
         c.setFont(FONT_NAME, 12)
         c.drawString(margin, y, f"■ {title}")
         y -= 5 * mm
+
+        # 本文
         c.setFont(FONT_NAME, 10)
         for line in wrap(text or "", 46):
-            if y < 30 * mm:
+            if y < bottom:
                 c.showPage()
-                y = height - 30 * mm
+                y = top
                 c.setFont(FONT_NAME, 10)
             c.drawString(margin, y, line)
-            y -= 5 * mm
-        y -= 3 * mm
+            y -= 6 * mm
 
-    c.showPage()
-    y = height - 30 * mm
-    draw_text_block(yearly["year_label"], yearly["year_text"])
-    for month in yearly["months"][:6]:
-        draw_text_block(month["label"], month["text"])
+        # ブロック間の余白
+        y -= 6 * mm
 
+    # 年運＋ 12ヶ月分を順番に流し込み
     c.showPage()
-    y = height - 30 * mm
-    for month in yearly["months"][6:]:
-        draw_text_block(month["label"], month["text"])
+    y = top
+    draw_text_block(yearly.get("year_label", ""), yearly.get("year_text", ""))
+    for month in yearly.get("months", []):
+        draw_text_block(month.get("label", ""), month.get("text", ""))
 
 
 def draw_yearly_pages_renai_b4(c, yearly):
+    """恋愛版（B4）の年運＋12ヶ月ページを描画する。"""
     width, height = B4
     margin = 20 * mm
-    y = height - 30 * mm
+    top = height - 30 * mm
+    bottom = 30 * mm
+    y = top
 
     def draw_text_block(title, text):
         nonlocal y
+        # タイトル行＋本文1行分の余白が無ければ改ページ
+        if y < bottom + 18 * mm:
+            c.showPage()
+            y = top
+
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {title}")
         y -= 6 * mm
+
         c.setFont(FONT_NAME, 11)
         for line in wrap(text or "", 45):
-            if y < 30 * mm:
+            if y < bottom:
                 c.showPage()
-                y = height - 30 * mm
+                y = top
                 c.setFont(FONT_NAME, 11)
             c.drawString(margin, y, line)
             y -= 7 * mm
+
         y -= 6 * mm
 
     c.showPage()
-    y = height - 30 * mm
-    draw_text_block(yearly["year_label"], yearly["year_text"])
-    for month in yearly["months"][:6]:
-        draw_text_block(month["label"], month["text"])
+    y = top
+    draw_text_block(yearly.get("year_label", ""), yearly.get("year_text", ""))
+    for month in yearly.get("months", []):
+        draw_text_block(month.get("label", ""), month.get("text", ""))
 
-    c.showPage()
-    y = height - 30 * mm
-    for month in yearly["months"][6:]:
-        draw_text_block(month["label"], month["text"])
 
 
 
