@@ -63,6 +63,21 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False):
 
         try:
             result = json.loads(raw)
+            # 月表記のズレ対策（GPTが本文先頭で別月を出すことがあるため矯正）
+            import re
+            def _fix_month_prefix(s, y, m):
+                if not isinstance(s, str):
+                    return s
+                s = s.strip()
+                s = re.sub(r"^\s*(?:\d{4}年\s*\d{1,2}月|今月|来月)\s*は\s*[、,]?\s*", "", s)
+                if not s:
+                    return f"{y}年{m}月は"
+                return f"{y}年{m}月は、" + s
+
+            if isinstance(result, dict):
+                result["month_fortune"] = _fix_month_prefix(result.get("month_fortune", ""), target1.year, target1.month)
+                result["next_month_fortune"] = _fix_month_prefix(result.get("next_month_fortune", ""), target2.year, target2.month)
+
             print("=== 四柱推命内容 ===")
             for k, v in result.items():
                 print(f"{k}: {v[:50]}{'...' if len(v) > 50 else ''}")
@@ -364,7 +379,7 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
 def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False):
     import re
     palm_result = analyze_palm(image_data)
-    shichu_result_raw = get_shichu_fortune(birthdate)
+    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month)
     iching_result = get_iching_advice()
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
@@ -386,9 +401,9 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
         print("❌ lucky_info 整形失敗:", e)
         lucky_lines = []
 
-    today = datetime.today()
+    today = now or datetime.today()
     target1 = today.replace(day=15)
-    if today.day >= 20:
+    if today.day >= 20 or force_next_month:
         target1 += relativedelta(months=1)
     target2 = target1 + relativedelta(months=1)
     month_label = f"{target1.year}年{target1.month}月の運勢"
