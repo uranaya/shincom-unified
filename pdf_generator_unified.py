@@ -11,29 +11,21 @@ import os
 from datetime import datetime
 import re
 
-
-# --- month label sanitization (avoid mismatch like "2026年1月は..." under "2026年2月の運勢") ---
-_ym_prefix_re = re.compile(r'^\s*(\d{4})年\s*(\d{1,2})月\s*は[、,\s]*')
-
-def _normalize_month_text(content: str, key: str) -> str:
+def _normalize_month_fortune_text(text: str, kind: str) -> str:
+    """Remove leading 'YYYY年M月は' style prefixes to avoid heading/body month mismatches.
+    kind: 'month' or 'next'
     """
-    Some LLM outputs redundantly start with 'YYYY年M月は...' which can mismatch the heading month
-    depending on the base-month logic. To prevent visible inconsistencies, replace that leading
-    pattern with '今月は' or '来月は' (headings already contain the exact month).
-    """
-    if not content:
-        return content
-    lines = content.strip().splitlines()
-    if not lines:
-        return content
-    first = lines[0]
-    m = _ym_prefix_re.match(first)
-    if m:
-        prefix = "今月は" if key == "month_fortune" else ("来月は" if key == "next_month_fortune" else "")
-        first = _ym_prefix_re.sub(prefix, first, count=1)
-        lines[0] = first
-        return "\n".join(lines)
-    return content
+    if not isinstance(text, str):
+        return text
+    s = text.strip()
+    # Match patterns like '2026年1月は' or '2026年1月は、'
+    s = re.sub(r'^\s*\d{4}年\s*\d{1,2}月\s*は\s*[、,]?\s*', '', s)
+    prefix = '今月は' if kind == 'month' else '来月は'
+    # If the text already starts with 今月/来月, don't double-prefix.
+    if s.startswith('今月') or s.startswith('来月'):
+        return s
+    return prefix + '、' + s if s else prefix + '。'
+
 
 from header_utils import draw_header
 from lucky_utils import draw_lucky_section
@@ -260,8 +252,6 @@ def draw_shincom_a4(c, data, include_yearly=False):
         wrap_len = 36 if 'month' in key else 40
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
-        if key in ('month_fortune','next_month_fortune'):
-            content = _normalize_month_text(content, key)
 
         if title:
             c.drawString(margin, y, f"◆ {title}")
@@ -317,8 +307,6 @@ def draw_shincom_b4(c, data, include_yearly=False):
         wrap_len = 40 if 'month' in key else 45
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
-        if key in ('month_fortune','next_month_fortune'):
-            content = _normalize_month_text(content, key)
         if title:
             c.drawString(margin, y, f"◆ {title}")
             y -= 7 * mm

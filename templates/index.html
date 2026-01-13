@@ -83,11 +83,6 @@
     <input type="checkbox" id="full_year" name="full_year" value="yes" style="margin-right: 8px; vertical-align: middle;">
     <label for="full_year" style="vertical-align: middle;">1年分の運勢を出す（＋2ページ）</label>
   </div>
-  <div style="margin: 10px 0;">
-    <input type="checkbox" id="force_next_month" name="force_next_month" value="yes" style="margin-right: 8px; vertical-align: middle;">
-    <label for="force_next_month" style="vertical-align: middle;">来月・再来月を占う（20日以前でも来月起点にする）</label>
-  </div>
-
 
   <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
   <a href="/renai" style="display:block; text-align:center; margin:10px 0;">💘 恋愛占いはこちら</a>
@@ -292,46 +287,80 @@
         } catch (_) {}
       }
 
+      const btn = document.getElementById("submitBtn");
       const birthdate = document.getElementById("birthdate").value;
       const imageData = canvas.toDataURL("image/png");
       const fullYear = document.getElementById("full_year").checked;
-      const forceNextMonth = document.getElementById("force_next_month").checked;
-      const path = window.location.pathname;
+      const forceNextMonth = document.getElementById("force_next_month") ? document.getElementById("force_next_month").checked : false;
 
-      if (!birthdate || !imageData) {
-        alert("生年月日と手相画像の両方を入力してください。");
+      if (!birthdate) {
+        alert("生年月日を入力してください");
         return;
       }
 
-      const btn = document.getElementById("submitBtn");
       btn.disabled = true;
       btn.textContent = "鑑定中... 1分程度お待ちください";
 
-      const payload = { image_data: imageData, birthdate, full_year: fullYear, force_next_month: forceNextMonth };
+      // 送信先は現在のパス（/ten, /tenmob など）を維持
+      const path = window.location.pathname;
+
+      const payload = {
+        image_data: imageData,
+        birthdate: birthdate,
+        full_year: fullYear,
+        force_next_month: forceNextMonth
+      };
 
       try {
         const response = await fetch(path, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify(payload),
+          redirect: "follow"
         });
+
+        const contentType = (response.headers.get("content-type") || "").toLowerCase();
+
+        // JSON以外（HTMLなど）の場合：中身をテキストで表示して原因が分かるようにする
+        if (!contentType.includes("application/json")) {
+          const text = await response.text();
+          const head = text.slice(0, 200).replace(/\s+/g, " ").trim();
+          // よくあるケース：ログインページへリダイレクトされ HTML が返る
+          if (head.toLowerCase().includes("<!doctype") || head.toLowerCase().includes("<html")) {
+            throw new Error(`サーバーがHTMLを返しました（ログイン切れ/サーバーエラーの可能性）。HTTP ${response.status}: ${head}`);
+          }
+          throw new Error(`サーバー応答がJSONではありません。HTTP ${response.status}: ${head}`);
+        }
+
         const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || `サーバーエラー（HTTP ${response.status}）`);
+        }
+
         if (result.redirect_url) {
           // 完了チャイム（短時間待ってから遷移）
           const chime = document.getElementById("chimeSound");
           try {
-            chime.currentTime = 0;
-            const playPromise = chime.play();
-            if (playPromise && typeof playPromise.then === "function") {
-              await Promise.race([
-                playPromise.catch(()=>{}),
-                new Promise(res => setTimeout(res, 700))
-              ]);
+            if (chime) {
+              chime.currentTime = 0;
+              const play = chime.play();
+              if (play && typeof play.then === "function") {
+                await Promise.race([
+                  play.catch(()=>{}),
+                  new Promise(res => setTimeout(res, 700))
+                ]);
+              } else {
+                await new Promise(res => setTimeout(res, 700));
+              }
             }
           } catch (_) {}
           window.location.href = result.redirect_url;
         } else {
-          alert("PDF生成後のリダイレクトが取得できませんでした");
+          alert(result.error || "PDF生成後のリダイレクトが取得できませんでした");
         }
       } catch (error) {
         alert("送信エラー: " + error.message);
