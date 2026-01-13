@@ -34,13 +34,10 @@ def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bo
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
 
-    # ★ 基準月 base（通常: 20日境 / 強制: 翌月起点）
+    # ★ 20日境の基準月 base
     base = now.replace(day=15)
-    if force_next_month:
+    if now.day >= 20:
         base += relativedelta(months=1)
-    else:
-        if now.day >= 20:
-            base += relativedelta(months=1)
 
     # 年ラベルは基準月の年
     target_year = base.year

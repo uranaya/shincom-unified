@@ -672,7 +672,7 @@ def selfmob_uuid(uuid_str):
             except Exception:
                 return "生年月日が不正です", 400
             try:
-                kyusei_text = get_kyusei_fortune(year, month, day)
+                kyusei_text = get_kyusei_fortune(year, month, day, now=now, force_next_month=force_next_month)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
@@ -792,7 +792,7 @@ def renaiselfmob_uuid(uuid_str):
 
             now = datetime.now()
             target1 = now.replace(day=15)
-            if now.day >= 20:
+            if force_next_month or now.day >= 20:
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
 
@@ -974,12 +974,12 @@ def ten_shincom():
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
-            force_next_month = bool(data.get("force_next_month", False)) if is_json else (data.get("force_next_month") == "yes")
+            force_next_month = data.get("force_next_month", False) if is_json else (data.get("force_next_month") == "yes")
+
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
-            now = datetime.now()
             try:
                 kyusei_text = get_kyusei_fortune(year, month, day, now=now, force_next_month=force_next_month)
             except Exception as e:
@@ -997,20 +997,16 @@ def ten_shincom():
             except Exception as e:
                 print("❌ 本命星取得エラー:", e)
                 honmeisei = ""
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(
-                image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month
-            )
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text)
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()
+            now = datetime.now()
             target1 = now.replace(day=15)
-            if force_next_month:
+            if force_next_month or now.day >= 20:
                 target1 += relativedelta(months=1)
-            else:
-                if now.day >= 20:
-                    target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
-            year_label = f"{target1.year}年の運勢" if force_next_month else f"{now.year}年の運勢"
+            year_label = f"{now.year}年の運勢"
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
             result_data = {
