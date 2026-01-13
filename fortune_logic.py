@@ -364,12 +364,11 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
 def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False):
     import re
     palm_result = analyze_palm(image_data)
-    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month)
+    shichu_result_raw = get_shichu_fortune(birthdate)
     iching_result = get_iching_advice()
-    base_now = now or datetime.today()
-    age = base_now.year - int(birthdate[:4])
+    age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
-    raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text)
+    raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now)
 
 
     lucky_lines = []
@@ -389,7 +388,7 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
 
     today = datetime.today()
     target1 = today.replace(day=15)
-    if today.day >= 20 or force_next_month:
+    if today.day >= 20:
         target1 += relativedelta(months=1)
     target2 = target1 + relativedelta(months=1)
     month_label = f"{target1.year}年{target1.month}月の運勢"

@@ -667,6 +667,8 @@ def selfmob_uuid(uuid_str):
             data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
+            now = datetime.now()
+
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
@@ -973,8 +975,8 @@ def ten_shincom():
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
-            force_next_month = data.get("force_next_month", False) if is_json else (str(data.get("force_next_month")).lower() in ("yes","on","true","1"))
-            now = datetime.now()
+            force_next_month = data.get("force_next_month", False) if is_json else (data.get("force_next_month") == "yes")
+
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:

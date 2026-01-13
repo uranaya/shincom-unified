@@ -175,8 +175,8 @@ def get_kyusei_fortune(year: int, month: int, day: int, now=None, force_next_mon
         honmeisei = get_honmeisei(year, month, day)
 
         # 今日の日付を基準に、「20日以降は翌月ベース」で年・月を判定する
-        base_now = now or datetime.now()
-        base = base_now
+        current = now or datetime.now()
+        base = current
         if base.day >= 20 or force_next_month:
             base = base + relativedelta(months=1)
 
