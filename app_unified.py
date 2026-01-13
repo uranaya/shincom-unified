@@ -998,13 +998,13 @@ def ten_shincom():
             except Exception as e:
                 print("❌ 本命星取得エラー:", e)
                 honmeisei = ""
+            now = datetime.now()
             palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month)
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()
-            now = datetime.now()
             target1 = now.replace(day=15)
-            if now.day >= 20:
+            if now.day >= 20 or force_next_month:
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
             year_label = f"{target1.year}年の運勢"
@@ -2055,6 +2055,5 @@ def online_lp():
 @app.route('/selfmob/google808abc9a83ba5e55.html')
 def google_verification_file():
     return send_from_directory('static', 'google808abc9a83ba5e55.html')
-
 
 
