@@ -14,16 +14,19 @@ from pdf_generator_unified import create_pdf_unified
 
 
 
-def get_shichu_fortune(birthdate):
+def get_shichu_fortune(birthdate, now: datetime = None, force_next_month: bool = False):
     import json
     eto = get_nicchu_eto(birthdate)
     try:
-        today = datetime.today()
+        base_now = now if isinstance(now, datetime) else datetime.today()
 
-        # ★ 20日境の基準月ロジック
-        target1 = today.replace(day=15)
-        if today.day >= 20:
+        # ★ 基準月ロジック（通常: 20日境 / 強制: 翌月起点）
+        target1 = base_now.replace(day=15)
+        if force_next_month:
             target1 += relativedelta(months=1)
+        else:
+            if base_now.day >= 20:
+                target1 += relativedelta(months=1)
         target2 = target1 + relativedelta(months=1)
 
         # 「今年」は基準月の年に合わせる
@@ -361,10 +364,10 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
 
 
 
-def generate_fortune(image_data, birthdate, kyusei_text):
+def generate_fortune(image_data, birthdate, kyusei_text, now: datetime = None, force_next_month: bool = False):
     import re
     palm_result = analyze_palm(image_data)
-    shichu_result_raw = get_shichu_fortune(birthdate)
+    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month)
     iching_result = get_iching_advice()
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
@@ -386,10 +389,13 @@ def generate_fortune(image_data, birthdate, kyusei_text):
         print("❌ lucky_info 整形失敗:", e)
         lucky_lines = []
 
-    today = datetime.today()
-    target1 = today.replace(day=15)
-    if today.day >= 20:
+    base_now = now if isinstance(now, datetime) else datetime.today()
+    target1 = base_now.replace(day=15)
+    if force_next_month:
         target1 += relativedelta(months=1)
+    else:
+        if base_now.day >= 20:
+            target1 += relativedelta(months=1)
     target2 = target1 + relativedelta(months=1)
     month_label = f"{target1.year}年{target1.month}月の運勢"
     next_month_label = f"{target2.year}年{target2.month}月の運勢"

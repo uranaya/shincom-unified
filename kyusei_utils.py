@@ -168,16 +168,23 @@ def get_directions(year: int, month: int, honmeisei: str) -> dict:
         return {"good": "取得失敗", "bad": "取得失敗"}
 
 
-def get_kyusei_fortune(year: int, month: int, day: int) -> str:
-    """九星気学の2行テキストを生成する。"""
+def get_kyusei_fortune(year: int, month: int, day: int, now: datetime = None, force_next_month: bool = False) -> str:
+    """九星気学の2行テキストを生成する。
+
+    - 通常は「20日以降は翌月ベース」で年・月を判定
+    - force_next_month=True の場合は、日付に関係なく「翌月起点」で判定
+    """
     try:
         # 生年月日から本命星を取得
         honmeisei = get_honmeisei(year, month, day)
 
-        # 今日の日付を基準に、「20日以降は翌月ベース」で年・月を判定する
-        now = datetime.now()
-        base = now
-        if base.day >= 20:
+        # 判定基準日（now）を正規化
+        base_now = now if now is not None else datetime.now()
+
+        # 「翌月起点」チェックが入っている場合は、無条件で翌月ベース
+        # 入っていない場合は従来どおり「20日以降は翌月」
+        base = base_now
+        if force_next_month or base.day >= 20:
             base = base + relativedelta(months=1)
 
         # 基準月の翌月

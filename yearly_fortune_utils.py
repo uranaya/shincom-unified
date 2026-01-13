@@ -29,15 +29,18 @@ def _ask_openai(prompt: str, retries=3, delay=2) -> str:
     return "取得に失敗しました（OpenAI APIエラー）"
 
 
-def generate_yearly_fortune(user_birth: str, now: datetime):
+def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bool = False):
     nicchu = get_nicchu_eto(user_birth)
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
 
-    # ★ 20日境の基準月 base
+    # ★ 基準月 base（通常: 20日境 / 強制: 翌月起点）
     base = now.replace(day=15)
-    if now.day >= 20:
+    if force_next_month:
         base += relativedelta(months=1)
+    else:
+        if now.day >= 20:
+            base += relativedelta(months=1)
 
     # 年ラベルは基準月の年
     target_year = base.year
