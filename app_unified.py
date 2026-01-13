@@ -2042,6 +2042,12 @@ def admin_sales_add_missing():
 
 
 
+@app.route("/online", methods=["GET"])
+def online_lp():
+    return render_template("lp_online_v2.html")
+
+
+
 
 @app.route('/selfmob/google808abc9a83ba5e55.html')
 def google_verification_file():
