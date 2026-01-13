@@ -36,7 +36,7 @@ def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bo
 
     # ★ 20日境の基準月 base
     base = now.replace(day=15)
-    if now.day >= 20:
+    if now.day >= 20 or force_next_month:
         base += relativedelta(months=1)
 
     # 年ラベルは基準月の年

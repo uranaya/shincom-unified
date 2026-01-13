@@ -82,12 +82,12 @@
   <div style="margin: 10px 0;">
     <input type="checkbox" id="full_year" name="full_year" value="yes" style="margin-right: 8px; vertical-align: middle;">
     <label for="full_year" style="vertical-align: middle;">1年分の運勢を出す（＋2ページ）</label>
-  
+  </div>
+
   <div style="margin: 10px 0;">
     <input type="checkbox" id="force_next_month" name="force_next_month" value="yes" style="margin-right: 8px; vertical-align: middle;">
     <label for="force_next_month" style="vertical-align: middle;">来月・再来月を占う（20日以前でも来月起点にする）</label>
   </div>
-</div>
 
   <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
   <a href="/renai" style="display:block; text-align:center; margin:10px 0;">💘 恋愛占いはこちら</a>
@@ -295,7 +295,6 @@
       const birthdate = document.getElementById("birthdate").value;
       const imageData = canvas.toDataURL("image/png");
       const fullYear = document.getElementById("full_year").checked;
-      const forceNextMonth = document.getElementById("force_next_month") ? document.getElementById("force_next_month").checked : false;
       const path = window.location.pathname;
 
       if (!birthdate || !imageData) {
@@ -307,6 +306,7 @@
       btn.disabled = true;
       btn.textContent = "鑑定中... 1分程度お待ちください";
 
+      const forceNextMonth = document.getElementById("force_next_month")?.checked || false;
       const payload = { image_data: imageData, birthdate, full_year: fullYear, force_next_month: forceNextMonth };
 
       try {
@@ -316,6 +316,10 @@
           body: JSON.stringify(payload)
         });
         const result = await response.json();
+        if (result.error) {
+          alert("エラー: " + result.error);
+          return;
+        }
         if (result.redirect_url) {
           // 完了チャイム（短時間待ってから遷移）
           const chime = document.getElementById("chimeSound");
