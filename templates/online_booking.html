@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>オンライン予約</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif; margin: 16px; }
+    .wrap { max-width: 980px; margin: 0 auto; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; margin: 12px 0; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { display: block; font-size: 13px; margin: 6px 0 4px; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+    textarea { min-height: 120px; }
+    .btn { padding: 10px 14px; border: 1px solid #111; background: #111; color: #fff; border-radius: 8px; cursor: pointer; }
+    .muted { color: #666; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; font-size: 13px; vertical-align: top; }
+    th { text-align: left; background: #fafafa; }
+    .ok { color: #0a7a0a; }
+    .err { color: #b00020; }
+    @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>オンライン予約</h1>
+    <p class="muted">フォーム送信で「予約（仮）」を登録します。決済方法は個別やり取り前提のため、ここでは“希望”として記録します。</p>
+
+    {% if ok %}
+      <p class="ok">登録しました。</p>
+    {% endif %}
+    {% if error %}
+      <p class="err">{{ error }}</p>
+    {% endif %}
+
+    <div class="card">
+      <h2>予約フォーム</h2>
+      <form method="post" action="/online/booking">
+        <div class="row">
+          <div>
+            <label>担当（任意）</label>
+            <select name="teller_id">
+              <option value="">指定なし</option>
+              {% for t in tellers %}
+                <option value="{{ t[0] }}">{{ t[1] }}{% if t[4] and t[4] > 0 %}（目安 {{ t[4] }}円）{% endif %}</option>
+              {% endfor %}
+            </select>
+
+            <label>お名前（必須）</label>
+            <input name="customer_name" required />
+
+            <label>連絡手段（必須）</label>
+            <select name="contact_method" required>
+              <option value="">選択してください</option>
+              <option value="email">email</option>
+              <option value="line">line</option>
+              <option value="phone">phone</option>
+              <option value="other">other</option>
+            </select>
+
+            <label>連絡先（必須）</label>
+            <input name="contact_value" placeholder="メールアドレス / LINE ID / 電話番号など" required />
+
+            <label>決済方法（希望・任意）</label>
+            <select name="payment_method">
+              <option value="">未指定</option>
+              <option value="card">card</option>
+              <option value="bank">bank</option>
+              <option value="paypay">paypay</option>
+              <option value="cash">cash</option>
+              <option value="other">other</option>
+            </select>
+
+            <label>希望日（任意）</label>
+            <input type="date" name="preferred_date" />
+
+            <label>希望時間帯（任意）</label>
+            <input name="preferred_time" placeholder="例）20:00〜21:00 / 夜 / できれば午前 など" />
+          </div>
+
+          <div>
+            <label>相談内容（任意）</label>
+            <textarea name="note" placeholder="相談概要、気になっていること、返信しやすい時間帯など"></textarea>
+
+            <p class="muted">
+              ※ 送信後に予約一覧へ反映されます（直近50件）。
+            </p>
+
+            <button class="btn" type="submit">予約（仮）を登録</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>予約一覧（直近50件）</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>作成日時</th>
+            <th>ステータス</th>
+            <th>担当</th>
+            <th>お客様</th>
+            <th>連絡</th>
+            <th>希望</th>
+            <th>決済</th>
+            <th>public_id</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in bookings %}
+            <tr>
+              <td>{{ b[1] }}</td>
+              <td>{{ b[2] }}</td>
+              <td>{{ b[9] }}</td>
+              <td>
+                {{ b[3] }}<br/>
+                <span class="muted">{{ b[4] }}: {{ b[5] }}</span>
+              </td>
+              <td>{{ b[4] }}<br/>{{ b[5] }}</td>
+              <td>
+                {% if b[6] %}{{ b[6] }}{% endif %}
+                {% if b[7] %}<br/>{{ b[7] }}{% endif %}
+              </td>
+              <td>{{ b[8] }}</td>
+              <td><code>{{ b[0] }}</code></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="8" class="muted">まだ予約がありません。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>API（動作確認用）</h2>
+      <ul>
+        <li><a href="/api/online/tellers">/api/online/tellers</a></li>
+        <li><a href="/api/online/bookings">/api/online/bookings</a></li>
+      </ul>
+    </div>
+
+  </div>
+</body>
+</html>

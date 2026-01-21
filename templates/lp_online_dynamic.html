@@ -4,16 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>占い師を選んで予約 | うらなや（占いの館）</title>
-
   <meta name="description" content="占いの館の所属占い師を選んで、オンラインで予約・鑑定。テンプレではなく、状況に合わせて丁寧に鑑定します。" />
   <meta name="robots" content="index,follow" />
 
-  <!-- OGP（SNSシェア用） -->
   <meta property="og:title" content="占い師を選んで予約 | うらなや（占いの館）" />
   <meta property="og:description" content="所属占い師を選んで、オンラインで予約・鑑定。" />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="/static/img/ogp_online_1200x630.png" />
-  <meta property="og:url" content="https://YOUR_DOMAIN/online" />
+  <meta property="og:url" content="{{ request.url }}" />
 
   <link rel="stylesheet" href="/static/css/lp_online_v2.css" />
 </head>
@@ -33,7 +31,6 @@
   </header>
 
   <main role="main">
-    <!-- Hero -->
     <section class="hero">
       <div class="hero-bg" aria-hidden="true"></div>
       <div class="hero-overlay" aria-hidden="true"></div>
@@ -79,7 +76,6 @@
       </div>
     </section>
 
-    <!-- Problem -->
     <section class="section section--paper">
       <div class="container">
         <h2 class="section-title">こんな状態ではありませんか？</h2>
@@ -98,7 +94,6 @@
       </div>
     </section>
 
-    <!-- Tellers -->
     <section class="section" id="tellers">
       <div class="container">
         <div class="section-head">
@@ -106,103 +101,53 @@
           <p class="section-sub">プロフィール・得意分野・稼働状況を見て選べます。</p>
         </div>
 
-        <!--
-          将来：DB連携する場合は、ここをJinjaでループに置き換えます。
-          {% for t in tellers %}
-            ... t.name, t.specialties, t.status, t.slug ...
-          {% endfor %}
-        -->
-
         <div class="teller-grid">
-          <article class="teller-card">
-            <div class="teller-top">
-              <div class="avatar avatar--a" aria-hidden="true"></div>
-              <div class="teller-meta">
-                <div class="teller-name">占い師A</div>
-                <div class="teller-tags">
-                  <span class="tag">恋愛</span>
-                  <span class="tag">復縁</span>
-                  <span class="tag">相手の気持ち</span>
-                </div>
-              </div>
-              <div class="status status--busy">待機中</div>
-            </div>
-            <p class="teller-desc">気持ちの整理を丁寧に。現実的な着地と行動案まで落とし込みます。</p>
-            <div class="teller-actions">
-              <a class="btn btn--primary" href="/online/booking?u=a">この占い師で予約</a>
-              <a class="btn btn--ghost" href="/teller/a">プロフィール</a>
-            </div>
-          </article>
+          {% if tellers and tellers|length > 0 %}
+            {% for t in tellers %}
+              <article class="teller-card">
+                <div class="teller-top">
+                  <div class="avatar" style="background-image:url('{{ t.photo_url if t.photo_url else '' }}');" aria-hidden="true"></div>
 
-          <article class="teller-card">
-            <div class="teller-top">
-              <div class="avatar avatar--b" aria-hidden="true"></div>
-              <div class="teller-meta">
-                <div class="teller-name">占い師B</div>
-                <div class="teller-tags">
-                  <span class="tag">仕事</span>
-                  <span class="tag">転職</span>
-                  <span class="tag">適性</span>
-                </div>
-              </div>
-              <div class="status status--on">予約可</div>
-            </div>
-            <p class="teller-desc">仕事の悩みを構造化。選択肢の比較と判断軸づくりが得意です。</p>
-            <div class="teller-actions">
-              <a class="btn btn--primary" href="/online/booking?u=b">この占い師で予約</a>
-              <a class="btn btn--ghost" href="/teller/b">プロフィール</a>
-            </div>
-          </article>
+                  <div class="teller-meta">
+                    <div class="teller-name">{{ t.display_name }}</div>
+                    <div class="teller-tags">
+                      {% for tag in t.tags %}
+                        <span class="tag">{{ tag }}</span>
+                      {% endfor %}
+                    </div>
+                  </div>
 
-          <article class="teller-card">
-            <div class="teller-top">
-              <div class="avatar avatar--c" aria-hidden="true"></div>
-              <div class="teller-meta">
-                <div class="teller-name">占い師C</div>
-                <div class="teller-tags">
-                  <span class="tag">家庭</span>
-                  <span class="tag">人間関係</span>
-                  <span class="tag">メンタル</span>
+                  {% if t.is_active %}
+                    {% if t.is_accepting %}
+                      <div class="status status--on">予約可</div>
+                    {% else %}
+                      <div class="status status--busy">待機中</div>
+                    {% endif %}
+                  {% else %}
+                    <div class="status status--off">準備中</div>
+                  {% endif %}
                 </div>
-              </div>
-              <div class="status status--on">予約可</div>
-            </div>
-            <p class="teller-desc">状況を否定せず、必要な距離感と対話の作り方を一緒に整理します。</p>
-            <div class="teller-actions">
-              <a class="btn btn--primary" href="/online/booking?u=c">この占い師で予約</a>
-              <a class="btn btn--ghost" href="/teller/c">プロフィール</a>
-            </div>
-          </article>
 
-          <article class="teller-card">
-            <div class="teller-top">
-              <div class="avatar avatar--d" aria-hidden="true"></div>
-              <div class="teller-meta">
-                <div class="teller-name">占い師D</div>
-                <div class="teller-tags">
-                  <span class="tag">総合</span>
-                  <span class="tag">運勢</span>
-                  <span class="tag">方向性</span>
+                <p class="teller-desc">{{ t.short_bio }}</p>
+
+                <div class="teller-actions">
+                  <a class="btn btn--primary" href="/online/booking?teller_id={{ t.id }}">この占い師で予約</a>
+                  <a class="btn btn--ghost" href="/teller/{{ t.slug }}">プロフィール</a>
                 </div>
-              </div>
-              <div class="status status--off">準備中</div>
-            </div>
-            <p class="teller-desc">全体運から現状の位置づけを整理。次に取るべき戦略を明確にします。</p>
-            <div class="teller-actions">
-              <a class="btn btn--primary" href="/online/booking?u=d">この占い師で予約</a>
-              <a class="btn btn--ghost" href="/teller/d">プロフィール</a>
-            </div>
-          </article>
+              </article>
+            {% endfor %}
+          {% else %}
+            <p style="color: rgba(255,255,255,0.75);">現在、公開中の占い師がいません。</p>
+          {% endif %}
         </div>
 
         <div class="note-row">
-          <span class="note">※「待機中」はすぐ予約しやすい状態です。</span>
+          <span class="note">※「予約可」は予約枠が公開されている状態です。</span>
           <span class="note">※当日キャンセル等の規定は予約ページでご確認ください。</span>
         </div>
       </div>
     </section>
 
-    <!-- How -->
     <section class="section section--paper" id="how">
       <div class="container">
         <h2 class="section-title">オンライン鑑定の流れ</h2>
@@ -240,7 +185,6 @@
       </div>
     </section>
 
-    <!-- CTA -->
     <section class="section">
       <div class="container">
         <div class="cta-panel">
@@ -258,7 +202,6 @@
       </div>
     </section>
 
-    <!-- Footer legal -->
     <footer class="site-footer" role="contentinfo">
       <div class="container footer-inner">
         <div class="footer-links">

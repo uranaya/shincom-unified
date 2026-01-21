@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>オンライン予約 | うらなや（占いの館）</title>
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/static/css/lp_online_v2.css" />
+  <link rel="stylesheet" href="/static/css/booking.css" />
+</head>
+
+<body>
+  <header class="site-header" role="banner">
+    <div class="container header-inner">
+      <a class="brand" href="/online">
+        <span class="brand__name">うらなや</span>
+        <span class="brand__sub">オンライン予約</span>
+      </a>
+      <nav class="header-cta" aria-label="主要導線">
+        <a class="btn btn--ghost" href="/online#tellers">占い師一覧へ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main role="main">
+    <section class="section booking-hero">
+      <div class="container">
+        <h1 class="booking-title">オンライン予約</h1>
+        <p class="booking-lead">占い師・希望日時・相談内容を入力してください。</p>
+
+        <div class="booking-grid">
+          <aside class="booking-card">
+            <div class="booking-card__head">選択中の占い師</div>
+
+            {% if selected_teller %}
+              <div class="teller-mini">
+                <div class="avatar" style="background-image:url('{{ selected_teller.photo_url if selected_teller.photo_url else '' }}');"></div>
+                <div class="teller-mini__meta">
+                  <div class="teller-mini__name">{{ selected_teller.display_name }}</div>
+                  <div class="teller-mini__tags">
+                    {% for tag in selected_teller.tags %}
+                      <span class="tag">{{ tag }}</span>
+                    {% endfor %}
+                  </div>
+                  <div class="teller-mini__bio">{{ selected_teller.short_bio }}</div>
+                </div>
+              </div>
+            {% else %}
+              <p class="muted">まだ占い師が選択されていません。</p>
+              <a class="btn btn--primary" href="/online#tellers">占い師を選ぶ</a>
+            {% endif %}
+
+            <div class="booking-note">
+              <div>※予約内容は送信後に確認メール（またはLINE）でご案内します。</div>
+              <div>※占いはエンターテインメントとしてお楽しみください。</div>
+            </div>
+          </aside>
+
+          <section class="booking-card">
+            <div class="booking-card__head">予約フォーム</div>
+
+            {% if error %}
+              <div class="alert">{{ error }}</div>
+            {% endif %}
+            {% if success %}
+              <div class="success">{{ success }}</div>
+            {% endif %}
+
+            <form class="form" method="post" action="/online/booking">
+              <input type="hidden" name="teller_id" value="{{ selected_teller.id if selected_teller else '' }}">
+
+              <div class="field">
+                <label>占い師</label>
+                <select name="teller_select" required>
+                  <option value="">選択してください</option>
+                  {% for t in tellers %}
+                    <option value="{{ t.id }}" {% if selected_teller and t.id == selected_teller.id %}selected{% endif %}>
+                      {{ t.display_name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="field">
+                <label>相談カテゴリ</label>
+                <select name="category" required>
+                  <option value="恋愛">恋愛</option>
+                  <option value="仕事">仕事</option>
+                  <option value="家庭">家庭</option>
+                  <option value="人間関係">人間関係</option>
+                  <option value="総合" selected>総合</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label>鑑定形式</label>
+                <select name="mode" required>
+                  <option value="チャット" selected>チャット</option>
+                  <option value="通話">通話</option>
+                  <option value="PDF">PDF</option>
+                </select>
+              </div>
+
+              <div class="field grid-2">
+                <div>
+                  <label>希望日時（第1希望）</label>
+                  <input type="datetime-local" name="slot1" required>
+                </div>
+                <div>
+                  <label>希望日時（第2希望）</label>
+                  <input type="datetime-local" name="slot2">
+                </div>
+              </div>
+
+              <div class="field">
+                <label>希望日時（第3希望）</label>
+                <input type="datetime-local" name="slot3">
+              </div>
+
+              <div class="field">
+                <label>相談内容</label>
+                <textarea name="message" rows="6" placeholder="例：相手の気持ちが分からず不安です。現状の整理と、次に取る行動を知りたいです。" required></textarea>
+              </div>
+
+              <div class="field grid-2">
+                <div>
+                  <label>お名前（ニックネーム可）</label>
+                  <input type="text" name="name" required>
+                </div>
+                <div>
+                  <label>連絡手段</label>
+                  <select name="contact_type" required>
+                    <option value="メール" selected>メール</option>
+                    <option value="LINE">LINE</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>連絡先（メールまたはLINE ID）</label>
+                <input type="text" name="contact" required>
+              </div>
+
+              <div class="field checkbox">
+                <label>
+                  <input type="checkbox" name="agree" value="1" required>
+                  利用規約・プライバシーポリシーに同意します
+                </label>
+                <div class="small-links">
+                  <a href="/terms" target="_blank" rel="noopener">利用規約</a>
+                  <a href="/privacy" target="_blank" rel="noopener">プライバシーポリシー</a>
+                </div>
+              </div>
+
+              <div class="actions">
+                <button class="btn btn--primary btn--lg" type="submit">予約を送信する</button>
+                <a class="btn btn--ghost btn--lg" href="/online">LPへ戻る</a>
+              </div>
+
+              <p class="fineprint">
+                ※この時点では「予約リクエスト」です。確定日時は返信でご案内します。<br>
+                ※キャンセル規定は確定時の案内をご確認ください。
+              </p>
+            </form>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

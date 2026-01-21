@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>占い師管理</title>
+  <style>
+    body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;margin:16px;}
+    .wrap{max-width:1100px;margin:0 auto;}
+    .top{display:flex;gap:12px;align-items:center;justify-content:space-between;}
+    .btn{display:inline-block;padding:10px 14px;border-radius:10px;border:1px solid #111;background:#111;color:#fff;text-decoration:none;}
+    .btn2{display:inline-block;padding:8px 12px;border-radius:10px;border:1px solid #555;background:#fff;color:#111;text-decoration:none;}
+    table{width:100%;border-collapse:collapse;margin-top:12px;}
+    th,td{border-bottom:1px solid #eee;padding:10px;font-size:13px;vertical-align:top;}
+    th{background:#fafafa;text-align:left;}
+    .tag{display:inline-block;border:1px solid #ddd;border-radius:999px;padding:2px 8px;margin:2px;font-size:12px;color:#333;}
+    .muted{color:#666;}
+    form{display:inline;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>占い師管理</h1>
+        <div class="muted">/online の表示内容はここで更新します（HTML編集不要）。</div>
+      </div>
+      <div>
+        <a class="btn" href="/admin/tellers/new">新規登録</a>
+        <a class="btn2" href="/admin">管理TOP</a>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>表示</th>
+          <th>slug</th>
+          <th>タグ</th>
+          <th>紹介</th>
+          <th>写真</th>
+          <th>公開</th>
+          <th>受付</th>
+          <th>並び</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tellers %}
+        <tr>
+          <td>{{ t.id }}</td>
+          <td><strong>{{ t.display_name }}</strong></td>
+          <td><code>{{ t.slug }}</code></td>
+          <td>
+            {% for tag in t.tags %}
+              <span class="tag">{{ tag }}</span>
+            {% endfor %}
+          </td>
+          <td class="muted">{{ t.short_bio }}</td>
+          <td class="muted">{{ t.photo_url }}</td>
+          <td>
+            <form method="post" action="/admin/tellers/{{ t.id }}/toggle">
+              <input type="hidden" name="field" value="is_active"/>
+              <button class="btn2" type="submit">{{ "公開中" if t.is_active else "非公開" }}</button>
+            </form>
+          </td>
+          <td>
+            <form method="post" action="/admin/tellers/{{ t.id }}/toggle">
+              <input type="hidden" name="field" value="is_accepting"/>
+              <button class="btn2" type="submit">{{ "受付中" if t.is_accepting else "停止" }}</button>
+            </form>
+          </td>
+          <td>{{ t.sort_order }}</td>
+          <td>
+            <a class="btn2" href="/admin/tellers/{{ t.id }}/edit">編集</a>
+            <a class="btn2" href="/online/booking?teller_id={{ t.id }}">予約フォーム確認</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10" class="muted">まだ占い師が登録されていません。</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
