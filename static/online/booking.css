@@ -1,0 +1,107 @@
+.booking-hero{ padding-top: 38px; }
+.booking-title{ margin: 0 0 6px; font-size: 28px; letter-spacing: .02em; }
+.booking-lead{ margin: 0 0 18px; color: rgba(255,255,255,0.78); }
+
+.booking-grid{
+  display:grid;
+  grid-template-columns: 0.92fr 1.08fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.booking-card{
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.03);
+  border-radius: var(--radius2);
+  padding: 16px;
+}
+.booking-card__head{ font-weight: 900; margin-bottom: 12px; letter-spacing: .02em; }
+
+.teller-mini{ display:flex; gap: 12px; align-items: flex-start; }
+.teller-mini__meta{ flex:1; min-width:0; }
+.teller-mini__name{ font-weight: 900; }
+.teller-mini__tags{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.teller-mini__bio{ margin-top: 10px; color: rgba(255,255,255,0.74); font-size: 13px; }
+.muted{ color: rgba(255,255,255,0.68); }
+
+.booking-note{
+  margin-top: 14px;
+  color: rgba(255,255,255,0.62);
+  font-size: 12px;
+  display:grid;
+  gap: 4px;
+}
+
+.form{ display:grid; gap: 12px; }
+.field label{
+  display:block;
+  margin-bottom: 6px;
+  color: rgba(255,255,255,0.86);
+  font-weight: 700;
+  font-size: 13px;
+}
+.field input, .field select, .field textarea{
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(0,0,0,0.14);
+  color: rgba(255,255,255,0.92);
+  outline: none;
+}
+.field textarea{ resize: vertical; }
+
+.field.grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.field.checkbox{
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.10);
+  border-radius: 12px;
+  padding: 12px;
+}
+.field.checkbox label{
+  margin: 0;
+  display:flex;
+  gap: 10px;
+  align-items:center;
+  font-weight: 700;
+}
+.field.checkbox input{ width: 18px; height: 18px; }
+
+.small-links{
+  margin-top: 8px;
+  display:flex;
+  gap: 12px;
+  color: rgba(255,255,255,0.70);
+  font-size: 12px;
+}
+.small-links a{ border-bottom: 1px dashed rgba(255,255,255,0.25); }
+
+.actions{ display:flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+
+.alert{
+  border: 1px solid rgba(255,120,120,0.35);
+  background: rgba(255,120,120,0.10);
+  border-radius: 12px;
+  padding: 12px;
+  color: rgba(255,255,255,0.90);
+}
+.success{
+  border: 1px solid rgba(95,210,140,0.35);
+  background: rgba(95,210,140,0.12);
+  border-radius: 12px;
+  padding: 12px;
+  color: rgba(255,255,255,0.92);
+}
+
+.fineprint{
+  margin: 0;
+  color: rgba(255,255,255,0.62);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 980px){
+  .booking-grid{ grid-template-columns: 1fr; }
+  .field.grid-2{ grid-template-columns: 1fr; }
+}
