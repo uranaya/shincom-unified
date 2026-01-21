@@ -7,11 +7,14 @@ import requests
 import traceback
 import io
 import csv
+
+import psycopg2
+import psycopg2.extras
+
 from io import TextIOWrapper
 from datetime import datetime
 from urllib.parse import quote
 from sqlalchemy import create_engine, text
-import csv
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response,render_template_string
 from fortune_logic import generate_fortune
 from dotenv import load_dotenv
@@ -26,6 +29,8 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+
+from online_booking_admin import init_online_tables, register_online_routes
 
 
 # --- 星座・干支番号・動物占い（PDF用共通ロジック） ---
@@ -122,6 +127,10 @@ UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", ".")
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "secret!123")
 
+# --- Online booking route registration ---
+if DATABASE_URL:
+    register_online_routes(app, DATABASE_URL)
+
 
 # Initialize locks for thread-safe operations
 used_file_lock = threading.Lock()
@@ -175,6 +184,12 @@ if DATABASE_URL:
         """)
 
         conn.commit()
+
+
+    # --- Online booking tables init (tellers / bookings) ---
+    init_online_tables(DATABASE_URL)
+
+
         cur.close()
         conn.close()
         print("✅ データベース初期化完了（shop_logs, webhook_events, sales）")
@@ -2043,11 +2058,6 @@ def admin_sales_add_missing():
 
 
 
-
-
-@app.route("/online", methods=["GET"])
-def online_lp():
-    return render_template("lp_online_v2.html")
 
 
 
