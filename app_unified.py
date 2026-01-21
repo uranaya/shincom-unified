@@ -103,7 +103,6 @@ from flask import send_from_directory
 
 import sqlite3
 import threading
-import psycopg2
 
 
 # 料金設定（テスト中はここをいじるだけ）
@@ -185,18 +184,18 @@ if DATABASE_URL:
 
         conn.commit()
 
-
-    # --- Online booking tables init (tellers / bookings) ---
-    init_online_tables(DATABASE_URL)
-
+        # --- Online booking tables init (tellers / bookings) ---
+        # online_booking_admin.py の init_online_tables(conn) は「接続」を受け取る設計
+        init_online_tables(conn)
 
         cur.close()
         conn.close()
-        print("✅ データベース初期化完了（shop_logs, webhook_events, sales）")
+        print("✅ データベース初期化完了（shop_logs, webhook_events, sales, tellers, bookings）")
     except Exception as e:
         print("❌ DB初期化エラー:", e)
 else:
     print("⚠️ DATABASE_URL が未設定。ローカル実行ではDB非使用。")
+
 
 
 
