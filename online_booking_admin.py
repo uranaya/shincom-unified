@@ -407,6 +407,56 @@ def register_online_routes(app, database_url: str) -> None:
         return jsonify({"tellers": fetch_public_tellers()})
 
     # ---------------------------
+    # Contact
+    # ---------------------------
+
+    @app.route("/contact", methods=["GET", "POST"])
+    def contact_page():
+        """
+        LPからの問い合わせ用。
+        - GET: フォーム表示
+        - POST: SMTPが設定されていればメール送信、未設定なら完了表示のみ
+        """
+        error = ""
+        success = ""
+
+        if request.method == "POST":
+            try:
+                name = (request.form.get("name") or "").strip()
+                contact = (request.form.get("contact") or "").strip()
+                message = (request.form.get("message") or "").strip()
+
+                if not (name and contact and message):
+                    raise ValueError("未入力の必須項目があります。")
+
+                subject = f"[うらなや お問い合わせ] {name}"
+                body = "\n".join([
+                    f"名前: {name}",
+                    f"連絡先: {contact}",
+                    "",
+                    "内容:",
+                    message,
+                ])
+
+                try:
+                    send_booking_email(subject, body)
+                except Exception as e:
+                    # メール失敗でも問い合わせ自体は受理
+                    print("⚠️ contact mail failed:", e)
+
+                success = "お問い合わせを受け付けました。折り返しご連絡いたします。"
+
+            except Exception as e:
+                error = str(e)
+
+        return render_template(
+            "online/contact.html",
+            error=error,
+            success=success
+        )
+
+
+    # ---------------------------
     # Admin (Tellers)
     # ---------------------------
 

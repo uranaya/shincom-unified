@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>お問い合わせ | うらなや</title>
+  <link rel="stylesheet" href="/static/css/lp_online_v2.css" />
+  <link rel="stylesheet" href="/static/css/booking.css" />
+  <style>
+    .wrap{ padding: 40px 0; }
+    .card{ max-width: 880px; margin: 0 auto; }
+    .msg-ok{ margin: 14px 0; padding: 12px 14px; border-radius: 12px; background: rgba(0,255,0,.10); }
+    .msg-ng{ margin: 14px 0; padding: 12px 14px; border-radius: 12px; background: rgba(255,0,0,.10); }
+  </style>
+</head>
+<body>
+  <header class="site-header" role="banner">
+    <div class="container header-inner">
+      <a class="brand" href="/online">
+        <span class="brand__name">うらなや</span>
+        <span class="brand__sub">お問い合わせ</span>
+      </a>
+      <nav class="header-cta">
+        <a class="btn btn--ghost" href="/online">LPへ戻る</a>
+        <a class="btn btn--primary" href="/online/booking">予約へ進む</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="container">
+      <section class="booking-card card">
+        <h1 style="margin:0 0 10px;">お問い合わせ</h1>
+        <p class="muted" style="margin:0 0 18px;">
+          オンライン鑑定のご相談、メニューの確認、日時調整などはこちらからお送りください。
+        </p>
+
+        {% if success %}
+          <div class="msg-ok">{{ success }}</div>
+        {% endif %}
+        {% if error %}
+          <div class="msg-ng">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/contact">
+          <div class="field">
+            <label>お名前（必須）</label>
+            <input type="text" name="name" required>
+          </div>
+
+          <div class="field">
+            <label>ご連絡先（必須）</label>
+            <input type="text" name="contact" placeholder="メール / LINE ID / 電話番号 など" required>
+          </div>
+
+          <div class="field">
+            <label>お問い合わせ内容（必須）</label>
+            <textarea name="message" rows="8" required
+              placeholder="例：オンライン鑑定の流れを知りたい／この占い師の空き状況／メニュー相談 など"></textarea>
+          </div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;">
+            <button class="btn btn--primary btn--lg" type="submit">送信する</button>
+            <a class="btn btn--ghost btn--lg" href="/online">戻る</a>
+          </div>
+        </form>
+
+        <hr style="margin:22px 0; opacity:.25;">
+
+        <div class="muted" style="font-size:12px; line-height:1.7;">
+          ※内容により返信にお時間をいただく場合があります。<br>
+          ※緊急のご連絡は、予約時の連絡先をご利用ください。
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
