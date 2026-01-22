@@ -93,13 +93,18 @@
               </div>
 
               <div class="field">
-                <label>鑑定形式</label>
-                <select name="mode" required>
-                  <option value="チャット" selected>チャット</option>
-                  <option value="通話">通話</option>
-                  <option value="PDF">PDF</option>
-                </select>
-              </div>
+  		<label>鑑定メニュー（税抜／税込）</label>
+  		<select name="mode" required>
+    		<option value="ビデオ通話30分_5000" selected>ビデオ通話（30分）5,000円／5,500円</option>
+    		<option value="通話30分_5000">通話（30分）5,000円／5,500円</option>
+    		<option value="鑑定動画_3000">鑑定動画（後日送付）3,000円／3,300円</option>
+    		<option value="鑑定PDF_2000">鑑定PDF（後日送付）2,000円／2,200円</option>
+  		</select>
+  		<div class="muted" style="margin-top:6px;font-size:12px;">
+    		※表示は税抜です。税込（10%）を併記しています。
+  		</div>
+	      </div>
+
 
               <div class="field grid-2">
                 <div>

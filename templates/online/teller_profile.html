@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ teller.display_name }} | 占い師プロフィール</title>
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/static/css/lp_online_v2.css" />
+  <link rel="stylesheet" href="/static/css/booking.css" />
+  <style>
+    .profile-wrap{ padding-top: 38px; }
+    .profile-card{ max-width: 980px; margin: 0 auto; }
+    .profile-head{ display:flex; gap: 14px; align-items: flex-start; }
+    .profile-avatar{ width: 96px; height: 96px; border-radius: 999px; background-size: cover; background-position:center; border:1px solid rgba(255,255,255,.14); }
+    .profile-meta{ flex:1; min-width:0; }
+    .profile-name{ font-size: 26px; font-weight: 900; margin: 0; }
+    .profile-arts{ display:flex; flex-wrap:wrap; gap:8px; margin-top: 10px; }
+    .profile-bio-long{ white-space: pre-wrap; line-height: 1.9; color: rgba(255,255,255,0.86); margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <header class="site-header" role="banner">
+    <div class="container header-inner">
+      <a class="brand" href="/online">
+        <span class="brand__name">うらなや</span>
+        <span class="brand__sub">占い師プロフィール</span>
+      </a>
+      <nav class="header-cta">
+        <a class="btn btn--ghost" href="/online#tellers">一覧へ戻る</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="profile-wrap">
+    <div class="container">
+      <section class="booking-card profile-card">
+        <div class="profile-head">
+          <div class="profile-avatar" style="background-image:url('{{ teller.photo_url if teller.photo_url else '' }}');"></div>
+          <div class="profile-meta">
+            <h1 class="profile-name">{{ teller.display_name }}</h1>
+
+            <div class="profile-arts">
+              {% if teller.art1 %}<span class="tag">{{ teller.art1 }}</span>{% endif %}
+              {% if teller.art2 %}<span class="tag">{{ teller.art2 }}</span>{% endif %}
+              {% if teller.art3 %}<span class="tag">{{ teller.art3 }}</span>{% endif %}
+            </div>
+
+            <div class="teller-mini__tags" style="margin-top:10px;">
+              {% for tag in teller.tags %}
+                <span class="tag">{{ tag }}</span>
+              {% endfor %}
+            </div>
+
+            <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+              <a class="btn btn--primary btn--lg" href="/online/booking?teller_id={{ teller.id }}">この占い師で予約</a>
+              <a class="btn btn--ghost btn--lg" href="/online">LPへ戻る</a>
+            </div>
+          </div>
+        </div>
+
+        {% if teller.long_bio %}
+          <div class="profile-bio-long">{{ teller.long_bio }}</div>
+        {% else %}
+          <div class="profile-bio-long" style="color: rgba(255,255,255,0.70);">
+            ただいま準備中です。
+          </div>
+        {% endif %}
+      </section>
+    </div>
+  </main>
+</body>
+</html>

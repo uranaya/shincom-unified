@@ -51,6 +51,29 @@
             <label>紹介文（短文）</label>
             <textarea name="short_bio" placeholder="現状整理と次の一手を具体化する鑑定が得意です。">{{ teller.short_bio if teller else '' }}</textarea>
 
+
+<div class="field">
+  <label>長めの紹介文（long_bio）</label>
+  <textarea name="long_bio" rows="10" placeholder="300〜800字程度で。">{{ teller.long_bio if teller else '' }}</textarea>
+</div>
+
+<div class="field grid-3">
+  <div>
+    <label>占術1（art1）</label>
+    <input type="text" name="art1" value="{{ teller.art1 if teller else '' }}" placeholder="例：手相">
+  </div>
+  <div>
+    <label>占術2（art2）</label>
+    <input type="text" name="art2" value="{{ teller.art2 if teller else '' }}" placeholder="例：タロット">
+  </div>
+  <div>
+    <label>占術3（art3）</label>
+    <input type="text" name="art3" value="{{ teller.art3 if teller else '' }}" placeholder="例：四柱推命">
+  </div>
+</div>
+
+
+
             <label>公開</label>
             <div class="muted">
               <label><input type="checkbox" name="is_active" value="1" {% if teller and teller.is_active %}checked{% elif mode=="new" %}checked{% endif %}/> 公開する</label>

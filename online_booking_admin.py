@@ -2,35 +2,43 @@
 """
 Online booking + teller admin module for shincom-unified (Flask + psycopg2 direct SQL).
 
-Integration goal:
-- Public LP:      GET  /online
-- Public booking: GET/POST /online/booking
-- Admin tellers:  GET  /admin/tellers
-                 GET/POST /admin/tellers/new
-                 GET/POST /admin/tellers/<id>/edit
-                 POST /admin/tellers/<id>/toggle
-- Admin bookings: GET  /admin/bookings   (minimal list)
+Public:
+- GET  /online
+- GET/POST /online/booking
+- GET  /teller/<slug>        (profile)
 
-Assumptions:
-- app_unified.py already defines:
-    * Flask `app`
-    * DATABASE_URL env var
-    * admin login sets `session["admin"] = True` (or similar)
-    * `jsonify`, `render_template`, `request`, `redirect`, `session`
-- This module provides:
-    * init_online_tables(conn)  -> create tellers/bookings tables (idempotent)
-    * register_online_routes(app) -> register routes on the given Flask app
+Admin:
+- GET  /admin/tellers
+- GET/POST /admin/tellers/new
+- GET/POST /admin/tellers/<id>/edit
+- POST /admin/tellers/<id>/toggle
+- GET  /admin/bookings       (minimal list)
+
+Integration:
+- app_unified.py should call init_online_tables(conn) after it creates the other tables.
+- app_unified.py should call register_online_routes(app, DATABASE_URL) after Flask app creation.
+
+Notes:
+- Admin auth check is centralized in _require_admin(); align its session key with your app.
+- Email notification on booking completion is optional; enabled only when SMTP env vars are set.
 """
 
 import json
-import uuid
+import os
+import smtplib
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from email.message import EmailMessage
+from email.utils import formataddr
+from typing import Any, Dict, List, Optional
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from flask import jsonify, render_template, request, redirect, session
+from flask import jsonify, render_template, request, redirect, session, abort
 
+
+# ---------------------------
+# Helpers
+# ---------------------------
 
 def _parse_tags(tags_json: str) -> List[str]:
     try:
@@ -44,22 +52,95 @@ def _parse_dt_local(v: Optional[str]) -> Optional[datetime]:
     """Parse <input type="datetime-local">: 'YYYY-MM-DDTHH:MM'."""
     if not v:
         return None
-    # datetime.fromisoformat handles 'YYYY-MM-DDTHH:MM'
     return datetime.fromisoformat(v)
 
 
+def _db_conn(database_url: str):
+    if not database_url:
+        raise RuntimeError("DATABASE_URL is not set")
+    return psycopg2.connect(database_url)
+
+
+def _require_admin():
+    # Align with your existing admin auth pattern.
+    # If your app uses a different key, change this function only.
+    if not session.get("admin"):
+        return redirect("/admin/login")
+    return None
+
+
+def _ensure_text(v: Optional[str]) -> str:
+    return (v or "").strip()
+
+
+def _guess_contact_type(contact: str) -> str:
+    if "@" in (contact or ""):
+        return "email"
+    # phone / line / other
+    return "phone"
+
+
+# ---------------------------
+# Email (optional)
+# ---------------------------
+
+def send_booking_email(subject: str, body: str) -> None:
+    """
+    Send a notification email to BOOKING_NOTIFY_TO.
+    If required env vars are missing, this becomes a no-op.
+
+    Env:
+      BOOKING_NOTIFY_TO  (e.g. musubiya.uo@gmail.com)
+      SMTP_HOST          (e.g. smtp.gmail.com or SendGrid/others)
+      SMTP_PORT          (587 typical)
+      SMTP_USER
+      SMTP_PASS
+      SMTP_FROM          optional (e.g. '"うらなや予約" <noreply@...>')
+    """
+    to_addr = os.getenv("BOOKING_NOTIFY_TO", "").strip()
+    host = os.getenv("SMTP_HOST", "").strip()
+    port = int(os.getenv("SMTP_PORT", "587"))
+    user = os.getenv("SMTP_USER", "").strip()
+    pwd = os.getenv("SMTP_PASS", "").strip()
+    from_raw = os.getenv("SMTP_FROM", "").strip()
+
+    if not (to_addr and host and user and pwd):
+        return  # no-op
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["To"] = to_addr
+    msg["From"] = from_raw if from_raw else formataddr(("うらなや予約", user))
+    msg.set_content(body)
+
+    with smtplib.SMTP(host, port, timeout=15) as smtp:
+        smtp.ehlo()
+        smtp.starttls()
+        smtp.login(user, pwd)
+        smtp.send_message(msg)
+
+
+# ---------------------------
+# DB init
+# ---------------------------
+
 def init_online_tables(conn) -> None:
     """
-    Create tables/indexes required for online LP + booking + admin.
+    Create/upgrade tables/indexes required for online LP + booking + admin.
     Safe to run on every boot.
     """
     with conn.cursor() as cur:
+        # Base tables (idempotent)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS tellers (
               id SERIAL PRIMARY KEY,
               slug TEXT UNIQUE NOT NULL,
               display_name TEXT NOT NULL,
               short_bio TEXT DEFAULT '',
+              long_bio TEXT DEFAULT '',
+              art1 TEXT DEFAULT '',
+              art2 TEXT DEFAULT '',
+              art3 TEXT DEFAULT '',
               photo_url TEXT DEFAULT '',
               tags_json TEXT DEFAULT '[]',
               is_active BOOLEAN DEFAULT TRUE,
@@ -69,6 +150,12 @@ def init_online_tables(conn) -> None:
               updated_at TIMESTAMP DEFAULT NOW()
             );
         """)
+
+        # If DB already had old schema, ensure new columns exist (PostgreSQL supports IF NOT EXISTS)
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS long_bio TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS art1 TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS art2 TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS art3 TEXT DEFAULT '';""")
 
         cur.execute("""
             CREATE TABLE IF NOT EXISTS bookings (
@@ -90,39 +177,30 @@ def init_online_tables(conn) -> None:
             );
         """)
 
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_tellers_active_order ON tellers(is_active, sort_order, id);")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_bookings_teller_created ON bookings(teller_id, created_at DESC);")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);")
+        # Indexes
+        cur.execute("""CREATE INDEX IF NOT EXISTS idx_tellers_active_order ON tellers(is_active, sort_order, id);""")
+        cur.execute("""CREATE INDEX IF NOT EXISTS idx_bookings_teller_created ON bookings(teller_id, created_at DESC);""")
+        cur.execute("""CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);""")
 
     conn.commit()
 
 
-def _db_conn(database_url: str):
-    if not database_url:
-        raise RuntimeError("DATABASE_URL is not set")
-    return psycopg2.connect(database_url)
-
-
-def _require_admin():
-    # Align with your existing admin auth pattern.
-    # If your app uses a different key, change this single function.
-    if not session.get("admin"):
-        return redirect("/admin/login")
-    return None
-
+# ---------------------------
+# Routes registration
+# ---------------------------
 
 def register_online_routes(app, database_url: str) -> None:
-    """
-    Register all routes. Call this once from app_unified.py after app creation.
-    """
+    """Register all routes. Call this once from app_unified.py after app creation."""
+
+    # --------- queries ---------
 
     def fetch_public_tellers() -> List[Dict[str, Any]]:
         conn = _db_conn(database_url)
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT id, slug, display_name, short_bio, photo_url, tags_json,
-                           is_active, is_accepting, sort_order
+                    SELECT id, slug, display_name, short_bio, long_bio, art1, art2, art3,
+                           photo_url, tags_json, is_active, is_accepting, sort_order
                     FROM tellers
                     WHERE is_active = TRUE
                     ORDER BY sort_order ASC, id ASC;
@@ -139,8 +217,8 @@ def register_online_routes(app, database_url: str) -> None:
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT id, slug, display_name, short_bio, photo_url, tags_json,
-                           is_active, is_accepting, sort_order,
+                    SELECT id, slug, display_name, short_bio, long_bio, art1, art2, art3,
+                           photo_url, tags_json, is_active, is_accepting, sort_order,
                            created_at, updated_at
                     FROM tellers
                     ORDER BY sort_order ASC, id ASC;
@@ -157,13 +235,33 @@ def register_online_routes(app, database_url: str) -> None:
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT id, slug, display_name, short_bio, photo_url, tags_json,
-                           is_active, is_accepting, sort_order,
+                    SELECT id, slug, display_name, short_bio, long_bio, art1, art2, art3,
+                           photo_url, tags_json, is_active, is_accepting, sort_order,
                            created_at, updated_at
                     FROM tellers
                     WHERE id = %s
                     LIMIT 1;
                 """, (teller_id,))
+                r = cur.fetchone()
+                if not r:
+                    return None
+                r["tags"] = _parse_tags(r.get("tags_json"))
+                return r
+        finally:
+            conn.close()
+
+    def fetch_teller_by_slug(slug: str) -> Optional[Dict[str, Any]]:
+        conn = _db_conn(database_url)
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT id, slug, display_name, short_bio, long_bio, art1, art2, art3,
+                           photo_url, tags_json, is_active, is_accepting, sort_order,
+                           created_at, updated_at
+                    FROM tellers
+                    WHERE slug = %s
+                    LIMIT 1;
+                """, (slug,))
                 r = cur.fetchone()
                 if not r:
                     return None
@@ -200,13 +298,21 @@ def register_online_routes(app, database_url: str) -> None:
         finally:
             conn.close()
 
-    # ---------- Public ----------
+    # ---------------------------
+    # Public
+    # ---------------------------
 
     @app.get("/online")
     def online_lp():
         tellers = fetch_public_tellers()
-        # templates/online/lp_online_dynamic.html
         return render_template("online/lp_online_dynamic.html", tellers=tellers)
+
+    @app.get("/teller/<slug>")
+    def teller_profile(slug: str):
+        t = fetch_teller_by_slug(slug)
+        if not t:
+            abort(404)
+        return render_template("online/teller_profile.html", teller=t)
 
     @app.route("/online/booking", methods=["GET", "POST"])
     def online_booking():
@@ -235,17 +341,22 @@ def register_online_routes(app, database_url: str) -> None:
                 if not agree:
                     raise ValueError("利用規約・プライバシーポリシーへの同意が必要です。")
 
+                contact = _ensure_text(request.form.get("contact")) or _ensure_text(request.form.get("email"))
+                contact_type = _ensure_text(request.form.get("contact_type"))
+                if contact and not contact_type:
+                    contact_type = _guess_contact_type(contact)
+
                 payload = {
                     "teller_id": int(teller_id),
-                    "category": (request.form.get("category") or "").strip(),
-                    "mode": (request.form.get("mode") or "").strip(),
+                    "category": _ensure_text(request.form.get("category")),
+                    "mode": _ensure_text(request.form.get("mode")),
                     "slot1": _parse_dt_local(request.form.get("slot1")),
                     "slot2": _parse_dt_local(request.form.get("slot2")),
                     "slot3": _parse_dt_local(request.form.get("slot3")),
-                    "message": (request.form.get("message") or "").strip(),
-                    "name": (request.form.get("name") or "").strip(),
-                    "contact_type": (request.form.get("contact_type") or "").strip(),
-                    "contact": (request.form.get("contact") or "").strip(),
+                    "message": _ensure_text(request.form.get("message")),
+                    "name": _ensure_text(request.form.get("name")),
+                    "contact_type": contact_type,
+                    "contact": contact,
                     "agree": agree,
                 }
 
@@ -257,10 +368,32 @@ def register_online_routes(app, database_url: str) -> None:
                 booking_id = insert_booking(payload)
                 success = f"予約リクエストを受け付けました（受付番号：{booking_id}）。折り返しご連絡します。"
 
+                # Email notification (optional)
+                try:
+                    teller_name = selected_teller.get("display_name", "")
+                    subject = f"[うらなや予約] 新規予約 #{booking_id} / {teller_name}"
+                    body = "\n".join([
+                        f"予約ID: {booking_id}",
+                        f"占い師: {teller_name} (id={payload['teller_id']})",
+                        f"カテゴリ: {payload['category']}",
+                        f"鑑定メニュー: {payload['mode']}",
+                        f"希望日時1: {payload['slot1']}",
+                        f"希望日時2: {payload.get('slot2') or '-'}",
+                        f"希望日時3: {payload.get('slot3') or '-'}",
+                        f"名前: {payload['name']}",
+                        f"連絡手段: {payload['contact_type']}",
+                        f"連絡先: {payload['contact']}",
+                        "",
+                        "相談内容:",
+                        payload["message"],
+                    ])
+                    send_booking_email(subject, body)
+                except Exception as e:
+                    print("⚠️ booking mail failed:", e)
+
             except Exception as e:
                 error = str(e)
 
-        # templates/online/booking.html
         return render_template(
             "online/booking.html",
             tellers=tellers,
@@ -273,7 +406,9 @@ def register_online_routes(app, database_url: str) -> None:
     def api_online_tellers():
         return jsonify({"tellers": fetch_public_tellers()})
 
-    # ---------- Admin (Tellers) ----------
+    # ---------------------------
+    # Admin (Tellers)
+    # ---------------------------
 
     @app.get("/admin/tellers")
     def admin_tellers_list():
@@ -292,12 +427,16 @@ def register_online_routes(app, database_url: str) -> None:
         error = ""
         if request.method == "POST":
             try:
-                slug = (request.form.get("slug") or "").strip()
-                display_name = (request.form.get("display_name") or "").strip()
-                short_bio = (request.form.get("short_bio") or "").strip()
-                photo_url = (request.form.get("photo_url") or "").strip()
-                tags_raw = (request.form.get("tags") or "").strip()  # comma separated
-                sort_order = int((request.form.get("sort_order") or "100").strip())
+                slug = _ensure_text(request.form.get("slug"))
+                display_name = _ensure_text(request.form.get("display_name"))
+                short_bio = _ensure_text(request.form.get("short_bio"))
+                long_bio = _ensure_text(request.form.get("long_bio"))
+                art1 = _ensure_text(request.form.get("art1"))
+                art2 = _ensure_text(request.form.get("art2"))
+                art3 = _ensure_text(request.form.get("art3"))
+                photo_url = _ensure_text(request.form.get("photo_url"))
+                tags_raw = _ensure_text(request.form.get("tags"))  # comma separated
+                sort_order = int((_ensure_text(request.form.get("sort_order")) or "100"))
                 is_active = (request.form.get("is_active") == "1")
                 is_accepting = (request.form.get("is_accepting") == "1")
 
@@ -312,10 +451,12 @@ def register_online_routes(app, database_url: str) -> None:
                     with conn.cursor() as cur:
                         cur.execute("""
                             INSERT INTO tellers
-                              (slug, display_name, short_bio, photo_url, tags_json, is_active, is_accepting, sort_order, updated_at)
+                              (slug, display_name, short_bio, long_bio, art1, art2, art3,
+                               photo_url, tags_json, is_active, is_accepting, sort_order, updated_at)
                             VALUES
-                              (%s,%s,%s,%s,%s,%s,%s,%s,NOW());
-                        """, (slug, display_name, short_bio, photo_url, tags_json, is_active, is_accepting, sort_order))
+                              (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW());
+                        """, (slug, display_name, short_bio, long_bio, art1, art2, art3,
+                              photo_url, tags_json, is_active, is_accepting, sort_order))
                         conn.commit()
                 finally:
                     conn.close()
@@ -339,12 +480,16 @@ def register_online_routes(app, database_url: str) -> None:
         error = ""
         if request.method == "POST":
             try:
-                slug = (request.form.get("slug") or "").strip()
-                display_name = (request.form.get("display_name") or "").strip()
-                short_bio = (request.form.get("short_bio") or "").strip()
-                photo_url = (request.form.get("photo_url") or "").strip()
-                tags_raw = (request.form.get("tags") or "").strip()
-                sort_order = int((request.form.get("sort_order") or "100").strip())
+                slug = _ensure_text(request.form.get("slug"))
+                display_name = _ensure_text(request.form.get("display_name"))
+                short_bio = _ensure_text(request.form.get("short_bio"))
+                long_bio = _ensure_text(request.form.get("long_bio"))
+                art1 = _ensure_text(request.form.get("art1"))
+                art2 = _ensure_text(request.form.get("art2"))
+                art3 = _ensure_text(request.form.get("art3"))
+                photo_url = _ensure_text(request.form.get("photo_url"))
+                tags_raw = _ensure_text(request.form.get("tags"))
+                sort_order = int((_ensure_text(request.form.get("sort_order")) or "100"))
                 is_active = (request.form.get("is_active") == "1")
                 is_accepting = (request.form.get("is_accepting") == "1")
 
@@ -362,6 +507,10 @@ def register_online_routes(app, database_url: str) -> None:
                             SET slug=%s,
                                 display_name=%s,
                                 short_bio=%s,
+                                long_bio=%s,
+                                art1=%s,
+                                art2=%s,
+                                art3=%s,
                                 photo_url=%s,
                                 tags_json=%s,
                                 is_active=%s,
@@ -369,7 +518,8 @@ def register_online_routes(app, database_url: str) -> None:
                                 sort_order=%s,
                                 updated_at=NOW()
                             WHERE id=%s;
-                        """, (slug, display_name, short_bio, photo_url, tags_json, is_active, is_accepting, sort_order, teller_id))
+                        """, (slug, display_name, short_bio, long_bio, art1, art2, art3,
+                              photo_url, tags_json, is_active, is_accepting, sort_order, teller_id))
                         conn.commit()
                 finally:
                     conn.close()
@@ -378,7 +528,6 @@ def register_online_routes(app, database_url: str) -> None:
             except Exception as e:
                 error = str(e)
 
-        # Provide CSV tags string for form display
         teller = dict(teller)
         teller["tags_csv"] = ", ".join(teller.get("tags") or [])
         return render_template("admin/teller_form.html", mode="edit", teller=teller, error=error)
@@ -389,7 +538,7 @@ def register_online_routes(app, database_url: str) -> None:
         if r:
             return r
 
-        field = (request.form.get("field") or "").strip()
+        field = _ensure_text(request.form.get("field"))
         if field not in ("is_active", "is_accepting"):
             return "Bad Request", 400
 
@@ -403,7 +552,9 @@ def register_online_routes(app, database_url: str) -> None:
 
         return redirect("/admin/tellers")
 
-    # ---------- Admin (Bookings) minimal ----------
+    # ---------------------------
+    # Admin (Bookings) minimal
+    # ---------------------------
 
     @app.get("/admin/bookings")
     def admin_bookings_list():
@@ -439,4 +590,3 @@ def register_online_routes(app, database_url: str) -> None:
             conn.close()
 
         return render_template("admin/bookings_list.html", bookings=rows)
-
