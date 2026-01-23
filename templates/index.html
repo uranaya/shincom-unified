@@ -87,6 +87,16 @@
     <input type="checkbox" id="force_next_month" name="force_next_month" value="yes" style="margin-right: 8px; vertical-align: middle;">
     <label for="force_next_month" style="vertical-align: middle;">来月・再来月を占う（20日以前でも来月起点にする）</label>
   </div>
+  <div style="margin: 10px 0;">
+    <input type="checkbox" id="tokyo_mode" name="tokyo_mode" value="yes" style="margin-right: 8px; vertical-align: middle;">
+    <label for="tokyo_mode" style="vertical-align: middle;">東京（浅草）向けの文章にする</label>
+  </div>
+
+  <div style="margin: 10px 0;">
+    <input type="checkbox" id="lang_en" name="lang_en" value="yes" style="margin-right: 8px; vertical-align: middle;">
+    <label for="lang_en" style="vertical-align: middle;">English output</label>
+  </div>
+
 </div>
 
   <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
@@ -308,7 +318,10 @@
 
       const forceNextMonth = document.getElementById("force_next_month")?.checked || false;
 
-      const payload = { image_data: imageData, birthdate, full_year: fullYear, force_next_month: forceNextMonth };
+      const tokyoMode = document.getElementById("tokyo_mode")?.checked || false;
+      const outputLang = (document.getElementById("lang_en")?.checked) ? "en" : "ja";
+
+      const payload = { image_data: imageData, birthdate, full_year: fullYear, force_next_month: forceNextMonth, tokyo_mode: tokyoMode, output_lang: outputLang };
 
       try {
         const response = await fetch(path, {

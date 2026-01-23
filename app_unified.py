@@ -729,15 +729,26 @@ def selfmob_uuid(uuid_str):
             target2 = target1 + relativedelta(months=1)
 
             result_data = {
+                "lang": output_lang,
+                "style": style_mode,
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
-                "titles": {
-                    "palm_summary": "手相の総合アドバイス",
-                    "personality": "性格診断",
-                    "year_fortune": f"{today.year}年の運勢",
-                    "month_fortune": f"{target1.year}年{target1.month}月の運勢",
-                    "next_month_fortune": f"{target2.year}年{target2.month}月の運勢",
-                },
+                "titles": (lambda _lang, _today, _t1, _t2: (
+                    {
+                        "palm_summary": "手相の総合アドバイス",
+                        "personality": "性格診断",
+                        "year_fortune": f"{_today.year}年の運勢",
+                        "month_fortune": f"{_t1.year}年{_t1.month}月の運勢",
+                        "next_month_fortune": f"{_t2.year}年{_t2.month}月の運勢",
+                    } if _lang != "en" else
+                    {
+                        "palm_summary": "Overall Palm Advice",
+                        "personality": "Personality Insights",
+                        "year_fortune": f"Yearly Fortune: {_today.year}",
+                        "month_fortune": f"This Month: {_t1.strftime('%b %Y')}",
+                        "next_month_fortune": f"Next Month: {_t2.strftime('%b %Y')}",
+                    }
+                ))(output_lang, today, target1, target2),
                 "texts": {
                     "palm_summary": summary_text,
                     "personality": shichu_result.get("personality", ""),
@@ -990,6 +1001,11 @@ def ten_shincom():
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
             force_next_month = data.get("force_next_month", False) if is_json else (data.get("force_next_month") == "yes")
+            tokyo_mode = data.get("tokyo_mode", False) if is_json else (data.get("tokyo_mode") == "yes")
+            output_lang = (data.get("output_lang") or "ja") if is_json else ((data.get("output_lang") or "").strip() or "ja")
+            if output_lang not in ("ja", "en"):
+                output_lang = "ja"
+            style_mode = "tokyo" if tokyo_mode else "default"
 
             try:
                 year, month, day = map(int, birthdate.split("-"))
@@ -1013,7 +1029,7 @@ def ten_shincom():
                 print("❌ 本命星取得エラー:", e)
                 honmeisei = ""
             now = datetime.now()
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month)
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month, style=style_mode, lang=output_lang)
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()
@@ -1021,19 +1037,30 @@ def ten_shincom():
             if now.day >= 20 or force_next_month:
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
-            year_label = f"{target1.year}年の運勢"
-            month_label = f"{target1.year}年{target1.month}月の運勢"
-            next_month_label = f"{target2.year}年{target2.month}月の運勢"
+            if output_lang == "en":
+                year_label = f"Fortune for {target1.year}"
+                month_label = f"Fortune for {target1.year}-{target1.month:02d}"
+                next_month_label = f"Fortune for {target2.year}-{target2.month:02d}"
+            else:
+                year_label = f"{target1.year}年の運勢"
+                month_label = f"{target1.year}年{target1.month}月の運勢"
+                next_month_label = f"{target2.year}年{target2.month}月の運勢"
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
-                "titles": {
+                "titles": ({
+                    "palm_summary": "Palm Reading Summary",
+                    "personality": "Personality Profile",
+                    "year_fortune": year_label,
+                    "month_fortune": month_label,
+                    "next_month_fortune": next_month_label
+                } if output_lang == "en" else {
                     "palm_summary": "手相の総合アドバイス",
                     "personality": "性格診断",
                     "year_fortune": year_label,
                     "month_fortune": month_label,
                     "next_month_fortune": next_month_label
-                },
+                }),
                 "texts": {
                     "palm_summary": summary_text,
                     "personality": shichu_result.get("personality", ""),

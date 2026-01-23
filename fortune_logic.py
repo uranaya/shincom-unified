@@ -14,7 +14,7 @@ from pdf_generator_unified import create_pdf_unified
 
 
 
-def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False):
+def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, style: str = "default", lang: str = "ja"):
     import json
     eto = get_nicchu_eto(birthdate)
     try:
@@ -33,7 +33,24 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False):
         tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
         tsuhen_month2 = get_tsuhensei_for_date(birthdate, target2.year, target2.month)
 
-        prompt = f"""あなたは四柱推命の専門家です。
+        style_note = ""
+        if style == "tokyo":
+            style_note = (
+                "\n【東京（浅草）向けの語り口】\n"
+                "・観光客/都会のお客様にも伝わるテンポの良い文章\n"
+                "・過度な方言やローカル固有名詞は避けつつ、『街歩き・人混み・移動』など都会の生活文脈に寄せる\n"
+                "・怖がらせる表現は避け、前向きで実行しやすい提案にする\n"
+            )
+        lang_note = ""
+        if lang == "en":
+            lang_note = (
+                "\n【Language】\n"
+                "Write EVERYTHING in natural English.\n"
+                "Do not include Japanese.\n"
+                "Avoid technical astrology jargon; explain in plain, practical terms.\n"
+            )
+
+        prompt = f"""あなたは四柱推命の専門家です。{style_note}{lang_note}
 - 日柱: {eto}
 - 年の通変星: {tsuhen_year}
 - {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
@@ -74,7 +91,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False):
                     return f"{y}年{m}月は"
                 return f"{y}年{m}月は、" + s
 
-            if isinstance(result, dict):
+            if isinstance(result, dict) and lang != "en":
                 result["month_fortune"] = _fix_month_prefix(result.get("month_fortune", ""), target1.year, target1.month)
                 result["next_month_fortune"] = _fix_month_prefix(result.get("next_month_fortune", ""), target2.year, target2.month)
 
@@ -100,7 +117,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False):
         }
 
 
-def analyze_palm(image_data):
+def analyze_palm(image_data, style: str = "default", lang: str = "ja"):
     try:
         # Data URL形式 or base64のみの両方に対応
         if "," in image_data:
@@ -136,7 +153,21 @@ def analyze_palm(image_data):
             "全体を通して、読み手が安心し前向きになれるような、優しく包み込むような文体でまとめてください。"
         )
 
-        # ユーザープロンプト（出力フォーマット）
+                # --- 出力トーン切替（東京/英語） ---
+        if style == "tokyo":
+            system_prompt += (
+                "\n\n【東京（浅草）向けの語り口】\n"
+                "・観光や街歩きのリズムに合う、短く切れの良い文章\n"
+                "・怖がらせず、背中を押す前向きな提案に寄せる\n"
+            )
+        if lang == "en":
+            system_prompt += (
+                "\n\n【Language】\n"
+                "Write EVERYTHING in natural English. Do not include Japanese.\n"
+                "Keep it warm and uplifting, but not exaggerated.\n"
+            )
+
+# ユーザープロンプト（出力フォーマット）
         user_prompt = (
             "以下の形式で出力してください：\n"
             "### 1. 生命線\n（説明文）\n\n"
@@ -179,9 +210,13 @@ def analyze_palm(image_data):
 
 
 
-def get_iching_advice():
+def get_iching_advice(style: str = "default", lang: str = "ja"):
     try:
         prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
+        if style == "tokyo":
+            prompt += "（東京/浅草の短時間鑑定にも合うように、テンポよく実行しやすい助言にしてください。）"
+        if lang == "en":
+            prompt = "You are an I Ching advisor. Give a gentle, positive message the client needs right now in about 120-160 English words. Do not use Japanese. Keep it practical and reassuring."
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -376,11 +411,11 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
 
 
 
-def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False):
+def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False, style: str = "default", lang: str = "ja"):
     import re
-    palm_result = analyze_palm(image_data)
-    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month)
-    iching_result = get_iching_advice()
+    palm_result = analyze_palm(image_data, style=style, lang=lang)
+    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, style=style, lang=lang)
+    iching_result = get_iching_advice(style=style, lang=lang)
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
     raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now)
@@ -401,6 +436,28 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
         print("❌ lucky_info 整形失敗:", e)
         lucky_lines = []
 
+    if lang == "en" and lucky_lines:
+        rep = {
+            "アイテム：": "Item: ",
+            "カラー：": "Color: ",
+            "ナンバー：": "Number: ",
+            "フード：": "Food: ",
+            "デー：": "Day: ",
+            "アイテム": "Item",
+            "カラー": "Color",
+            "ナンバー": "Number",
+            "フード": "Food",
+            "デー": "Day",
+            "◆": "◆",
+        }
+        fixed = []
+        for line in lucky_lines:
+            s = line
+            for k, v in rep.items():
+                s = s.replace(k, v)
+            fixed.append(s)
+        lucky_lines = fixed
+
     today = now or datetime.today()
     target1 = today.replace(day=15)
     if today.day >= 20 or force_next_month:
@@ -408,6 +465,9 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     target2 = target1 + relativedelta(months=1)
     month_label = f"{target1.year}年{target1.month}月の運勢"
     next_month_label = f"{target2.year}年{target2.month}月の運勢"
+    if lang == "en":
+        month_label = f"Fortune for {target1.year}-{target1.month:02d}"
+        next_month_label = f"Fortune for {target2.year}-{target2.month:02d}"
 
     shichu_texts = {"personality": "", "year_fortune": "", "month_fortune": "", "next_month_fortune": ""}
     pattern = r"[■◆]\s*(性格|[0-9]{4}年の運勢|[0-9]{4}年[0-9]{1,2}月の運勢)(.*?)(?=[■◆]|$)"
@@ -522,7 +582,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 
     topic_sections = []
     try:
-        iching_result = get_iching_advice()
+        iching_result = get_iching_advice(style=style, lang=lang)
     except Exception as e:
         print("⚠ 易占い取得エラー（テーマ用）:", e)
         iching_result = "（易占い結果取得エラー）"

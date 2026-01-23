@@ -11,20 +11,46 @@ import os
 from datetime import datetime
 import re
 
-def _normalize_month_fortune_text(text: str, kind: str) -> str:
-    """Remove leading 'YYYY年M月は' style prefixes to avoid heading/body month mismatches.
+def _t(lang: str, ja: str, en: str) -> str:
+    return en if lang == 'en' else ja
+
+def _get_lang(data: dict) -> str:
+    if not isinstance(data, dict):
+        return 'ja'
+    lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
+    lang = (lang or 'ja').strip().lower()
+    return 'en' if lang.startswith('en') else 'ja'
+
+
+def _normalize_month_fortune_text(text: str, kind: str, lang: str = 'ja') -> str:
+    """Normalize month-fortune body text so it doesn't repeat the month already shown in the heading.
+
+    - JA: remove leading 'YYYY年M月は' and add a gentle '今月は/来月は' prefix if missing.
+    - EN: keep it concise and avoid redundant leading month phrases; add 'This month/Next month' if missing.
     kind: 'month' or 'next'
     """
     if not isinstance(text, str):
         return text
-    s = text.strip()
-    # Match patterns like '2026年1月は' or '2026年1月は、'
+    s = (text or '').strip()
+
+    # Remove Japanese leading date phrases like '2026年1月は、'
     s = re.sub(r'^\s*\d{4}年\s*\d{1,2}月\s*は\s*[、,]?\s*', '', s)
+
+    if lang == 'en':
+        # Remove simple English leading month phrases like 'In Jan 2026,' or 'January 2026:'
+        s = re.sub(r'^\s*(in\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}\s*[:,-]?\s*',
+                   '', s, flags=re.IGNORECASE)
+        prefix = 'This month' if kind == 'month' else 'Next month'
+        if re.match(r'^(this\s+month|next\s+month)\b', s, flags=re.IGNORECASE):
+            return s
+        return f"{prefix}: {s}" if s else f"{prefix}."
+
+    # JA
     prefix = '今月は' if kind == 'month' else '来月は'
-    # If the text already starts with 今月/来月, don't double-prefix.
     if s.startswith('今月') or s.startswith('来月'):
         return s
     return prefix + '、' + s if s else prefix + '。'
+
 
 
 from header_utils import draw_header
@@ -43,7 +69,7 @@ def wrap(text, limit):
 
 def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
     c.setFont(FONT_NAME, 12)
-    c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
+    c.drawString(margin, y, "■ " + _t(lang, "ラッキー情報（生年月日より）", "Lucky Info (based on birthdate)"))
     y -= 6 * mm
     c.setFont(FONT_NAME, 10)
 
@@ -58,7 +84,7 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
     if lucky_direction:
         y -= 2 * mm
         c.setFont(FONT_NAME, 12)
-        c.drawString(margin, y, "■ 吉方位（九星気学より）")
+        c.drawString(margin, y, "■ " + _t(lang, "吉方位（九星気学より）", "Lucky Directions (Kyusei Kigaku)"))
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         for line in lucky_direction.strip().splitlines():
@@ -174,10 +200,11 @@ def draw_yearly_pages_renai_b4(c, yearly):
 
 
 def draw_shincom_a4(c, data, include_yearly=False):
+    lang = _get_lang(data)
     width, height = A4
     margin = 20 * mm
     y = height - margin
-    y = draw_header(c, width, margin, y)
+    y = draw_header(c, width, margin, y, lang=lang)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
     # 生年月日・星座・干支・動物占い・本命星（手相画像の直下に表示）
@@ -193,9 +220,9 @@ def draw_shincom_a4(c, data, include_yearly=False):
     # 1行目：生年月日＋星座
     line1_parts = []
     if birthdate:
-        line1_parts.append(f"生年月日：{birthdate}")
+        line1_parts.append(f"{_t(lang, '生年月日', 'Birthdate')}：{birthdate}")
     if zodiac:
-        line1_parts.append(f"星座：{zodiac}")
+        line1_parts.append(f"{_t(lang, '星座', 'Zodiac')}：{zodiac}")
     if line1_parts:
         info_lines.append(" / ".join(line1_parts))
 
@@ -203,13 +230,13 @@ def draw_shincom_a4(c, data, include_yearly=False):
     line2_parts = []
     if eto:
         if eto_number:
-            line2_parts.append(f"干支：{eto}（{eto_number}番）")
+            line2_parts.append(f"{_t(lang, '干支', 'Zodiac (JPN)')}：{eto} ({eto_number})")
         else:
-            line2_parts.append(f"干支：{eto}")
+            line2_parts.append(f"{_t(lang, '干支', 'Zodiac (JPN)')}：{eto}")
     if animal:
-        line2_parts.append(f"動物占い：{animal}")
+        line2_parts.append(f"{_t(lang, '動物占い', 'Animal')}：{animal}")
     if honmeisei:
-        line2_parts.append(f"本命星：{honmeisei}")
+        line2_parts.append(f"{_t(lang, '本命星', 'Main Star')}：{honmeisei}")
     if line2_parts:
         info_lines.append(" / ".join(line2_parts))
 
@@ -253,6 +280,13 @@ def draw_shincom_a4(c, data, include_yearly=False):
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
 
+        # Normalize month/next-month body to avoid duplicated date phrases
+        if key in ('month_fortune', 'next_month_fortune'):
+            kind = 'month' if key == 'month_fortune' else 'next'
+            content = _normalize_month_fortune_text(content, kind, lang)
+            if lang == 'en':
+                wrap_len += 6
+
         if title:
             c.drawString(margin, y, f"◆ {title}")
             y -= 6 * mm
@@ -272,10 +306,11 @@ def draw_shincom_a4(c, data, include_yearly=False):
 
 
 def draw_shincom_b4(c, data, include_yearly=False):
+    lang = _get_lang(data)
     width, height = B4
     margin = 20 * mm
     y = height - margin
-    y = draw_header(c, width, margin, y)
+    y = draw_header(c, width, margin, y, lang=lang)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
     c.setFont(FONT_NAME, 14)
@@ -307,6 +342,13 @@ def draw_shincom_b4(c, data, include_yearly=False):
         wrap_len = 40 if 'month' in key else 45
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
+
+        # Normalize month/next-month body to avoid duplicated date phrases
+        if key in ('month_fortune', 'next_month_fortune'):
+            kind = 'month' if key == 'month_fortune' else 'next'
+            content = _normalize_month_fortune_text(content, kind, lang)
+            if lang == 'en':
+                wrap_len += 6
         if title:
             c.drawString(margin, y, f"◆ {title}")
             y -= 7 * mm
@@ -387,6 +429,7 @@ def draw_yearly_pages_shincom_b4(c, yearly):
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
+    lang = _get_lang(data)
     from reportlab.lib.pagesizes import A4, B4
     from reportlab.lib.units import mm
     from header_utils import draw_header
@@ -402,7 +445,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     width, height = A4 if size == 'a4' else B4
     margin = 20 * mm
     wrap_len = 40 if size == 'a4' else 45
-    y = draw_header(c, width, margin, height - margin)
+    y = draw_header(c, width, margin, height - margin, lang=lang)
 
     # 1ページ目：相性診断・恋愛運（年/月/来月）
     main_keys = [
@@ -455,9 +498,11 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
 
 
 def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
+    data = data or {}
+    data.setdefault('lang', _get_lang(data))
     size = size.lower()
     c = canvas.Canvas(filepath, pagesize=A4 if size == 'a4' else B4)
-    c.setTitle('占い結果')
+    c.setTitle(_t(_get_lang(data), '占い結果', 'Fortune Result'))
     if mode == 'shincom':
         if size == 'a4':
             draw_shincom_a4(c, data, include_yearly)
