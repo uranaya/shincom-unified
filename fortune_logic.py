@@ -258,7 +258,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 
 
-def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None):
+def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None, lang: str = "ja"):
     """
     九星の直接連想（紫/9/火曜…）を避け、数秘 + タロット + 易(八卦) + 色彩心理を混ぜて
     「◆ アイテム／カラー／ナンバー／フード／デー」を1行で返す（リスト1要素）。
@@ -403,8 +403,67 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
     # ---- 9) デー（曜日）：タロットの惑星由来 ----
     day = tarot_weekday
 
+
+    # ---- 10.5) Language: English rendering (best-effort deterministic translation) ----
+    if lang == "en":
+        day_map = {
+            "日曜": "Sunday", "月曜": "Monday", "火曜": "Tuesday", "水曜": "Wednesday",
+            "木曜": "Thursday", "金曜": "Friday", "土曜": "Saturday"
+        }
+        color_map = {
+            "白": "White", "黒": "Black", "赤": "Red", "青": "Blue", "緑": "Green", "黄": "Yellow",
+            "橙": "Orange", "オレンジ": "Orange", "ピンク": "Pink", "桃": "Pink",
+            "金": "Gold", "銀": "Silver", "紫": "Purple", "茶": "Brown", "灰": "Gray",
+            "ターコイズ": "Turquoise", "シルバー": "Silver", "ライトグレー": "Light Gray",
+            "ライム": "Lime", "ベージュ": "Beige", "クリーム": "Cream", "ネイビー": "Navy",
+        }
+        item_map = {
+            "高機能ペン": "Premium Pen", "小型ガジェット": "Mini Gadget", "カードケース": "Card Holder",
+            "ノート": "Notebook", "アロマストーン": "Aroma Stone", "読書用しおり": "Bookmark",
+            "フラワー雑貨": "Floral Accessory", "リップバーム": "Lip Balm", "ハンドクリーム": "Hand Cream",
+            "手帳カバー": "Planner Cover", "革財布": "Leather Wallet", "名刺入れ": "Business Card Case",
+            "万年筆": "Fountain Pen", "御守り": "Lucky Charm", "レザーしおり": "Leather Bookmark",
+            "ペアマグ": "Pair Mug", "ハートチャーム": "Heart Charm", "香水": "Perfume",
+            "スニーカー": "Sneakers", "トラベルポーチ": "Travel Pouch", "スポーツタオル": "Sports Towel",
+            "トレーニングバンド": "Workout Band", "蜂蜜飴": "Honey Candy", "カフェタンブラー": "Tumbler",
+            "読書灯": "Reading Light", "ルーペ": "Magnifier", "上質ノート": "Quality Notebook",
+            "腕時計": "Wristwatch", "キーホルダー": "Keychain", "ラッキーチャーム": "Lucky Charm",
+            "バランスボード": "Balance Board", "スクエアトート": "Square Tote", "スケール柄グッズ": "Scale-pattern Item",
+            "アイピロー": "Eye Pillow", "ストレッチポール": "Stretch Pole", "アロマオイル": "Aroma Oil",
+            "断捨離ボックス": "Declutter Box", "新品タオル": "New Towel", "新しい歯ブラシ": "New Toothbrush",
+            "ブレンドティー": "Blended Tea", "保温ボトル": "Thermal Bottle", "整う入浴剤": "Bath Salt",
+            "カカオ高配チョコ": "Dark Chocolate", "アロマキャンドル": "Scented Candle", "レザーブレス": "Leather Bracelet",
+            "スマホ充電器": "Phone Charger", "耐衝撃ケース": "Shockproof Case", "貼るカイロ": "Heat Patch",
+            "星座チャーム": "Zodiac Charm", "ミスト化粧水": "Face Mist", "クリアポーチ": "Clear Pouch",
+            "アロマディフューザー": "Aroma Diffuser", "ムーン雑貨": "Moon Accessory", "柔軟剤": "Fabric Softener",
+            "サングラス": "Sunglasses", "ビタミンCタブレット": "Vitamin C", "明るいマグ": "Bright Mug",
+            "ホイッスル": "Whistle", "目覚まし時計": "Alarm Clock", "ホワイトノート": "White Notebook",
+            "地球柄ノート": "Earth Notebook", "パスポートケース": "Passport Case", "トラベルタグ": "Travel Tag",
+            "小さなバックパック": "Small Backpack", "ピンバッジ": "Pin Badge", "スカーフ": "Scarf",
+            "トートバッグ": "Tote Bag",
+        }
+        # translate fields
+        item = item_map.get(item, item)
+        # color: try exact first, then token replace
+        color = color_map.get(color, color)
+        for k, v in color_map.items():
+            color = color.replace(k, v)
+        food_map = {
+            "バジル": "Basil", "ほうれん草": "Spinach", "枝豆": "Edamame", "抹茶": "Matcha", "グリーンスムージー": "Green Smoothie",
+            "カレー": "Curry", "トマトスープ": "Tomato Soup", "唐辛子せんべい": "Chili Rice Cracker", "チリビーンズ": "Chili Beans", "生姜湯": "Ginger Tea",
+            "さつまいも": "Sweet Potato", "かぼちゃ": "Pumpkin", "雑穀ごはん": "Mixed Grains Rice", "味噌汁": "Miso Soup", "おにぎり": "Rice Ball",
+            "白身魚": "White Fish", "ヨーグルト": "Yogurt", "梨": "Pear", "ナッツ": "Nuts", "豆腐": "Tofu",
+            "わかめ": "Wakame", "しじみ汁": "Clam Soup", "寒天": "Agar Jelly", "ところてん": "Agar Noodles", "昆布だし": "Kelp Stock",
+            "季節の果物": "Seasonal Fruit", "スープ": "Soup"
+        }
+        food = food_map.get(food, food)
+        for k, v in food_map.items():
+            food = food.replace(k, v)
+        day = day_map.get(day, day)
+
     # ---- 10) 最終1行フォーマット ----
-    line = f"◆ アイテム：{item}　　◆ カラー：{color}　　◆ ナンバー：{number}　　◆ フード：{food}　　◆ デー：{day}"
+    line = (f"◆ Item: {item}   ◆ Color: {color}   ◆ Number: {number}   ◆ Food: {food}   ◆ Day: {day}" if lang == "en"
+            else f"◆ アイテム：{item}　　◆ カラー：{color}　　◆ ナンバー：{number}　　◆ フード：{food}　　◆ デー：{day}")
     return [line]
 
 
@@ -418,7 +477,7 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     iching_result = get_iching_advice(style=style, lang=lang)
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
-    raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now)
+    raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now, lang=lang)
 
 
     lucky_lines = []

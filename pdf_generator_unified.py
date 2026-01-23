@@ -17,6 +17,17 @@ def _t(lang: str, ja: str, en: str) -> str:
 def _get_lang(data: dict) -> str:
     if not isinstance(data, dict):
         return 'ja'
+
+def _normalize_text(text: str, lang: str) -> str:
+    if not text:
+        return ""
+    s = str(text)
+    if lang == "en":
+        # remove common Japanese prefixes that might leak into English mode
+        for p in ("今月は、", "来月は、", "今年は、", "今月は", "来月は", "今年は"):
+            if s.startswith(p):
+                s = s[len(p):].lstrip()
+    return s
     lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
     lang = (lang or 'ja').strip().lower()
     return 'en' if lang.startswith('en') else 'ja'
@@ -101,12 +112,23 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang: 
     - If there isn't enough space, first try a compact layout (smaller line height),
       and if still insufficient, start a new page.
     """
+    if lang == 'en':
+        bottom_margin_mm = min(bottom_margin_mm, 12)
     bottom = (bottom_margin_mm * mm)
 
     def _draw(compact: bool, y0: float) -> float:
-        title_font = 11 if compact else 12
-        body_font = 9 if compact else 10
-        line_step = (5 if compact else 6) * mm
+        if compact and lang == 'en':
+            title_font = 10
+        else:
+            title_font = 11 if compact else 12
+        if compact and lang == 'en':
+            body_font = 8
+        else:
+            body_font = 9 if compact else 10
+        if compact and lang == 'en':
+            line_step = 4.5 * mm
+        else:
+            line_step = (5 if compact else 6) * mm
 
         c.setFont(FONT_NAME, title_font)
         c.drawString(margin, y0, "■ " + _t(lang, "ラッキー情報（生年月日より）", "Lucky Info (based on birthdate)"))
