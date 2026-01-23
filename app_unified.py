@@ -892,7 +892,14 @@ def view_pdf(filename):
         wait_time += 0.5
     if not os.path.exists(full_path):
         return "PDFが見つかりませんでした", 404
-    return send_file(full_path, mimetype="application/pdf")
+    # NOTE: Avoid Gunicorn sendfile() on non-blocking sockets (can cause 520/ValueError on some hosts)
+    # Read into memory and return as a normal response.
+    with open(full_path, "rb") as f:
+        pdf_bytes = f.read()
+    resp = make_response(pdf_bytes)
+    resp.headers["Content-Type"] = "application/pdf"
+    resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+    return resp
 
 
 

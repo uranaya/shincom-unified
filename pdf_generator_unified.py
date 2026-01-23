@@ -72,34 +72,94 @@ def wrap(text, limit, lang: str | None = None):
         limit = max(int(limit * 1.8), limit + 10)
     return _wrap(s, limit, break_long_words=True, break_on_hyphens=True)
 
+def _estimate_lucky_height_mm(lucky_lines, lucky_direction: str, compact: bool = False) -> float:
+    """Rough vertical size estimate for lucky section (in mm)."""
+    line_h = 5 if compact else 6  # mm per line
+    title_h = 6  # title baseline spacing
+    gap = 2 if compact else 2
 
-def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang: str = 'ja'):
-    # lang は result_data['lang']（'ja' / 'en'）を想定。未指定時は日本語。
-    c.setFont(FONT_NAME, 12)
-    c.drawString(margin, y, "■ " + _t(lang, "ラッキー情報（生年月日より）", "Lucky Info (based on birthdate)"))
-    y -= 6 * mm
-    c.setFont(FONT_NAME, 10)
+    # lucky info title + gap
+    total = title_h + gap
 
-    # 2項目ずつ改行する形式（最大3行）
-    for i in range(0, len(lucky_lines), 2):
-        line1 = lucky_lines[i]
-        line2 = lucky_lines[i + 1] if i + 1 < len(lucky_lines) else ""
-        formatted = f"{line1:<38}    {line2}"
-        c.drawString(margin, y, formatted)
-        y -= 6 * mm
+    # lucky lines: printed 2 items per line
+    num_info_lines = max(1, (len(lucky_lines) + 1) // 2) if lucky_lines else 1
+    total += num_info_lines * line_h
 
-    if lucky_direction:
-        y -= 2 * mm
-        c.setFont(FONT_NAME, 12)
-        c.drawString(margin, y, "■ " + _t(lang, "吉方位（九星気学より）", "Lucky Directions (Kyusei Kigaku)"))
-        y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
-        for line in lucky_direction.strip().splitlines():
-            c.drawString(margin, y, line.strip())
-            y -= 6 * mm
+    if lucky_direction and lucky_direction.strip():
+        # small gap + directions title + gap
+        total += (2 if compact else 2) + title_h + gap
+        dir_lines = [ln for ln in lucky_direction.strip().splitlines() if ln.strip()]
+        total += max(1, len(dir_lines)) * line_h
 
-    return y
+    # bottom breathing room
+    total += 2
+    return total
 
+
+def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang: str = 'ja', page_height: float | None = None, bottom_margin_mm: float = 20):
+    """Draw lucky info/directions near the end of a page without cutting off.
+    - If there isn't enough space, first try a compact layout (smaller line height),
+      and if still insufficient, start a new page.
+    """
+    bottom = (bottom_margin_mm * mm)
+
+    def _draw(compact: bool, y0: float) -> float:
+        title_font = 11 if compact else 12
+        body_font = 9 if compact else 10
+        line_step = (5 if compact else 6) * mm
+
+        c.setFont(FONT_NAME, title_font)
+        c.drawString(margin, y0, "■ " + _t(lang, "ラッキー情報（生年月日より）", "Lucky Info (based on birthdate)"))
+        y0 -= line_step
+
+        c.setFont(FONT_NAME, body_font)
+
+        # 2項目ずつ1行（英語ラベルが長い場合でも横に逃がして縦を節約）
+        if not lucky_lines:
+            lucky_lines = []
+
+        for i in range(0, len(lucky_lines), 2):
+            line1 = lucky_lines[i]
+            line2 = lucky_lines[i + 1] if i + 1 < len(lucky_lines) else ""
+            # 固定幅パディングは英語で崩れやすいので、シンプル結合にする
+            formatted = (line1 + ("    " + line2 if line2 else "")).strip()
+            c.drawString(margin, y0, formatted)
+            y0 -= line_step
+
+        if lucky_direction and lucky_direction.strip():
+            y0 -= 2 * mm
+            c.setFont(FONT_NAME, title_font)
+            c.drawString(margin, y0, "■ " + _t(lang, "吉方位（九星気学より）", "Lucky Directions (Kyusei Kigaku)"))
+            y0 -= line_step
+            c.setFont(FONT_NAME, body_font)
+            for line in lucky_direction.strip().splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                c.drawString(margin, y0, line)
+                y0 -= line_step
+
+        return y0
+
+    # If page height is known, ensure the block fits.
+    if page_height is None:
+        # Fallback: just draw without pagination logic
+        return _draw(False, y)
+
+    # Try normal layout first
+    need_mm = _estimate_lucky_height_mm(lucky_lines, lucky_direction, compact=False)
+    if (y - need_mm * mm) < bottom:
+        # Try compact
+        need_mm_c = _estimate_lucky_height_mm(lucky_lines, lucky_direction, compact=True)
+        if (y - need_mm_c * mm) < bottom:
+            # New page (keep spec: no header on page2+)
+            c.showPage()
+            y = page_height - (20 * mm)
+            return _draw(False, y)
+        else:
+            return _draw(True, y)
+    else:
+        return _draw(False, y)
 
 def draw_palm_image(c, base64_image, width, y):
     try:
@@ -306,7 +366,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.setFont(FONT_NAME, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=_get_lang(data))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=_get_lang(data), page_height=height)
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
@@ -367,7 +427,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         c.setFont(FONT_NAME, 14)
 
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=_get_lang(data))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=_get_lang(data), page_height=height)
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])
@@ -494,7 +554,8 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
         c, width, margin, y,
         data.get("lucky_info", []),
         data.get("lucky_direction", ""),
-        lang=_get_lang(data)
+        lang=_get_lang(data),
+        page_height=height
     )
 
     # 年運（オプション）
