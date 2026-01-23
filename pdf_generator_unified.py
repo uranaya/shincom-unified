@@ -115,12 +115,11 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang: 
         c.setFont(FONT_NAME, body_font)
 
         # 2項目ずつ1行（英語ラベルが長い場合でも横に逃がして縦を節約）
-        if not lucky_lines:
-            lucky_lines = []
+        _lucky_lines = lucky_lines or []
 
-        for i in range(0, len(lucky_lines), 2):
-            line1 = lucky_lines[i]
-            line2 = lucky_lines[i + 1] if i + 1 < len(lucky_lines) else ""
+        for i in range(0, len(_lucky_lines), 2):
+            line1 = _lucky_lines[i]
+            line2 = _lucky_lines[i + 1] if i + 1 < len(_lucky_lines) else ""
             # 固定幅パディングは英語で崩れやすいので、シンプル結合にする
             formatted = (line1 + ("    " + line2 if line2 else "")).strip()
             c.drawString(margin, y0, formatted)
