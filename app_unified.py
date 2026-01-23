@@ -883,25 +883,73 @@ def preview(filename):
 
 
 import time
+from flask import Response
+
 @app.route('/view/<filename>')
 def view_pdf(filename):
     full_path = os.path.join(UPLOAD_FOLDER, filename)
-    wait_time = 0
-    while not os.path.exists(full_path) and wait_time < 5:
+
+    # Wait briefly for async generation
+    wait_time = 0.0
+    while not os.path.exists(full_path) and wait_time < 5.0:
         time.sleep(0.5)
         wait_time += 0.5
+
     if not os.path.exists(full_path):
         return "PDFが見つかりませんでした", 404
-    # NOTE: Avoid Gunicorn sendfile() on non-blocking sockets (can cause 520/ValueError on some hosts)
-    # Read into memory and return as a normal response.
-    with open(full_path, "rb") as f:
-        pdf_bytes = f.read()
-    resp = make_response(pdf_bytes)
-    resp.headers["Content-Type"] = "application/pdf"
+
+    file_size = os.path.getsize(full_path)
+    range_header = request.headers.get("Range")
+
+    # ---- Range support (important for Chrome/Edge PDF viewer stability) ----
+    # Example: "Range: bytes=0-1023"
+    if range_header and range_header.startswith("bytes="):
+        try:
+            byte_range = range_header.replace("bytes=", "").strip()
+            start_s, end_s = byte_range.split("-", 1)
+            start = int(start_s) if start_s else 0
+            end = int(end_s) if end_s else (file_size - 1)
+            if start < 0:
+                start = 0
+            if end >= file_size:
+                end = file_size - 1
+            if end < start:
+                end = start
+
+            length = end - start + 1
+            with open(full_path, "rb") as f:
+                f.seek(start)
+                data = f.read(length)
+
+            resp = Response(data, status=206, mimetype="application/pdf")
+            resp.headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+            resp.headers["Accept-Ranges"] = "bytes"
+            resp.headers["Content-Length"] = str(len(data))
+            resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+            # Avoid buggy keep-alive edge cases observed on some hosts
+            resp.headers["Connection"] = "close"
+            resp.headers["Cache-Control"] = "no-store"
+            return resp
+        except Exception:
+            # Fall back to full response if Range parsing fails
+            pass
+
+    # ---- Stream full file in chunks (avoid gunicorn sendfile & large single writes) ----
+    def generate():
+        with open(full_path, "rb") as f:
+            while True:
+                chunk = f.read(64 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+
+    resp = Response(generate(), mimetype="application/pdf")
     resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+    resp.headers["Accept-Ranges"] = "bytes"
+    resp.headers["Content-Length"] = str(file_size)
+    resp.headers["Connection"] = "close"
+    resp.headers["Cache-Control"] = "no-store"
     return resp
-
-
 
 @app.route("/view_shop_log")
 def view_shop_log():
