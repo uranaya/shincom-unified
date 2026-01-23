@@ -758,7 +758,6 @@ def selfmob_uuid(uuid_str):
                 },
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
-                "lang": output_lang,
                 "birthdate": birthdate,
                 "palm_result": palm_result,
                 "shichu_result": shichu_result,
@@ -1086,7 +1085,6 @@ def ten_shincom():
                 },
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
-                "lang": output_lang,
                 "birthdate": birthdate,
                 "zodiac": zodiac,
                 "eto": eto,
@@ -1096,7 +1094,9 @@ def ten_shincom():
                 "palm_result": "\n".join(palm_texts),
                 "shichu_result": shichu_result,
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
-                "palm_image": image_data
+                "palm_image": image_data,
+                "lang": output_lang,
+                "style": style_mode
             }
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, now, force_next_month=force_next_month)

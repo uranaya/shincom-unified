@@ -17,17 +17,6 @@ def _t(lang: str, ja: str, en: str) -> str:
 def _get_lang(data: dict) -> str:
     if not isinstance(data, dict):
         return 'ja'
-
-def _normalize_text(text: str, lang: str) -> str:
-    if not text:
-        return ""
-    s = str(text)
-    if lang == "en":
-        # remove common Japanese prefixes that might leak into English mode
-        for p in ("今月は、", "来月は、", "今年は、", "今月は", "来月は", "今年は"):
-            if s.startswith(p):
-                s = s[len(p):].lstrip()
-    return s
     lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
     lang = (lang or 'ja').strip().lower()
     return 'en' if lang.startswith('en') else 'ja'
@@ -112,23 +101,12 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang: 
     - If there isn't enough space, first try a compact layout (smaller line height),
       and if still insufficient, start a new page.
     """
-    if lang == 'en':
-        bottom_margin_mm = min(bottom_margin_mm, 12)
     bottom = (bottom_margin_mm * mm)
 
     def _draw(compact: bool, y0: float) -> float:
-        if compact and lang == 'en':
-            title_font = 10
-        else:
-            title_font = 11 if compact else 12
-        if compact and lang == 'en':
-            body_font = 8
-        else:
-            body_font = 9 if compact else 10
-        if compact and lang == 'en':
-            line_step = 4.5 * mm
-        else:
-            line_step = (5 if compact else 6) * mm
+        title_font = 11 if compact else 12
+        body_font = 9 if compact else 10
+        line_step = (5 if compact else 6) * mm
 
         c.setFont(FONT_NAME, title_font)
         c.drawString(margin, y0, "■ " + _t(lang, "ラッキー情報（生年月日より）", "Lucky Info (based on birthdate)"))
@@ -363,8 +341,26 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.setFont(FONT_NAME, 12)
 
     # 四柱推命・まとめ等（タイトルのみでも出す）
+    # ENは文章が長くなりやすいので、2ページ目の末尾に「ラッキー情報」を収めるために
+    # ここで行数を制限し、必要なら末尾を省略します（他モードには影響しない）。
+    caps_en = {
+        'palm_summary': 5,
+        'personality': 6,
+        'year_fortune': 6,
+        'month_fortune': 5,
+        'next_month_fortune': 5,
+    }
+    leading = 6 * mm
+    wrap_base = 40
+    if lang == 'en':
+        # 英語はより詰める
+        body_font_size = 9
+        wrap_base = 52
+        leading = 5.2 * mm
+    else:
+        body_font_size = 10
+
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
-        wrap_len = 36 if 'month' in key else 40
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
 
@@ -372,21 +368,40 @@ def draw_shincom_a4(c, data, include_yearly=False):
         if key in ('month_fortune', 'next_month_fortune'):
             kind = 'month' if key == 'month_fortune' else 'next'
             content = _normalize_month_fortune_text(content, kind, lang)
-            if lang == 'en':
-                wrap_len += 6
 
+        # Wrap length
+        wrap_len = wrap_base
+        if lang != 'en':
+            wrap_len = 36 if 'month' in key else 40
+
+        # Title
+        c.setFont(FONT_NAME, 12)
         if title:
             c.drawString(margin, y, f"◆ {title}")
             y -= 6 * mm
-        c.setFont(FONT_NAME, 10)
-        if content:
-            for line in wrap(content, wrap_len):
-                c.drawString(margin, y, line)
-                y -= 6 * mm
-        y -= 3 * mm
-        c.setFont(FONT_NAME, 12)
 
-    # ラッキー情報を2ページ目末尾に移動
+        # Body
+        c.setFont(FONT_NAME, body_font_size)
+        if content:
+            lines = wrap(content, wrap_len)
+            if lang == 'en':
+                # Hard cap per section to keep lucky info on page 2
+                cap = caps_en.get(key, 6)
+                if len(lines) > cap:
+                    lines = lines[:cap]
+                    # add ellipsis to last line if space
+                    if lines:
+                        if len(lines[-1]) > 3:
+                            lines[-1] = lines[-1].rstrip() + "..."
+                        else:
+                            lines[-1] = "..."
+            for line in lines:
+                c.drawString(margin, y, line)
+                y -= leading
+
+        # spacing between sections
+        y -= 2.5 * mm
+
     y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=_get_lang(data), page_height=height)
 
     if include_yearly:
