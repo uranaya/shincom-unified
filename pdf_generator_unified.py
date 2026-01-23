@@ -63,8 +63,14 @@ FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
 
-def wrap(text, limit):
-    return _wrap(text, limit)
+def wrap(text, limit, lang: str | None = None):
+    s = '' if text is None else str(text)
+    # For English output, character-count wrapping becomes too narrow in the PDF. 
+    # Expand the wrap limit to approximate the same visual width as Japanese.
+    _lang = (lang or ('en' if re.search(r'[A-Za-z]', s) and ' ' in s else 'ja'))
+    if _lang.startswith('en'):
+        limit = max(int(limit * 1.8), limit + 10)
+    return _wrap(s, limit, break_long_words=True, break_on_hyphens=True)
 
 
 def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang: str = 'ja'):

@@ -1001,8 +1001,16 @@ def ten_shincom():
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
             force_next_month = data.get("force_next_month", False) if is_json else (data.get("force_next_month") == "yes")
-            tokyo_mode = data.get("tokyo_mode", False) if is_json else (data.get("tokyo_mode") == "yes")
+            tokyo_mode = data.get("tokyo_mode", False) if is_json else (data.get("tokyo_mode") in ("yes","on","true","1"))
+            if not is_json and (data.get("tokyo") in ("yes","on","true","1")):
+                tokyo_mode = True
             output_lang = (data.get("output_lang") or "ja") if is_json else ((data.get("output_lang") or "").strip() or "ja")
+            # Support checkbox-style language toggle (e.g., <input name="lang_en" type="checkbox">)
+            if not is_json and (data.get("lang_en") in ("on", "yes", "true", "1")):
+                output_lang = "en"
+            if not is_json and (data.get("output_lang") in ("on", "yes") ) and (data.get("lang_en") is None):
+                # backward compatibility if checkbox named output_lang was used
+                output_lang = "en"
             if output_lang not in ("ja", "en"):
                 output_lang = "ja"
             style_mode = "tokyo" if tokyo_mode else "default"
@@ -2091,5 +2099,4 @@ def admin_sales_add_missing():
 @app.route('/selfmob/google808abc9a83ba5e55.html')
 def google_verification_file():
     return send_from_directory('static', 'google808abc9a83ba5e55.html')
-
 
