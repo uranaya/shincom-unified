@@ -4,7 +4,6 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.pdfmetrics import stringWidth
 from textwrap import wrap
 import base64
 import io
@@ -42,7 +41,7 @@ def wrap(text, limit):
     return _wrap(text, limit)
 
 
-def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang: str = 'ja'):
+def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
     c.setFont(FONT_NAME, 12)
     c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
     y -= 6 * mm
@@ -266,7 +265,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.setFont(FONT_NAME, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=data.get('lang','ja'))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
@@ -319,7 +318,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         c.setFont(FONT_NAME, 14)
 
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=data.get('lang','ja'))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])

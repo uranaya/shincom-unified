@@ -23,7 +23,7 @@ def create_qr_code(url, path="qr_uranaya.png"):
         img.save(path)
     return path
 
-def draw_header(c, width, margin, y_pos, font=FONT_NAME, lang='ja'):
+def draw_header(c, width, margin, y_pos, font=FONT_NAME):
     """
     Draw the common header (QR code advertisement block) at the given y position.
     Returns the updated y position after drawing the header.
@@ -34,23 +34,13 @@ def draw_header(c, width, margin, y_pos, font=FONT_NAME, lang='ja'):
         c.drawImage(qr_ad_path, width - margin - 30 * mm, y_pos - 30 * mm, width=30 * mm, height=30 * mm)
         ad_text = c.beginText(margin, y_pos - 10)
         ad_text.setFont(font, 11)
-        if lang == "en":
-            ad_text.textLine("────────── Shin Computer Fortune ──────────")
-            ad_text.textLine("[Supervised by URANAYA Fortune House]")
-            ad_text.textLine("Your future can change with your actions.")
-            ad_text.textLine("For deeper guidance or personal concerns,")
-            ad_text.textLine("we also offer in-person, phone, and online sessions.")
-            ad_text.textLine("More details here →")
-            ad_text.textLine("──────────────────────────────────────────")
-        else:
-            ad_text.textLine("───────── シン・コンピューター占い ────────────")
-            ad_text.textLine("【占いの館・占い師「うらなや」監修】")
-            ad_text.textLine("未来はあなたの行動で変化していきます")
-            ad_text.textLine("より詳しく占いたい方、個人的な悩みは")
-            ad_text.textLine("「対面鑑定」「電話鑑定」「オンライン鑑定」も可能です。")
-            ad_text.textLine("詳しくはこちらから →")
-            ad_text.textLine("──────────────────────────────────")
-
+        ad_text.textLine("───────── シン・コンピューター占い ────────────")
+        ad_text.textLine("【占いの館・占い師「うらなや」監修】")
+        ad_text.textLine("未来はあなたの行動で変化していきます")
+        ad_text.textLine("より詳しく占いたい方、個人的な悩みは")
+        ad_text.textLine("「対面鑑定」「電話鑑定」「オンライン鑑定」も可能です。")
+        ad_text.textLine("詳しくはこちらから →")
+        ad_text.textLine("──────────────────────────────────")
         c.drawText(ad_text)
         # Adjust y position after header
         y_pos -= 50 * mm

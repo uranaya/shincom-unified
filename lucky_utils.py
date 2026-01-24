@@ -10,77 +10,57 @@ from reportlab.lib.units import mm
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-
-def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str='ja', **kwargs):
-    """Return lucky info as a *single-line* string list (length 1).
-    For English output, labels are in English and the content is constrained to one line.
+def generate_lucky_info(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result_raw: str, kyusei_text: str, lang: str = 'ja'):
     """
-    lang = (lang or 'ja').lower()
-    if lang.startswith('en'):
-        prompt = f"""You are a fortune-telling advisor.
-The customer is {age} years old. Use the following reading notes as reference.
+    Returns a list of short lines for the "Lucky" section.
+    lang: 'ja' or 'en'
+    """
+    lang_instruction = "\n\nWrite in English." if lang == 'en' else ""
+    prompt = f"""
+あなたは占いコンテンツ制作者です。
+次の情報を参考に「ラッキー情報」を短い箇条書きで作ってください。
+（日柱名や占い専門用語は出さず、現実に使える内容にしてください）
 
-[Palm]
-{palm_result}
+- 日柱（内部用）: {nicchu_eto}
+- 生年月日: {birthdate}
+- 年齢: {age}
+- 手相要約: {palm_result}
+- 四柱推命要約: {shichu_result_raw}
+- 九星気学: {kyusei_text}
 
-[Four Pillars summary]
-{shichu_result}
+出力形式（各項目1行、合計5行以内、短く）：
+◆ ラッキーアイテム：...
+◆ ラッキーカラー：...
+◆ ラッキーフード：...
+◆ ラッキースポット：...
+◆ ラッキーナンバー：...
+""" + lang_instruction
 
-[Nine-Star directions]
-{kyusei_text}
+    text = _ask_openai(prompt)
+    # normalize to lines
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    # keep at most 5
+    lines = lines[:5]
 
-Output EXACTLY ONE LINE in this format (no extra text, no line breaks):
-◆ Item: XX  ◆ Color: XX  ◆ Number: XX  ◆ Food: XX  ◆ Day: (Mon/Tue/Wed/Thu/Fri/Sat/Sun)
+    # If English, ensure prefixes are English for consistency
+    if lang == 'en':
+        mapped = []
+        for ln in lines:
+            ln = ln.lstrip("◆").strip()
+            # basic replacements
+            ln = ln.replace("ラッキーアイテム", "Lucky item").replace("ラッキーカラー", "Lucky color")                    .replace("ラッキーフード", "Lucky food").replace("ラッキースポット", "Lucky spot")                    .replace("ラッキーナンバー", "Lucky number")
+            # Ensure colon
+            if ":" not in ln:
+                ln = ln.replace("：", ":")
+            if not ln.startswith("Lucky"):
+                # fallback
+                ln = "Lucky: " + ln
+            mapped.append("◆ " + ln)
+        lines = mapped
 
-Rules:
-- Must start with '◆'
-- ONE LINE ONLY (no newline)
-- Keep each value short (a word or a few words)
-- No explanations, no reasons, no additional sentences
-"""
-    else:
-        prompt = f"""あなたは占いの専門家です。
-相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
+    return lines
 
-【手相】
-{palm_result}
-
-【四柱推命】
-{shichu_result}
-
-【九星気学の方位】
-{kyusei_text}
-
-以下5つの項目を、すべて1行にまとめて簡潔に出力してください：
-
-◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日
-
-- 「◆」で始める
-- 出力は1行だけにする
-- 各項目は短く（単語～数語）
-- 補足説明・理由・語り・改行は一切禁止
-- 他の文や文章は禁止（この形式のみで返答すること）
-"""
-
-    try:
-        response = openai.ChatCompletion.create(
-            model=os.getenv("OPENAI_LUCKY_MODEL", "gpt-4o-mini"),
-            messages=[
-                {"role": "system", "content": "Return exactly one line in the required format. No extra text." if lang.startswith('en') else "指定フォーマットの1行のみ返してください。"},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.4
-        )
-        one_line = response["choices"][0]["message"]["content"].strip().replace("\\n", " ").strip()
-        return [one_line]
-    except Exception as e:
-        print("❌ ラッキー情報取得失敗:", e)
-        return ["◆ Item: -  ◆ Color: -  ◆ Number: -  ◆ Food: -  ◆ Day: -" if lang.startswith('en') else "◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
-
-
-
-
-def generate_lucky_direction(birthdate: str, today: datetime.date, lang: str = "ja") -> str:
+def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
     """
     九星気学に基づく吉方位テキストを生成する。
     today の「20日以降」は翌月を「今月」とみなして計算する。
@@ -116,7 +96,7 @@ def generate_lucky_direction(birthdate: str, today: datetime.date, lang: str = "
     good_dir_now = dir_now.get("good", "不明")
     good_dir_next = dir_next.get("good", "不明")
 
-    return (f"Luckiest directions: Year {base.year}: {good_dir_year}; This month: {good_dir_now}; Next month: {good_dir_next}." if (lang or "ja").lower().startswith("en") else f"{base.year}年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。")
+    return f"{base.year}年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。"
 
 
 
@@ -224,8 +204,8 @@ def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_
         lines = response["choices"][0]["message"]["content"].strip().splitlines()
         lucky_lines = []
         for line in lines:
-            if ("：" in line) or (":" in line):
-                label, value = (line.split("：",1) if "：" in line else line.split(":",1))
+            if "：" in line:
+                label, value = line.split("：", 1)
                 label = label.replace("・", "").strip()
                 value = value.strip().split("（")[0]
                 lucky_lines.append(f"{label}：{value}")  # 「◆」は付けない
