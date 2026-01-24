@@ -729,6 +729,7 @@ def selfmob_uuid(uuid_str):
             target2 = target1 + relativedelta(months=1)
 
             result_data = {
+        'lang': output_lang,
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
@@ -818,6 +819,7 @@ def renaiselfmob_uuid(uuid_str):
             raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
 
             result_data = {
+        'lang': output_lang,
                 "texts": {
                     "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
                     "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),
@@ -1028,6 +1030,7 @@ def ten_shincom():
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
             result_data = {
+        'lang': output_lang,
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
@@ -1104,6 +1107,7 @@ def renai():
         raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
 
         result_data = {
+        'lang': output_lang,
             "texts": {
                 "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
                 "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),
