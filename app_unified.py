@@ -729,7 +729,6 @@ def selfmob_uuid(uuid_str):
             target2 = target1 + relativedelta(months=1)
 
             result_data = {
-        'lang': output_lang,
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
@@ -738,6 +737,7 @@ def selfmob_uuid(uuid_str):
                     "year_fortune": f"{today.year}年の運勢",
                     "month_fortune": f"{target1.year}年{target1.month}月の運勢",
                     "next_month_fortune": f"{target2.year}年{target2.month}月の運勢",
+            'lang': output_lang,
                 },
                 "texts": {
                     "palm_summary": summary_text,
@@ -819,7 +819,6 @@ def renaiselfmob_uuid(uuid_str):
             raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
 
             result_data = {
-        'lang': output_lang,
                 "texts": {
                     "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
                     "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),
@@ -993,6 +992,15 @@ def ten_shincom():
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
             force_next_month = data.get("force_next_month", False) if is_json else (data.get("force_next_month") == "yes")
 
+            output_lang = (data.get('output_lang') or data.get('lang') or '').strip()
+            if not output_lang:
+                # checkbox name variants
+                en_flag = data.get('english') or data.get('english_output') or data.get('output_en')
+                if is_json:
+                    output_lang = 'en' if bool(en_flag) else 'ja'
+                else:
+                    output_lang = 'en' if (en_flag in ('yes','on','true','1')) else 'ja'
+
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
@@ -1015,10 +1023,7 @@ def ten_shincom():
                 print("❌ 本命星取得エラー:", e)
                 honmeisei = ""
             now = datetime.now()
-            # Output options (safe defaults if the form does not provide them))
-            output_lang = "en" if (request.form.get("english_output") or request.form.get("lang") == "en") else "ja"
-            style_mode = "tokyo" if (request.form.get("tokyo_mode") or request.form.get("style") == "tokyo") else "normal"
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month, style=style_mode, lang=output_lang)
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month, lang=output_lang)
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()
@@ -1030,7 +1035,6 @@ def ten_shincom():
             month_label = f"{target1.year}年{target1.month}月の運勢"
             next_month_label = f"{target2.year}年{target2.month}月の運勢"
             result_data = {
-        'lang': output_lang,
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
@@ -1061,7 +1065,7 @@ def ten_shincom():
                 "palm_image": image_data
             }
             if full_year:
-                yearly_data = generate_yearly_fortune(birthdate, now, force_next_month=force_next_month)
+                yearly_data = generate_yearly_fortune(birthdate, now, force_next_month=force_next_month, lang=output_lang)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
@@ -1107,7 +1111,6 @@ def renai():
         raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
 
         result_data = {
-        'lang': output_lang,
             "texts": {
                 "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
                 "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),

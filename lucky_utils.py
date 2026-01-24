@@ -1,90 +1,198 @@
-import os
-import json
-from typing import List
-
+import datetime
+from dateutil.relativedelta import relativedelta   # ★ この行を追加
+from kyusei_utils import get_honmeisei, get_directions
 import openai
+import os
+from reportlab.lib.units import mm
 
 
-def _call_chat(system: str, user: str, model: str = None, temperature: float = 0.7) -> str:
-    model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    resp = openai.ChatCompletion.create(
-        model=model,
-        temperature=temperature,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-    )
-    return resp["choices"][0]["message"]["content"].strip()
+# ✅ APIキーの指定（必須）
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-def generate_lucky_info(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result_raw: str, kyusei_text: str, lang: str = "ja") -> List[str]:
-    lang = (lang or "ja").lower()
+def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str='ja', **kwargs):
+    prompt = f"""あなたは占いの専門家です。
+相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
 
-    if lang.startswith("en"):
-        system = "You are a helpful fortune-telling assistant. Produce concise, friendly, practical suggestions."
-        user = f"""Create 5 short 'Lucky Info' lines in ENGLISH.
+【手相】\n{palm_result}\n
+【四柱推命】\n{shichu_result}\n
+【九星気学の方位】\n{kyusei_text}
 
-Rules:
-- Output JSON array only (no markdown).
-- Keep each line short (ideally <= 40 characters).
-- Topics (in order): lucky item, lucky color, lucky number, lucky food/drink, lucky action.
-- Do NOT include Japanese.
+以下5つの項目を、すべて1行にまとめて簡潔に出力してください：
 
-Inputs:
-Birthdate: {birthdate} (age {age})
-Palm summary: {palm_result}
-Shichu summary: {shichu_result_raw}
-Kyusei: {kyusei_text}
-"""
-    else:
-        system = "あなたは占い師アシスタントです。短く読みやすい開運情報を作ります。"
-        user = f"""次の入力を参考に「ラッキー情報」を5行、日本語で作ってください。
+◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日
 
-ルール：
-- JSON配列のみ（markdown禁止）
-- 1行は短く（目安：全角18〜22文字程度）
-- テーマ（順番）：ラッキーアイテム、ラッキーカラー、ラッキーナンバー、ラッキーフード/ドリンク、ラッキーアクション
-
-入力：
-生年月日: {birthdate}（{age}歳）
-手相要約: {palm_result}
-四柱推命要約: {shichu_result_raw}
-九星: {kyusei_text}
+- 「◆」で始める
+- 出力は1行だけにする
+- 各項目は短く（単語～数語）
+- 補足説明・理由・語り・改行は一切禁止
+- 他の文や文章は禁止（この形式のみで返答すること）
 """
 
-    txt = _call_chat(system, user, temperature=0.6)
     try:
-        arr = json.loads(txt)
-        if isinstance(arr, list):
-            return [str(x) for x in arr][:5]
-    except Exception:
-        pass
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.6
+        )
+        return [response["choices"][0]["message"]["content"].strip()]
+    except Exception as e:
+        print("❌ ラッキー情報取得失敗:", e)
+        return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
 
-    # fallback
-    lines = [x.strip(" -•　") for x in txt.splitlines() if x.strip()]
-    return lines[:5]
+
+def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
+    """
+    九星気学に基づく吉方位テキストを生成する。
+    today の「20日以降」は翌月を「今月」とみなして計算する。
+    """
+    # 生年月日のパース
+    try:
+        bd = (
+            birthdate
+            if isinstance(birthdate, datetime.date)
+            else datetime.datetime.strptime(birthdate, "%Y-%m-%d").date()
+        )
+    except Exception as e:
+        print("⚠️ generate_lucky_direction birthdate parse error:", e)
+        bd = today if isinstance(today, datetime.date) else datetime.date.today()
+
+    # today を date 型に正規化
+    base = today.date() if isinstance(today, datetime.datetime) else today
+
+    # 20日以降は翌月ベース
+    if base.day >= 20:
+        base = base + relativedelta(months=1)
+
+    # 本命星を取得
+    honmeisei = get_honmeisei(bd.year, bd.month, bd.day)
+
+    # 年盤（base.year）、今月（base.month）、来月（base.month+1）
+    dir_year = get_directions(base.year, 0, honmeisei)
+    dir_now = get_directions(base.year, base.month, honmeisei)
+    next_month_date = base + relativedelta(months=1)
+    dir_next = get_directions(next_month_date.year, next_month_date.month, honmeisei)
+
+    good_dir_year = dir_year.get("good", "不明")
+    good_dir_now = dir_now.get("good", "不明")
+    good_dir_next = dir_next.get("good", "不明")
+
+    return f"{base.year}年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。"
 
 
-def generate_lucky_direction(birthdate: str, kyusei_text: str, now_ym: str, lang: str = "ja") -> str:
-    lang = (lang or "ja").lower()
 
-    if lang.startswith("en"):
-        system = "You are a helpful fortune-telling assistant."
-        user = f"""Write ONE short 'Lucky Direction' sentence in ENGLISH (max ~120 chars).
-
-Inputs:
-Birthdate: {birthdate}
-Kyusei: {kyusei_text}
-Period: {now_ym}
-"""
+def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction, font_name="IPAexGothic"):
+    """
+    Draw the Lucky Info section (lucky items and lucky direction) at the current y position.
+    Returns the updated y position.
+    """
+    # Section header
+    c.setFont(font_name, 12)
+    c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
+    y -= 8 * mm
+    c.setFont(font_name, 10)
+    # Lucky items (two-column layout)
+    if lucky_info:
+        col_width = (width - 2 * margin) / 2
+        x1 = margin + 10
+        x2 = margin + 10 + col_width
+        col = 0
+        for i, item in enumerate(lucky_info):
+            if "：" in item:
+                label, value = item.split("：", 1)
+                label = label.replace("ラッキー", "").strip()
+                item = f"{label}：{value.strip()}"
+            x = x1 if col == 0 else x2
+            c.drawString(x, y, item)
+            if col == 1:
+                y -= 6 * mm
+            col = (col + 1) % 2
+        if col == 1:
+            y -= 6 * mm
     else:
-        system = "あなたは占い師アシスタントです。吉方位を短くまとめます。"
-        user = f"""次の入力を参考に、吉方位を短く1〜2文で日本語出力してください（長文禁止）。
+        c.drawString(margin + 10, y, "情報が取得できませんでした。")
+        y -= 6 * mm
 
-生年月日: {birthdate}
-九星: {kyusei_text}
-対象: {now_ym}
+    # Lucky direction (Nine-Star Ki) lines
+    if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
+        for line in lucky_direction.strip().splitlines():
+            c.drawString(margin + 10, y, line.strip())
+            y -= 6 * mm
+    else:
+        c.drawString(margin + 10, y, "情報未取得")
+        y -= 6 * mm
+
+    return y - 10 * mm
+
+    if lucky_info:
+        for item in lucky_info:
+            if item and isinstance(item, str):
+                from textwrap import wrap
+                for line in wrap(item.strip(), 40):
+                    c.drawString(margin + 10, y, line)
+                    y -= 6 * mm
+    else:
+        c.drawString(margin + 10, y, "情報が取得できませんでした。")
+        y -= 6 * mm
+
+    y -= 4 * mm
+
+    if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
+        c.drawString(margin, y, "■ 吉方位（九星気学より）")
+        y -= 6 * mm
+        from textwrap import wrap
+        for line in wrap(lucky_direction.strip(), 42):
+            c.drawString(margin + 10, y, line)
+            y -= 6 * mm
+    else:
+        c.drawString(margin, y, "■ 吉方位（九星気学より）情報未取得")
+        y -= 6 * mm
+
+    return y - 10 * mm
+
+
+# 🆕 恋愛専用：手相なしの簡易版ラッキー情報
+def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_text):
+    prompt = f"""あなたは占いの専門家です。
+相談者は現在{age}歳です。以下の2つの鑑定結果を参考にしてください。
+
+【四柱推命】\n{shichu_result}\n
+【九星気学の方位】\n{kyusei_text}
+
+この内容を元に、相談者にとって今最も恋愛運を高めるための
+ラッキーアイテム・ラッキーカラー・ラッキーナンバー・ラッキーフード・ラッキーデー
+をそれぞれ1つずつ、以下の形式で簡潔に提案してください：
+
+・アイテム：〇〇  
+・カラー：〇〇  
+・ナンバー：〇〇  
+・フード：〇〇  
+・デー：〇曜日
+
+※以下の条件を厳守してください：
+- 各項目は1行で記述
+- 解説や補足、象徴、理由付けは禁止
+- 装飾語は不要（例：「共感力を象徴する」などはNG）
+- 出力は上記5行のみに限定
 """
 
-    return _call_chat(system, user, temperature=0.5)
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        lines = response["choices"][0]["message"]["content"].strip().splitlines()
+        lucky_lines = []
+        for line in lines:
+            if ("：" in line) or (":" in line):
+                label, value = (line.split("：",1) if "：" in line else line.split(":",1))
+                label = label.replace("・", "").strip()
+                value = value.strip().split("（")[0]
+                lucky_lines.append(f"{label}：{value}")  # 「◆」は付けない
+            if len(lucky_lines) == 5:
+                break
+        return lucky_lines
+    except Exception as e:
+        print("❌ 恋愛ラッキー情報取得失敗:", e)
+        return ["アイテム：ー", "カラー：ー", "ナンバー：ー", "フード：ー", "デー：ー"]
