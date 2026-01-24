@@ -29,95 +29,58 @@ def _ask_openai(prompt: str, retries=3, delay=2) -> str:
     return "取得に失敗しました（OpenAI APIエラー）"
 
 
-def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bool = False, style: str = 'default', lang: str = 'ja', **kwargs):
-    nicchu = get_nicchu_eto(user_birth)
-    born = datetime.strptime(user_birth, "%Y-%m-%d")
-    honmeisei = get_honmeisei(born.year, born.month, born.day)
+def generate_yearly_fortune(birthdate: str, now=None, lang: str = 'ja', style: str = 'normal'):
+    """Generate 12-month fortunes. Returns list[str] of length 12."""
+    if now is None:
+        now = datetime.datetime.now()
 
-    # ★ 20日境の基準月 base
-    base = now.replace(day=15)
-    if now.day >= 20 or force_next_month:
-        base += relativedelta(months=1)
+    year = now.year
+    months = [f"{year}-{m:02d}" for m in range(1, 13)]
 
-    # 年ラベルは基準月の年
-    target_year = base.year
+    style_note = ""
+    if style == "tokyo":
+        style_note = ("Use a bright, uplifting tone suitable for Tokyo/Asakusa visitors. "
+                      "At most one short Asakusa-flavored phrase in the entire output."
+                      if (lang or 'ja').lower().startswith('en') else
+                      "東京（浅草）向け：明るく前向き。浅草要素は全体で一言程度に留める。")
 
-    # Year fortune prompt
-    tsuhen_year = get_tsuhensei_for_year(user_birth, target_year)
-    if (lang or "ja").lower().startswith("en"):
-        prompt_year = f"""
-You are a fortune advisor.
-Based on the following information, write a concise annual overview for {target_year} in natural English.
+    if (lang or 'ja').lower().startswith('en'):
+        prompt = """You create a 12-month fortune for a customer.
+Return ONLY valid JSON with key 'months' whose value is an array of 12 strings.
+Each string must be 2-4 sentences, practical and encouraging, no scary wording.
+Do NOT mention zodiac stem/branch names.
 
-- Day pillar (for internal reference): {nicchu}
-- Key theme (tsuhensei): {tsuhen_year}
-
-Rules:
-- Do NOT mention Japanese fortune-telling terms (e.g., tsuhensei names) or zodiac names; translate meanings into plain words
-- About 120 words max
-- Positive, actionable, and easy to understand
-""".strip()
+Input:
+- Birthdate: {birthdate}
+- Target year: {year}
+- Months: {months}
+Style note: {style_note}
+""".format(birthdate=birthdate, year=year, months=", ".join(months), style_note=style_note)
     else:
-        prompt_year = f"""
-あなたは開運アドバイザーです。
-以下の情報をもとに、{target_year}年における「あなた」の全体運を自然な日本語で表現してください。
+        prompt = """あなたは占い文章の作成者です。
+次の条件で「1年分（12か月）」の運勢を作ってください。
 
-- 日柱: {nicchu}
-- 通変星: {tsuhen_year}
+【出力】JSONのみ。キーは months。値は12個の文字列配列。
+各月は2〜4文で、前向きで実用的に。脅す表現や断定は避ける。
+干支名（例：甲子など）は本文に出さない。
 
-条件：
-- 占い用語（例：比肩、印綬など）や干支名は使わず、
-  意味に沿ってやさしい言葉に置き換えてください
-- 約120文字以内
-- 前向きで、行動や考え方の指針になるように
-- 読んだ人が「なるほど」と感じるように
-""".strip()
-    year_fortune = _ask_openai(prompt_year)
+【入力】
+生年月日: {birthdate}
+対象年: {year}
+月: {months}
 
-    # ★ 基準月 base から 12か月分
-    month_fortunes = []
-    for i in range(12):
-        target = base + relativedelta(months=i)
-        y, m = target.year, target.month
-        tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
-        dirs = get_directions(y, m, honmeisei)
+スタイル: {style_note}
+""".format(birthdate=birthdate, year=year, months=", ".join(months), style_note=style_note)
 
-        if (lang or "ja").lower().startswith("en"):
-            prompt_month = f"""
-You are a professional fortune advisor.
-Based on the following information, write a concise monthly outlook for {y}-{m:02d} in natural English.
-
-- Day pillar (internal reference): {nicchu}
-- Key theme: {tsuhen_month}
-- Directions (reference): {dirs}
-
-Rules:
-- Do NOT mention Japanese fortune terms or zodiac names; rewrite as plain guidance
-- About 120 words max
-- Keep it encouraging and practical
-""".strip()
-        else:
-            prompt_month = f"""
-あなたは占いの専門家です。
-以下の情報をもとに、{y}年{m}月の運気を自然な日本語で約120文字以内にまとめてください。
-
-- 日柱: {nicchu}
-- 月の通変星: {tsuhen_month}
-
-条件：
-- 占い専門用語は使わず意味をやさしく表現
-- 主語は「あなた」
-- 月ごとに変化を出す（行動・感情・周囲との関係など）
-- 現実的でポジティブな内容
-""".strip()
-        text = _ask_openai(prompt_month)
-        month_fortunes.append({
-            "label": f"{y}年{m}月の運勢",
-            "text": text
-        })
-
-    return {
-        "year_label": f"{target_year}年の総合運",
-        "year_text": year_fortune,
-        "months": month_fortunes
-    }
+    data = _ask_openai(prompt)
+    result = data.get("months") if isinstance(data, dict) else None
+    if not isinstance(result, list):
+        # Fallback: return empty list with 12 slots to keep PDF stable
+        return ["" for _ in range(12)]
+    # normalize to 12
+    out = [(str(x) if x is not None else "").strip() for x in result]
+    if len(out) < 12:
+        out += [""] * (12 - len(out))
+    elif len(out) > 12:
+        out = out[:12]
+    return out

@@ -10,53 +10,71 @@ from reportlab.lib.units import mm
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str = 'ja'):
-    prompt = f"""あなたは占いの専門家です。
-相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
+def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text, lang: str = 'ja'):
+    """Generate 5-line lucky info (items/colors/etc). Returns a list[str] lines."""
+    client = OpenAI(api_key=OPENAI_API_KEY)
 
-【手相】\n{palm_result}\n
-【四柱推命】\n{shichu_result}\n
-【九星気学の方位】\n{kyusei_text}
+    if (lang or 'ja').lower().startswith('en'):
+        prompt = f"""Create a short 'Lucky Info' section for a fortune-telling PDF.
+Return EXACTLY 5 lines, each as 'Label: value', in English, using these labels in this order:
+1) Item
+2) Color
+3) Number
+4) Food
+5) Lucky day
 
-以下5つの項目を、すべて1行にまとめて簡潔に出力してください：
+Context:
+- Day pillar (internal reference only): {nicchu_eto}
+- Birthdate: {birthdate} (age {age})
+- Palm summary: {palm_result}
+- Shichu Suimei summary: {shichu_result_raw}
+- Kyusei: {kyusei_text}
 
-◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日
+Rules:
+- Keep each value concise (ideally under ~35 characters after the colon).
+- Suggest realistic, shop-like spiritual items (cleansing goods, aroma, stones, small charms).
+"""
+    else:
+        prompt = f"""占い結果PDFに載せる「ラッキー情報」を作ってください。
 
-- 「◆」で始める
-- 出力は1行だけにする
-- 各項目は短く（単語～数語）
-- 補足説明・理由・語り・改行は一切禁止
-- 他の文や文章は禁止（この形式のみで返答すること）
+【出力形式】必ず5行、次の順で「ラベル：内容」の形にしてください：
+1) アイテム：
+2) カラー：
+3) ナンバー：
+4) フード：
+5) ラッキーデー：
+
+【参考情報】
+日柱（内部参照）: {nicchu_eto}
+生年月日: {birthdate}（年齢 {age}）
+手相要約: {palm_result}
+四柱推命要約: {shichu_result_raw}
+九星: {kyusei_text}
+
+【ルール】
+- 1行は短め（コロン以降はできれば35文字程度まで）
+- 実際のスピリチュアルショップにありそうな開運アイテムにする
 """
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.6
-        )
-        txt = response["choices"][0]["message"]["content"].strip()
-        if (lang or "ja").lower().startswith("en"):
-            # Try to normalize into 2 lines (Item/Color/Number + Food/Day)
-            import re as _re
-            item = _re.search(r"(アイテム|Item)[:：]\s*([^/\n]+)", txt)
-            color = _re.search(r"(カラー|Color)[:：]\s*([^/\n]+)", txt)
-            number = _re.search(r"(ナンバー|Number)[:：]\s*([^/\n]+)", txt)
-            food = _re.search(r"(フード|Food)[:：]\s*([^/\n]+)", txt)
-            day = _re.search(r"(デー|Day)[:：]\s*([^/\n]+)", txt)
-            if item and color and number and food and day:
-                line1 = f"◆ Item: {item.group(2).strip()} / Color: {color.group(2).strip()} / Number: {number.group(2).strip()}"
-                line2 = f"◆ Food: {food.group(2).strip()} / Day: {day.group(2).strip()}"
-                return [line1, line2]
-            return ["◆ Item / Color / Number", "◆ Food / Day"]
-        return [txt]
-    except Exception as e:
-        print("❌ ラッキー情報取得失敗:", e)
-        if (lang or "ja").lower().startswith("en"):
-            return ["◆ Item / Color / Number: -", "◆ Food / Day: -"]
-        return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
+    res = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You generate short lucky info lines for a fortune-telling PDF."},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.8,
+    )
 
+    text = (res.choices[0].message.content or "").strip()
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
 
+    # Defensive: ensure 5 lines; pad / truncate
+    if len(lines) < 5:
+        # Add empty placeholders to keep layout stable
+        lines += [""] * (5 - len(lines))
+    elif len(lines) > 5:
+        lines = lines[:5]
+    return lines
 def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
     """
     九星気学に基づく吉方位テキストを生成する。
@@ -168,47 +186,6 @@ def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction, font_na
 
 
 # 🆕 恋愛専用：手相なしの簡易版ラッキー情報
-def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_text):
-    prompt = f"""あなたは占いの専門家です。
-相談者は現在{age}歳です。以下の2つの鑑定結果を参考にしてください。
-
-【四柱推命】\n{shichu_result}\n
-【九星気学の方位】\n{kyusei_text}
-
-この内容を元に、相談者にとって今最も恋愛運を高めるための
-ラッキーアイテム・ラッキーカラー・ラッキーナンバー・ラッキーフード・ラッキーデー
-をそれぞれ1つずつ、以下の形式で簡潔に提案してください：
-
-・アイテム：〇〇  
-・カラー：〇〇  
-・ナンバー：〇〇  
-・フード：〇〇  
-・デー：〇曜日
-
-※以下の条件を厳守してください：
-- 各項目は1行で記述
-- 解説や補足、象徴、理由付けは禁止
-- 装飾語は不要（例：「共感力を象徴する」などはNG）
-- 出力は上記5行のみに限定
-"""
-
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
-        )
-        lines = response["choices"][0]["message"]["content"].strip().splitlines()
-        lucky_lines = []
-        for line in lines:
-            if "：" in line:
-                label, value = line.split("：", 1)
-                label = label.replace("・", "").strip()
-                value = value.strip().split("（")[0]
-                lucky_lines.append(f"{label}：{value}")  # 「◆」は付けない
-            if len(lucky_lines) == 5:
-                break
-        return lucky_lines
-    except Exception as e:
-        print("❌ 恋愛ラッキー情報取得失敗:", e)
-        return ["アイテム：ー", "カラー：ー", "ナンバー：ー", "フード：ー", "デー：ー"]
+def generate_lucky_renai_info(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text, lang: str = 'ja'):
+    """Renai version lucky info; same format as generate_lucky_info."""
+    return generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text, lang=lang)

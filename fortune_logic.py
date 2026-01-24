@@ -14,7 +14,7 @@ from pdf_generator_unified import create_pdf_unified
 
 
 
-def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, style: str = 'default', lang: str = 'ja', **kwargs):
+def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, style: str = 'normal', lang: str = 'ja'):
     import json
     eto = get_nicchu_eto(birthdate)
     try:
@@ -33,23 +33,51 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
         tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
         tsuhen_month2 = get_tsuhensei_for_date(birthdate, target2.year, target2.month)
 
-        prompt = f"""あなたは四柱推命の専門家です。
-- 日柱: {eto}
-- 年の通変星: {tsuhen_year}
-- {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
-- {target2.year}年{target2.month}月の通変星: {tsuhen_month2}
+        # Build prompt by language / style
+        style_note = ""
+        if style == "tokyo":
+            style_note = ("\nStyle: Use a bright, uplifting tone suitable for Tokyo/Asakusa visitors. "
+                          "You may add one short, natural Asakusa-flavored phrase at most, and avoid excessive tourism talk.\n"
+                          if lang == "en" else
+                          "\n【スタイル】東京（浅草）向け：明るく前向きで、観光客にも自然に馴染む言葉選び。浅草要素は一言程度に留め、旅ガイド化しない。\n")
 
-以下の4項目について、次のJSON形式で返答してください（出力はJSONのみ）：
+        if lang == "en":
+            prompt = f"""You are a professional Four Pillars of Destiny (Shichu Suimei) consultant.
+        Return ONLY valid JSON with exactly these keys:
+        - personality
+        - year_fortune
+        - month_fortune
+        - next_month_fortune
 
-{{
-  "personality": "性格について300文字以内で自然な本文",
-  "year_fortune": "{this_year}年の運勢（300文字以内）",
-  "month_fortune": "{target1.year}年{target1.month}月の運勢（300文字以内）",
-  "next_month_fortune": "{target2.year}年{target2.month}月の運勢（300文字以内）"
-}}
+        Rules:
+        - Write natural, customer-friendly English.
+        - Do NOT mention the zodiac stem/branch name directly.
+        - Avoid overly deterministic or scary wording; keep it constructive and actionable.
+        - Keep each field to about 3-6 sentences.
 
-出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。
-"""
+        Birthdate: {birthdate}
+        Target year/month: {target1.strftime('%Y-%m')} (month_fortune), next month is {target2.strftime('%Y-%m')}
+
+        {style_note}
+        """
+        else:
+            prompt = f"""あなたは四柱推命の専門家です。以下の情報をもとに、鑑定結果を **JSON形式のみ** で出力してください。
+        キーは必ず次の4つのみ：
+        - personality
+        - year_fortune
+        - month_fortune
+        - next_month_fortune
+
+        ルール：
+        - 干支名（例：甲子など）を本文に表示しない
+        - 脅す表現や断定的すぎる表現は避け、前向きで実用的に
+        - 各項目は3〜6文程度で、読みやすく
+
+        生年月日: {birthdate}
+        対象年月: {target1.strftime('%Y-%m')}（今月運勢）, 来月: {target2.strftime('%Y-%m')}
+
+        {style_note}
+        """
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -223,7 +251,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 
 
-def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None, lang: str = 'ja'):
+def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None):
     """
     九星の直接連想（紫/9/火曜…）を避け、数秘 + タロット + 易(八卦) + 色彩心理を混ぜて
     「◆ アイテム／カラー／ナンバー／フード／デー」を1行で返す（リスト1要素）。
@@ -376,7 +404,7 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
 
 
 
-def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False, style: str = 'default', lang: str = 'ja', **kwargs):
+def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False, style: str = 'normal', lang: str = 'ja'):
     import re
     palm_result = analyze_palm(image_data)
     shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, style=style, lang=lang)

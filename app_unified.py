@@ -15,7 +15,7 @@ from io import TextIOWrapper
 from datetime import datetime
 from urllib.parse import quote
 from sqlalchemy import create_engine, text
-from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response, render_template_string, Response
+from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response,render_template_string
 from fortune_logic import generate_fortune
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
@@ -874,43 +874,14 @@ def preview(filename):
 import time
 @app.route('/view/<filename>')
 def view_pdf(filename):
-    """PDF表示（Chrome/スマホでのRange要求に対応し、sendfile由来のSocketエラーも回避）"""
     full_path = os.path.join(UPLOAD_FOLDER, filename)
-
-    import time
     wait_time = 0
     while not os.path.exists(full_path) and wait_time < 5:
         time.sleep(0.5)
         wait_time += 0.5
-
     if not os.path.exists(full_path):
         return "PDFが見つかりませんでした", 404
-
-    file_size = os.path.getsize(full_path)
-    range_header = request.headers.get('Range', None)
-
-    with open(full_path, 'rb') as f:
-        data = f.read()
-
-    # Range対応（例: "bytes=0-1023"）
-    if range_header:
-        m = re.match(r"bytes=(\d+)-(\d*)", range_header)
-        if m:
-            start = int(m.group(1))
-            end = int(m.group(2)) if m.group(2) else min(start + 1024 * 1024 - 1, file_size - 1)
-            end = min(end, file_size - 1)
-            chunk = data[start:end + 1]
-            rv = Response(chunk, 206, mimetype='application/pdf', direct_passthrough=False)
-            rv.headers.add('Content-Range', f'bytes {start}-{end}/{file_size}')
-            rv.headers.add('Accept-Ranges', 'bytes')
-            rv.headers.add('Content-Length', str(len(chunk)))
-            return rv
-
-    # フル返却（send_fileではなくメモリ返却でsendfileを回避）
-    rv = Response(data, 200, mimetype='application/pdf', direct_passthrough=False)
-    rv.headers.add('Content-Length', str(file_size))
-    rv.headers.add('Accept-Ranges', 'bytes')
-    return rv
+    return send_file(full_path, mimetype="application/pdf")
 
 
 
@@ -1042,7 +1013,10 @@ def ten_shincom():
                 print("❌ 本命星取得エラー:", e)
                 honmeisei = ""
             now = datetime.now()
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month)
+            # Output options (safe defaults if the form does not provide them))
+            output_lang = "en" if (request.form.get("english_output") or request.form.get("lang") == "en") else "ja"
+            style_mode = "tokyo" if (request.form.get("tokyo_mode") or request.form.get("style") == "tokyo") else "normal"
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month, style=style_mode, lang=output_lang)
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()

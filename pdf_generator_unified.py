@@ -4,7 +4,6 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.pdfmetrics import stringWidth
 from textwrap import wrap
 import base64
 import io
@@ -42,81 +41,68 @@ def wrap(text, limit):
     return _wrap(text, limit)
 
 
-def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='ja', page_height=None, **kwargs):
-    """ラッキー情報セクション
-    - 2列表示で横幅を有効活用（余白があるのに3ページ化する問題を抑制）
-    - lucky_lines が 1行でも2行でも崩れない
-    - 呼び出し側の互換（lang/page_height/kwargs）対応
-    """
-    if not lucky_lines:
-        lucky_lines = []
-
+def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction_text, lang: str = 'ja', lang=data.get('lang','ja')):
+    """Draw lucky info in 2 columns, attempting to keep each row to 1 line."""
+    # Header
+    title = "■ Lucky Info" if (lang or 'ja').lower().startswith('en') else "■ ラッキー情報"
     c.setFont(FONT_NAME, 12)
-    title = "■ Lucky Info (from birthdate)" if (str(lang).lower().startswith("en")) else "■ ラッキー情報（生年月日より）"
     c.drawString(margin, y, title)
-    y -= 6 * mm
+    y -= 14
 
-    # 2列レイアウト
+    # Normalize lines
+    if lucky_lines is None:
+        lucky_lines = []
+    if isinstance(lucky_lines, str):
+        lucky_lines = [ln.strip() for ln in lucky_lines.splitlines() if ln.strip()]
+    lucky_lines = [str(x).strip() for x in lucky_lines if str(x).strip()]
+
+    # Ensure at least 5 lines for stable layout
+    while len(lucky_lines) < 5:
+        lucky_lines.append("")
+
     c.setFont(FONT_NAME, 10)
-    col_gap = 8 * mm
-    col_w = (width - 2 * margin - col_gap) / 2.0
-    line_h = 5.6 * mm
 
-    def _fit_one_line(s: str, max_w: float) -> str:
+    usable_w = width - margin * 2
+    gap = 14
+    col_w = (usable_w - gap) / 2.0
+    left_x = margin
+    right_x = margin + col_w + gap
+
+    def fit_one_line(s: str, max_w: float) -> str:
         s = (s or "").strip()
         if not s:
             return ""
-        # 収まるならそのまま
         if stringWidth(s, FONT_NAME, 10) <= max_w:
             return s
-        # 末尾省略
+        # Truncate with ellipsis (…)
         ell = "…"
-        while s and stringWidth(s + ell, FONT_NAME, 10) > max_w:
-            s = s[:-1]
-        return (s + ell) if s else ell
+        lo, hi = 0, len(s)
+        # binary search max length that fits
+        while lo < hi:
+            mid = (lo + hi) // 2
+            cand = s[:mid].rstrip() + ell
+            if stringWidth(cand, FONT_NAME, 10) <= max_w:
+                lo = mid + 1
+            else:
+                hi = mid
+        mid = max(1, lo - 1)
+        return s[:mid].rstrip() + ell
 
-    # 2つずつ（左・右）描画。奇数なら右は空。
-    for i in range(0, len(lucky_lines), 2):
-        left = _fit_one_line(lucky_lines[i], col_w)
-        right = _fit_one_line(lucky_lines[i + 1] if i + 1 < len(lucky_lines) else "", col_w)
+    # Draw 5 lines in 2 columns: (1,2) (3,4) (5,dir)
+    rows = [
+        (lucky_lines[0], lucky_lines[1]),
+        (lucky_lines[2], lucky_lines[3]),
+        (lucky_lines[4], (lucky_direction_text or "")),
+    ]
 
-        c.drawString(margin, y, left)
-        if right:
-            c.drawString(margin + col_w + col_gap, y, right)
+    line_h = 13
+    for left, right in rows:
+        c.drawString(left_x, y, fit_one_line(left, col_w))
+        c.drawString(right_x, y, fit_one_line(right, col_w))
         y -= line_h
 
-    # 方位（必要なら最後に）
-    if lucky_direction:
-        y -= 1.5 * mm
-        c.setFont(FONT_NAME, 10)
-        direction_title = "■ Lucky Directions" if (str(lang).lower().startswith("en")) else "■ ラッキー方位"
-        c.drawString(margin, y, direction_title)
-        y -= 5.5 * mm
-
-        dir_text = (lucky_direction or "").strip()
-        # 1行で無理なら折り返し（左列幅いっぱいで）
-        max_w = width - 2 * margin
-        if stringWidth(dir_text, FONT_NAME, 10) <= max_w:
-            c.drawString(margin, y, dir_text)
-            y -= line_h
-        else:
-            # 簡易折り返し
-            words = dir_text.split()
-            cur = ""
-            for w in words:
-                candidate = (cur + " " + w).strip()
-                if stringWidth(candidate, FONT_NAME, 10) <= max_w:
-                    cur = candidate
-                else:
-                    c.drawString(margin, y, cur)
-                    y -= line_h
-                    cur = w
-            if cur:
-                c.drawString(margin, y, cur)
-                y -= line_h
-
+    y -= 2
     return y
-
 def draw_palm_image(c, base64_image, width, y):
     try:
         image_data = base64.b64decode(base64_image.split(',')[1])
@@ -314,7 +300,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.setFont(FONT_NAME, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', '', lang=data.get('lang','ja')))
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
@@ -367,7 +353,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         c.setFont(FONT_NAME, 14)
 
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', '', lang=data.get('lang','ja')))
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])
@@ -491,7 +477,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     # ラッキー情報・吉方位（2ページ目末尾）
     y = draw_lucky_section(
         c, width, margin, y,
-        data.get("lucky_info", []),
+        data.get("lucky_info", [], lang=data.get('lang','ja')),
         data.get("lucky_direction", "")
     )
 
