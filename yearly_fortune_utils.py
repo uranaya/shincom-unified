@@ -29,7 +29,7 @@ def _ask_openai(prompt: str, retries=3, delay=2) -> str:
     return "取得に失敗しました（OpenAI APIエラー）"
 
 
-def generate_yearly_fortune(birthdate: str, now=None, lang: str = 'ja'):
+def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bool = False, style: str = 'default', lang: str = 'ja', **kwargs):
     nicchu = get_nicchu_eto(user_birth)
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
@@ -44,7 +44,21 @@ def generate_yearly_fortune(birthdate: str, now=None, lang: str = 'ja'):
 
     # Year fortune prompt
     tsuhen_year = get_tsuhensei_for_year(user_birth, target_year)
-    prompt_year = f"""
+    if (lang or "ja").lower().startswith("en"):
+        prompt_year = f"""
+You are a fortune advisor.
+Based on the following information, write a concise annual overview for {target_year} in natural English.
+
+- Day pillar (for internal reference): {nicchu}
+- Key theme (tsuhensei): {tsuhen_year}
+
+Rules:
+- Do NOT mention Japanese fortune-telling terms (e.g., tsuhensei names) or zodiac names; translate meanings into plain words
+- About 120 words max
+- Positive, actionable, and easy to understand
+""".strip()
+    else:
+        prompt_year = f"""
 あなたは開運アドバイザーです。
 以下の情報をもとに、{target_year}年における「あなた」の全体運を自然な日本語で表現してください。
 
@@ -68,7 +82,22 @@ def generate_yearly_fortune(birthdate: str, now=None, lang: str = 'ja'):
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
         dirs = get_directions(y, m, honmeisei)
 
-        prompt_month = f"""
+        if (lang or "ja").lower().startswith("en"):
+            prompt_month = f"""
+You are a professional fortune advisor.
+Based on the following information, write a concise monthly outlook for {y}-{m:02d} in natural English.
+
+- Day pillar (internal reference): {nicchu}
+- Key theme: {tsuhen_month}
+- Directions (reference): {dirs}
+
+Rules:
+- Do NOT mention Japanese fortune terms or zodiac names; rewrite as plain guidance
+- About 120 words max
+- Keep it encouraging and practical
+""".strip()
+        else:
+            prompt_month = f"""
 あなたは占いの専門家です。
 以下の情報をもとに、{y}年{m}月の運気を自然な日本語で約120文字以内にまとめてください。
 

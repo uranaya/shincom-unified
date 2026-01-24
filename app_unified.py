@@ -15,7 +15,7 @@ from io import TextIOWrapper
 from datetime import datetime
 from urllib.parse import quote
 from sqlalchemy import create_engine, text
-from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response,render_template_string
+from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response, render_template_string, Response
 from fortune_logic import generate_fortune
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
@@ -729,27 +729,15 @@ def selfmob_uuid(uuid_str):
             target2 = target1 + relativedelta(months=1)
 
             result_data = {
-            'lang': lang,
-                "lang": output_lang,
-                "style": style_mode,
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
-                "titles": (lambda _lang, _today, _t1, _t2: (
-                    {
-                        "palm_summary": "手相の総合アドバイス",
-                        "personality": "性格診断",
-                        "year_fortune": f"{_today.year}年の運勢",
-                        "month_fortune": f"{_t1.year}年{_t1.month}月の運勢",
-                        "next_month_fortune": f"{_t2.year}年{_t2.month}月の運勢",
-                    } if _lang != "en" else
-                    {
-                        "palm_summary": "Overall Palm Advice",
-                        "personality": "Personality Insights",
-                        "year_fortune": f"Yearly Fortune: {_today.year}",
-                        "month_fortune": f"This Month: {_t1.strftime('%b %Y')}",
-                        "next_month_fortune": f"Next Month: {_t2.strftime('%b %Y')}",
-                    }
-                ))(output_lang, today, target1, target2),
+                "titles": {
+                    "palm_summary": "手相の総合アドバイス",
+                    "personality": "性格診断",
+                    "year_fortune": f"{today.year}年の運勢",
+                    "month_fortune": f"{target1.year}年{target1.month}月の運勢",
+                    "next_month_fortune": f"{target2.year}年{target2.month}月の運勢",
+                },
                 "texts": {
                     "palm_summary": summary_text,
                     "personality": shichu_result.get("personality", ""),
@@ -870,63 +858,60 @@ def renaiselfmob_uuid(uuid_str):
 
 
 @app.route("/preview/<filename>")
-def preview_pdf(filename):
-    """Preview wrapper. The PDF itself is served by /view with Range support."""
-    return render_template("pdf_preview.html", filename=filename)
+def preview(filename):
+    """占い結果PDFのプレビュー画面表示"""
+    user_agent = request.headers.get("User-Agent", "").lower()
 
-from flask import Response
+    # iPhoneまたはAndroidの簡易判定（必要に応じて拡張可）
+    if "iphone" in user_agent or "android" in user_agent:
+        return redirect(url_for("view_pdf", filename=filename))
 
+    referer = request.referrer or ""
+    return render_template("fortune_pdf.html", filename=filename, referer=referer)
+
+
+
+import time
 @app.route('/view/<filename>')
 def view_pdf(filename):
-    """Return PDF bytes with correct Range support; stable in Chrome/Edge."""
-    file_path = os.path.join(UPLOAD_FOLDER, filename)
-    if not os.path.exists(file_path):
-        return "PDF not found", 404
+    """PDF表示（Chrome/スマホでのRange要求に対応し、sendfile由来のSocketエラーも回避）"""
+    full_path = os.path.join(UPLOAD_FOLDER, filename)
 
-    file_size = os.path.getsize(file_path)
-    range_header = (request.headers.get("Range") or "").strip()
+    import time
+    wait_time = 0
+    while not os.path.exists(full_path) and wait_time < 5:
+        time.sleep(0.5)
+        wait_time += 0.5
 
-    def _read(start, end):
-        with open(file_path, "rb") as f:
-            f.seek(start)
-            return f.read(end - start + 1)
+    if not os.path.exists(full_path):
+        return "PDFが見つかりませんでした", 404
 
-    if not range_header:
-        data = Path(file_path).read_bytes()
-        resp = Response(data, mimetype="application/pdf")
-        resp.headers["Content-Length"] = str(len(data))
-        resp.headers["Accept-Ranges"] = "bytes"
-        resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
-        resp.headers["Cache-Control"] = "no-store"
-        resp.headers["Connection"] = "close"
-        return resp
+    file_size = os.path.getsize(full_path)
+    range_header = request.headers.get('Range', None)
 
-    m = re.match(r"bytes=(\d*)-(\d*)", range_header)
-    if not m:
-        data = Path(file_path).read_bytes()
-        resp = Response(data, mimetype="application/pdf")
-        resp.headers["Content-Length"] = str(len(data))
-        resp.headers["Accept-Ranges"] = "bytes"
-        resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
-        resp.headers["Cache-Control"] = "no-store"
-        resp.headers["Connection"] = "close"
-        return resp
+    with open(full_path, 'rb') as f:
+        data = f.read()
 
-    start_s, end_s = m.group(1), m.group(2)
-    start_b = int(start_s) if start_s else 0
-    end_b = int(end_s) if end_s else (file_size - 1)
-    start_b = max(0, min(start_b, file_size - 1))
-    end_b = max(start_b, min(end_b, file_size - 1))
+    # Range対応（例: "bytes=0-1023"）
+    if range_header:
+        m = re.match(r"bytes=(\d+)-(\d*)", range_header)
+        if m:
+            start = int(m.group(1))
+            end = int(m.group(2)) if m.group(2) else min(start + 1024 * 1024 - 1, file_size - 1)
+            end = min(end, file_size - 1)
+            chunk = data[start:end + 1]
+            rv = Response(chunk, 206, mimetype='application/pdf', direct_passthrough=False)
+            rv.headers.add('Content-Range', f'bytes {start}-{end}/{file_size}')
+            rv.headers.add('Accept-Ranges', 'bytes')
+            rv.headers.add('Content-Length', str(len(chunk)))
+            return rv
 
-    data = _read(start_b, end_b)
-    resp = Response(data, status=206, mimetype="application/pdf", direct_passthrough=True)
-    resp.headers["Content-Range"] = f"bytes {start_b}-{end_b}/{file_size}"
-    resp.headers["Accept-Ranges"] = "bytes"
-    resp.headers["Content-Length"] = str(len(data))
-    resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
-    resp.headers["Cache-Control"] = "no-store"
-    resp.headers["Connection"] = "close"
-    return resp
+    # フル返却（send_fileではなくメモリ返却でsendfileを回避）
+    rv = Response(data, 200, mimetype='application/pdf', direct_passthrough=False)
+    rv.headers.add('Content-Length', str(file_size))
+    rv.headers.add('Accept-Ranges', 'bytes')
+    return rv
+
 
 
 @app.route("/view_shop_log")
@@ -1034,19 +1019,6 @@ def ten_shincom():
             birthdate = data.get("birthdate")
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
             force_next_month = data.get("force_next_month", False) if is_json else (data.get("force_next_month") == "yes")
-            tokyo_mode = data.get("tokyo_mode", False) if is_json else (data.get("tokyo_mode") in ("yes","on","true","1"))
-            if not is_json and (data.get("tokyo") in ("yes","on","true","1")):
-                tokyo_mode = True
-            output_lang = (data.get("output_lang") or "ja") if is_json else ((data.get("output_lang") or "").strip() or "ja")
-            # Support checkbox-style language toggle (e.g., <input name="lang_en" type="checkbox">)
-            if not is_json and (data.get("lang_en") in ("on", "yes", "true", "1")):
-                output_lang = "en"
-            if not is_json and (data.get("output_lang") in ("on", "yes") ) and (data.get("lang_en") is None):
-                # backward compatibility if checkbox named output_lang was used
-                output_lang = "en"
-            if output_lang not in ("ja", "en"):
-                output_lang = "ja"
-            style_mode = "tokyo" if tokyo_mode else "default"
 
             try:
                 year, month, day = map(int, birthdate.split("-"))
@@ -1070,7 +1042,7 @@ def ten_shincom():
                 print("❌ 本命星取得エラー:", e)
                 honmeisei = ""
             now = datetime.now()
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month, style=style_mode, lang=output_lang)
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month)
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()
@@ -1078,30 +1050,19 @@ def ten_shincom():
             if now.day >= 20 or force_next_month:
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
-            if output_lang == "en":
-                year_label = f"Fortune for {target1.year}"
-                month_label = f"Fortune for {target1.year}-{target1.month:02d}"
-                next_month_label = f"Fortune for {target2.year}-{target2.month:02d}"
-            else:
-                year_label = f"{target1.year}年の運勢"
-                month_label = f"{target1.year}年{target1.month}月の運勢"
-                next_month_label = f"{target2.year}年{target2.month}月の運勢"
+            year_label = f"{target1.year}年の運勢"
+            month_label = f"{target1.year}年{target1.month}月の運勢"
+            next_month_label = f"{target2.year}年{target2.month}月の運勢"
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
-                "titles": ({
-                    "palm_summary": "Palm Reading Summary",
-                    "personality": "Personality Profile",
-                    "year_fortune": year_label,
-                    "month_fortune": month_label,
-                    "next_month_fortune": next_month_label
-                } if output_lang == "en" else {
+                "titles": {
                     "palm_summary": "手相の総合アドバイス",
                     "personality": "性格診断",
                     "year_fortune": year_label,
                     "month_fortune": month_label,
                     "next_month_fortune": next_month_label
-                }),
+                },
                 "texts": {
                     "palm_summary": summary_text,
                     "personality": shichu_result.get("personality", ""),
@@ -1120,9 +1081,7 @@ def ten_shincom():
                 "palm_result": "\n".join(palm_texts),
                 "shichu_result": shichu_result,
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
-                "palm_image": image_data,
-                "lang": output_lang,
-                "style": style_mode
+                "palm_image": image_data
             }
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, now, force_next_month=force_next_month)
@@ -2134,4 +2093,5 @@ def admin_sales_add_missing():
 @app.route('/selfmob/google808abc9a83ba5e55.html')
 def google_verification_file():
     return send_from_directory('static', 'google808abc9a83ba5e55.html')
+
 

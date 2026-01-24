@@ -11,46 +11,20 @@ import os
 from datetime import datetime
 import re
 
-def _t(lang: str, ja: str, en: str) -> str:
-    return en if lang == 'en' else ja
-
-def _get_lang(data: dict) -> str:
-    if not isinstance(data, dict):
-        return 'ja'
-    lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
-    lang = (lang or 'ja').strip().lower()
-    return 'en' if lang.startswith('en') else 'ja'
-
-
-def _normalize_month_fortune_text(text: str, kind: str, lang: str = 'ja') -> str:
-    """Normalize month-fortune body text so it doesn't repeat the month already shown in the heading.
-
-    - JA: remove leading 'YYYY年M月は' and add a gentle '今月は/来月は' prefix if missing.
-    - EN: keep it concise and avoid redundant leading month phrases; add 'This month/Next month' if missing.
+def _normalize_month_fortune_text(text: str, kind: str) -> str:
+    """Remove leading 'YYYY年M月は' style prefixes to avoid heading/body month mismatches.
     kind: 'month' or 'next'
     """
     if not isinstance(text, str):
         return text
-    s = (text or '').strip()
-
-    # Remove Japanese leading date phrases like '2026年1月は、'
+    s = text.strip()
+    # Match patterns like '2026年1月は' or '2026年1月は、'
     s = re.sub(r'^\s*\d{4}年\s*\d{1,2}月\s*は\s*[、,]?\s*', '', s)
-
-    if lang == 'en':
-        # Remove simple English leading month phrases like 'In Jan 2026,' or 'January 2026:'
-        s = re.sub(r'^\s*(in\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}\s*[:,-]?\s*',
-                   '', s, flags=re.IGNORECASE)
-        prefix = 'This month' if kind == 'month' else 'Next month'
-        if re.match(r'^(this\s+month|next\s+month)\b', s, flags=re.IGNORECASE):
-            return s
-        return f"{prefix}: {s}" if s else f"{prefix}."
-
-    # JA
     prefix = '今月は' if kind == 'month' else '来月は'
+    # If the text already starts with 今月/来月, don't double-prefix.
     if s.startswith('今月') or s.startswith('来月'):
         return s
     return prefix + '、' + s if s else prefix + '。'
-
 
 
 from header_utils import draw_header
@@ -63,102 +37,84 @@ FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
 
-def wrap(text, limit, lang: str | None = None):
-    s = '' if text is None else str(text)
-    # For English output, character-count wrapping becomes too narrow in the PDF. 
-    # Expand the wrap limit to approximate the same visual width as Japanese.
-    _lang = (lang or ('en' if re.search(r'[A-Za-z]', s) and ' ' in s else 'ja'))
-    if _lang.startswith('en'):
-        limit = max(int(limit * 1.8), limit + 10)
-    return _wrap(s, limit, break_long_words=True, break_on_hyphens=True)
-
-def _estimate_lucky_height_mm(lucky_lines, lucky_direction: str, compact: bool = False) -> float:
-    """Rough vertical size estimate for lucky section (in mm)."""
-    line_h = 5 if compact else 6  # mm per line
-    title_h = 6  # title baseline spacing
-    gap = 2 if compact else 2
-
-    # lucky info title + gap
-    total = title_h + gap
-
-    # lucky lines: printed 2 items per line
-    num_info_lines = max(1, (len(lucky_lines) + 1) // 2) if lucky_lines else 1
-    total += num_info_lines * line_h
-
-    if lucky_direction and lucky_direction.strip():
-        # small gap + directions title + gap
-        total += (2 if compact else 2) + title_h + gap
-        dir_lines = [ln for ln in lucky_direction.strip().splitlines() if ln.strip()]
-        total += max(1, len(dir_lines)) * line_h
-
-    # bottom breathing room
-    total += 2
-    return total
+def wrap(text, limit):
+    return _wrap(text, limit)
 
 
-def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang: str = 'ja', page_height: float | None = None, bottom_margin_mm: float = 20):
-    """Draw lucky info/directions near the end of a page without cutting off.
-    - If there isn't enough space, first try a compact layout (smaller line height),
-      and if still insufficient, start a new page.
+def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='ja', page_height=None, **kwargs):
+    """ラッキー情報セクション
+    - 2列表示で横幅を有効活用（余白があるのに3ページ化する問題を抑制）
+    - lucky_lines が 1行でも2行でも崩れない
+    - 呼び出し側の互換（lang/page_height/kwargs）対応
     """
-    bottom = (bottom_margin_mm * mm)
+    if not lucky_lines:
+        lucky_lines = []
 
-    def _draw(compact: bool, y0: float) -> float:
-        title_font = 11 if compact else 12
-        body_font = 9 if compact else 10
-        line_step = (5 if compact else 6) * mm
+    c.setFont(FONT_NAME, 12)
+    title = "■ Lucky Info (from birthdate)" if (str(lang).lower().startswith("en")) else "■ ラッキー情報（生年月日より）"
+    c.drawString(margin, y, title)
+    y -= 6 * mm
 
-        c.setFont(FONT_NAME, title_font)
-        c.drawString(margin, y0, "■ " + _t(lang, "ラッキー情報（生年月日より）", "Lucky Info (based on birthdate)"))
-        y0 -= line_step
+    # 2列レイアウト
+    c.setFont(FONT_NAME, 10)
+    col_gap = 8 * mm
+    col_w = (width - 2 * margin - col_gap) / 2.0
+    line_h = 5.6 * mm
 
-        c.setFont(FONT_NAME, body_font)
+    def _fit_one_line(s: str, max_w: float) -> str:
+        s = (s or "").strip()
+        if not s:
+            return ""
+        # 収まるならそのまま
+        if stringWidth(s, FONT_NAME, 10) <= max_w:
+            return s
+        # 末尾省略
+        ell = "…"
+        while s and stringWidth(s + ell, FONT_NAME, 10) > max_w:
+            s = s[:-1]
+        return (s + ell) if s else ell
 
-        # 2項目ずつ1行（英語ラベルが長い場合でも横に逃がして縦を節約）
-        _lucky_lines = lucky_lines or []
+    # 2つずつ（左・右）描画。奇数なら右は空。
+    for i in range(0, len(lucky_lines), 2):
+        left = _fit_one_line(lucky_lines[i], col_w)
+        right = _fit_one_line(lucky_lines[i + 1] if i + 1 < len(lucky_lines) else "", col_w)
 
-        for i in range(0, len(_lucky_lines), 2):
-            line1 = _lucky_lines[i]
-            line2 = _lucky_lines[i + 1] if i + 1 < len(_lucky_lines) else ""
-            # 固定幅パディングは英語で崩れやすいので、シンプル結合にする
-            formatted = (line1 + ("    " + line2 if line2 else "")).strip()
-            c.drawString(margin, y0, formatted)
-            y0 -= line_step
+        c.drawString(margin, y, left)
+        if right:
+            c.drawString(margin + col_w + col_gap, y, right)
+        y -= line_h
 
-        if lucky_direction and lucky_direction.strip():
-            y0 -= 2 * mm
-            c.setFont(FONT_NAME, title_font)
-            c.drawString(margin, y0, "■ " + _t(lang, "吉方位（九星気学より）", "Lucky Directions (Kyusei Kigaku)"))
-            y0 -= line_step
-            c.setFont(FONT_NAME, body_font)
-            for line in lucky_direction.strip().splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                c.drawString(margin, y0, line)
-                y0 -= line_step
+    # 方位（必要なら最後に）
+    if lucky_direction:
+        y -= 1.5 * mm
+        c.setFont(FONT_NAME, 10)
+        direction_title = "■ Lucky Directions" if (str(lang).lower().startswith("en")) else "■ ラッキー方位"
+        c.drawString(margin, y, direction_title)
+        y -= 5.5 * mm
 
-        return y0
-
-    # If page height is known, ensure the block fits.
-    if page_height is None:
-        # Fallback: just draw without pagination logic
-        return _draw(False, y)
-
-    # Try normal layout first
-    need_mm = _estimate_lucky_height_mm(lucky_lines, lucky_direction, compact=False)
-    if (y - need_mm * mm) < bottom:
-        # Try compact
-        need_mm_c = _estimate_lucky_height_mm(lucky_lines, lucky_direction, compact=True)
-        if (y - need_mm_c * mm) < bottom:
-            # New page (keep spec: no header on page2+)
-            c.showPage()
-            y = page_height - (20 * mm)
-            return _draw(False, y)
+        dir_text = (lucky_direction or "").strip()
+        # 1行で無理なら折り返し（左列幅いっぱいで）
+        max_w = width - 2 * margin
+        if stringWidth(dir_text, FONT_NAME, 10) <= max_w:
+            c.drawString(margin, y, dir_text)
+            y -= line_h
         else:
-            return _draw(True, y)
-    else:
-        return _draw(False, y)
+            # 簡易折り返し
+            words = dir_text.split()
+            cur = ""
+            for w in words:
+                candidate = (cur + " " + w).strip()
+                if stringWidth(candidate, FONT_NAME, 10) <= max_w:
+                    cur = candidate
+                else:
+                    c.drawString(margin, y, cur)
+                    y -= line_h
+                    cur = w
+            if cur:
+                c.drawString(margin, y, cur)
+                y -= line_h
+
+    return y
 
 def draw_palm_image(c, base64_image, width, y):
     try:
@@ -266,11 +222,10 @@ def draw_yearly_pages_renai_b4(c, yearly):
 
 
 def draw_shincom_a4(c, data, include_yearly=False):
-    lang = _get_lang(data)
     width, height = A4
     margin = 20 * mm
     y = height - margin
-    y = draw_header(c, width, margin, y, lang=lang)
+    y = draw_header(c, width, margin, y)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
     # 生年月日・星座・干支・動物占い・本命星（手相画像の直下に表示）
@@ -286,9 +241,9 @@ def draw_shincom_a4(c, data, include_yearly=False):
     # 1行目：生年月日＋星座
     line1_parts = []
     if birthdate:
-        line1_parts.append(f"{_t(lang, '生年月日', 'Birthdate')}：{birthdate}")
+        line1_parts.append(f"生年月日：{birthdate}")
     if zodiac:
-        line1_parts.append(f"{_t(lang, '星座', 'Zodiac')}：{zodiac}")
+        line1_parts.append(f"星座：{zodiac}")
     if line1_parts:
         info_lines.append(" / ".join(line1_parts))
 
@@ -296,13 +251,13 @@ def draw_shincom_a4(c, data, include_yearly=False):
     line2_parts = []
     if eto:
         if eto_number:
-            line2_parts.append(f"{_t(lang, '干支', 'Zodiac (JPN)')}：{eto} ({eto_number})")
+            line2_parts.append(f"干支：{eto}（{eto_number}番）")
         else:
-            line2_parts.append(f"{_t(lang, '干支', 'Zodiac (JPN)')}：{eto}")
+            line2_parts.append(f"干支：{eto}")
     if animal:
-        line2_parts.append(f"{_t(lang, '動物占い', 'Animal')}：{animal}")
+        line2_parts.append(f"動物占い：{animal}")
     if honmeisei:
-        line2_parts.append(f"{_t(lang, '本命星', 'Main Star')}：{honmeisei}")
+        line2_parts.append(f"本命星：{honmeisei}")
     if line2_parts:
         info_lines.append(" / ".join(line2_parts))
 
@@ -341,79 +296,34 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.setFont(FONT_NAME, 12)
 
     # 四柱推命・まとめ等（タイトルのみでも出す）
-    # ENは文章が長くなりやすいので、2ページ目の末尾に「ラッキー情報」を収めるために
-    # ここで行数を制限し、必要なら末尾を省略します（他モードには影響しない）。
-    caps_en = {
-        'palm_summary': 5,
-        'personality': 6,
-        'year_fortune': 6,
-        'month_fortune': 5,
-        'next_month_fortune': 5,
-    }
-    leading = 6 * mm
-    wrap_base = 40
-    if lang == 'en':
-        # 英語はより詰める
-        body_font_size = 9
-        wrap_base = 52
-        leading = 5.2 * mm
-    else:
-        body_font_size = 10
-
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
+        wrap_len = 36 if 'month' in key else 40
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
 
-        # Normalize month/next-month body to avoid duplicated date phrases
-        if key in ('month_fortune', 'next_month_fortune'):
-            kind = 'month' if key == 'month_fortune' else 'next'
-            content = _normalize_month_fortune_text(content, kind, lang)
-
-        # Wrap length
-        wrap_len = wrap_base
-        if lang != 'en':
-            wrap_len = 36 if 'month' in key else 40
-
-        # Title
-        c.setFont(FONT_NAME, 12)
         if title:
             c.drawString(margin, y, f"◆ {title}")
             y -= 6 * mm
-
-        # Body
-        c.setFont(FONT_NAME, body_font_size)
+        c.setFont(FONT_NAME, 10)
         if content:
-            lines = wrap(content, wrap_len)
-            if lang == 'en':
-                # Hard cap per section to keep lucky info on page 2
-                cap = caps_en.get(key, 6)
-                if len(lines) > cap:
-                    lines = lines[:cap]
-                    # add ellipsis to last line if space
-                    if lines:
-                        if len(lines[-1]) > 3:
-                            lines[-1] = lines[-1].rstrip() + "..."
-                        else:
-                            lines[-1] = "..."
-            for line in lines:
+            for line in wrap(content, wrap_len):
                 c.drawString(margin, y, line)
-                y -= leading
+                y -= 6 * mm
+        y -= 3 * mm
+        c.setFont(FONT_NAME, 12)
 
-        # spacing between sections
-        y -= 2.5 * mm
-
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=_get_lang(data), page_height=height)
+    # ラッキー情報を2ページ目末尾に移動
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
 
 
 def draw_shincom_b4(c, data, include_yearly=False):
-    lang = _get_lang(data)
     width, height = B4
     margin = 20 * mm
     y = height - margin
-    y = draw_header(c, width, margin, y, lang=lang)
+    y = draw_header(c, width, margin, y)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
     c.setFont(FONT_NAME, 14)
@@ -445,13 +355,6 @@ def draw_shincom_b4(c, data, include_yearly=False):
         wrap_len = 40 if 'month' in key else 45
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
-
-        # Normalize month/next-month body to avoid duplicated date phrases
-        if key in ('month_fortune', 'next_month_fortune'):
-            kind = 'month' if key == 'month_fortune' else 'next'
-            content = _normalize_month_fortune_text(content, kind, lang)
-            if lang == 'en':
-                wrap_len += 6
         if title:
             c.drawString(margin, y, f"◆ {title}")
             y -= 7 * mm
@@ -463,7 +366,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         c.setFont(FONT_NAME, 14)
 
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=_get_lang(data), page_height=height)
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])
@@ -532,7 +435,6 @@ def draw_yearly_pages_shincom_b4(c, yearly):
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
-    lang = _get_lang(data)
     from reportlab.lib.pagesizes import A4, B4
     from reportlab.lib.units import mm
     from header_utils import draw_header
@@ -548,7 +450,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     width, height = A4 if size == 'a4' else B4
     margin = 20 * mm
     wrap_len = 40 if size == 'a4' else 45
-    y = draw_header(c, width, margin, height - margin, lang=lang)
+    y = draw_header(c, width, margin, height - margin)
 
     # 1ページ目：相性診断・恋愛運（年/月/来月）
     main_keys = [
@@ -589,9 +491,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     y = draw_lucky_section(
         c, width, margin, y,
         data.get("lucky_info", []),
-        data.get("lucky_direction", ""),
-        lang=_get_lang(data),
-        page_height=height
+        data.get("lucky_direction", "")
     )
 
     # 年運（オプション）
@@ -603,11 +503,9 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
 
 
 def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
-    data = data or {}
-    data.setdefault('lang', _get_lang(data))
     size = size.lower()
     c = canvas.Canvas(filepath, pagesize=A4 if size == 'a4' else B4)
-    c.setTitle(_t(_get_lang(data), '占い結果', 'Fortune Result'))
+    c.setTitle('占い結果')
     if mode == 'shincom':
         if size == 'a4':
             draw_shincom_a4(c, data, include_yearly)
