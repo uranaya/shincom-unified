@@ -10,8 +10,31 @@ from reportlab.lib.units import mm
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str='ja', **kwargs):
-    prompt = f"""あなたは占いの専門家です。
+def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str = 'ja'):
+    if lang == "en":
+        prompt = f"""You are a professional fortune teller.
+The client is {age} years old. Use the readings below as context.
+
+[PALM READING]
+{palm_result}
+
+[FOUR PILLARS]
+{shichu_result}
+
+[KYUSEI KIGAKU DIRECTIONS]
+{kyusei_text}
+
+Output ONE line ONLY, in this exact format, short and punchy (no extra words, no line breaks):
+◆ Item: ...   ◆ Color: ...   ◆ Number: ...   ◆ Food: ...   ◆ Day: Mon/Tue/Wed/Thu/Fri/Sat/Sun
+
+Rules:
+- Start with '◆'
+- One line only (no newlines)
+- Keep each value to 1–3 words
+- No reasons, no explanations, no additional text
+"""
+    else:
+        prompt = f"""あなたは占いの専門家です。
 相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
 
 【手相】\n{palm_result}\n
@@ -38,7 +61,7 @@ def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, 
         return [response["choices"][0]["message"]["content"].strip()]
     except Exception as e:
         print("❌ ラッキー情報取得失敗:", e)
-        return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
+        return ["◆ Item: -   ◆ Color: -   ◆ Number: -   ◆ Food: -   ◆ Day: -"] if lang == 'en' else ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
 
 
 def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
@@ -185,8 +208,8 @@ def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_
         lines = response["choices"][0]["message"]["content"].strip().splitlines()
         lucky_lines = []
         for line in lines:
-            if ("：" in line) or (":" in line):
-                label, value = (line.split("：",1) if "：" in line else line.split(":",1))
+            if "：" in line:
+                label, value = line.split("：", 1)
                 label = label.replace("・", "").strip()
                 value = value.strip().split("（")[0]
                 lucky_lines.append(f"{label}：{value}")  # 「◆」は付けない

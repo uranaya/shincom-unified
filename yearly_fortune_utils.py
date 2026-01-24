@@ -10,32 +10,6 @@ import time
 MAX_CHAR = 120  # Max characters for monthly fortune
 
 
-def _build_monthly_prompt(month_label: str, eto: str, tsuhensei_year: str, tsuhensei_month: str, lang: str) -> str:
-    if lang == "en":
-        return "\n".join([
-            "You are a professional fortune teller.",
-            "Write in natural, friendly English for customers.",
-            "Do NOT mention stems/branches or technical terms; do not show raw astrology tables.",
-            f"Month: {month_label}",
-            f"Day pillar: {eto}",
-            f"Year star (Tsuhensei): {tsuhensei_year}",
-            f"Month star (Tsuhensei): {tsuhensei_month}",
-            "Output: 2-3 short sentences, practical and positive.",
-            f"Limit: within {MAX_CHAR} characters (English).",
-        ])
-    return "\n".join([
-        "あなたはプロの占い師です。",
-        "干支や専門用語を出さず、現実に即した前向きな文章にしてください。",
-        f"対象月: {month_label}",
-        f"日柱: {eto}",
-        f"年の通変星: {tsuhensei_year}",
-        f"月の通変星: {tsuhensei_month}",
-        "出力は2〜3文で、実用的でやさしい語り口にしてください。",
-        f"文字数上限: {MAX_CHAR}字。",
-    ])
-
-
-
 def _ask_openai(prompt: str, retries=3, delay=2) -> str:
     for attempt in range(retries):
         try:
@@ -55,7 +29,7 @@ def _ask_openai(prompt: str, retries=3, delay=2) -> str:
     return "取得に失敗しました（OpenAI APIエラー）"
 
 
-def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bool = False, lang: str = 'ja', **kwargs):
+def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bool = False, lang: str = 'ja'):
     nicchu = get_nicchu_eto(user_birth)
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
@@ -83,7 +57,7 @@ def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bo
 - 約120文字以内
 - 前向きで、行動や考え方の指針になるように
 - 読んだ人が「なるほど」と感じるように
-""".strip()
+""" + lang_instruction.strip()
     year_fortune = _ask_openai(prompt_year)
 
     # ★ 基準月 base から 12か月分
@@ -106,7 +80,7 @@ def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bo
 - 主語は「あなた」
 - 月ごとに変化を出す（行動・感情・周囲との関係など）
 - 現実的でポジティブな内容
-""".strip()
+""" + lang_instruction.strip()
         text = _ask_openai(prompt_month)
         month_fortunes.append({
             "label": f"{y}年{m}月の運勢",
@@ -118,3 +92,5 @@ def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bo
         "year_text": year_fortune,
         "months": month_fortunes
     }
+    lang_instruction = "\n\nWrite in English. Do NOT include eto or Ten-God terms." if lang == 'en' else ""
+

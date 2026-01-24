@@ -11,14 +11,10 @@ from lucky_utils import generate_lucky_info, generate_lucky_direction
 from yearly_love_fortune_utils import generate_yearly_love_fortune
 from pdf_generator_unified import create_pdf_unified
 
-def _lang_note(lang: str) -> str:
-    return "Write in English." if lang == "en" else "日本語で出力してください。"
 
 
 
-
-
-def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False):
+def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang: str = 'ja', style: str | None = None):
     import json
     eto = get_nicchu_eto(birthdate)
     try:
@@ -37,7 +33,29 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False):
         tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
         tsuhen_month2 = get_tsuhensei_for_date(birthdate, target2.year, target2.month)
 
-        prompt = f"""あなたは四柱推命の専門家です。
+        if lang == "en":
+            prompt = f"""You are an expert in Four Pillars of Destiny (Shichu Suimei).
+- Day Pillar (for internal use only): {eto}
+- Year Ten-God: {tsuhen_year}
+- Ten-God for {target1.year}-{target1.month:02d}: {tsuhen_month1}
+- Ten-God for {target2.year}-{target2.month:02d}: {tsuhen_month2}
+
+Return ONLY a JSON object with these 4 fields:
+
+{{
+  "personality": "Natural prose within 900 characters",
+  "year_fortune": "Fortune for {this_year} within 900 characters",
+  "month_fortune": "Fortune for {target1.year}-{target1.month:02d} within 900 characters",
+  "next_month_fortune": "Fortune for {target2.year}-{target2.month:02d} within 900 characters"
+}}
+
+Rules:
+- Write in English.
+- Do NOT mention zodiac stems/branches, eto, or Ten-God names in the prose.
+- Positive, warm, and practical tone.
+"""
+        else:
+            prompt = f"""あなたは四柱推命の専門家です。
 - 日柱: {eto}
 - 年の通変星: {tsuhen_year}
 - {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
@@ -380,7 +398,7 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
 
 
 
-def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool=False, style: str='normal', lang: str='ja', **kwargs):
+def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False, lang: str = 'ja', style: str | None = None, **kwargs):
     import re
     palm_result = analyze_palm(image_data)
     shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month)
