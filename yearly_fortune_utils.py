@@ -29,7 +29,7 @@ def _ask_openai(prompt: str, retries=3, delay=2) -> str:
     return "取得に失敗しました（OpenAI APIエラー）"
 
 
-def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bool = False, force_next_month: bool = False, lang: str = 'ja'):
+def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bool = False, lang: str = 'ja'):
     nicchu = get_nicchu_eto(user_birth)
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)

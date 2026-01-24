@@ -33,6 +33,8 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
         tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
         tsuhen_month2 = get_tsuhensei_for_date(birthdate, target2.year, target2.month)
 
+        lang_instruction = "Write in English. Do NOT include the Eto (sexagenary cycle) name or Ten-God (tsuhensei) terms; explain meanings in plain language. Tone should be warm and encouraging." if lang == 'en' else "出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。"
+
         prompt = f"""あなたは四柱推命の専門家です。
 - 日柱: {eto}
 - 年の通変星: {tsuhen_year}
@@ -48,7 +50,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
   "next_month_fortune": "{target2.year}年{target2.month}月の運勢（300文字以内）"
 }}
 
-出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。
+	{lang_instruction}
 """
         response = openai.ChatCompletion.create(
             model="gpt-4",
@@ -100,7 +102,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
         }
 
 
-def analyze_palm(image_data, style=style, lang=lang):
+def analyze_palm(image_data, style: str = '', lang: str = 'ja'):
     try:
         # Data URL形式 or base64のみの両方に対応
         if "," in image_data:
@@ -120,6 +122,9 @@ def analyze_palm(image_data, style=style, lang=lang):
             if name in tesou_descriptions
         )
 
+        # 言語指定（英語出力）
+        lang_instruction = "\n\nWrite in English. Do NOT mention Eto (sexagenary cycle) names or specialized fortune-telling jargon; explain meanings in plain language." if lang == 'en' else ""
+
         # 特殊線をより魅力的に出すようにした system_prompt（語り口・優先順位調整版）
         system_prompt = (
             "あなたはプロの手相鑑定士です。以下の条件に従って、手相画像から5つの線・相を選び、"
@@ -134,6 +139,7 @@ def analyze_palm(image_data, style=style, lang=lang):
             "【各線の意味ガイド】\n"
             f"{description_text}\n\n"
             "全体を通して、読み手が安心し前向きになれるような、優しく包み込むような文体でまとめてください。"
+            + lang_instruction
         )
 
         # ユーザープロンプト（出力フォーマット）
@@ -148,6 +154,7 @@ def analyze_palm(image_data, style=style, lang=lang):
             "・各項目は200文字前後で、やわらかく詩的で心に残る表現にしてください\n"
             "・“無い”や“不足”という否定的な表現は避け、可能性や伸びしろとして前向きに表現してください\n"
             "・心に灯をともすような、やさしく前向きな締めくくりで終えてください"
+            + ("\n\nOutput MUST be in English." if lang == 'en' else "")
         )
 
         response = openai.ChatCompletion.create(
@@ -179,9 +186,12 @@ def analyze_palm(image_data, style=style, lang=lang):
 
 
 
-def get_iching_advice(, style: str = '', lang: str = 'ja'):
+def get_iching_advice(style: str = '', lang: str = 'ja'):
     try:
-        prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
+        if lang == 'en':
+            prompt = "You are an I Ching (Yi Jing) advisor. Give a gentle, positive message for the querent in about 120-160 words of natural English. Avoid specialized jargon; focus on practical guidance."
+        else:
+            prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -194,7 +204,10 @@ def get_iching_advice(, style: str = '', lang: str = 'ja'):
 
 
 def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str = 'ja'):
-    prompt = f"""あなたは占いの専門家です。
+    head = "You are a fortune advisor." if lang == 'en' else "あなたは占いの専門家です。"
+    line_format = "◆ Item: XX  ◆ Color: XX  ◆ Number: XX  ◆ Food: XX  ◆ Day: (Mon/Tue/...)" if lang == 'en' else "◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日"
+
+    prompt = f"""{head}
 相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
 
 【手相】\n{palm_result}\n
@@ -203,7 +216,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 以下5つの項目を、すべて1行にまとめて簡潔に出力してください：
 
-◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日
+{line_format}
 
 - 補足、理由、改行は一切禁止
 - 各項目は短く（単語～数語）
@@ -218,12 +231,12 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
         return [response["choices"][0]["message"]["content"].strip()]
     except Exception as e:
         print("❌ ラッキー情報取得失敗:", e)
-        return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
+        return ["◆ Item: -  ◆ Color: -  ◆ Number: -  ◆ Food: -  ◆ Day: -" if lang == 'en' else "◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
 
 
 
 
-def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None):
+def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None, lang: str = 'ja'):
     """
     九星の直接連想（紫/9/火曜…）を避け、数秘 + タロット + 易(八卦) + 色彩心理を混ぜて
     「◆ アイテム／カラー／ナンバー／フード／デー」を1行で返す（リスト1要素）。
@@ -369,8 +382,12 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
     day = tarot_weekday
 
     # ---- 10) 最終1行フォーマット ----
-    line = f"◆ アイテム：{item}　　◆ カラー：{color}　　◆ ナンバー：{number}　　◆ フード：{food}　　◆ デー：{day}"
-    return [line]
+    if lang == 'en':
+        line = f"◆ Item: {item}    ◆ Color: {color}    ◆ Number: {number}    ◆ Food: {food}    ◆ Day: {day}"
+        return [line]
+    else:
+        line = f"◆ アイテム：{item}　　◆ カラー：{color}　　◆ ナンバー：{number}　　◆ フード：{food}　　◆ デー：{day}"
+        return [line]
 
 
 
@@ -378,9 +395,9 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
 
 def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False, style: str = '', lang: str = 'ja'):
     import re
-    palm_result = analyze_palm(image_data)
+    palm_result = analyze_palm(image_data, style=style, lang=lang)
     shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, style=style, lang=lang)
-    iching_result = get_iching_advice()
+    iching_result = get_iching_advice(style=style, lang=lang)
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
     raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now)
