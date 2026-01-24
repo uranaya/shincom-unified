@@ -991,6 +991,10 @@ def ten_shincom():
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
             force_next_month = data.get("force_next_month", False) if is_json else (data.get("force_next_month") == "yes")
 
+# 表示スタイル（東京/浅草向け）と出力言語
+style_mode = 'tokyo' if (data.get('tokyo_mode', False) if is_json else (data.get('tokyo_mode') == 'yes')) else ''
+output_lang = 'en' if (data.get('english_output', False) if is_json else (data.get('english_output') == 'yes')) else 'ja'
+
             try:
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
@@ -1013,7 +1017,7 @@ def ten_shincom():
                 print("❌ 本命星取得エラー:", e)
                 honmeisei = ""
             now = datetime.now()
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month)
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month, style=style_mode, lang=output_lang)
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()
@@ -1053,7 +1057,8 @@ def ten_shincom():
                 "shichu_result": shichu_result,
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "palm_image": image_data
-            }
+            'lang': output_lang,
+        }
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, now, force_next_month=force_next_month)
                 result_data["yearly_fortunes"] = yearly_data

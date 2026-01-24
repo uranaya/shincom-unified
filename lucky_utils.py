@@ -10,55 +10,36 @@ from reportlab.lib.units import mm
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-def generate_lucky_info(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result_raw: str, kyusei_text: str, lang: str = 'ja'):
-    """
-    Returns a list of short lines for the "Lucky" section.
-    lang: 'ja' or 'en'
-    """
-    lang_instruction = "\n\nWrite in English." if lang == 'en' else ""
-    prompt = f"""
-あなたは占いコンテンツ制作者です。
-次の情報を参考に「ラッキー情報」を短い箇条書きで作ってください。
-（日柱名や占い専門用語は出さず、現実に使える内容にしてください）
+def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str = 'ja'):
+    prompt = f"""あなたは占いの専門家です。
+相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
 
-- 日柱（内部用）: {nicchu_eto}
-- 生年月日: {birthdate}
-- 年齢: {age}
-- 手相要約: {palm_result}
-- 四柱推命要約: {shichu_result_raw}
-- 九星気学: {kyusei_text}
+【手相】\n{palm_result}\n
+【四柱推命】\n{shichu_result}\n
+【九星気学の方位】\n{kyusei_text}
 
-出力形式（各項目1行、合計5行以内、短く）：
-◆ ラッキーアイテム：...
-◆ ラッキーカラー：...
-◆ ラッキーフード：...
-◆ ラッキースポット：...
-◆ ラッキーナンバー：...
-""" + lang_instruction
+以下5つの項目を、すべて1行にまとめて簡潔に出力してください：
 
-    text = _ask_openai(prompt)
-    # normalize to lines
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    # keep at most 5
-    lines = lines[:5]
+◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日
 
-    # If English, ensure prefixes are English for consistency
-    if lang == 'en':
-        mapped = []
-        for ln in lines:
-            ln = ln.lstrip("◆").strip()
-            # basic replacements
-            ln = ln.replace("ラッキーアイテム", "Lucky item").replace("ラッキーカラー", "Lucky color")                    .replace("ラッキーフード", "Lucky food").replace("ラッキースポット", "Lucky spot")                    .replace("ラッキーナンバー", "Lucky number")
-            # Ensure colon
-            if ":" not in ln:
-                ln = ln.replace("：", ":")
-            if not ln.startswith("Lucky"):
-                # fallback
-                ln = "Lucky: " + ln
-            mapped.append("◆ " + ln)
-        lines = mapped
+- 「◆」で始める
+- 出力は1行だけにする
+- 各項目は短く（単語～数語）
+- 補足説明・理由・語り・改行は一切禁止
+- 他の文や文章は禁止（この形式のみで返答すること）
+"""
 
-    return lines
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.6
+        )
+        return [response["choices"][0]["message"]["content"].strip()]
+    except Exception as e:
+        print("❌ ラッキー情報取得失敗:", e)
+        return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
+
 
 def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
     """

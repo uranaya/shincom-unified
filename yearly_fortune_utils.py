@@ -29,64 +29,68 @@ def _ask_openai(prompt: str, retries=3, delay=2) -> str:
     return "取得に失敗しました（OpenAI APIエラー）"
 
 
-def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bool = False, lang: str = 'ja'):
-    """
-    Returns yearly fortune + 12 monthly fortunes.
-    - force_next_month: if True, base month starts from next month even if today < 20th.
-    - lang: 'ja' or 'en'
-    """
-    lang_instruction = "\n\nWrite in English. Do NOT include eto names or Ten-God terms. Avoid fortune-telling jargon. Keep it positive and practical." if lang == 'en' else ""
-
+def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bool = False, force_next_month: bool = False, lang: str = 'ja'):
     nicchu = get_nicchu_eto(user_birth)
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
 
-    # Base month (20-day rule)
+    # ★ 20日境の基準月 base
     base = now.replace(day=15)
     if now.day >= 20 or force_next_month:
         base += relativedelta(months=1)
 
+    # 年ラベルは基準月の年
     target_year = base.year
 
+    lang_instruction = "\n\nWrite in English. Do NOT include eto or Ten-God terms." if lang == 'en' else ""
+
+    # Year fortune prompt
     tsuhen_year = get_tsuhensei_for_year(user_birth, target_year)
     prompt_year = f"""
-You are an advisor who gives practical, uplifting guidance.
-Based on the info below, write a short yearly outlook for {target_year} for the person addressed as "you".
+あなたは開運アドバイザーです。
+以下の情報をもとに、{target_year}年における「あなた」の全体運を自然な日本語で表現してください。
 
-- Day-pillar (internal): {nicchu}
-- Ten-God (internal meaning): {tsuhen_year}
+- 日柱: {nicchu}
+- 通変星: {tsuhen_year}
 
-Rules:
-- Do NOT mention eto names or Ten-God terms.
-- About 120 Japanese characters or ~3-5 English sentences.
-- Positive, realistic, actionable.
-""" + lang_instruction
+条件：
+- 占い用語（例：比肩、印綬など）や干支名は使わず、
+  意味に沿ってやさしい言葉に置き換えてください
+- 約120文字以内
+- 前向きで、行動や考え方の指針になるように
+- 読んだ人が「なるほど」と感じるように
+""" + lang_instruction.strip()
     year_fortune = _ask_openai(prompt_year)
 
+    # ★ 基準月 base から 12か月分
     month_fortunes = []
     for i in range(12):
         target = base + relativedelta(months=i)
         y, m = target.year, target.month
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
-        _ = get_directions(y, m, honmeisei)  # kept for future use / consistency
+        dirs = get_directions(y, m, honmeisei)
 
         prompt_month = f"""
-You are a professional fortune advisor.
-Write an outlook for {y}-{m:02d} for the person addressed as "you", in a practical and positive tone.
+あなたは占いの専門家です。
+以下の情報をもとに、{y}年{m}月の運気を自然な日本語で約120文字以内にまとめてください。
 
-- Day-pillar (internal): {nicchu}
-- Monthly Ten-God (internal meaning): {tsuhen_month}
+- 日柱: {nicchu}
+- 月の通変星: {tsuhen_month}
 
-Rules:
-- Do NOT mention eto names or Ten-God terms.
-- Keep it concise (about 120 Japanese characters or ~3-5 English sentences).
-- Add month-to-month variation (actions, emotions, relationships, pacing).
-""" + lang_instruction
-
+条件：
+- 占い専門用語は使わず意味をやさしく表現
+- 主語は「あなた」
+- 月ごとに変化を出す（行動・感情・周囲との関係など）
+- 現実的でポジティブな内容
+""" + lang_instruction.strip()
         text = _ask_openai(prompt_month)
-        label = f"{y}年{m}月の運勢" if lang != 'en' else f"Fortune for {y}-{m:02d}"
-        month_fortunes.append({"label": label, "text": text})
+        month_fortunes.append({
+            "label": f"{y}年{m}月の運勢",
+            "text": text
+        })
 
-    year_label = f"{target_year}年の総合運" if lang != 'en' else f"Yearly Fortune for {target_year}"
-    return {"year_label": year_label, "year_text": year_fortune, "months": month_fortunes}
-
+    return {
+        "year_label": f"{target_year}年の総合運",
+        "year_text": year_fortune,
+        "months": month_fortunes
+    }

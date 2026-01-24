@@ -14,8 +14,7 @@ from pdf_generator_unified import create_pdf_unified
 
 
 
-def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, style: str = None, lang: str = 'ja'):
-    lang_instruction = "\n\nWrite in English. Do NOT include eto names or fortune-telling jargon." if lang == 'en' else ""
+def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, style: str = '', lang: str = 'ja'):
     import json
     eto = get_nicchu_eto(birthdate)
     try:
@@ -50,7 +49,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
 }}
 
 出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。
-""" + lang_instruction
+"""
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -101,8 +100,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
         }
 
 
-def analyze_palm(image_data, style: str = None, lang: str = 'ja'):
-    lang_instruction = "\n\nWrite in English. Do NOT include eto names or fortune-telling jargon." if lang == 'en' else ""
+def analyze_palm(image_data, style=style, lang=lang):
     try:
         # Data URL形式 or base64のみの両方に対応
         if "," in image_data:
@@ -181,8 +179,7 @@ def analyze_palm(image_data, style: str = None, lang: str = 'ja'):
 
 
 
-def get_iching_advice(style: str = None, lang: str = 'ja'):
-    lang_instruction = "\n\nWrite in English. Do NOT include eto names or fortune-telling jargon." if lang == 'en' else ""
+def get_iching_advice(, style: str = '', lang: str = 'ja'):
     try:
         prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
         response = openai.ChatCompletion.create(
@@ -196,7 +193,7 @@ def get_iching_advice(style: str = None, lang: str = 'ja'):
         return "現在、易占いの結果が取得できませんでした。"
 
 
-def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
+def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str = 'ja'):
     prompt = f"""あなたは占いの専門家です。
 相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
 
@@ -210,7 +207,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 - 補足、理由、改行は一切禁止
 - 各項目は短く（単語～数語）
-""" + lang_instruction
+"""
 
     try:
         response = openai.ChatCompletion.create(
@@ -226,7 +223,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 
 
-def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None, lang: str = 'ja'):
+def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None):
     """
     九星の直接連想（紫/9/火曜…）を避け、数秘 + タロット + 易(八卦) + 色彩心理を混ぜて
     「◆ アイテム／カラー／ナンバー／フード／デー」を1行で返す（リスト1要素）。
@@ -379,10 +376,10 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
 
 
 
-def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False, style: str = None, lang: str = 'ja'):
+def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False, style: str = '', lang: str = 'ja'):
     import re
     palm_result = analyze_palm(image_data)
-    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month)
+    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, style=style, lang=lang)
     iching_result = get_iching_advice()
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)

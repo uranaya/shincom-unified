@@ -41,8 +41,9 @@ def wrap(text, limit):
     return _wrap(text, limit)
 
 
-def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction):
+def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang: str = 'ja'):
     c.setFont(FONT_NAME, 12)
+    LUCKY_TITLE = 'Lucky Information' if lang == 'en' else 'LUCKY_TITLE'
     c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
     y -= 6 * mm
     c.setFont(FONT_NAME, 10)
@@ -247,7 +248,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
-    # 四柱推命・まとめ等（タイトルのみでも出す）
+    # ('Four Pillars' if lang=='en' else '四柱推命')・まとめ等（タイトルのみでも出す）
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
         wrap_len = 36 if 'month' in key else 40
         title = data['titles'].get(key, "")
@@ -265,7 +266,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.setFont(FONT_NAME, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=data.get('lang','ja'))
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
