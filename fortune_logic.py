@@ -14,8 +14,6 @@ from pdf_generator_unified import create_pdf_unified
 
 
 
-
-
 def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False):
     import json
     eto = get_nicchu_eto(birthdate)
@@ -378,19 +376,51 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
 
 
 
+def _translate_result_to_english(palm_titles, palm_texts, shichu_result: dict, iching_result: str, lucky_lines: list):
+    """Translate JP outputs to EN in one shot, preserving structure."""
+    payload = {
+        "palm_titles": palm_titles,
+        "palm_texts": palm_texts,
+        "shichu": shichu_result,
+        "iching": iching_result,
+        "lucky_lines": lucky_lines,
+    }
+    prompt = (
+        "Translate the following Japanese fortune-telling content into natural English for customers. "
+        "Keep it positive and readable. Do NOT add new information. Preserve list lengths.\n\n"
+        "Return STRICT JSON with keys: palm_titles (list), palm_texts (list), "
+        "shichu (object with personality/year_fortune/month_fortune/next_month_fortune), "
+        "iching (string), lucky_lines (list).\n\n"
+        f"INPUT_JSON:\n{json.dumps(payload, ensure_ascii=False)}"
+    )
+    try:
+        resp = openai.ChatCompletion.create(
+            model=os.getenv("OPENAI_MODEL_TEXT", "gpt-3.5-turbo"),
+            max_tokens=1800,
+            temperature=0.3,
+            messages=[
+                {"role": "system", "content": "You are a professional translator and editor for fortune-telling content."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = (resp.choices[0].message.content or "").strip()
+        m = re.search(r"\{.*\}", text, re.S)
+        if m:
+            obj = json.loads(m.group(0))
+            return (
+                obj.get("palm_titles", palm_titles),
+                obj.get("palm_texts", palm_texts),
+                obj.get("shichu", shichu_result),
+                obj.get("iching", iching_result),
+                obj.get("lucky_lines", lucky_lines),
+            )
+    except Exception as e:
+        print("❌ translate_to_english error:", e)
+    if lang == 'en':
+        palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = _translate_result_to_english(palm_titles, palm_texts, shichu_result, iching_result, lucky_lines)
+    return palm_titles, palm_texts, shichu_result, iching_result, lucky_lines
 
-def _lang_pack(lang: str):
-    """Return (system_prompt, lang_note) for OpenAI calls."""
-    if (lang or 'ja').lower().startswith('en'):
-        system = "You are a professional fortune teller. Write clear, natural English for customers. Do not mention Japanese astrology jargon, eto names, or Ten-God terms; translate meanings into plain English."
-        note = "\n\nWrite in English. Do NOT include eto names or Ten-God terms. Keep it friendly, practical, and positive."
-        return system, note
-    system = "あなたは占いのプロです。お客様に寄り添い、前向きで具体的なアドバイスを自然な日本語で書いてください。占い用語や干支名は出さず、意味をやさしい言葉に置き換えてください。"
-    note = ""
-    return system, note
-
-def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool=False, style: str='normal', lang: str='ja', **kwargs):
-    system_prompt, lang_note = _lang_pack(lang)
+def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False, lang: str = 'ja'):
     import re
     palm_result = analyze_palm(image_data)
     shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month)
@@ -672,7 +702,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         )
 
         # 吉方位テキスト（九星気学ベース）
-        kyusei_text = generate_lucky_direction(user_birth, base.date(), lang=lang)
+        kyusei_text = generate_lucky_direction(user_birth, base.date())
 
         # ラッキー情報（恋愛版）
         lucky_info = generate_lucky_renai_info(

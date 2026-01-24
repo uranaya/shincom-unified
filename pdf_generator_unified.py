@@ -42,80 +42,32 @@ def wrap(text, limit):
     return _wrap(text, limit)
 
 
-def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='ja', page_height=None, **kwargs):
-    """ラッキー情報セクション
-    - 2列表示で横幅を有効活用（余白があるのに3ページ化する問題を抑制）
-    - lucky_lines が 1行でも2行でも崩れない
-    - 呼び出し側の互換（lang/page_height/kwargs）対応
-    """
-    if not lucky_lines:
-        lucky_lines = []
-
+def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang: str = 'ja'):
     c.setFont(FONT_NAME, 12)
-    title = "■ Lucky Info (from birthdate)" if (str(lang).lower().startswith("en")) else "■ ラッキー情報（生年月日より）"
-    c.drawString(margin, y, title)
+    c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
     y -= 6 * mm
-
-    # 2列レイアウト
     c.setFont(FONT_NAME, 10)
-    col_gap = 8 * mm
-    col_w = (width - 2 * margin - col_gap) / 2.0
-    line_h = 5.6 * mm
 
-    def _fit_one_line(s: str, max_w: float) -> str:
-        s = (s or "").strip()
-        if not s:
-            return ""
-        # 収まるならそのまま
-        if stringWidth(s, FONT_NAME, 10) <= max_w:
-            return s
-        # 末尾省略
-        ell = "…"
-        while s and stringWidth(s + ell, FONT_NAME, 10) > max_w:
-            s = s[:-1]
-        return (s + ell) if s else ell
-
-    # 2つずつ（左・右）描画。奇数なら右は空。
+    # 2項目ずつ改行する形式（最大3行）
     for i in range(0, len(lucky_lines), 2):
-        left = _fit_one_line(lucky_lines[i], col_w)
-        right = _fit_one_line(lucky_lines[i + 1] if i + 1 < len(lucky_lines) else "", col_w)
+        line1 = lucky_lines[i]
+        line2 = lucky_lines[i + 1] if i + 1 < len(lucky_lines) else ""
+        formatted = f"{line1:<38}    {line2}"
+        c.drawString(margin, y, formatted)
+        y -= 6 * mm
 
-        c.drawString(margin, y, left)
-        if right:
-            c.drawString(margin + col_w + col_gap, y, right)
-        y -= line_h
-
-    # 方位（必要なら最後に）
     if lucky_direction:
-        y -= 1.5 * mm
+        y -= 2 * mm
+        c.setFont(FONT_NAME, 12)
+        c.drawString(margin, y, "■ 吉方位（九星気学より）")
+        y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        direction_title = "■ Lucky Directions" if (str(lang).lower().startswith("en")) else "■ ラッキー方位"
-        c.drawString(margin, y, direction_title)
-        y -= 5.5 * mm
-
-        dir_text = (lucky_direction or "").strip()
-        # 1行で無理なら折り返し（左列幅いっぱいで）
-        max_w = width - 2 * margin
-        if stringWidth(dir_text, FONT_NAME, 10) <= max_w:
-            c.drawString(margin, y, dir_text)
-            y -= line_h
-        else:
-            # 簡易折り返し
-            words = dir_text.split()
-            cur = ""
-            for w in words:
-                candidate = (cur + " " + w).strip()
-                if stringWidth(candidate, FONT_NAME, 10) <= max_w:
-                    cur = candidate
-                else:
-                    c.drawString(margin, y, cur)
-                    y -= line_h
-                    cur = w
-            if cur:
-                c.drawString(margin, y, cur)
-                y -= line_h
+        for line in lucky_direction.strip().splitlines():
+            c.drawString(margin, y, line.strip())
+            y -= 6 * mm
 
     return y
+
 
 def draw_palm_image(c, base64_image, width, y):
     try:
@@ -314,7 +266,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.setFont(FONT_NAME, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=data.get('lang','ja'))
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
@@ -367,7 +319,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         c.setFont(FONT_NAME, 14)
 
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=data.get('lang','ja'))
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])
