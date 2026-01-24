@@ -14,7 +14,7 @@ from pdf_generator_unified import create_pdf_unified
 
 
 
-def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, style: str = "default", lang: str = "ja"):
+def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False):
     import json
     eto = get_nicchu_eto(birthdate)
     try:
@@ -33,24 +33,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
         tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
         tsuhen_month2 = get_tsuhensei_for_date(birthdate, target2.year, target2.month)
 
-        style_note = ""
-        if style == "tokyo":
-            style_note = (
-                "\n【東京（浅草）向けの語り口】\n"
-                "・観光客/都会のお客様にも伝わるテンポの良い文章\n"
-                "・過度な方言やローカル固有名詞は避けつつ、『街歩き・人混み・移動』など都会の生活文脈に寄せる\n"
-                "・怖がらせる表現は避け、前向きで実行しやすい提案にする\n"
-            )
-        lang_note = ""
-        if lang == "en":
-            lang_note = (
-                "\n【Language】\n"
-                "Write EVERYTHING in natural English.\n"
-                "Do not include Japanese.\n"
-                "Avoid technical astrology jargon; explain in plain, practical terms.\n"
-            )
-
-        prompt = f"""あなたは四柱推命の専門家です。{style_note}{lang_note}
+        prompt = f"""あなたは四柱推命の専門家です。
 - 日柱: {eto}
 - 年の通変星: {tsuhen_year}
 - {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
@@ -91,7 +74,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
                     return f"{y}年{m}月は"
                 return f"{y}年{m}月は、" + s
 
-            if isinstance(result, dict) and lang != "en":
+            if isinstance(result, dict):
                 result["month_fortune"] = _fix_month_prefix(result.get("month_fortune", ""), target1.year, target1.month)
                 result["next_month_fortune"] = _fix_month_prefix(result.get("next_month_fortune", ""), target2.year, target2.month)
 
@@ -117,7 +100,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
         }
 
 
-def analyze_palm(image_data, style: str = "default", lang: str = "ja"):
+def analyze_palm(image_data):
     try:
         # Data URL形式 or base64のみの両方に対応
         if "," in image_data:
@@ -153,21 +136,7 @@ def analyze_palm(image_data, style: str = "default", lang: str = "ja"):
             "全体を通して、読み手が安心し前向きになれるような、優しく包み込むような文体でまとめてください。"
         )
 
-                # --- 出力トーン切替（東京/英語） ---
-        if style == "tokyo":
-            system_prompt += (
-                "\n\n【東京（浅草）向けの語り口】\n"
-                "・観光や街歩きのリズムに合う、短く切れの良い文章\n"
-                "・怖がらせず、背中を押す前向きな提案に寄せる\n"
-            )
-        if lang == "en":
-            system_prompt += (
-                "\n\n【Language】\n"
-                "Write EVERYTHING in natural English. Do not include Japanese.\n"
-                "Keep it warm and uplifting, but not exaggerated.\n"
-            )
-
-# ユーザープロンプト（出力フォーマット）
+        # ユーザープロンプト（出力フォーマット）
         user_prompt = (
             "以下の形式で出力してください：\n"
             "### 1. 生命線\n（説明文）\n\n"
@@ -210,13 +179,9 @@ def analyze_palm(image_data, style: str = "default", lang: str = "ja"):
 
 
 
-def get_iching_advice(style: str = "default", lang: str = "ja"):
+def get_iching_advice():
     try:
         prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
-        if style == "tokyo":
-            prompt += "（東京/浅草の短時間鑑定にも合うように、テンポよく実行しやすい助言にしてください。）"
-        if lang == "en":
-            prompt = "You are an I Ching advisor. Give a gentle, positive message the client needs right now in about 120-160 English words. Do not use Japanese. Keep it practical and reassuring."
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -258,223 +223,70 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 
 
-def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None, lang: str = "ja"):
+def generate_lucky_info_mixed(
+    nicchu_eto: str,
+    birthdate: str,
+    age: int,
+    palm_result: str,
+    shichu_result: str,
+    kyusei_text: str,
+    now=None,
+    lang: str = "ja",
+):
     """
-    九星の直接連想（紫/9/火曜…）を避け、数秘 + タロット + 易(八卦) + 色彩心理を混ぜて
-    「◆ アイテム／カラー／ナンバー／フード／デー」を1行で返す（リスト1要素）。
-    - GPT非依存
-    - 誕生日 × 当年月で擬似ランダム
-    - タロット/八卦の配列長差異（3/4/5要素）に強い
+    GPT非依存の「ラッキー情報」を生成します。
+
+    方針:
+    - 日本語 / 英語の両対応（lang: 'ja' or 'en'）
+    - PDFに収めやすいよう **最大2行** で返す（list[str]）
+      * 1行目: Item / Color / Number
+      * 2行目: Food / Day
+    - 九星の文章(kyusei_text)は、日本語混入の主因になりやすいので
+      lucky_info には含めず、別枠(lucky_direction 等)で表示する前提。
     """
     from datetime import datetime
+    import hashlib
 
-    # ---- 1) 擬似ランダム seed（誕生日×当年当月で月替わり）----
     today = now or datetime.today()
     seed_base = f"{birthdate}-{today.year}-{today.month}"
-    seed = int(hashlib.sha256(seed_base.encode()).hexdigest(), 16) % (2**32)
-    rng = random.Random(seed)
+    seed = int(hashlib.sha256(seed_base.encode("utf-8")).hexdigest(), 16)
 
-    # ---- 2) 数秘：ライフパス（1〜9）----
-    def lifepath(date_str: str) -> int:
-        digits = [int(ch) for ch in date_str if ch.isdigit()]
-        s = sum(digits)
-        while s > 9:
-            s = sum(int(d) for d in str(s))
-        return max(1, min(9, s))
-    lp = lifepath(birthdate)  # 1..9
+    def pick(arr):
+        return arr[seed % len(arr)]
 
-    # ---- 3) タロット（大アルカナ）一枚引き + 惑星/曜日 + 色ヒント ----
-    # 惑星→曜日：Sun=日, Moon=月, Mars=火, Mercury=水, Jupiter=木, Venus=金, Saturn=土
-    tarot_deck = [
-        ("The Fool", "Uranus", "自由/風", ["白", "ライム", "ターコイズ"]),
-        ("The Magician", "Mercury", "創造/知", ["黄", "ライトグレー", "シルバー"]),
-        ("The High Priestess", "Moon", "直感/内省", ["群青", "オフホワイト", "パール"]),
-        ("The Empress", "Venus", "実り/美", ["ピンク", "オリーブ", "アプリコット"]),
-        ("The Emperor", "Mars", "意志/統率", ["赤", "黒", "ボルドー"]),
-        ("The Hierophant", "Venus", "価値/伝統", ["ベージュ", "グリーン", "ココア"]),
-        ("The Lovers", "Mercury", "選択/調和", ["ライトピンク", "ミント", "コーラル"]),
-        ("The Chariot", "Moon", "前進/勝利", ["ネイビー", "ホワイト", "メタリック"]),
-        ("Strength", "Sun", "勇気/自己肯定", ["ゴールド", "サンイエロー", "キャメル"]),
-        ("The Hermit", "Mercury", "洞察/学び", ["チャコール", "カーキ", "ティール"]),
-        ("Wheel of Fortune", "Jupiter", "転機/拡大", ["ロイヤルブルー", "サファイア", "群青"]),
-        ("Justice", "Venus", "均衡/公正", ["エメラルド", "グレージュ", "ホワイト"]),
-        ("The Hanged Man", "Neptune", "視点転換/献身", ["アクア", "ラベンダー", "スモーキーブルー"]),
-        ("Death", "Mars", "刷新/再生", ["バーガンディ", "スレートグレー", "ダークグリーン"]),
-        ("Temperance", "Jupiter", "調整/中庸", ["スカイブルー", "ペールオレンジ", "セージ"]),
-        ("The Devil", "Saturn", "執着/制御", ["ダークブラウン", "グラファイト", "モスグリーン"]),
-        ("The Tower", "Mars", "突破/再構成", ["クリムゾン", "チャコール", "アイアンブルー"]),
-        ("The Star", "Saturn", "希望/透明感", ["アイスブルー", "シルバー", "パステル"]),
-        ("The Moon", "Moon", "感受性/夢", ["パールホワイト", "ブルーグレー", "ミッドナイトブルー"]),
-        ("The Sun", "Sun", "祝福/活力", ["サンフラワー", "オレンジ", "アンバー"]),
-        ("Judgement", "Pluto", "覚醒/再起", ["ホワイト", "スカーレット", "スカイグレー"]),
-        ("The World", "Saturn", "完成/統合", ["ピーコックグリーン", "ディープブルー", "サンド"])
-    ]
-    card = rng.choice(tarot_deck)
-    # 3要素/4要素 どちらでも受ける
-    if len(card) == 4:
-        card_name, planet, _theme, card_color_candidates = card
-    elif len(card) == 3:
-        card_name, planet, card_color_candidates = card
-    else:
-        # フォールバック
-        card_name, planet, card_color_candidates = ("The Sun", "Sun", ["サンフラワー", "オレンジ", "アンバー"])
+    items_ja = ["浄化用の小さな水晶", "アロマオイル（ラベンダー）", "白いハンカチ", "金色のチャーム", "小さなノート", "シンプルなリング"]
+    items_en = ["a small cleansing crystal", "lavender aroma oil", "a white handkerchief", "a gold charm", "a small notebook", "a simple ring"]
 
-    weekday_map = {
-        "Sun": "日曜日", "Moon": "月曜日", "Mars": "火曜日",
-        "Mercury": "水曜日", "Jupiter": "木曜日",
-        "Venus": "金曜日", "Saturn": "土曜日",
-        "Neptune": "木曜日", "Pluto": "土曜日", "Uranus": "水曜日"
-    }
-    tarot_weekday = weekday_map.get(planet, "金曜日")
+    colors_ja = ["白", "金", "深い青", "若草色", "薄紫", "黒"]
+    colors_en = ["white", "gold", "deep blue", "fresh green", "soft purple", "black"]
 
-    # ---- 4) 易（八卦）→ 色/食の傾向（4要素 or 5要素を許容）----
-    # 4要素: (卦名, 性質, 五行, [色])
-    # 5要素: (卦名, 性質, 五行, [色], [食])
-    trigrams = [
-        ("乾", "天", "金", ["白", "シルバー"], ["ナッツ", "白身魚", "大根"]),
-        ("兌", "沢", "金", ["ミルキー", "ピンク"], ["乳製品", "ヨーグルト", "桃"]),
-        ("離", "火", "火", ["オレンジ", "朱"], ["スパイス", "トマト", "唐辛子"]),
-        ("震", "雷", "木", ["ライム", "若草"], ["香草", "枝豆", "青菜"]),
-        ("巽", "風", "木", ["ミント", "ターコイズ"], ["ハーブティー", "緑茶", "きのこ"]),
-        ("坎", "水", "水", ["青", "ネイビー"], ["海藻", "貝類", "寒天"]),
-        ("艮", "山", "土", ["ベージュ", "オークル"], ["根菜", "芋", "味噌"]),
-        ("坤", "地", "土", ["アース", "モカ"], ["穀類", "きなこ", "パン"])
-    ]
-    trig = rng.choice(trigrams)
-    trig_foods_from_tuple = None
-    if len(trig) >= 5:
-        trig_name, trig_nature, wu_xing, trig_colors, trig_foods_from_tuple = trig[:5]
-    elif len(trig) == 4:
-        trig_name, trig_nature, wu_xing, trig_colors = trig
-    else:
-        trig_name, trig_nature, wu_xing, trig_colors = ("坤", "地", "土", ["アース", "モカ"])
+    foods_ja = ["ハーブティー", "柑橘", "温かいスープ", "ナッツ", "魚料理", "チョコレート（少量）"]
+    foods_en = ["herbal tea", "citrus", "warm soup", "nuts", "fish dish", "a small piece of chocolate"]
 
-    # ---- 5) アイテム候補（タロット傾向に応じた雑貨）----
-    item_pool = {
-        "The Magician": ["高機能ペン", "小型ガジェット", "カードケース"],
-        "The High Priestess": ["ノート", "アロマストーン", "読書用しおり"],
-        "The Empress": ["フラワー雑貨", "リップバーム", "ハンドクリーム"],
-        "The Emperor": ["手帳カバー", "革財布", "名刺入れ"],
-        "The Hierophant": ["万年筆", "御守り", "レザーしおり"],
-        "The Lovers": ["ペアマグ", "ハートチャーム", "香水"],
-        "The Chariot": ["スニーカー", "トラベルポーチ", "スポーツタオル"],
-        "Strength": ["トレーニングバンド", "蜂蜜飴", "カフェタンブラー"],
-        "The Hermit": ["読書灯", "ルーペ", "上質ノート"],
-        "Wheel of Fortune": ["腕時計", "キーホルダー", "ラッキーチャーム"],
-        "Justice": ["バランスボード", "スクエアトート", "スケール柄グッズ"],
-        "The Hanged Man": ["アイピロー", "ストレッチポール", "アロマオイル"],
-        "Death": ["断捨離ボックス", "新品タオル", "新しい歯ブラシ"],
-        "Temperance": ["ブレンドティー", "保温ボトル", "整う入浴剤"],
-        "The Devil": ["カカオ高配チョコ", "アロマキャンドル", "レザーブレス"],
-        "The Tower": ["スマホ充電器", "耐衝撃ケース", "貼るカイロ"],
-        "The Star": ["星座チャーム", "ミスト化粧水", "クリアポーチ"],
-        "The Moon": ["アロマディフューザー", "ムーン雑貨", "柔軟剤"],
-        "The Sun": ["サングラス", "ビタミンCタブレット", "明るいマグ"],
-        "Judgement": ["ホイッスル", "目覚まし時計", "ホワイトノート"],
-        "The World": ["地球柄ノート", "パスポートケース", "トラベルタグ"],
-        "The Fool": ["小さなバックパック", "ピンバッジ", "スカーフ"]
-    }
-    item_candidates = item_pool.get(card_name, ["キーホルダー", "ノート", "トートバッグ"])
-    item = rng.choice(item_candidates)
+    days_ja = ["月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日", "日曜日"]
+    days_en = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-    # ---- 6) カラー：タロット候補 × 八卦候補 → 紫系を抑制して1つ ----
-    color_candidates = list({*card_color_candidates, *trig_colors})
-    filtered = [c for c in color_candidates if "紫" not in c and "パープル" not in c]
-    color = rng.choice(filtered if filtered else color_candidates)
+    item = pick(items_en if lang == "en" else items_ja)
+    color = pick(colors_en if lang == "en" else colors_ja)
+    number = (seed % 9) + 1
+    food = pick(foods_en if lang == "en" else foods_ja)
+    day = (days_en if lang == "en" else days_ja)[seed % 7]
 
-    # ---- 7) ナンバー：数秘ライフパス優先、9偏重回避 ----
-    number = lp
-    if number == 9 and rng.random() < 0.5:
-        number = rng.choice([1,2,3,4,5,6,7,8])
-
-    # ---- 8) フード：八卦タプルに食候補があれば優先、無ければ五行マップ ----
-    if trig_foods_from_tuple:
-        food = rng.choice(trig_foods_from_tuple)
-    else:
-        food_map = {
-            "木": ["バジル", "ほうれん草", "枝豆", "抹茶", "グリーンスムージー"],
-            "火": ["カレー", "トマトスープ", "唐辛子せんべい", "チリビーンズ", "生姜湯"],
-            "土": ["さつまいも", "かぼちゃ", "雑穀ごはん", "味噌汁", "おにぎり"],
-            "金": ["白身魚", "ヨーグルト", "梨", "ナッツ", "豆腐"],
-            "水": ["わかめ", "しじみ汁", "寒天", "ところてん", "昆布だし"]
-        }
-        food = rng.choice(food_map.get(wu_xing, ["季節の果物", "ナッツ", "スープ"]))
-
-    # ---- 9) デー（曜日）：タロットの惑星由来 ----
-    day = tarot_weekday
-
-
-    # ---- 10.5) Language: English rendering (best-effort deterministic translation) ----
     if lang == "en":
-        day_map = {
-            "日曜": "Sunday", "月曜": "Monday", "火曜": "Tuesday", "水曜": "Wednesday",
-            "木曜": "Thursday", "金曜": "Friday", "土曜": "Saturday"
-        }
-        color_map = {
-            "白": "White", "黒": "Black", "赤": "Red", "青": "Blue", "緑": "Green", "黄": "Yellow",
-            "橙": "Orange", "オレンジ": "Orange", "ピンク": "Pink", "桃": "Pink",
-            "金": "Gold", "銀": "Silver", "紫": "Purple", "茶": "Brown", "灰": "Gray",
-            "ターコイズ": "Turquoise", "シルバー": "Silver", "ライトグレー": "Light Gray",
-            "ライム": "Lime", "ベージュ": "Beige", "クリーム": "Cream", "ネイビー": "Navy",
-        }
-        item_map = {
-            "高機能ペン": "Premium Pen", "小型ガジェット": "Mini Gadget", "カードケース": "Card Holder",
-            "ノート": "Notebook", "アロマストーン": "Aroma Stone", "読書用しおり": "Bookmark",
-            "フラワー雑貨": "Floral Accessory", "リップバーム": "Lip Balm", "ハンドクリーム": "Hand Cream",
-            "手帳カバー": "Planner Cover", "革財布": "Leather Wallet", "名刺入れ": "Business Card Case",
-            "万年筆": "Fountain Pen", "御守り": "Lucky Charm", "レザーしおり": "Leather Bookmark",
-            "ペアマグ": "Pair Mug", "ハートチャーム": "Heart Charm", "香水": "Perfume",
-            "スニーカー": "Sneakers", "トラベルポーチ": "Travel Pouch", "スポーツタオル": "Sports Towel",
-            "トレーニングバンド": "Workout Band", "蜂蜜飴": "Honey Candy", "カフェタンブラー": "Tumbler",
-            "読書灯": "Reading Light", "ルーペ": "Magnifier", "上質ノート": "Quality Notebook",
-            "腕時計": "Wristwatch", "キーホルダー": "Keychain", "ラッキーチャーム": "Lucky Charm",
-            "バランスボード": "Balance Board", "スクエアトート": "Square Tote", "スケール柄グッズ": "Scale-pattern Item",
-            "アイピロー": "Eye Pillow", "ストレッチポール": "Stretch Pole", "アロマオイル": "Aroma Oil",
-            "断捨離ボックス": "Declutter Box", "新品タオル": "New Towel", "新しい歯ブラシ": "New Toothbrush",
-            "ブレンドティー": "Blended Tea", "保温ボトル": "Thermal Bottle", "整う入浴剤": "Bath Salt",
-            "カカオ高配チョコ": "Dark Chocolate", "アロマキャンドル": "Scented Candle", "レザーブレス": "Leather Bracelet",
-            "スマホ充電器": "Phone Charger", "耐衝撃ケース": "Shockproof Case", "貼るカイロ": "Heat Patch",
-            "星座チャーム": "Zodiac Charm", "ミスト化粧水": "Face Mist", "クリアポーチ": "Clear Pouch",
-            "アロマディフューザー": "Aroma Diffuser", "ムーン雑貨": "Moon Accessory", "柔軟剤": "Fabric Softener",
-            "サングラス": "Sunglasses", "ビタミンCタブレット": "Vitamin C", "明るいマグ": "Bright Mug",
-            "ホイッスル": "Whistle", "目覚まし時計": "Alarm Clock", "ホワイトノート": "White Notebook",
-            "地球柄ノート": "Earth Notebook", "パスポートケース": "Passport Case", "トラベルタグ": "Travel Tag",
-            "小さなバックパック": "Small Backpack", "ピンバッジ": "Pin Badge", "スカーフ": "Scarf",
-            "トートバッグ": "Tote Bag",
-        }
-        # translate fields
-        item = item_map.get(item, item)
-        # color: try exact first, then token replace
-        color = color_map.get(color, color)
-        for k, v in color_map.items():
-            color = color.replace(k, v)
-        food_map = {
-            "バジル": "Basil", "ほうれん草": "Spinach", "枝豆": "Edamame", "抹茶": "Matcha", "グリーンスムージー": "Green Smoothie",
-            "カレー": "Curry", "トマトスープ": "Tomato Soup", "唐辛子せんべい": "Chili Rice Cracker", "チリビーンズ": "Chili Beans", "生姜湯": "Ginger Tea",
-            "さつまいも": "Sweet Potato", "かぼちゃ": "Pumpkin", "雑穀ごはん": "Mixed Grains Rice", "味噌汁": "Miso Soup", "おにぎり": "Rice Ball",
-            "白身魚": "White Fish", "ヨーグルト": "Yogurt", "梨": "Pear", "ナッツ": "Nuts", "豆腐": "Tofu",
-            "わかめ": "Wakame", "しじみ汁": "Clam Soup", "寒天": "Agar Jelly", "ところてん": "Agar Noodles", "昆布だし": "Kelp Stock",
-            "季節の果物": "Seasonal Fruit", "スープ": "Soup"
-        }
-        food = food_map.get(food, food)
-        for k, v in food_map.items():
-            food = food.replace(k, v)
-        day = day_map.get(day, day)
+        line1 = f"Item: {item}   Color: {color}   Number: {number}"
+        line2 = f"Food: {food}   Day: {day}"
+    else:
+        line1 = f"◆ アイテム：{item}　◆ カラー：{color}　◆ ナンバー：{number}"
+        line2 = f"◆ フード：{food}　◆ デー：{day}"
 
-    # ---- 10) 最終1行フォーマット ----
-    line = (f"◆ Item: {item}   ◆ Color: {color}   ◆ Number: {number}   ◆ Food: {food}   ◆ Day: {day}" if lang == "en"
-            else f"◆ アイテム：{item}　　◆ カラー：{color}　　◆ ナンバー：{number}　　◆ フード：{food}　　◆ デー：{day}")
-    return [line]
+    return [line1, line2]
 
 
-
-
-
-def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False, style: str = "default", lang: str = "ja"):
+def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False, lang: str = 'ja'):
     import re
-    palm_result = analyze_palm(image_data, style=style, lang=lang)
-    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, style=style, lang=lang)
-    iching_result = get_iching_advice(style=style, lang=lang)
+    palm_result = analyze_palm(image_data)
+    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month)
+    iching_result = get_iching_advice()
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
     raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now, lang=lang)
@@ -495,28 +307,6 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
         print("❌ lucky_info 整形失敗:", e)
         lucky_lines = []
 
-    if lang == "en" and lucky_lines:
-        rep = {
-            "アイテム：": "Item: ",
-            "カラー：": "Color: ",
-            "ナンバー：": "Number: ",
-            "フード：": "Food: ",
-            "デー：": "Day: ",
-            "アイテム": "Item",
-            "カラー": "Color",
-            "ナンバー": "Number",
-            "フード": "Food",
-            "デー": "Day",
-            "◆": "◆",
-        }
-        fixed = []
-        for line in lucky_lines:
-            s = line
-            for k, v in rep.items():
-                s = s.replace(k, v)
-            fixed.append(s)
-        lucky_lines = fixed
-
     today = now or datetime.today()
     target1 = today.replace(day=15)
     if today.day >= 20 or force_next_month:
@@ -524,9 +314,6 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     target2 = target1 + relativedelta(months=1)
     month_label = f"{target1.year}年{target1.month}月の運勢"
     next_month_label = f"{target2.year}年{target2.month}月の運勢"
-    if lang == "en":
-        month_label = f"Fortune for {target1.year}-{target1.month:02d}"
-        next_month_label = f"Fortune for {target2.year}-{target2.month:02d}"
 
     shichu_texts = {"personality": "", "year_fortune": "", "month_fortune": "", "next_month_fortune": ""}
     pattern = r"[■◆]\s*(性格|[0-9]{4}年の運勢|[0-9]{4}年[0-9]{1,2}月の運勢)(.*?)(?=[■◆]|$)"
@@ -641,7 +428,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 
     topic_sections = []
     try:
-        iching_result = get_iching_advice(style=style, lang=lang)
+        iching_result = get_iching_advice()
     except Exception as e:
         print("⚠ 易占い取得エラー（テーマ用）:", e)
         iching_result = "（易占い結果取得エラー）"

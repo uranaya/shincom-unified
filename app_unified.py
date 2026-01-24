@@ -729,6 +729,7 @@ def selfmob_uuid(uuid_str):
             target2 = target1 + relativedelta(months=1)
 
             result_data = {
+            'lang': lang,
                 "lang": output_lang,
                 "style": style_mode,
                 "palm_titles": palm_titles,
@@ -869,87 +870,64 @@ def renaiselfmob_uuid(uuid_str):
 
 
 @app.route("/preview/<filename>")
-def preview(filename):
-    """占い結果PDFのプレビュー画面表示"""
-    user_agent = request.headers.get("User-Agent", "").lower()
+def preview_pdf(filename):
+    """Preview wrapper. The PDF itself is served by /view with Range support."""
+    return render_template("pdf_preview.html", filename=filename)
 
-    # iPhoneまたはAndroidの簡易判定（必要に応じて拡張可）
-    if "iphone" in user_agent or "android" in user_agent:
-        return redirect(url_for("view_pdf", filename=filename))
-
-    referer = request.referrer or ""
-    return render_template("fortune_pdf.html", filename=filename, referer=referer)
-
-
-
-import time
 from flask import Response
 
 @app.route('/view/<filename>')
 def view_pdf(filename):
-    full_path = os.path.join(UPLOAD_FOLDER, filename)
+    """Return PDF bytes with correct Range support; stable in Chrome/Edge."""
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.exists(file_path):
+        return "PDF not found", 404
 
-    # Wait briefly for async generation
-    wait_time = 0.0
-    while not os.path.exists(full_path) and wait_time < 5.0:
-        time.sleep(0.5)
-        wait_time += 0.5
+    file_size = os.path.getsize(file_path)
+    range_header = (request.headers.get("Range") or "").strip()
 
-    if not os.path.exists(full_path):
-        return "PDFが見つかりませんでした", 404
+    def _read(start, end):
+        with open(file_path, "rb") as f:
+            f.seek(start)
+            return f.read(end - start + 1)
 
-    file_size = os.path.getsize(full_path)
-    range_header = request.headers.get("Range")
+    if not range_header:
+        data = Path(file_path).read_bytes()
+        resp = Response(data, mimetype="application/pdf")
+        resp.headers["Content-Length"] = str(len(data))
+        resp.headers["Accept-Ranges"] = "bytes"
+        resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+        resp.headers["Cache-Control"] = "no-store"
+        resp.headers["Connection"] = "close"
+        return resp
 
-    # ---- Range support (important for Chrome/Edge PDF viewer stability) ----
-    # Example: "Range: bytes=0-1023"
-    if range_header and range_header.startswith("bytes="):
-        try:
-            byte_range = range_header.replace("bytes=", "").strip()
-            start_s, end_s = byte_range.split("-", 1)
-            start = int(start_s) if start_s else 0
-            end = int(end_s) if end_s else (file_size - 1)
-            if start < 0:
-                start = 0
-            if end >= file_size:
-                end = file_size - 1
-            if end < start:
-                end = start
+    m = re.match(r"bytes=(\d*)-(\d*)", range_header)
+    if not m:
+        data = Path(file_path).read_bytes()
+        resp = Response(data, mimetype="application/pdf")
+        resp.headers["Content-Length"] = str(len(data))
+        resp.headers["Accept-Ranges"] = "bytes"
+        resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+        resp.headers["Cache-Control"] = "no-store"
+        resp.headers["Connection"] = "close"
+        return resp
 
-            length = end - start + 1
-            with open(full_path, "rb") as f:
-                f.seek(start)
-                data = f.read(length)
+    start_s, end_s = m.group(1), m.group(2)
+    start_b = int(start_s) if start_s else 0
+    end_b = int(end_s) if end_s else (file_size - 1)
+    start_b = max(0, min(start_b, file_size - 1))
+    end_b = max(start_b, min(end_b, file_size - 1))
 
-            resp = Response(data, status=206, mimetype="application/pdf")
-            resp.headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
-            resp.headers["Accept-Ranges"] = "bytes"
-            resp.headers["Content-Length"] = str(len(data))
-            resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
-            # Avoid buggy keep-alive edge cases observed on some hosts
-            resp.headers["Connection"] = "close"
-            resp.headers["Cache-Control"] = "no-store"
-            return resp
-        except Exception:
-            # Fall back to full response if Range parsing fails
-            pass
-
-    # ---- Stream full file in chunks (avoid gunicorn sendfile & large single writes) ----
-    def generate():
-        with open(full_path, "rb") as f:
-            while True:
-                chunk = f.read(64 * 1024)
-                if not chunk:
-                    break
-                yield chunk
-
-    resp = Response(generate(), mimetype="application/pdf")
-    resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+    data = _read(start_b, end_b)
+    resp = Response(data, status=206, mimetype="application/pdf", direct_passthrough=True)
+    resp.headers["Content-Range"] = f"bytes {start_b}-{end_b}/{file_size}"
     resp.headers["Accept-Ranges"] = "bytes"
-    resp.headers["Content-Length"] = str(file_size)
-    resp.headers["Connection"] = "close"
+    resp.headers["Content-Length"] = str(len(data))
+    resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
     resp.headers["Cache-Control"] = "no-store"
+    resp.headers["Connection"] = "close"
     return resp
+
 
 @app.route("/view_shop_log")
 def view_shop_log():
