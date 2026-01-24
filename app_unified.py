@@ -731,10 +731,315 @@ def selfmob_uuid(uuid_str):
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
-                "lang": output_lang,
                 "titles": {
-                    "palm_summary": ("Overall Palm Reading" if output_lang == "en" else "手相の総合アドバイス"),
-                    "personality": ("Personality" if output_lang == "en" else "性格診断"),
+                    "palm_summary": "手相の総合アドバイス",
+                    "personality": "性格診断",
+                    "year_fortune": f"{today.year}年の運勢",
+                    "month_fortune": f"{target1.year}年{target1.month}月の運勢",
+                    "next_month_fortune": f"{target2.year}年{target2.month}月の運勢",
+            'lang': output_lang,
+                },
+                "texts": {
+                    "palm_summary": summary_text,
+                    "personality": shichu_result.get("personality", ""),
+                    "year_fortune": shichu_result.get("year_fortune", ""),
+                    "month_fortune": shichu_result.get("month_fortune", ""),
+                    "next_month_fortune": shichu_result.get("next_month_fortune", ""),
+                },
+                "lucky_info": lucky_lines,
+                "lucky_direction": kyusei_text,
+                "birthdate": birthdate,
+                "palm_result": palm_result,
+                "shichu_result": shichu_result,
+                "iching_result": iching_result,
+                "palm_image": image_data,
+            }
+
+            if full_year:
+                yearly_data = generate_yearly_fortune(birthdate, today)
+                result_data["yearly_fortunes"] = yearly_data
+                result_data["titles"]["year_fortune"] = yearly_data["year_label"]
+                result_data["texts"]["year_fortune"] = yearly_data["year_text"]
+
+            filename = f"result_{uuid_str}.pdf"
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            shop_id = session.get("shop_id", "default")
+            threading.Thread(
+                target=background_generate_pdf,
+                args=(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id),
+            ).start()
+
+            redirect_url = url_for("preview", filename=filename)
+            return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
+        except Exception as e:
+            print("処理エラー:", e)
+            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
+
+    return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
+
+
+
+@app.route("/renaiselfmob/<uuid_str>", methods=["GET", "POST"])
+@app.route("/renaiselfmob_full/<uuid_str>", methods=["GET", "POST"])
+def renaiselfmob_uuid(uuid_str):
+    full_year = None
+    lines = []
+    try:
+        with open(USED_UUID_FILE, "r") as f:
+            lines = [line.strip() for line in f if line.strip()]
+        for line in lines:
+            parts = line.strip().split(",", 3)
+            if len(parts) < 4:
+                continue
+            uid, flag, mode, shop_id = parts
+            if uid == uuid_str:
+                full_year = mode.endswith("_full")
+                break
+        if full_year is None:
+            return "無効なリンクです（UUID不一致）", 400
+    except FileNotFoundError:
+        return "使用履歴が確認できません", 400
+
+    if request.method == "POST":
+        try:
+            user_birth = request.form.get("user_birth")
+            partner_birth = request.form.get("partner_birth")
+            if not user_birth or not isinstance(user_birth, str):
+                return "生年月日が不正です", 400
+
+            target1 = now.replace(day=15)
+            if now.day >= 20 or force_next_month:
+                target1 += relativedelta(months=1)
+            target2 = target1 + relativedelta(months=1)
+
+            year_label = f"{now.year}年の恋愛運"
+            month_label = f"{target1.year}年{target1.month}月の恋愛運"
+            next_month_label = f"{target2.year}年{target2.month}月の恋愛運"
+
+            raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
+
+            result_data = {
+                "texts": {
+                    "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
+                    "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),
+                    "year_love": raw_result.get("texts", {}).get("year_love", ""),
+                    "month_love": raw_result.get("texts", {}).get("month_love", ""),
+                    "next_month_love": raw_result.get("texts", {}).get("next_month_love", "")
+                },
+                "titles": {
+                    "compatibility": raw_result.get("titles", {}).get("compatibility", "相性診断" if partner_birth else "恋愛傾向と出会い"),
+                    "overall_love_fortune": raw_result.get("titles", {}).get("overall_love_fortune", "総合恋愛運"),
+                    "year_love": raw_result.get("titles", {}).get("year_love", year_label),
+                    "month_love": raw_result.get("titles", {}).get("month_love", month_label),
+                    "next_month_love": raw_result.get("titles", {}).get("next_month_love", next_month_label)
+                },
+                "themes": raw_result.get("themes", []),
+                "lucky_info": raw_result.get("lucky_info", []),
+                "lucky_direction": raw_result.get("lucky_direction", ""),
+                "yearly_love_fortunes": raw_result.get("yearly_love_fortunes", {})
+            }
+
+            filename = f"renai_{uuid_str}.pdf"
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            shop_id = session.get("shop_id", "default")
+
+            threading.Thread(
+                target=background_generate_pdf,
+                args=(filepath, result_data, "renai", "a4", full_year, uuid_str, shop_id)
+            ).start()
+
+            return redirect(url_for("preview", filename=filename))
+        except Exception as e:
+            print("処理エラー:", e)
+            return "処理中にエラーが発生しました", 500
+
+    return render_template("index_renaiselfmob.html", uuid_str=uuid_str, full_year=full_year)
+
+
+
+
+@app.route("/preview/<filename>")
+def preview(filename):
+    """占い結果PDFのプレビュー画面表示"""
+    user_agent = request.headers.get("User-Agent", "").lower()
+
+    # iPhoneまたはAndroidの簡易判定（必要に応じて拡張可）
+    if "iphone" in user_agent or "android" in user_agent:
+        return redirect(url_for("view_pdf", filename=filename))
+
+    referer = request.referrer or ""
+    return render_template("fortune_pdf.html", filename=filename, referer=referer)
+
+
+
+import time
+@app.route('/view/<filename>')
+def view_pdf(filename):
+    full_path = os.path.join(UPLOAD_FOLDER, filename)
+    wait_time = 0
+    while not os.path.exists(full_path) and wait_time < 5:
+        time.sleep(0.5)
+        wait_time += 0.5
+    if not os.path.exists(full_path):
+        return "PDFが見つかりませんでした", 404
+    return send_file(full_path, mimetype="application/pdf")
+
+
+
+@app.route("/view_shop_log")
+def view_shop_log():
+    """shop_logsテーブルの内容を表示（ソート付き）"""
+    sort_column = request.args.get("sort", "date")
+    sort_order = request.args.get("order", "desc")
+
+    allowed = {"date", "shop_id", "service", "count"}
+    if sort_column not in allowed:
+        sort_column = "date"
+
+    logs = []
+    if DATABASE_URL:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            query = f"SELECT date, shop_id, service, count FROM shop_logs ORDER BY {sort_column} {sort_order};"
+            cur.execute(query)
+            logs = cur.fetchall()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            return f"エラー: {e}"
+    return render_template("shop_log.html", logs=logs, sort_column=sort_column, sort_order=sort_order)
+
+
+@app.route("/view_shop_log_monthly")
+def view_shop_log_monthly():
+    """月ごと + shop_id + service ごとの集計"""
+    sort_column = request.args.get("sort", "month")
+    sort_order = request.args.get("order", "desc")
+    allowed = {"month", "shop_id", "service", "total"}
+    if sort_column not in allowed:
+        sort_column = "month"
+
+    logs = []
+    if DATABASE_URL:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            query = f"""
+                SELECT TO_CHAR(date, 'YYYY-MM') AS month, shop_id, service, SUM(count) AS total
+                FROM shop_logs
+                GROUP BY TO_CHAR(date, 'YYYY-MM'), shop_id, service
+                ORDER BY {sort_column} {sort_order};
+            """
+            cur.execute(query)
+            logs = cur.fetchall()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            return f"エラー: {e}"
+
+    return render_template("shop_log_monthly.html", logs=logs, sort_column=sort_column, sort_order=sort_order)
+
+
+
+@app.route("/reset_shop_log", methods=["POST"])
+def reset_shop_log():
+    if DATABASE_URL:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute("DELETE FROM shop_logs;")
+            conn.commit()
+            cur.close()
+            conn.close()
+            print("✅ shop_logs 全リセット完了")
+        except Exception as e:
+            return f"削除エラー: {e}"
+    return redirect(url_for("view_shop_log"))
+
+
+
+
+# ログイン制御（シンプルな仮ユーザー認証）
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        pw = request.form.get("password")
+        if pw == os.getenv("ADMIN_PASSWORD", "pass"):
+            session["logged_in"] = True
+            return redirect("/home")
+        return render_template("login.html", error="パスワードが間違っています")
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/")
+
+@app.route("/ten", methods=["GET", "POST"], endpoint="ten")
+@app.route("/tenmob", methods=["GET", "POST"], endpoint="tenmob")
+def ten_shincom():
+    if "logged_in" not in session:
+        return redirect(url_for("login", next=request.endpoint))
+    mode = "shincom"
+    size = "B4" if request.path == "/ten" else "A4"
+    if request.method == "POST":
+        is_json = request.is_json
+        try:
+            data = request.get_json() if is_json else request.form
+            image_data = data.get("image_data")
+            birthdate = data.get("birthdate")
+            full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
+            force_next_month = data.get("force_next_month", False) if is_json else (data.get("force_next_month") == "yes")
+
+            output_lang = (data.get('output_lang') or data.get('lang') or '').strip()
+            if not output_lang:
+                # checkbox name variants
+                en_flag = data.get('english') or data.get('english_output') or data.get('output_en')
+                if is_json:
+                    output_lang = 'en' if bool(en_flag) else 'ja'
+                else:
+                    output_lang = 'en' if (en_flag in ('yes','on','true','1')) else 'ja'
+
+            try:
+                year, month, day = map(int, birthdate.split("-"))
+            except Exception:
+                return "生年月日が不正です", 400
+            try:
+                kyusei_text = get_kyusei_fortune(year, month, day)
+            except Exception as e:
+                print("❌ lucky_direction 取得エラー:", e)
+                kyusei_text = ""
+            eto = get_nicchu_eto(birthdate)
+            # 生年月日から星座・干支番号・動物占い・本命星を算出（PDF用）
+            zodiac = get_zodiac_sign(month, day)
+            eto_number = ETO_ORDER_MAP.get(eto)
+            animal = ""
+            if eto_number is not None and 1 <= eto_number <= len(ANIMAL60):
+                animal = ANIMAL60[eto_number - 1]
+            try:
+                honmeisei = get_honmeisei(year, month, day)
+            except Exception as e:
+                print("❌ 本命星取得エラー:", e)
+                honmeisei = ""
+            now = datetime.now()
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month, lang=output_lang)
+            summary_text = ""
+            if len(palm_texts) == 6:
+                summary_text = palm_texts.pop()
+            target1 = now.replace(day=15)
+            if now.day >= 20 or force_next_month:
+                target1 += relativedelta(months=1)
+            target2 = target1 + relativedelta(months=1)
+            year_label = f"{target1.year}年の運勢"
+            month_label = f"{target1.year}年{target1.month}月の運勢"
+            next_month_label = f"{target2.year}年{target2.month}月の運勢"
+            result_data = {
+                "palm_titles": palm_titles,
+                "palm_texts": palm_texts,
+                "titles": {
+                    "palm_summary": "手相の総合アドバイス",
+                    "personality": "性格診断",
                     "year_fortune": year_label,
                     "month_fortune": month_label,
                     "next_month_fortune": next_month_label

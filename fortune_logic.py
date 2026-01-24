@@ -14,7 +14,9 @@ from pdf_generator_unified import create_pdf_unified
 
 
 
-def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang: str = 'ja', style: str | None = None):
+
+
+def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False):
     import json
     eto = get_nicchu_eto(birthdate)
     try:
@@ -33,29 +35,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang
         tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
         tsuhen_month2 = get_tsuhensei_for_date(birthdate, target2.year, target2.month)
 
-        if lang == "en":
-            prompt = f"""You are an expert in Four Pillars of Destiny (Shichu Suimei).
-- Day Pillar (for internal use only): {eto}
-- Year Ten-God: {tsuhen_year}
-- Ten-God for {target1.year}-{target1.month:02d}: {tsuhen_month1}
-- Ten-God for {target2.year}-{target2.month:02d}: {tsuhen_month2}
-
-Return ONLY a JSON object with these 4 fields:
-
-{{
-  "personality": "Natural prose within 900 characters",
-  "year_fortune": "Fortune for {this_year} within 900 characters",
-  "month_fortune": "Fortune for {target1.year}-{target1.month:02d} within 900 characters",
-  "next_month_fortune": "Fortune for {target2.year}-{target2.month:02d} within 900 characters"
-}}
-
-Rules:
-- Write in English.
-- Do NOT mention zodiac stems/branches, eto, or Ten-God names in the prose.
-- Positive, warm, and practical tone.
-"""
-        else:
-            prompt = f"""あなたは四柱推命の専門家です。
+        prompt = f"""あなたは四柱推命の専門家です。
 - 日柱: {eto}
 - 年の通変星: {tsuhen_year}
 - {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
@@ -398,7 +378,19 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
 
 
 
-def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False, lang: str = 'ja', style: str | None = None, **kwargs):
+
+def _lang_pack(lang: str):
+    """Return (system_prompt, lang_note) for OpenAI calls."""
+    if (lang or 'ja').lower().startswith('en'):
+        system = "You are a professional fortune teller. Write clear, natural English for customers. Do not mention Japanese astrology jargon, eto names, or Ten-God terms; translate meanings into plain English."
+        note = "\n\nWrite in English. Do NOT include eto names or Ten-God terms. Keep it friendly, practical, and positive."
+        return system, note
+    system = "あなたは占いのプロです。お客様に寄り添い、前向きで具体的なアドバイスを自然な日本語で書いてください。占い用語や干支名は出さず、意味をやさしい言葉に置き換えてください。"
+    note = ""
+    return system, note
+
+def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool=False, style: str='normal', lang: str='ja', **kwargs):
+    system_prompt, lang_note = _lang_pack(lang)
     import re
     palm_result = analyze_palm(image_data)
     shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month)
@@ -680,7 +672,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         )
 
         # 吉方位テキスト（九星気学ベース）
-        kyusei_text = generate_lucky_direction(user_birth, base.date())
+        kyusei_text = generate_lucky_direction(user_birth, base.date(), lang=lang)
 
         # ラッキー情報（恋愛版）
         lucky_info = generate_lucky_renai_info(

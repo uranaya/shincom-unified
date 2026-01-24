@@ -10,36 +10,46 @@ from reportlab.lib.units import mm
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str = 'ja'):
-    if lang == "en":
-        prompt = f"""You are a professional fortune teller.
-The client is {age} years old. Use the readings below as context.
 
-[PALM READING]
+def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str='ja', **kwargs):
+    """Return lucky info as a *single-line* string list (length 1).
+    For English output, labels are in English and the content is constrained to one line.
+    """
+    lang = (lang or 'ja').lower()
+    if lang.startswith('en'):
+        prompt = f"""You are a fortune-telling advisor.
+The customer is {age} years old. Use the following reading notes as reference.
+
+[Palm]
 {palm_result}
 
-[FOUR PILLARS]
+[Four Pillars summary]
 {shichu_result}
 
-[KYUSEI KIGAKU DIRECTIONS]
+[Nine-Star directions]
 {kyusei_text}
 
-Output ONE line ONLY, in this exact format, short and punchy (no extra words, no line breaks):
-◆ Item: ...   ◆ Color: ...   ◆ Number: ...   ◆ Food: ...   ◆ Day: Mon/Tue/Wed/Thu/Fri/Sat/Sun
+Output EXACTLY ONE LINE in this format (no extra text, no line breaks):
+◆ Item: XX  ◆ Color: XX  ◆ Number: XX  ◆ Food: XX  ◆ Day: (Mon/Tue/Wed/Thu/Fri/Sat/Sun)
 
 Rules:
-- Start with '◆'
-- One line only (no newlines)
-- Keep each value to 1–3 words
-- No reasons, no explanations, no additional text
+- Must start with '◆'
+- ONE LINE ONLY (no newline)
+- Keep each value short (a word or a few words)
+- No explanations, no reasons, no additional sentences
 """
     else:
         prompt = f"""あなたは占いの専門家です。
 相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
 
-【手相】\n{palm_result}\n
-【四柱推命】\n{shichu_result}\n
-【九星気学の方位】\n{kyusei_text}
+【手相】
+{palm_result}
+
+【四柱推命】
+{shichu_result}
+
+【九星気学の方位】
+{kyusei_text}
 
 以下5つの項目を、すべて1行にまとめて簡潔に出力してください：
 
@@ -54,17 +64,23 @@ Rules:
 
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.6
+            model=os.getenv("OPENAI_LUCKY_MODEL", "gpt-4o-mini"),
+            messages=[
+                {"role": "system", "content": "Return exactly one line in the required format. No extra text." if lang.startswith('en') else "指定フォーマットの1行のみ返してください。"},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.4
         )
-        return [response["choices"][0]["message"]["content"].strip()]
+        one_line = response["choices"][0]["message"]["content"].strip().replace("\\n", " ").strip()
+        return [one_line]
     except Exception as e:
         print("❌ ラッキー情報取得失敗:", e)
-        return ["◆ Item: -   ◆ Color: -   ◆ Number: -   ◆ Food: -   ◆ Day: -"] if lang == 'en' else ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
+        return ["◆ Item: -  ◆ Color: -  ◆ Number: -  ◆ Food: -  ◆ Day: -" if lang.startswith('en') else "◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
 
 
-def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
+
+
+def generate_lucky_direction(birthdate: str, today: datetime.date, lang: str = "ja") -> str:
     """
     九星気学に基づく吉方位テキストを生成する。
     today の「20日以降」は翌月を「今月」とみなして計算する。
@@ -100,7 +116,7 @@ def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
     good_dir_now = dir_now.get("good", "不明")
     good_dir_next = dir_next.get("good", "不明")
 
-    return f"{base.year}年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。"
+    return (f"Luckiest directions: Year {base.year}: {good_dir_year}; This month: {good_dir_now}; Next month: {good_dir_next}." if (lang or "ja").lower().startswith("en") else f"{base.year}年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。")
 
 
 
@@ -208,8 +224,8 @@ def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_
         lines = response["choices"][0]["message"]["content"].strip().splitlines()
         lucky_lines = []
         for line in lines:
-            if "：" in line:
-                label, value = line.split("：", 1)
+            if ("：" in line) or (":" in line):
+                label, value = (line.split("：",1) if "：" in line else line.split(":",1))
                 label = label.replace("・", "").strip()
                 value = value.strip().split("（")[0]
                 lucky_lines.append(f"{label}：{value}")  # 「◆」は付けない
