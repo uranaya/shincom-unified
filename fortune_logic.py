@@ -14,7 +14,9 @@ from pdf_generator_unified import create_pdf_unified
 
 
 
-def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, style: str = '', lang: str = 'ja'):
+
+
+def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang: str = 'ja'):
     import json
     eto = get_nicchu_eto(birthdate)
     try:
@@ -33,9 +35,27 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
         tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
         tsuhen_month2 = get_tsuhensei_for_date(birthdate, target2.year, target2.month)
 
-        lang_instruction = "Write in English. Do NOT include the Eto (sexagenary cycle) name or Ten-God (tsuhensei) terms; explain meanings in plain language. Tone should be warm and encouraging." if lang == 'en' else "出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。"
+        if (lang or 'ja').lower().startswith('en'):
+            prompt = f"""You are a Four Pillars (BaZi) reading advisor.
+- Day pillar (eto): {eto}
+- Ten-God for the year: {tsuhen_year}
+- Ten-God for {target1.year}-{target1.month:02d}: {tsuhen_month1}
+- Ten-God for {target2.year}-{target2.month:02d}: {tsuhen_month2}
 
-        prompt = f"""あなたは四柱推命の専門家です。
+Return ONLY JSON in the following schema:
+{{
+  "personality": "A natural English paragraph (max ~900 characters, not words)",
+  "year_fortune": "Fortune overview for {this_year} (max ~900 characters)",
+  "month_fortune": "Fortune for {target1.year}-{target1.month:02d} (max ~900 characters)",
+  "next_month_fortune": "Fortune for {target2.year}-{target2.month:02d} (max ~900 characters)"
+}}
+
+Rules:
+- Do NOT mention eto names or Ten-God terms; translate meanings into plain English
+- Positive, practical, and customer-friendly
+"""
+        else:
+            prompt = f"""あなたは四柱推命の専門家です。
 - 日柱: {eto}
 - 年の通変星: {tsuhen_year}
 - {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
@@ -50,7 +70,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
   "next_month_fortune": "{target2.year}年{target2.month}月の運勢（300文字以内）"
 }}
 
-	{lang_instruction}
+出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。
 """
         response = openai.ChatCompletion.create(
             model="gpt-4",
@@ -76,7 +96,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
                     return f"{y}年{m}月は"
                 return f"{y}年{m}月は、" + s
 
-            if isinstance(result, dict):
+            if isinstance(result, dict) and not (lang or "ja").lower().startswith("en"):
                 result["month_fortune"] = _fix_month_prefix(result.get("month_fortune", ""), target1.year, target1.month)
                 result["next_month_fortune"] = _fix_month_prefix(result.get("next_month_fortune", ""), target2.year, target2.month)
 
@@ -86,23 +106,33 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, styl
             return result
         except json.JSONDecodeError:
             print("❌ GPTが正しいJSONを返しませんでした")
-            return {
+            return ({
+                "personality": "Could not retrieve the result.",
+                "year_fortune": f"Could not retrieve the fortune for {this_year}.",
+                "month_fortune": f"Could not retrieve the fortune for {target1.year}-{target1.month:02d}.",
+                "next_month_fortune": f"Could not retrieve the fortune for {target2.year}-{target2.month:02d}."
+            } if (lang or 'ja').lower().startswith('en') else {
                 "personality": "取得できませんでした",
                 "year_fortune": f"{this_year}年の運勢は取得できませんでした",
                 "month_fortune": f"{target1.year}年{target1.month}月の運勢は取得できませんでした",
                 "next_month_fortune": f"{target2.year}年{target2.month}月の運勢は取得できませんでした"
-            }
+            })
     except Exception as e:
         print("❌ get_shichu_fortune エラー:", e)
-        return {
-            "personality": "取得できませんでした",
-            "year_fortune": "今年の運勢は取得できませんでした",
-            "month_fortune": "今月の運勢は取得できませんでした",
-            "next_month_fortune": "来月の運勢は取得できませんでした"
-        }
+        return ({
+                "personality": "Could not retrieve the result.",
+                "year_fortune": f"Could not retrieve the fortune for {this_year}.",
+                "month_fortune": f"Could not retrieve the fortune for {target1.year}-{target1.month:02d}.",
+                "next_month_fortune": f"Could not retrieve the fortune for {target2.year}-{target2.month:02d}."
+            } if (lang or 'ja').lower().startswith('en') else {
+                "personality": "取得できませんでした",
+                "year_fortune": f"{this_year}年の運勢は取得できませんでした",
+                "month_fortune": f"{target1.year}年{target1.month}月の運勢は取得できませんでした",
+                "next_month_fortune": f"{target2.year}年{target2.month}月の運勢は取得できませんでした"
+            })
 
 
-def analyze_palm(image_data, style: str = '', lang: str = 'ja'):
+def analyze_palm(image_data, lang: str = 'ja'):
     try:
         # Data URL形式 or base64のみの両方に対応
         if "," in image_data:
@@ -122,40 +152,57 @@ def analyze_palm(image_data, style: str = '', lang: str = 'ja'):
             if name in tesou_descriptions
         )
 
-        # 言語指定（英語出力）
-        lang_instruction = "\n\nWrite in English. Do NOT mention Eto (sexagenary cycle) names or specialized fortune-telling jargon; explain meanings in plain language." if lang == 'en' else ""
-
         # 特殊線をより魅力的に出すようにした system_prompt（語り口・優先順位調整版）
-        system_prompt = (
-            "あなたはプロの手相鑑定士です。以下の条件に従って、手相画像から5つの線・相を選び、"
-            "それぞれの意味と印象を、聞いた人が『ほう…！』と唸るような語り口で魅力的に解説してください。\n\n"
-            "【出力構成】\n"
-            "・1. 生命線、2. 運命線、3. 金運線は必ず含める\n"
-            "・4. 特殊線1、5. 特殊線2は以下の中から“あると嬉しいもの”を優先して選ぶ：\n"
-            f"{special_lines_text}\n"
-            "・特殊線は、兆し・傾向レベルでもポジティブに採用して構いません\n"
-            "・特に幸運・守護・才能・使命を感じさせる線を優先して選んでください\n"
-            "・2つの特殊線がどうしても見つからない場合のみ、感情線や頭脳線などで自然に補ってください\n\n"
-            "【各線の意味ガイド】\n"
-            f"{description_text}\n\n"
-            "全体を通して、読み手が安心し前向きになれるような、優しく包み込むような文体でまとめてください。"
-            + lang_instruction
-        )
-
-        # ユーザープロンプト（出力フォーマット）
-        user_prompt = (
-            "以下の形式で出力してください：\n"
-            "### 1. 生命線\n（説明文）\n\n"
-            "### 2. 運命線\n（説明文）\n\n"
-            "### 3. 金運線\n（説明文）\n\n"
-            "### 4. 特殊線1\n（説明文）\n\n"
-            "### 5. 特殊線2\n（説明文）\n\n"
-            "### 総合的なアドバイス\n（全体のバランスを見たまとめ）\n\n"
-            "・各項目は200文字前後で、やわらかく詩的で心に残る表現にしてください\n"
-            "・“無い”や“不足”という否定的な表現は避け、可能性や伸びしろとして前向きに表現してください\n"
-            "・心に灯をともすような、やさしく前向きな締めくくりで終えてください"
-            + ("\n\nOutput MUST be in English." if lang == 'en' else "")
-        )
+        if (lang or 'ja').lower().startswith('en'):
+            system_prompt = (
+                "You are a professional palm reader. Follow the constraints and interpret the palm image in a warm, inspiring tone.\n\n"
+                "[Output rules]\n"
+                "- Always include: 1) Life line, 2) Fate line, 3) Money line\n"
+                "- Choose two additional 'special lines' preferably from this list (even subtle signs are OK if described positively):\n"
+                f"{special_lines_text}\n"
+                "- If you truly cannot pick two special lines, you may naturally use Heart line or Head line instead\n\n"
+                "[Meaning guide]\n"
+                f"{description_text}\n\n"
+                "Write in natural, customer-friendly English. Avoid negative wording like 'none' or 'lacking'; reframe as potential."
+            )
+            user_prompt = (
+                "Output in the following format:\n"
+                "### 1. Life Line\n(about 180–220 characters)\n\n"
+                "### 2. Fate Line\n(about 180–220 characters)\n\n"
+                "### 3. Money Line\n(about 180–220 characters)\n\n"
+                "### 4. Special Line 1\n(about 180–220 characters)\n\n"
+                "### 5. Special Line 2\n(about 180–220 characters)\n\n"
+                "### Overall Advice\n(A gentle, uplifting wrap-up)\n\n"
+                "- Keep it poetic but clear\n"
+                "- End with a hopeful, action-oriented closing"
+            )
+        else:
+            system_prompt = (
+                "あなたはプロの手相鑑定士です。以下の条件に従って、手相画像から5つの線・相を選び、"
+                "それぞれの意味と印象を、聞いた人が『ほう…！』と唸るような語り口で魅力的に解説してください。\n\n"
+                "【出力構成】\n"
+                "・1. 生命線、2. 運命線、3. 金運線は必ず含める\n"
+                "・4. 特殊線1、5. 特殊線2は以下の中から“あると嬉しいもの”を優先して選ぶ：\n"
+                f"{special_lines_text}\n"
+                "・特殊線は、兆し・傾向レベルでもポジティブに採用して構いません\n"
+                "・特に幸運・守護・才能・使命を感じさせる線を優先して選んでください\n"
+                "・2つの特殊線がどうしても見つからない場合のみ、感情線や頭脳線などで自然に補ってください\n\n"
+                "【各線の意味ガイド】\n"
+                f"{description_text}\n\n"
+                "全体を通して、読み手が安心し前向きになれるような、優しく包み込むような文体でまとめてください。"
+            )
+            user_prompt = (
+                "以下の形式で出力してください：\n"
+                "### 1. 生命線\n（説明文）\n\n"
+                "### 2. 運命線\n（説明文）\n\n"
+                "### 3. 金運線\n（説明文）\n\n"
+                "### 4. 特殊線1\n（説明文）\n\n"
+                "### 5. 特殊線2\n（説明文）\n\n"
+                "### 総合的なアドバイス\n（全体のバランスを見たまとめ）\n\n"
+                "・各項目は200文字前後で、やわらかく詩的で心に残る表現にしてください\n"
+                "・“無い”や“不足”という否定的な表現は避け、可能性や伸びしろとして前向きに表現してください\n"
+                "・心に灯をともすような、やさしく前向きな締めくくりで終えてください"
+            )
 
         response = openai.ChatCompletion.create(
             model="gpt-4-turbo",
@@ -186,12 +233,9 @@ def analyze_palm(image_data, style: str = '', lang: str = 'ja'):
 
 
 
-def get_iching_advice(style: str = '', lang: str = 'ja'):
+def get_iching_advice(lang: str = 'ja'):
     try:
-        if lang == 'en':
-            prompt = "You are an I Ching (Yi Jing) advisor. Give a gentle, positive message for the querent in about 120-160 words of natural English. Avoid specialized jargon; focus on practical guidance."
-        else:
-            prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
+        prompt = ("You are an I Ching advisor. Give a gentle, positive message the customer needs right now in natural English (about 180–220 characters)." if (lang or "ja").lower().startswith("en") else "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。")
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -200,14 +244,11 @@ def get_iching_advice(style: str = '', lang: str = 'ja'):
         return response.choices[0].message.content.strip()
     except Exception as e:
         print("❌ 易占い取得失敗:", e)
-        return "現在、易占いの結果が取得できませんでした。"
+        return ("Could not retrieve the I Ching message right now." if (lang or "ja").lower().startswith("en") else "現在、易占いの結果が取得できませんでした。")
 
 
-def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str = 'ja'):
-    head = "You are a fortune advisor." if lang == 'en' else "あなたは占いの専門家です。"
-    line_format = "◆ Item: XX  ◆ Color: XX  ◆ Number: XX  ◆ Food: XX  ◆ Day: (Mon/Tue/...)" if lang == 'en' else "◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日"
-
-    prompt = f"""{head}
+def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
+    prompt = f"""あなたは占いの専門家です。
 相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
 
 【手相】\n{palm_result}\n
@@ -216,7 +257,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 以下5つの項目を、すべて1行にまとめて簡潔に出力してください：
 
-{line_format}
+◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日
 
 - 補足、理由、改行は一切禁止
 - 各項目は短く（単語～数語）
@@ -231,12 +272,12 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
         return [response["choices"][0]["message"]["content"].strip()]
     except Exception as e:
         print("❌ ラッキー情報取得失敗:", e)
-        return ["◆ Item: -  ◆ Color: -  ◆ Number: -  ◆ Food: -  ◆ Day: -" if lang == 'en' else "◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
+        return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
 
 
 
 
-def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None, lang: str = 'ja'):
+def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None):
     """
     九星の直接連想（紫/9/火曜…）を避け、数秘 + タロット + 易(八卦) + 色彩心理を混ぜて
     「◆ アイテム／カラー／ナンバー／フード／デー」を1行で返す（リスト1要素）。
@@ -382,22 +423,28 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
     day = tarot_weekday
 
     # ---- 10) 最終1行フォーマット ----
-    if lang == 'en':
-        line = f"◆ Item: {item}    ◆ Color: {color}    ◆ Number: {number}    ◆ Food: {food}    ◆ Day: {day}"
-        return [line]
-    else:
-        line = f"◆ アイテム：{item}　　◆ カラー：{color}　　◆ ナンバー：{number}　　◆ フード：{food}　　◆ デー：{day}"
-        return [line]
+    line = f"◆ アイテム：{item}　　◆ カラー：{color}　　◆ ナンバー：{number}　　◆ フード：{food}　　◆ デー：{day}"
+    return [line]
 
 
 
 
 
-def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool = False, style: str = '', lang: str = 'ja'):
-    import re
-    palm_result = analyze_palm(image_data, style=style, lang=lang)
-    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, style=style, lang=lang)
-    iching_result = get_iching_advice(style=style, lang=lang)
+
+def _lang_pack(lang: str):
+    """Return (system_prompt, lang_note) for OpenAI calls."""
+    if (lang or 'ja').lower().startswith('en'):
+        system = "You are a professional fortune teller. Write clear, natural English for customers. Do not mention Japanese astrology jargon, eto names, or Ten-God terms; translate meanings into plain English."
+        note = "\n\nWrite in English. Do NOT include eto names or Ten-God terms. Keep it friendly, practical, and positive."
+        return system, note
+    system = "あなたは占いのプロです。お客様に寄り添い、前向きで具体的なアドバイスを自然な日本語で書いてください。占い用語や干支名は出さず、意味をやさしい言葉に置き換えてください。"
+    note = ""
+    return system, note
+
+def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool=False, style: str='normal', lang: str='ja', **kwargs):    import re
+    palm_result = analyze_palm(image_data, lang=lang)
+    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, lang=lang)
+    iching_result = get_iching_advice(lang=lang)
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
     raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now)
@@ -426,20 +473,28 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     month_label = f"{target1.year}年{target1.month}月の運勢"
     next_month_label = f"{target2.year}年{target2.month}月の運勢"
 
-    shichu_texts = {"personality": "", "year_fortune": "", "month_fortune": "", "next_month_fortune": ""}
-    pattern = r"[■◆]\s*(性格|[0-9]{4}年の運勢|[0-9]{4}年[0-9]{1,2}月の運勢)(.*?)(?=[■◆]|$)"
-    matches = re.findall(pattern, str(shichu_result_raw), flags=re.DOTALL)
-    for title, body in matches:
-        title = title.strip()
-        body = body.strip()
-        if "性格" in title:
-            shichu_texts["personality"] = body
-        elif title == month_label:
-            shichu_texts["month_fortune"] = body
-        elif title == next_month_label:
-            shichu_texts["next_month_fortune"] = body
-        elif "年" in title and "運勢" in title:
-            shichu_texts["year_fortune"] = body
+    if isinstance(shichu_result_raw, dict):
+        shichu_texts = {
+            "personality": shichu_result_raw.get("personality", ""),
+            "year_fortune": shichu_result_raw.get("year_fortune", ""),
+            "month_fortune": shichu_result_raw.get("month_fortune", ""),
+            "next_month_fortune": shichu_result_raw.get("next_month_fortune", "")
+        }
+    else:
+        shichu_texts = {"personality": "", "year_fortune": "", "month_fortune": "", "next_month_fortune": ""}
+        pattern = r"[■◆]\s*(性格|[0-9]{4}年の運勢|[0-9]{4}年[0-9]{1,2}月の運勢)(.*?)(?=[■◆]|$)"
+        matches = re.findall(pattern, str(shichu_result_raw), flags=re.DOTALL)
+        for title, body in matches:
+            title = title.strip()
+            body = body.strip()
+            if "性格" in title:
+                shichu_texts["personality"] = body
+            elif title == month_label:
+                shichu_texts["month_fortune"] = body
+            elif title == next_month_label:
+                shichu_texts["next_month_fortune"] = body
+            elif "年" in title and "運勢" in title:
+                shichu_texts["year_fortune"] = body
 
     palm_titles = []
     palm_texts = []
@@ -449,7 +504,7 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
             palm_titles.append(title.strip())
             palm_texts.append(body[0].strip() if body else "")
 
-    return palm_titles, palm_texts, shichu_result_raw, iching_result, lucky_lines
+    return palm_titles, palm_texts, shichu_texts, iching_result, lucky_lines
 
 
 
@@ -675,7 +730,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         )
 
         # 吉方位テキスト（九星気学ベース）
-        kyusei_text = generate_lucky_direction(user_birth, base.date())
+        kyusei_text = generate_lucky_direction(user_birth, base.date(), lang=lang)
 
         # ラッキー情報（恋愛版）
         lucky_info = generate_lucky_renai_info(

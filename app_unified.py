@@ -729,15 +729,24 @@ def selfmob_uuid(uuid_str):
             target2 = target1 + relativedelta(months=1)
 
             result_data = {
+                "lang": output_lang,
+                "style": "default",
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
-                "titles": {
+                "titles": ({
+                    "palm_summary": "Palm Reading Summary",
+                    "personality": "Personality Profile",
+                    "year_fortune": year_label,
+                    "month_fortune": month_label,
+                    "next_month_fortune": next_month_label
+                } if output_lang == "en" else {
                     "palm_summary": "手相の総合アドバイス",
                     "personality": "性格診断",
-                    "year_fortune": f"{today.year}年の運勢",
-                    "month_fortune": f"{target1.year}年{target1.month}月の運勢",
-                    "next_month_fortune": f"{target2.year}年{target2.month}月の運勢",
-                },
+                    "year_fortune": year_label,
+                    "month_fortune": month_label,
+                    "next_month_fortune": next_month_label
+                }),
+,
                 "texts": {
                     "palm_summary": summary_text,
                     "personality": shichu_result.get("personality", ""),
@@ -991,9 +1000,22 @@ def ten_shincom():
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
             force_next_month = data.get("force_next_month", False) if is_json else (data.get("force_next_month") == "yes")
 
-            # 表示スタイル（東京/浅草向け）と出力言語
-            style_mode = 'tokyo' if (data.get('tokyo_mode', False) if is_json else (data.get('tokyo_mode') == 'yes')) else ''
-            output_lang = 'en' if (data.get('english_output', False) if is_json else (data.get('english_output') == 'yes')) else 'ja'
+            output_lang = (data.get('output_lang') or data.get('lang') or '').strip()
+            # Support checkbox-style language toggles (front may send only a flag)
+            if not output_lang:
+                en_flag = (data.get('lang_en') or data.get('english') or data.get('english_output') or data.get('output_en'))
+                if is_json:
+                    output_lang = 'en' if bool(en_flag) else 'ja'
+                else:
+                    output_lang = 'en' if (en_flag in ('yes','on','true','1')) else 'ja'
+            # Backward compatibility: if output_lang itself is used as checkbox name
+            if not is_json and (data.get('output_lang') in ('on','yes','true','1')) and (data.get('lang_en') is None):
+                output_lang = 'en'
+            output_lang = (output_lang or 'ja').lower()
+            if output_lang not in ('ja','en'):
+                output_lang = 'ja'
+                else:
+                    output_lang = 'en' if (en_flag in ('yes','on','true','1')) else 'ja'
 
             try:
                 year, month, day = map(int, birthdate.split("-"))
@@ -1017,7 +1039,7 @@ def ten_shincom():
                 print("❌ 本命星取得エラー:", e)
                 honmeisei = ""
             now = datetime.now()
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month, style=style_mode, lang=output_lang)
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month, lang=output_lang)
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()
@@ -1025,9 +1047,15 @@ def ten_shincom():
             if now.day >= 20 or force_next_month:
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
-            year_label = f"{target1.year}年の運勢"
-            month_label = f"{target1.year}年{target1.month}月の運勢"
-            next_month_label = f"{target2.year}年{target2.month}月の運勢"
+            if output_lang == "en":
+                year_label = f"Fortune for {target1.year}"
+                month_label = f"Fortune for {target1.year}-{target1.month:02d}"
+                next_month_label = f"Fortune for {target2.year}-{target2.month:02d}"
+            else:
+                year_label = f"{target1.year}年の運勢"
+                month_label = f"{target1.year}年{target1.month}月の運勢"
+                next_month_label = f"{target2.year}年{target2.month}月の運勢"
+
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
@@ -1055,12 +1083,11 @@ def ten_shincom():
                 "honmeisei": honmeisei,
                 "palm_result": "\n".join(palm_texts),
                 "shichu_result": shichu_result,
-	                "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
-	                "palm_image": image_data,
-	                "lang": output_lang,
-	            }
+                "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
+                "palm_image": image_data
+            }
             if full_year:
-                yearly_data = generate_yearly_fortune(birthdate, now, force_next_month=force_next_month)
+                yearly_data = generate_yearly_fortune(birthdate, now, force_next_month=force_next_month, lang=output_lang)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
@@ -1669,77 +1696,6 @@ def admin_invoice():
     )
 
 
-@app.route('/admin/invoice_staff_special_pdf')
-def admin_invoice_staff_special_pdf():
-    if not session.get('admin'):
-        return redirect(url_for('admin_login_sales'))
-
-    month = request.args.get('month', datetime.today().strftime('%Y-%m'))
-    staff = request.args.get('staff')
-    if not staff:
-        return "占い師を指定してください", 400
-
-    month_start = month + "-01"
-    month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
-
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
-
-        # 月合計
-        cur.execute("""
-            SELECT method, SUM(amount)
-            FROM sales
-            WHERE date >= %s AND date < %s AND staff_name = %s
-            GROUP BY method;
-        """, (month_start, month_end, staff))
-        rows = cur.fetchall()
-
-        total_taiken = sum(total for method, total in rows if method == "対面")
-        total_pc = sum(total for method, total in rows if method == "コンピューター")
-        total_cashless = sum(total for method, total in rows if "現金外" in method)
-
-        # ★特別出店料: 対面20% + コンピューター40%
-        store_fee = total_taiken * 0.20 + total_pc * 0.40
-        store_fee_tax = int(store_fee * 1.10)
-        final_invoice = store_fee_tax - total_cashless
-
-        # 日別内訳（PDFに入れるため通常版と同じ粒度で取得）
-        cur.execute("""
-            SELECT date, method, SUM(amount)
-            FROM sales
-            WHERE date >= %s AND date < %s AND staff_name = %s
-            GROUP BY date, method
-            ORDER BY date, method;
-        """, (month_start, month_end, staff))
-        daily_rows = cur.fetchall()
-        cur.close()
-        conn.close()
-
-        daily_details = {}
-        for date, method, total in daily_rows:
-            date_str = date.strftime("%Y-%m-%d")
-            if date_str not in daily_details:
-                daily_details[date_str] = {"対面": 0, "コンピューター": 0, "現金外": 0}
-
-            cat = normalize_method(method)
-            if cat not in daily_details[date_str]:
-                daily_details[date_str][cat] = 0
-            daily_details[date_str][cat] += total
-
-        # PDF生成（ファイル名を通常と分ける）
-        pdf_path = os.path.join(UPLOAD_FOLDER, f"invoice_special_{staff}_{month}.pdf")
-        generate_invoice_pdf(
-            pdf_path, month, staff,
-            total_taiken, total_pc, total_cashless,
-            store_fee, store_fee_tax, final_invoice,
-            daily_details
-        )
-
-        return send_file(pdf_path, as_attachment=True, mimetype='application/pdf')
-
-    except Exception as e:
-        return f"❌ PDF生成エラー: {e}", 500
 
 
 
