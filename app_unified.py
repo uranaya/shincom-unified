@@ -746,7 +746,6 @@ def selfmob_uuid(uuid_str):
                     "month_fortune": month_label,
                     "next_month_fortune": next_month_label
                 }),
-,
                 "texts": {
                     "palm_summary": summary_text,
                     "personality": shichu_result.get("personality", ""),
@@ -1014,8 +1013,6 @@ def ten_shincom():
             output_lang = (output_lang or 'ja').lower()
             if output_lang not in ('ja','en'):
                 output_lang = 'ja'
-                else:
-                    output_lang = 'en' if (en_flag in ('yes','on','true','1')) else 'ja'
 
             try:
                 year, month, day = map(int, birthdate.split("-"))

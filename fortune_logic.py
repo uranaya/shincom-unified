@@ -441,7 +441,8 @@ def _lang_pack(lang: str):
     note = ""
     return system, note
 
-def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool=False, style: str='normal', lang: str='ja', **kwargs):    import re
+def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool=False, style: str='normal', lang: str='ja', **kwargs):
+    import re
     palm_result = analyze_palm(image_data, lang=lang)
     shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, lang=lang)
     iching_result = get_iching_advice(lang=lang)
