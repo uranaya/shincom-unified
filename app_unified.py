@@ -999,20 +999,117 @@ def ten_shincom():
             full_year = data.get("full_year", False) if is_json else (data.get("full_year") == "yes")
             force_next_month = data.get("force_next_month", False) if is_json else (data.get("force_next_month") == "yes")
 
-            output_lang = (data.get('output_lang') or data.get('lang') or '').strip()
-            # Support checkbox-style language toggles (front may send only a flag)
+            # ----------------------------
+
+            # Language selection (ja/en)
+
+            # Accept many possible front-end keys to avoid mismatches.
+
+            # ----------------------------
+
+            def _truthy(v):
+
+                if v is None:
+
+                    return False
+
+                s = str(v).strip().lower()
+
+                return s in ("1", "true", "yes", "on", "en", "english")
+
+
+
+            output_lang = (data.get("output_lang") or data.get("lang") or data.get("language") or "").strip().lower()
+
+
+
+            # 1) Direct explicit values
+
+            if output_lang in ("en", "english"):
+
+                output_lang = "en"
+
+            elif output_lang in ("ja", "jp", "japanese"):
+
+                output_lang = "ja"
+
+            else:
+
+                output_lang = ""
+
+
+
+            # 2) Checkbox / flag style keys (common patterns)
+
             if not output_lang:
-                en_flag = (data.get('lang_en') or data.get('english') or data.get('english_output') or data.get('output_en'))
-                if is_json:
-                    output_lang = 'en' if bool(en_flag) else 'ja'
-                else:
-                    output_lang = 'en' if (en_flag in ('yes','on','true','1')) else 'ja'
-            # Backward compatibility: if output_lang itself is used as checkbox name
-            if not is_json and (data.get('output_lang') in ('on','yes','true','1')) and (data.get('lang_en') is None):
-                output_lang = 'en'
-            output_lang = (output_lang or 'ja').lower()
-            if output_lang not in ('ja','en'):
-                output_lang = 'ja'
+
+                en_flag = (
+
+                    data.get("lang_en")
+
+                    or data.get("en")
+
+                    or data.get("english")
+
+                    or data.get("english_output")
+
+                    or data.get("output_en")
+
+                    or data.get("output_english")
+
+                )
+
+                if _truthy(en_flag):
+
+                    output_lang = "en"
+
+
+
+            # 3) Heuristic scan: if any key implies English and is checked / equals en
+
+            if not output_lang:
+
+                for k, v in (data.items() if hasattr(data, "items") else []):
+
+                    kl = str(k).strip().lower()
+
+                    vl = str(v).strip().lower() if v is not None else ""
+
+                    if vl in ("en", "english") and ("lang" in kl or "language" in kl or "output" in kl):
+
+                        output_lang = "en"
+
+                        break
+
+                    if ("english" in kl) or re.search(r"(^|_)en($|_)", kl):
+
+                        if _truthy(v):
+
+                            output_lang = "en"
+
+                            break
+
+
+
+            output_lang = output_lang or "ja"
+
+            if output_lang not in ("ja", "en"):
+
+                output_lang = "ja"
+
+
+
+            # Log once per request for fast troubleshooting
+
+            try:
+
+                form_keys = list(data.keys()) if hasattr(data, "keys") else []
+
+                print(f"[tenmob] output_lang={output_lang} keys={form_keys[:30]}")
+
+            except Exception:
+
+                pass
 
             try:
                 year, month, day = map(int, birthdate.split("-"))
