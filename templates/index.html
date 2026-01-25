@@ -88,12 +88,12 @@
     <label for="force_next_month" style="vertical-align: middle;">来月・再来月を占う（20日以前でも来月起点にする）</label>
 
 <label style="display:flex; align-items:center; gap:10px; margin-top:10px;">
-  <input type="checkbox" id="tokyo_mode" />
+  <input type="checkbox" id="tokyo_mode" name="tokyo_mode" value="yes" />
   <span>東京（浅草）向けの文章にする</span>
 </label>
 
 <label style="display:flex; align-items:center; gap:10px; margin-top:10px;">
-  <input type="checkbox" id="english_output" />
+  <input type="checkbox" id="english_output" name="english_output" value="yes" />
   <span>English output</span>
 </label>
   </div>
@@ -318,7 +318,21 @@
 
       const forceNextMonth = document.getElementById("force_next_month")?.checked || false;
 
-      const payload = { image_data: imageData, birthdate, full_year: fullYear, force_next_month: forceNextMonth };
+      const tokyoMode = document.getElementById("tokyo_mode")?.checked || false;
+const englishOutput = document.getElementById("english_output")?.checked || false;
+
+// Back-end accepts multiple keys; send explicit output_lang to make it unambiguous.
+const outputLang = englishOutput ? "en" : "ja";
+
+const payload = {
+  image_data: imageData,
+  birthdate,
+  full_year: fullYear,
+  force_next_month: forceNextMonth,
+  tokyo_mode: tokyoMode,
+  english_output: englishOutput,
+  output_lang: outputLang
+};
 
       try {
         const response = await fetch(path, {

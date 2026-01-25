@@ -1134,6 +1134,21 @@ def ten_shincom():
                 print("❌ 本命星取得エラー:", e)
                 honmeisei = ""
             now = datetime.now()
+# Cheap verification endpoint: /tenmob?ping_lang=1
+# Returns the resolved output_lang and the received language-related keys without calling OpenAI.
+if request.args.get("ping_lang") == "1" or data.get("ping_lang") in (True, "1", 1, "true", "True", "yes", "on"):
+    return jsonify({
+        "ok": True,
+        "output_lang": output_lang,
+        "received_keys": sorted(list(data.keys())),
+        "received_lang_fields": {
+            "output_lang": data.get("output_lang"),
+            "lang": data.get("lang"),
+            "language": data.get("language"),
+            "english_output": data.get("english_output"),
+            "tokyo_mode": data.get("tokyo_mode"),
+        },
+    })
             palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month, lang=output_lang)
             summary_text = ""
             if len(palm_texts) == 6:
@@ -2191,5 +2206,4 @@ def admin_sales_add_missing():
 @app.route('/selfmob/google808abc9a83ba5e55.html')
 def google_verification_file():
     return send_from_directory('static', 'google808abc9a83ba5e55.html')
-
 
