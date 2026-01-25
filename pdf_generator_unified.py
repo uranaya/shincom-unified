@@ -5,7 +5,7 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import stringWidth
-from textwrap import wrap
+from textwrap import wrap as _textwrap_wrap
 import base64
 import io
 import os
@@ -28,6 +28,70 @@ import os
 from datetime import datetime
 import re
 
+
+def _wrap_chars(text: str, limit: int):
+    """Character-count based wrapping (legacy)."""
+    if not text:
+        return []
+    return _textwrap_wrap(text, width=limit, break_long_words=True, replace_whitespace=False)
+
+def _wrap_by_width(c, text: str, font_name: str, font_size: int, max_width: float):
+    """
+    Pixel-width based wrapping using ReportLab stringWidth.
+    This is critical for English, where char-count wrapping produces excessive line breaks.
+    """
+    if not text:
+        return []
+    # Normalize whitespace but keep paragraph breaks.
+    paragraphs = (text or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    lines_out = []
+    for p in paragraphs:
+        if not p.strip():
+            lines_out.append("")
+            continue
+        words = p.split(" ")
+        cur = ""
+        for w in words:
+            if not w:
+                continue
+            cand = (cur + " " + w).strip() if cur else w
+            if stringWidth(cand, font_name, font_size) <= max_width:
+                cur = cand
+            else:
+                if cur:
+                    lines_out.append(cur)
+                # If a single word is too long, hard-split it.
+                if stringWidth(w, font_name, font_size) <= max_width:
+                    cur = w
+                else:
+                    buf = ""
+                    for ch in w:
+                        cand2 = buf + ch
+                        if stringWidth(cand2, font_name, font_size) <= max_width:
+                            buf = cand2
+                        else:
+                            if buf:
+                                lines_out.append(buf)
+                            buf = ch
+                    cur = buf
+        if cur:
+            lines_out.append(cur)
+    return lines_out
+
+def _wrap_text(c, text: str, lang: str, char_limit: int, font_name: str, font_size: int, max_width: float):
+    """Choose wrapping strategy by language."""
+    if (lang or "ja") == "en":
+        return _wrap_by_width(c, text, font_name, font_size, max_width)
+    return _wrap_chars(text, char_limit)
+
+def _ensure_y(c, y: float, needed_lines: int, line_h: float, margin: float, page_w: float, page_h: float, font_name: str, font_size: int):
+    """If not enough vertical space, start a new page. Returns new y."""
+    min_y = margin + 10*mm
+    if y - (needed_lines * line_h) < min_y:
+        c.showPage()
+        y = page_h - margin
+        c.setFont(font_name, font_size)
+    return y
 def _normalize_month_fortune_text(text: str, kind: str) -> str:
     """Remove leading 'YYYY年M月は' style prefixes to avoid heading/body month mismatches.
     kind: 'month' or 'next'
@@ -55,43 +119,8 @@ pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
 
 def wrap(text, limit):
-    """Backward-compatible wrapper around textwrap.wrap."""
-    return _wrap(text, limit)
-
-def _norm_lang(v: str) -> str:
-    v = (v or '').strip().lower()
-    if v in ('en', 'eng', 'english', '1', 'true', 'yes', 'on'):
-        return 'en'
-    return 'ja'
-
-def get_output_lang(data, default: str = 'ja') -> str:
-    """Resolve output language from result_data / request payload."""
-    if not isinstance(data, dict):
-        return _norm_lang(default)
-    for k in ('output_lang', 'lang', 'language', 'outputLanguage'):
-        if k in data and data.get(k) is not None:
-            return _norm_lang(str(data.get(k)))
-    return _norm_lang(default)
-
-def wrap_lang(text, ja_limit: int, en_limit: int, lang: str):
-    """Wrap text with different character limits for ja/en, preserving explicit newlines."""
-    lang = _norm_lang(lang)
-    limit = int(en_limit if lang == 'en' else ja_limit)
-    if text is None:
-        text = ''
-    s = str(text)
-    out = []
-    # Preserve user newlines: wrap each logical line independently
-    for para in s.splitlines() or ['']:
-        if lang == 'en':
-            lines = _wrap(para, limit, break_long_words=False, break_on_hyphens=False)
-        else:
-            lines = _wrap(para, limit)
-        if not lines:
-            out.append('')
-        else:
-            out.extend(lines)
-    return out
+    # Backward-compatible wrapper
+    return _wrap_chars(text, limit)
 
 
 def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='ja', page_height=None, **kwargs):
@@ -198,7 +227,6 @@ def draw_palm_image(c, base64_image, width, y):
 # 恋愛版 年運ページ（A4）
 # =========================
 def draw_yearly_pages_renai_a4(c, yearly):
-    lang = get_output_lang(yearly)
     """恋愛版 A4：年運＋12か月恋愛運を、テキスト量に応じて自動で複数ページに描画する。"""
     width, height = A4
     margin = 20 * mm
@@ -216,7 +244,7 @@ def draw_yearly_pages_renai_a4(c, yearly):
         y -= 5 * mm
 
         c.setFont(FONT_NAME, 10)
-        for line in wrap_lang(text or "", 46, 80, lang):
+        for line in wrap(text or "", 46):
             if y < bottom:
                 c.showPage()
                 y = top
@@ -239,7 +267,6 @@ def draw_yearly_pages_renai_a4(c, yearly):
 # 恋愛版 年運ページ（B4）
 # =========================
 def draw_yearly_pages_renai_b4(c, yearly):
-    lang = get_output_lang(yearly)
     """恋愛版 B4：年運＋12か月恋愛運を、テキスト量に応じて自動で複数ページに描画する。"""
     width, height = B4
     margin = 20 * mm
@@ -257,7 +284,7 @@ def draw_yearly_pages_renai_b4(c, yearly):
         y -= 6 * mm
 
         c.setFont(FONT_NAME, 11)
-        for line in wrap_lang(text or "", 45, 78, lang):
+        for line in wrap(text or "", 45):
             if y < bottom:
                 c.showPage()
                 y = top
@@ -277,8 +304,8 @@ def draw_yearly_pages_renai_b4(c, yearly):
 
 
 def draw_shincom_a4(c, data, include_yearly=False):
-    lang = get_output_lang(data)
     width, height = A4
+    lang = _get_lang(data)
     margin = 20 * mm
     y = height - margin
     y = draw_header(c, width, margin, y)
@@ -330,7 +357,10 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        for line in wrap_lang(data['palm_texts'][i], 40, 70, lang):
+        max_w = width - (2*margin)
+        lines = _wrap_text(c, data['palm_texts'][i], lang, 40, FONT_NAME, 10, max_w)
+        y = _ensure_y(c, y, len(lines)+2, 6*mm, margin, width, height, FONT_NAME, 10)
+        for line in lines:
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
@@ -345,7 +375,10 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        for line in wrap_lang(data['palm_texts'][i], 40, 70, lang):
+        max_w = width - (2*margin)
+        lines = _wrap_text(c, data['palm_texts'][i], lang, 40, FONT_NAME, 10, max_w)
+        y = _ensure_y(c, y, len(lines)+2, 6*mm, margin, width, height, FONT_NAME, 10)
+        for line in lines:
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
@@ -353,7 +386,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
 
     # 四柱推命・まとめ等（タイトルのみでも出す）
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
-        wrap_len = (75 if 'month' in key else 80) if lang == 'en' else (36 if 'month' in key else 40)
+        wrap_len = 36 if 'month' in key else 40
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
 
@@ -362,7 +395,10 @@ def draw_shincom_a4(c, data, include_yearly=False):
             y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         if content:
-            for line in wrap(content, wrap_len):
+            max_w = width - (2*margin)
+            lines = _wrap_text(c, content, lang, wrap_len, FONT_NAME, 10, max_w)
+            y = _ensure_y(c, y, len(lines)+1, 6*mm, margin, width, height, FONT_NAME, 10)
+            for line in lines:
                 c.drawString(margin, y, line)
                 y -= 6 * mm
         y -= 3 * mm
@@ -376,8 +412,8 @@ def draw_shincom_a4(c, data, include_yearly=False):
 
 
 def draw_shincom_b4(c, data, include_yearly=False):
-    lang = get_output_lang(data)
     width, height = B4
+    lang = _get_lang(data)
     margin = 20 * mm
     y = height - margin
     y = draw_header(c, width, margin, y)
@@ -388,7 +424,10 @@ def draw_shincom_b4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 7 * mm
         c.setFont(FONT_NAME, 12)
-        for line in wrap_lang(data['palm_texts'][i], 45, 78, lang):
+        max_w = width - (2*margin)
+        lines = _wrap_text(c, data['palm_texts'][i], lang, 45, FONT_NAME, 12, max_w)
+        y = _ensure_y(c, y, len(lines)+2, 7*mm, margin, width, height, FONT_NAME, 12)
+        for line in lines:
             c.drawString(margin, y, line)
             y -= 7 * mm
         y -= 4 * mm
@@ -401,7 +440,10 @@ def draw_shincom_b4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 7 * mm
         c.setFont(FONT_NAME, 12)
-        for line in wrap_lang(data['palm_texts'][i], 45, 78, lang):
+        max_w = width - (2*margin)
+        lines = _wrap_text(c, data['palm_texts'][i], lang, 45, FONT_NAME, 12, max_w)
+        y = _ensure_y(c, y, len(lines)+2, 7*mm, margin, width, height, FONT_NAME, 12)
+        for line in lines:
             c.drawString(margin, y, line)
             y -= 7 * mm
         y -= 4 * mm
@@ -409,7 +451,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
 
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
 
-        wrap_len = (80 if 'month' in key else 90) if lang == 'en' else (40 if 'month' in key else 45)
+        wrap_len = 40 if 'month' in key else 45
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
         if title:
@@ -417,7 +459,10 @@ def draw_shincom_b4(c, data, include_yearly=False):
             y -= 7 * mm
         c.setFont(FONT_NAME, 12)
         if content:
-            for line in wrap(content, wrap_len):
+            max_w = width - (2*margin)
+            lines = _wrap_text(c, content, lang, wrap_len, FONT_NAME, 10, max_w)
+            y = _ensure_y(c, y, len(lines)+1, 6*mm, margin, width, height, FONT_NAME, 10)
+            for line in lines:
                 c.drawString(margin, y, line)
                 y -= 7 * mm
         y -= 4 * mm
@@ -430,7 +475,6 @@ def draw_shincom_b4(c, data, include_yearly=False):
 
 
 def draw_yearly_pages_shincom_a4(c, yearly):
-    lang = get_output_lang(yearly)
     width, height = A4
     margin = 20 * mm
     y = height - 30 * mm
@@ -441,7 +485,7 @@ def draw_yearly_pages_shincom_a4(c, yearly):
         c.drawString(margin, y, f"■ {title}")
         y -= 5 * mm
         c.setFont(FONT_NAME, 10)
-        for line in wrap_lang(text or "", 45, 78, lang):
+        for line in wrap(text or "", 45):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
@@ -462,7 +506,6 @@ def draw_yearly_pages_shincom_a4(c, yearly):
 
 
 def draw_yearly_pages_shincom_b4(c, yearly):
-    lang = get_output_lang(yearly)
     width, height = B4
     margin = 20 * mm
     y = height - 30 * mm
@@ -473,7 +516,7 @@ def draw_yearly_pages_shincom_b4(c, yearly):
         c.drawString(margin, y, f"■ {title}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 11)
-        for line in wrap_lang(text or "", 45, 78, lang):
+        for line in wrap(text or "", 45):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
@@ -494,7 +537,6 @@ def draw_yearly_pages_shincom_b4(c, yearly):
 
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
-    lang = get_output_lang(data)
     from reportlab.lib.pagesizes import A4, B4
     from reportlab.lib.units import mm
     from header_utils import draw_header
@@ -509,7 +551,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
 
     width, height = A4 if size == 'a4' else B4
     margin = 20 * mm
-    wrap_len = (80 if size == 'a4' else 90) if lang == 'en' else (40 if size == 'a4' else 45)
+    wrap_len = 40 if size == 'a4' else 45
     y = draw_header(c, width, margin, height - margin)
 
     # 1ページ目：相性診断・恋愛運（年/月/来月）
