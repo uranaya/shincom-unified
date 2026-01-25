@@ -10,60 +10,151 @@ from reportlab.lib.units import mm
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str = 'ja'):
-    lang = (lang or 'ja').lower()
-    if lang.startswith('en'):
-        prompt = f"""You are a professional fortune-telling assistant for a Japanese spiritual shop.
-Create *short* 'Lucky Information' in English based on the inputs below.
+def generate_lucky_info(
+    nicchu_eto,
+    birthdate,
+    age,
+    palm_result,
+    shichu_result,
+    kyusei_text,
+    lang="ja",
+):
+    """Generate 'lucky info' lines for PDF.
 
-Output format (one per line):
-Item: <one item>
-Color: <one color>
-Number: <one number>
-Keyword: <one keyword>
-Action: <one action>
-Message: <1-2 sentences, upbeat and practical>
+    - Japanese is the default (stable production).
+    - English output is enabled when lang == 'en'.
+    - Robust against past refactors by normalizing `shichu_result_raw`.
+    """
+    # Backward/forward compatibility: prevent NameError in prompt templates
+    shichu_result_raw = shichu_result
 
-Inputs:
-- Day pillar (Eto) hint: {nicchu_eto}
+    lang = (lang or "ja").lower().strip()
+    if lang not in ("ja", "en"):
+        lang = "ja"
+
+    if lang == "en":
+        system_prompt = (
+            "You are a helpful assistant. Generate concise 'lucky info' for a fortune-telling PDF. "
+            "Return EXACTLY 5 lines in this order, each starting with a label and a colon:
+"
+            "Item: ...
+"
+            "Color: ...
+"
+            "Number: ...
+"
+            "Food: ...
+"
+            "Day: ...
+"
+            "Keep each value short (max ~12 words). No extra lines."
+        )
+        user_prompt = f"""User profile:
 - Birthdate: {birthdate}
 - Age: {age}
-- Palm reading summary: {palm_result}
-- Shichu (raw): {shichu_result_raw}
-- Kyusei text: {kyusei_text}
-"""
+- Day pillar (for internal use): {nicchu_eto}
+
+Palm reading summary:
+{palm_result}
+
+Shichu (raw):
+{shichu_result_raw}
+
+Kyusei (Japanese text; for context):
+{kyusei_text}
+
+Generate the 5 lines now."""
     else:
-        prompt = f"""あなたは占い師のアシスタントです。以下の情報をもとに、短い「ラッキー情報」を日本語で作ってください。
-出力は次の形式で、各項目を1行ずつにしてください：
+        system_prompt = (
+            "あなたは占いの文章を作るアシスタントです。PDFの末尾に載せる「ラッキー情報」を作成してください。"
+            "出力は必ず5行で、順序は固定です。各行は「◆」で始めてください。
+"
+            "1) ◆ アイテム：...
+"
+            "2) ◆ カラー：...
+"
+            "3) ◆ ナンバー：...
+"
+            "4) ◆ フード：...
+"
+            "5) ◆ デー：...
+"
+            "各項目は短く、読みやすく。余計な説明や改行を追加しないでください。"
+        )
+        user_prompt = f"""以下の情報を参考に、ラッキー情報を作成してください。
 
-アイテム：〇〇
-カラー：〇〇
-ナンバー：〇〇
-キーワード：〇〇
-アクション：〇〇
-一言メッセージ：〇〇
+【基本情報】
+- 生年月日: {birthdate}
+- 年齢: {age}
+- 日柱(内部用): {nicchu_eto}
 
-【入力】
-- 日柱の干支（参考、本文に出さない）：{nicchu_eto}
-- 生年月日：{birthdate}
-- 年齢：{age}
-- 手相の総評：{palm_result}
-- 四柱推命の要約：{shichu_result_raw}
-- 九星気学の情報：{kyusei_text}
-"""
+【手相鑑定(要約)】
+{palm_result}
+
+【四柱推命(生テキスト)】
+{shichu_result_raw}
+
+【九星気学(本文テキスト)】
+{kyusei_text}
+
+上記を踏まえ、指定の5行のみで出力してください。"""
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.6
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+
+        res = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.7,
         )
-        return [response["choices"][0]["message"]["content"].strip()]
-    except Exception as e:
-        print("❌ ラッキー情報取得失敗:", e)
-        if lang.startswith('en'):
-            return ["◆ Item: -   ◆ Color: -   ◆ Number: -   ◆ Food: -   ◆ Day: -"]
-        return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
+        out = (res.choices[0].message.content or "").strip()
+        lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
+
+        if lang == "en":
+            if len(lines) >= 5:
+                return lines[:5]
+            defaults = [
+                "Item: Smartphone charger",
+                "Color: Charcoal",
+                "Number: 5",
+                "Food: Peach",
+                "Day: Tuesday",
+            ]
+            return (lines + defaults)[:5]
+
+        normalized = []
+        for ln in lines:
+            if not ln.startswith("◆"):
+                ln = "◆ " + ln
+            normalized.append(ln)
+
+        if len(normalized) >= 5:
+            return normalized[:5]
+
+        normalized += [
+            "◆ アイテム：ー",
+            "◆ カラー：ー",
+            "◆ ナンバー：ー",
+            "◆ フード：ー",
+            "◆ デー：ー",
+        ]
+        return normalized[:5]
+
+    except Exception:
+        if lang == "en":
+            return [
+                "Item: Smartphone charger",
+                "Color: Charcoal",
+                "Number: 5",
+                "Food: Peach",
+                "Day: Tuesday",
+            ]
+        return ["◆ アイテム：ー", "◆ カラー：ー", "◆ ナンバー：ー", "◆ フード：ー", "◆ デー：ー"]
+
 
 
 def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
