@@ -277,7 +277,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 
 
-def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None):
+def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None, lang='ja'):
     """
     九星の直接連想（紫/9/火曜…）を避け、数秘 + タロット + 易(八卦) + 色彩心理を混ぜて
     「◆ アイテム／カラー／ナンバー／フード／デー」を1行で返す（リスト1要素）。
@@ -448,7 +448,7 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     iching_result = get_iching_advice(lang=lang)
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
-    raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now)
+    raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now, lang=lang)
 
 
     lucky_lines = []
