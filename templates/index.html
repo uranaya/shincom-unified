@@ -319,20 +319,11 @@
       const forceNextMonth = document.getElementById("force_next_month")?.checked || false;
 
       const tokyoMode = document.getElementById("tokyo_mode")?.checked || false;
-const englishOutput = document.getElementById("english_output")?.checked || false;
+      const englishOutput = document.getElementById("english_output")?.checked || false;
+      const outputLang = englishOutput ? "en" : "ja";
 
-// Back-end accepts multiple keys; send explicit output_lang to make it unambiguous.
-const outputLang = englishOutput ? "en" : "ja";
-
-const payload = {
-  image_data: imageData,
-  birthdate,
-  full_year: fullYear,
-  force_next_month: forceNextMonth,
-  tokyo_mode: tokyoMode,
-  english_output: englishOutput,
-  output_lang: outputLang
-};
+      const payload = { image_data: imageData, birthdate, full_year: fullYear, force_next_month: forceNextMonth,
+                        tokyo_mode: tokyoMode, english_output: englishOutput, output_lang: outputLang };
 
       try {
         const response = await fetch(path, {
