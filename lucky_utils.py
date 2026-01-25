@@ -41,7 +41,7 @@ def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, 
         return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
 
 
-def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
+def generate_lucky_direction(birthdate: str, today: datetime.date, lang: str = 'ja') -> str:
     """
     九星気学に基づく吉方位テキストを生成する。
     today の「20日以降」は翌月を「今月」とみなして計算する。
