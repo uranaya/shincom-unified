@@ -7,6 +7,7 @@ import requests
 import traceback
 import io
 import csv
+import re
 
 import psycopg2
 import psycopg2.extras

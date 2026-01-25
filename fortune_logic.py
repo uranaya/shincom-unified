@@ -770,27 +770,3 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         "lucky_direction": kyusei_text,
         "yearly_love_fortunes": yearly_love_fortunes,
     }
-    # 英語出力（英語チェック用）
-    if (lang or 'ja').lower().startswith('en'):
-        # 簡易翻訳マップ（頻出だけ）
-        color_map = {
-            "赤": "Red", "青": "Blue", "緑": "Green", "黄": "Yellow", "紫": "Purple",
-            "ピンク": "Pink", "黒": "Black", "白": "White", "金": "Gold", "銀": "Silver",
-            "オレンジ": "Orange", "水色": "Light Blue", "茶": "Brown", "グレー": "Gray",
-        }
-        day_map = {"月曜日":"Monday","火曜日":"Tuesday","水曜日":"Wednesday","木曜日":"Thursday","金曜日":"Friday","土曜日":"Saturday","日曜日":"Sunday"}
-        # 食べ物・アイテムは直訳しすぎず、語尾だけ英語に寄せる
-        def _ja_to_en_color(s): 
-            return color_map.get(s, s)
-        def _ja_to_en_day(s):
-            return day_map.get(s, s)
-        lucky_color_en = _ja_to_en_color(lucky_color)
-        lucky_day_en = _ja_to_en_day(lucky_day)
-        return [
-            f"◆ Lucky Item: {lucky_item}",
-            f"◆ Lucky Color: {lucky_color_en}",
-            f"◆ Lucky Number: {lucky_number}",
-            f"◆ Lucky Food: {lucky_food}",
-            f"◆ Lucky Day: {lucky_day_en}",
-        ]
-

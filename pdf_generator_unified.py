@@ -333,7 +333,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
     y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
-        draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'], lang=lang)
+        draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
 
 
 def draw_shincom_b4(c, data, include_yearly=False):
@@ -389,7 +389,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])
 
 
-def draw_yearly_pages_shincom_a4(c, yearly, lang='ja'):
+def draw_yearly_pages_shincom_a4(c, yearly):
     width, height = A4
     margin = 20 * mm
     y = height - 30 * mm
