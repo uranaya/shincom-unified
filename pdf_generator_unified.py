@@ -21,56 +21,6 @@ def _get_lang(data: dict) -> str:
     lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
     lang = (lang or 'ja').strip().lower()
     return 'en' if lang.startswith('en') else 'ja'
-
-def _wrap_lines(text, font_name, font_size, max_width, lang='ja', fallback_chars=40):
-    """Width-aware wrapping for English; Japanese keeps legacy char wrapping for stability."""
-    if not text:
-        return []
-    lang = (lang or 'ja').lower()
-    paragraphs = str(text).split('\n')
-    if not lang.startswith('en'):
-        out = []
-        for p in paragraphs:
-            p = p.strip()
-            if not p:
-                out.append('')
-                continue
-            out.extend(wrap(p, fallback_chars))
-        return out
-
-    from reportlab.pdfbase import pdfmetrics
-    out = []
-    for p in paragraphs:
-        p = p.strip()
-        if not p:
-            out.append('')
-            continue
-        words = p.split()
-        line = ''
-        for w in words:
-            cand = w if not line else (line + ' ' + w)
-            if pdfmetrics.stringWidth(cand, font_name, font_size) <= max_width:
-                line = cand
-                continue
-            if line:
-                out.append(line)
-                line = ''
-            if pdfmetrics.stringWidth(w, font_name, font_size) <= max_width:
-                line = w
-                continue
-            chunk = ''
-            for ch in w:
-                cand2 = chunk + ch
-                if pdfmetrics.stringWidth(cand2, font_name, font_size) <= max_width:
-                    chunk = cand2
-                else:
-                    if chunk:
-                        out.append(chunk)
-                    chunk = ch
-            line = chunk
-        if line:
-            out.append(line)
-    return out
 from textwrap import wrap
 import base64
 import io
@@ -291,10 +241,6 @@ def draw_yearly_pages_renai_b4(c, yearly):
 def draw_shincom_a4(c, data, include_yearly=False):
     width, height = A4
     margin = 20 * mm
-    lang = _get_lang(data)
-    content_width = width - (2 * margin)
-    wrap_body = lambda t, chars: _wrap_lines(t, FONT_NAME, 10, content_width, lang, chars)
-
     y = height - margin
     y = draw_header(c, width, margin, y)
     y = draw_palm_image(c, data["palm_image"], width, y)
@@ -345,7 +291,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        for line in _wrap_lines(data['palm_texts'][i], FONT_NAME, 10, content_width, lang, 40):
+        for line in wrap(data['palm_texts'][i], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
@@ -360,7 +306,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        for line in _wrap_lines(data['palm_texts'][i], FONT_NAME, 10, content_width, lang, 40):
+        for line in wrap(data['palm_texts'][i], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
@@ -377,7 +323,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
             y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         if content:
-            for line in _wrap_lines(content, FONT_NAME, 10, content_width, lang, wrap_len):
+            for line in wrap(content, wrap_len):
                 c.drawString(margin, y, line)
                 y -= 6 * mm
         y -= 3 * mm
@@ -387,7 +333,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
     y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
-        draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'], lang=_get_lang(data))
+        draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'], lang=lang)
 
 
 def draw_shincom_b4(c, data, include_yearly=False):
@@ -440,7 +386,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
     y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
-        draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'], lang=_get_lang(data))
+        draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])
 
 
 def draw_yearly_pages_shincom_a4(c, yearly, lang='ja'):
@@ -474,7 +420,7 @@ def draw_yearly_pages_shincom_a4(c, yearly, lang='ja'):
         draw_text_block(month["label"], month["text"])
 
 
-def draw_yearly_pages_shincom_b4(c, yearly, lang='ja'):
+def draw_yearly_pages_shincom_b4(c, yearly):
     width, height = B4
     margin = 20 * mm
     y = height - 30 * mm

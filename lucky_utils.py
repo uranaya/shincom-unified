@@ -1,314 +1,121 @@
-import datetime
-from dateutil.relativedelta import relativedelta   # ★ この行を追加
-from kyusei_utils import get_honmeisei, get_directions
-import openai
+# lucky_utils.py
+# ラッキー情報・ラッキー方位の生成ユーティリティ
+# - 既存の通常運用（日本語）に影響を出さない
+# - lang='en' のときは英語ラベルで返す（PDF英語版用）
+
+from __future__ import annotations
+
 import os
-from reportlab.lib.units import mm
+from typing import List
 
+from openai import OpenAI
 
-# ✅ APIキーの指定（必須）
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
+def _prompt_lucky_info(lang: str, nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result_raw: str, kyusei_text: str) -> str:
+    if (lang or "ja").lower().startswith("en"):
+        return f"""You are an assistant for a fortune-telling shop.
+Given the following inputs, generate EXACTLY 5 short lines in English, each starting with the label and a colon.
 
-def generate_lucky_info(
-    nicchu_eto,
-    birthdate,
-    age,
-    palm_result,
-    shichu_result,
-    kyusei_text,
-    lang="ja",
-):
-    """Generate 'lucky info' lines for PDF.
+Labels (in this order):
+1) Lucky Item
+2) Lucky Color
+3) Lucky Number
+4) Lucky Food
+5) Lucky Day
 
-    - Japanese is the default (stable production).
-    - English output is enabled when lang == 'en'.
-    - Robust against past refactors by normalizing `shichu_result_raw`.
-    """
-    # Backward/forward compatibility: prevent NameError in prompt templates
-    shichu_result_raw = shichu_result
+Constraints:
+- Each line should be concise (about 6-14 words).
+- Do not add any extra lines or explanations.
+- Avoid overly technical terms.
 
-    lang = (lang or "ja").lower().strip()
-    if lang not in ("ja", "en"):
-        lang = "ja"
-
-    if lang == "en":
-        system_prompt = (
-            "You are a helpful assistant. Generate concise 'lucky info' for a fortune-telling PDF. "
-            "Return EXACTLY 5 lines in this order, each starting with a label and a colon:
-"
-            "Item: ...
-"
-            "Color: ...
-"
-            "Number: ...
-"
-            "Food: ...
-"
-            "Day: ...
-"
-            "Keep each value short (max ~12 words). No extra lines."
-        )
-        user_prompt = f"""User profile:
+Inputs:
+- Day Pillar (nicchu_eto): {nicchu_eto}
 - Birthdate: {birthdate}
 - Age: {age}
-- Day pillar (for internal use): {nicchu_eto}
+- Palm reading (summary): {palm_result}
+- Shichu (raw): {shichu_result_raw}
+- Kyusei: {kyusei_text}
+"""
+    # default: Japanese
+    return f"""あなたは占い館のアシスタントです。
+以下の入力をもとに、ラッキー情報を「必ず5行」だけ出力してください。各行は「ラベル：内容」の形式にしてください。
 
-Palm reading summary:
-{palm_result}
+ラベル（この順番）：
+1) ラッキーアイテム
+2) ラッキーカラー
+3) ラッキーナンバー
+4) ラッキーフード
+5) ラッキーデー
 
-Shichu (raw):
-{shichu_result_raw}
+制約：
+- 各行は短めに（目安10〜20文字程度）
+- 余計な説明や前置き、空行を入れない
+- ラベルは必ず上記の文言を使う
 
-Kyusei (Japanese text; for context):
-{kyusei_text}
-
-Generate the 5 lines now."""
-    else:
-        system_prompt = (
-            "あなたは占いの文章を作るアシスタントです。PDFの末尾に載せる「ラッキー情報」を作成してください。"
-            "出力は必ず5行で、順序は固定です。各行は「◆」で始めてください。
-"
-            "1) ◆ アイテム：...
-"
-            "2) ◆ カラー：...
-"
-            "3) ◆ ナンバー：...
-"
-            "4) ◆ フード：...
-"
-            "5) ◆ デー：...
-"
-            "各項目は短く、読みやすく。余計な説明や改行を追加しないでください。"
-        )
-        user_prompt = f"""以下の情報を参考に、ラッキー情報を作成してください。
-
-【基本情報】
+入力：
+- 日柱（nicchu_eto）: {nicchu_eto}
 - 生年月日: {birthdate}
 - 年齢: {age}
-- 日柱(内部用): {nicchu_eto}
-
-【手相鑑定(要約)】
-{palm_result}
-
-【四柱推命(生テキスト)】
-{shichu_result_raw}
-
-【九星気学(本文テキスト)】
-{kyusei_text}
-
-上記を踏まえ、指定の5行のみで出力してください。"""
-
-    try:
-        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-
-        res = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.7,
-        )
-        out = (res.choices[0].message.content or "").strip()
-        lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
-
-        if lang == "en":
-            if len(lines) >= 5:
-                return lines[:5]
-            defaults = [
-                "Item: Smartphone charger",
-                "Color: Charcoal",
-                "Number: 5",
-                "Food: Peach",
-                "Day: Tuesday",
-            ]
-            return (lines + defaults)[:5]
-
-        normalized = []
-        for ln in lines:
-            if not ln.startswith("◆"):
-                ln = "◆ " + ln
-            normalized.append(ln)
-
-        if len(normalized) >= 5:
-            return normalized[:5]
-
-        normalized += [
-            "◆ アイテム：ー",
-            "◆ カラー：ー",
-            "◆ ナンバー：ー",
-            "◆ フード：ー",
-            "◆ デー：ー",
-        ]
-        return normalized[:5]
-
-    except Exception:
-        if lang == "en":
-            return [
-                "Item: Smartphone charger",
-                "Color: Charcoal",
-                "Number: 5",
-                "Food: Peach",
-                "Day: Tuesday",
-            ]
-        return ["◆ アイテム：ー", "◆ カラー：ー", "◆ ナンバー：ー", "◆ フード：ー", "◆ デー：ー"]
-
-
-
-def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
-    """
-    九星気学に基づく吉方位テキストを生成する。
-    today の「20日以降」は翌月を「今月」とみなして計算する。
-    """
-    # 生年月日のパース
-    try:
-        bd = (
-            birthdate
-            if isinstance(birthdate, datetime.date)
-            else datetime.datetime.strptime(birthdate, "%Y-%m-%d").date()
-        )
-    except Exception as e:
-        print("⚠️ generate_lucky_direction birthdate parse error:", e)
-        bd = today if isinstance(today, datetime.date) else datetime.date.today()
-
-    # today を date 型に正規化
-    base = today.date() if isinstance(today, datetime.datetime) else today
-
-    # 20日以降は翌月ベース
-    if base.day >= 20:
-        base = base + relativedelta(months=1)
-
-    # 本命星を取得
-    honmeisei = get_honmeisei(bd.year, bd.month, bd.day)
-
-    # 年盤（base.year）、今月（base.month）、来月（base.month+1）
-    dir_year = get_directions(base.year, 0, honmeisei)
-    dir_now = get_directions(base.year, base.month, honmeisei)
-    next_month_date = base + relativedelta(months=1)
-    dir_next = get_directions(next_month_date.year, next_month_date.month, honmeisei)
-
-    good_dir_year = dir_year.get("good", "不明")
-    good_dir_now = dir_now.get("good", "不明")
-    good_dir_next = dir_next.get("good", "不明")
-
-    return f"{base.year}年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。"
-
-
-
-def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction, font_name="IPAexGothic"):
-    """
-    Draw the Lucky Info section (lucky items and lucky direction) at the current y position.
-    Returns the updated y position.
-    """
-    # Section header
-    c.setFont(font_name, 12)
-    c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
-    y -= 8 * mm
-    c.setFont(font_name, 10)
-    # Lucky items (two-column layout)
-    if lucky_info:
-        col_width = (width - 2 * margin) / 2
-        x1 = margin + 10
-        x2 = margin + 10 + col_width
-        col = 0
-        for i, item in enumerate(lucky_info):
-            if "：" in item:
-                label, value = item.split("：", 1)
-                label = label.replace("ラッキー", "").strip()
-                item = f"{label}：{value.strip()}"
-            x = x1 if col == 0 else x2
-            c.drawString(x, y, item)
-            if col == 1:
-                y -= 6 * mm
-            col = (col + 1) % 2
-        if col == 1:
-            y -= 6 * mm
-    else:
-        c.drawString(margin + 10, y, "情報が取得できませんでした。")
-        y -= 6 * mm
-
-    # Lucky direction (Nine-Star Ki) lines
-    if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
-        for line in lucky_direction.strip().splitlines():
-            c.drawString(margin + 10, y, line.strip())
-            y -= 6 * mm
-    else:
-        c.drawString(margin + 10, y, "情報未取得")
-        y -= 6 * mm
-
-    return y - 10 * mm
-
-    if lucky_info:
-        for item in lucky_info:
-            if item and isinstance(item, str):
-                from textwrap import wrap
-                for line in wrap(item.strip(), 40):
-                    c.drawString(margin + 10, y, line)
-                    y -= 6 * mm
-    else:
-        c.drawString(margin + 10, y, "情報が取得できませんでした。")
-        y -= 6 * mm
-
-    y -= 4 * mm
-
-    if lucky_direction and isinstance(lucky_direction, str) and lucky_direction.strip():
-        c.drawString(margin, y, "■ 吉方位（九星気学より）")
-        y -= 6 * mm
-        from textwrap import wrap
-        for line in wrap(lucky_direction.strip(), 42):
-            c.drawString(margin + 10, y, line)
-            y -= 6 * mm
-    else:
-        c.drawString(margin, y, "■ 吉方位（九星気学より）情報未取得")
-        y -= 6 * mm
-
-    return y - 10 * mm
-
-
-# 🆕 恋愛専用：手相なしの簡易版ラッキー情報
-def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_text):
-    prompt = f"""あなたは占いの専門家です。
-相談者は現在{age}歳です。以下の2つの鑑定結果を参考にしてください。
-
-【四柱推命】\n{shichu_result}\n
-【九星気学の方位】\n{kyusei_text}
-
-この内容を元に、相談者にとって今最も恋愛運を高めるための
-ラッキーアイテム・ラッキーカラー・ラッキーナンバー・ラッキーフード・ラッキーデー
-をそれぞれ1つずつ、以下の形式で簡潔に提案してください：
-
-・アイテム：〇〇  
-・カラー：〇〇  
-・ナンバー：〇〇  
-・フード：〇〇  
-・デー：〇曜日
-
-※以下の条件を厳守してください：
-- 各項目は1行で記述
-- 解説や補足、象徴、理由付けは禁止
-- 装飾語は不要（例：「共感力を象徴する」などはNG）
-- 出力は上記5行のみに限定
+- 手相（要約）: {palm_result}
+- 四柱（raw）: {shichu_result_raw}
+- 九星: {kyusei_text}
 """
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
-        )
-        lines = response["choices"][0]["message"]["content"].strip().splitlines()
-        lucky_lines = []
-        for line in lines:
-            if "：" in line:
-                label, value = line.split("：", 1)
-                label = label.replace("・", "").strip()
-                value = value.strip().split("（")[0]
-                lucky_lines.append(f"{label}：{value}")  # 「◆」は付けない
-            if len(lucky_lines) == 5:
-                break
-        return lucky_lines
-    except Exception as e:
-        print("❌ 恋愛ラッキー情報取得失敗:", e)
-        return ["アイテム：ー", "カラー：ー", "ナンバー：ー", "フード：ー", "デー：ー"]
+def generate_lucky_info(
+    nicchu_eto: str,
+    birthdate: str,
+    age: int,
+    palm_result: str,
+    shichu_result_raw: str,
+    kyusei_text: str,
+    lang: str = "ja",
+    model: str = "gpt-4o-mini",
+) -> List[str]:
+    """ラッキー情報（5行）を返す。"""
+    prompt = _prompt_lucky_info(lang, nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text)
+    res = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.8,
+    )
+    text = (res.choices[0].message.content or "").strip()
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    # 保険：多すぎたら先頭5行、少なければそのまま
+    return lines[:5]
+
+def _prompt_lucky_direction(lang: str, kyusei_text: str) -> str:
+    if (lang or "ja").lower().startswith("en"):
+        return f"""Given the following Kyusei text, output ONE concise line in English:
+Format: Lucky Direction: <directions>
+- Keep it short.
+- No extra lines.
+
+Kyusei text:
+{kyusei_text}
+"""
+    return f"""以下の九星気学テキストをもとに、ラッキー方位を1行で出力してください。
+形式：ラッキー方位：〇〇
+- 余計な説明や空行は不要
+九星テキスト：
+{kyusei_text}
+"""
+
+def generate_lucky_direction(
+    kyusei_text: str,
+    lang: str = "ja",
+    model: str = "gpt-4o-mini",
+) -> str:
+    prompt = _prompt_lucky_direction(lang, kyusei_text)
+    res = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.5,
+    )
+    return (res.choices[0].message.content or "").strip()
