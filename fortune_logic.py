@@ -277,7 +277,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 
 
-def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None, lang: str='ja'):
+def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None):
     """
     九星の直接連想（紫/9/火曜…）を避け、数秘 + タロット + 易(八卦) + 色彩心理を混ぜて
     「◆ アイテム／カラー／ナンバー／フード／デー」を1行で返す（リスト1要素）。
@@ -291,7 +291,6 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
     today = now or datetime.today()
     seed_base = f"{birthdate}-{today.year}-{today.month}"
     seed = int(hashlib.sha256(seed_base.encode()).hexdigest(), 16) % (2**32)
-    is_en = (lang or 'ja').lower().startswith('en')
     rng = random.Random(seed)
 
     # ---- 2) 数秘：ライフパス（1〜9）----
@@ -449,7 +448,11 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     iching_result = get_iching_advice(lang=lang)
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
-    raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now, lang=lang)
+    # Lucky info: Japanese stable template by default; English uses OpenAI-based generator to avoid JP output.
+    if lang and str(lang).lower().startswith('en'):
+        raw_lucky_info = generate_lucky_info(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, lang='en')
+    else:
+        raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now)
 
 
     lucky_lines = []

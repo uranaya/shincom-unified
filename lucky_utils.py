@@ -11,22 +11,45 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text, lang: str = 'ja'):
-    prompt = f"""あなたは占いの専門家です。
-相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
+    lang = (lang or 'ja').lower()
+    if lang.startswith('en'):
+        prompt = f"""You are a professional fortune-telling assistant for a Japanese spiritual shop.
+Create *short* 'Lucky Information' in English based on the inputs below.
 
-【手相】\n{palm_result}\n
-【四柱推命】\n{shichu_result}\n
-【九星気学の方位】\n{kyusei_text}
+Output format (one per line):
+Item: <one item>
+Color: <one color>
+Number: <one number>
+Keyword: <one keyword>
+Action: <one action>
+Message: <1-2 sentences, upbeat and practical>
 
-以下5つの項目を、すべて1行にまとめて簡潔に出力してください：
+Inputs:
+- Day pillar (Eto) hint: {nicchu_eto}
+- Birthdate: {birthdate}
+- Age: {age}
+- Palm reading summary: {palm_result}
+- Shichu (raw): {shichu_result_raw}
+- Kyusei text: {kyusei_text}
+"""
+    else:
+        prompt = f"""あなたは占い師のアシスタントです。以下の情報をもとに、短い「ラッキー情報」を日本語で作ってください。
+出力は次の形式で、各項目を1行ずつにしてください：
 
-◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日
+アイテム：〇〇
+カラー：〇〇
+ナンバー：〇〇
+キーワード：〇〇
+アクション：〇〇
+一言メッセージ：〇〇
 
-- 「◆」で始める
-- 出力は1行だけにする
-- 各項目は短く（単語～数語）
-- 補足説明・理由・語り・改行は一切禁止
-- 他の文や文章は禁止（この形式のみで返答すること）
+【入力】
+- 日柱の干支（参考、本文に出さない）：{nicchu_eto}
+- 生年月日：{birthdate}
+- 年齢：{age}
+- 手相の総評：{palm_result}
+- 四柱推命の要約：{shichu_result_raw}
+- 九星気学の情報：{kyusei_text}
 """
 
     try:
@@ -38,10 +61,12 @@ def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, 
         return [response["choices"][0]["message"]["content"].strip()]
     except Exception as e:
         print("❌ ラッキー情報取得失敗:", e)
+        if lang.startswith('en'):
+            return ["◆ Item: -   ◆ Color: -   ◆ Number: -   ◆ Food: -   ◆ Day: -"]
         return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
 
 
-def generate_lucky_direction(birthdate: str, today: datetime.date, lang: str = 'ja') -> str:
+def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
     """
     九星気学に基づく吉方位テキストを生成する。
     today の「20日以降」は翌月を「今月」とみなして計算する。

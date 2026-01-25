@@ -7,7 +7,6 @@ import requests
 import traceback
 import io
 import csv
-import re
 
 import psycopg2
 import psycopg2.extras
@@ -1171,6 +1170,8 @@ def ten_shincom():
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
                 "birthdate": birthdate,
+                "language": output_lang,
+                "output_lang": output_lang,
                 "zodiac": zodiac,
                 "eto": eto,
                 "eto_number": eto_number,
@@ -2191,5 +2192,4 @@ def admin_sales_add_missing():
 @app.route('/selfmob/google808abc9a83ba5e55.html')
 def google_verification_file():
     return send_from_directory('static', 'google808abc9a83ba5e55.html')
-
 
