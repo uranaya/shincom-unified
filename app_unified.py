@@ -2184,6 +2184,65 @@ def admin_sales_add_missing():
 
 
 
+@app.route('/admin/invoice_staff_special_pdf')
+def admin_invoice_staff_special_pdf():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login_sales'))
+
+    month = request.args.get('month')
+    staff = request.args.get('staff')
+    if not month or not staff:
+        return "パラメータ不足", 400
+
+    month_start = month + "-01"
+    month_end = (datetime.strptime(month_start, "%Y-%m-%d")
+                 + relativedelta(months=1)).strftime('%Y-%m-%d')
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT method, SUM(amount)
+            FROM sales
+            WHERE date >= %s AND date < %s AND staff_name = %s
+            GROUP BY method;
+        """, (month_start, month_end, staff))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        total_taiken = 0
+        total_pc = 0
+        total_cashless = 0
+
+        for method, total in rows:
+            cat = normalize_method(method)
+            if cat == "対面":
+                total_taiken += total
+            elif cat == "コンピューター":
+                total_pc += total
+            elif cat == "現金外":
+                total_cashless += total
+
+        # ★ 特別出店料率
+        store_fee = total_taiken * 0.20 + total_pc * 0.40
+        store_fee_tax = int(store_fee * 1.10)
+        final_invoice = store_fee_tax - total_cashless
+
+        return render_template(
+            "invoice_staff.html",
+            month=month,
+            staff=staff,
+            total_taiken=total_taiken,
+            total_pc=total_pc,
+            total_cashless=total_cashless,
+            store_fee=store_fee,
+            store_fee_tax=store_fee_tax,
+            final_invoice=final_invoice
+        )
+
+    except Exception as e:
+        return f"❌ エラー: {e}", 500
 
 
 

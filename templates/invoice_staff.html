@@ -40,7 +40,8 @@
     button {
       padding: 10px 20px;
       font-size: 16px;
-      margin-top: 20px;
+      margin-top: 12px;
+      margin-right: 8px;
       background-color: #4CAF50;
       color: white;
       border: none;
@@ -88,10 +89,15 @@
     </tr>
   </table>
 
-  <button onclick="window.location.href='/admin/invoice_staff_special_pdf?month={{ month }}&staff={{ staff }}'">特別出店料（PDF）</button>
-  <button onclick="window.location.href='/admin/invoice_staff_pdf?month={{ month }}&staff={{ staff }}'">
-    通常PDF出力
-  </button>
+<!-- 既存の印刷ボタンは削除 -->
+
+<button onclick="window.location.href='/admin/invoice_staff_special_pdf?month={{ month }}&staff={{ staff }}'">
+  特別出店料（PDF）
+</button>
+
+<button onclick="window.location.href='/admin/invoice_staff_pdf?month={{ month }}&staff={{ staff }}'">
+  通常PDF出力
+</button>
 
 
 </body>
