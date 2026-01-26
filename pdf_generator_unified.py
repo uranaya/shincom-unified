@@ -111,7 +111,7 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     c.setFont(FONT_NAME, 12)
     title = "■ Lucky Info (from birthdate)" if is_en else "■ ラッキー情報（生年月日より）"
     c.drawString(margin, y, title)
-    y -= 6 * mm
+    y -= title_gap
 
     # 2列レイアウト
     c.setFont(FONT_NAME, body_font)
@@ -257,7 +257,7 @@ def draw_yearly_pages_renai_b4(c, yearly):
 
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {title}")
-        y -= 6 * mm
+        y -= title_gap
 
         c.setFont(FONT_NAME, 11)
         for line in wrap(text or "", 45):
@@ -330,11 +330,11 @@ def draw_shincom_a4(c, data, include_yearly=False):
     c.setFont(FONT_NAME, 12)
     for i in range(3):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 6 * mm
+        y -= title_gap
         c.setFont(FONT_NAME, 10)
         for line in wrap(data['palm_texts'][i], 40):
             c.drawString(margin, y, line)
-            y -= 6 * mm
+            y -= title_gap
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
@@ -345,28 +345,36 @@ def draw_shincom_a4(c, data, include_yearly=False):
     c.setFont(FONT_NAME, 12)
     for i in range(3, 5):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 6 * mm
+        y -= title_gap
         c.setFont(FONT_NAME, 10)
         for line in wrap(data['palm_texts'][i], 40):
             c.drawString(margin, y, line)
-            y -= 6 * mm
+            y -= title_gap
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
+    lang = data.get("lang", "ja")
+    is_en = str(lang).lower().startswith("en")
+    title_font = 11 if is_en else 12
+    title_gap = (5 if is_en else 6) * mm
+    line_gap = (5 if is_en else 6) * mm
+    wrap_len_en = 52
+
     # 四柱推命・まとめ等（タイトルのみでも出す）
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
-        wrap_len = 36 if 'month' in key else 40
+        wrap_len = wrap_len_en if is_en else (36 if 'month' in key else 40)
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
 
         if title:
+            c.setFont(FONT_NAME, title_font)
             c.drawString(margin, y, f"◆ {title}")
-            y -= 6 * mm
+            y -= title_gap
         c.setFont(FONT_NAME, 10)
         if content:
             for line in wrap(content, wrap_len):
                 c.drawString(margin, y, line)
-                y -= 6 * mm
+                y -= line_gap
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
@@ -500,7 +508,7 @@ def draw_yearly_pages_shincom_b4(c, yearly):
         nonlocal y
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {title}")
-        y -= 6 * mm
+        y -= title_gap
         c.setFont(FONT_NAME, 11)
         for line in wrap(text or "", 45):
             if y < 30 * mm:
@@ -509,7 +517,7 @@ def draw_yearly_pages_shincom_b4(c, yearly):
                 c.setFont(FONT_NAME, 11)
             c.drawString(margin, y, line)
             y -= 7 * mm
-        y -= 6 * mm
+        y -= title_gap
 
     c.showPage()
     y = height - 30 * mm
@@ -551,11 +559,11 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     for key in main_keys:
         if key in data.get("texts", {}) and data["texts"][key].strip():
             c.drawString(margin, y, f"◆ {data['titles'].get(key, key)}")
-            y -= 6 * mm
+            y -= title_gap
             c.setFont(FONT_NAME, 10)
             for line in wrap(data["texts"][key], wrap_len):
                 c.drawString(margin, y, line)
-                y -= 6 * mm
+                y -= title_gap
             y -= 4 * mm
             c.setFont(FONT_NAME, 12)
 
@@ -567,11 +575,11 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
         c.setFont(FONT_NAME, 12)
         for section in data["themes"]:
             c.drawString(margin, y, f"◆ {section['title']}")
-            y -= 6 * mm
+            y -= title_gap
             c.setFont(FONT_NAME, 10)
             for line in wrap(section["content"], wrap_len):
                 c.drawString(margin, y, line)
-                y -= 6 * mm
+                y -= title_gap
             y -= 4 * mm
             c.setFont(FONT_NAME, 12)
 

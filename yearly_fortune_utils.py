@@ -35,6 +35,7 @@ def _trim_to_max_chars(text: str, max_chars: int) -> str:
     if max_chars and len(t) > max_chars:
         if max_chars <= 3:
             return t[:max_chars]
+        return t[: max_chars - 3] + "..."
     return t
 
 
