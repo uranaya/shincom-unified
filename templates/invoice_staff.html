@@ -89,16 +89,13 @@
     </tr>
   </table>
 
-<!-- 既存の印刷ボタンは削除 -->
+  <button onclick="window.location.href='/admin/invoice_staff_special_pdf?month={{ month }}&staff={{ staff }}'">
+    特別出店料（PDF）
+  </button>
 
-<button onclick="window.location.href='/admin/invoice_staff_special_pdf?month={{ month }}&staff={{ staff }}'">
-  特別出店料（PDF）
-</button>
-
-<button onclick="window.location.href='/admin/invoice_staff_pdf?month={{ month }}&staff={{ staff }}'">
-  通常PDF出力
-</button>
-
+  <button onclick="window.location.href='/admin/invoice_staff_pdf?month={{ month }}&staff={{ staff }}'">
+    通常PDF出力
+  </button>
 
 </body>
 </html>
