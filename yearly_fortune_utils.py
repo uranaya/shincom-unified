@@ -19,6 +19,25 @@ MAX_CHAR_EN_YEAR = 520
 MAX_CHAR_EN_MONTH = 380
 
 
+
+# --- text helpers ---
+
+def _trim_to_max_chars(text: str, max_chars: int) -> str:
+    """Trim text to a safe maximum length without breaking rendering.
+
+    - Collapses excessive whitespace (spaces/newlines).
+    - If over max_chars, truncates and appends "...".
+    """
+    if not text:
+        return ""
+    # Normalize whitespace so the PDF layout is predictable
+    t = re.sub(r"\s+", " ", str(text)).strip()
+    if max_chars and len(t) > max_chars:
+        if max_chars <= 3:
+            return t[:max_chars]
+    return t
+
+
 def _build_monthly_prompt(month_label: str, eto: str, tsuhensei_year: str, tsuhensei_month: str, lang: str) -> str:
     if lang == "en":
         return "\n".join([
