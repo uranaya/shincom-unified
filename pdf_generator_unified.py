@@ -72,27 +72,48 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     if not lucky_lines:
         lucky_lines = []
 
+    # 改ページ判定（英語は本文が伸びやすく、末尾セクションが見切れがち）
+    try:
+        _ph = float(page_height) if page_height else float(getattr(c, "_pagesize", [0, 0])[1])
+    except Exception:
+        _ph = None
+
+    is_en = str(lang).lower().startswith("en")
+    # 英語は少し詰めて収まりやすくする
+    body_font = 9 if is_en else 10
+    line_h = (5.0 if is_en else 5.6) * mm
+    title_h = 6 * mm
+    dir_block_h = (1.5 + 5.5 + 6.0) * mm if lucky_direction else 0  # タイトル+本文想定
+    rows = (len(lucky_lines) + 1) // 2  # 2列なので2行で1段
+    need_h = title_h + (rows * line_h) + dir_block_h + 10 * mm
+    bottom_margin = 18 * mm
+
+    if _ph and (y - need_h) < bottom_margin:
+        c.showPage()
+        # ヘッダーは1ページ目だけ仕様なので、ここでは描かず本文位置へ
+        y = _ph - margin
+
     c.setFont(FONT_NAME, 12)
-    title = "■ Lucky Info (from birthdate)" if (str(lang).lower().startswith("en")) else "■ ラッキー情報（生年月日より）"
+    title = "■ Lucky Info (from birthdate)" if is_en else "■ ラッキー情報（生年月日より）"
     c.drawString(margin, y, title)
     y -= 6 * mm
 
     # 2列レイアウト
-    c.setFont(FONT_NAME, 10)
+    c.setFont(FONT_NAME, body_font)
     col_gap = 8 * mm
     col_w = (width - 2 * margin - col_gap) / 2.0
-    line_h = 5.6 * mm
+    # line_h は上で決定済み
 
     def _fit_one_line(s: str, max_w: float) -> str:
         s = (s or "").strip()
         if not s:
             return ""
         # 収まるならそのまま
-        if stringWidth(s, FONT_NAME, 10) <= max_w:
+        if stringWidth(s, FONT_NAME, body_font) <= max_w:
             return s
         # 末尾省略
         ell = "…"
-        while s and stringWidth(s + ell, FONT_NAME, 10) > max_w:
+        while s and stringWidth(s + ell, FONT_NAME, body_font) > max_w:
             s = s[:-1]
         return (s + ell) if s else ell
 
@@ -109,15 +130,15 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     # 方位（必要なら最後に）
     if lucky_direction:
         y -= 1.5 * mm
-        c.setFont(FONT_NAME, 10)
-        direction_title = "■ Lucky Directions" if (str(lang).lower().startswith("en")) else "■ ラッキー方位"
+        c.setFont(FONT_NAME, body_font)
+        direction_title = "■ Lucky Directions" if is_en else "■ ラッキー方位"
         c.drawString(margin, y, direction_title)
         y -= 5.5 * mm
 
         dir_text = (lucky_direction or "").strip()
         # 1行で無理なら折り返し（左列幅いっぱいで）
         max_w = width - 2 * margin
-        if stringWidth(dir_text, FONT_NAME, 10) <= max_w:
+        if stringWidth(dir_text, FONT_NAME, body_font) <= max_w:
             c.drawString(margin, y, dir_text)
             y -= line_h
         else:
@@ -335,7 +356,13 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.setFont(FONT_NAME, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    y = draw_lucky_section(
+        c, width, margin, y,
+        data.get('lucky_info', []),
+        data.get('lucky_direction', ''),
+        lang=data.get('lang', 'ja'),
+        page_height=height,
+    )
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
@@ -388,7 +415,13 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         c.setFont(FONT_NAME, 14)
 
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    y = draw_lucky_section(
+        c, width, margin, y,
+        data.get('lucky_info', []),
+        data.get('lucky_direction', ''),
+        lang=data.get('lang', 'ja'),
+        page_height=height,
+    )
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])
