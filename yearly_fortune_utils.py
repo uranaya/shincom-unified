@@ -6,6 +6,7 @@ from dateutil.relativedelta import relativedelta
 import openai
 import os
 import time
+import re
 
 # 日本語は従来通り短め（120〜160字目安）。
 MAX_CHAR_JA = 120
@@ -13,7 +14,9 @@ MAX_CHAR_JA = 120
 # 英語は「文字数」で制限すると極端に短くなりやすいため、
 # 1か月あたりの文章量を増やしてページがスカスカにならないようにする。
 # （厳密な words 制限ではなく、過剰に長くなりすぎないための上限）
-MAX_CHAR_EN = 520
+MAX_CHAR_EN = 420
+MAX_CHAR_EN_YEAR = 520
+MAX_CHAR_EN_MONTH = 380
 
 
 def _build_monthly_prompt(month_label: str, eto: str, tsuhensei_year: str, tsuhensei_month: str, lang: str) -> str:
@@ -28,7 +31,7 @@ def _build_monthly_prompt(month_label: str, eto: str, tsuhensei_year: str, tsuhe
             f"Month star (Tsuhensei): {tsuhensei_month}",
             "Output: 3-5 sentences (roughly 70-110 words).",
             "Keep it practical and positive. Include at least one actionable tip.",
-            f"Upper limit: about {MAX_CHAR_EN} characters.",
+            f"Upper limit: about {MAX_CHAR_EN_YEAR} characters.",
         ])
     return "\n".join([
         "あなたはプロの占い師です。",
@@ -86,7 +89,7 @@ Using the information below, write a {target_year} overview for the customer in 
 
 Length:
 - 4–7 sentences
-- Aim for ~100–160 words (keep within about {MAX_CHAR_EN} characters)
+- Aim for ~80–110 words (keep within about {MAX_CHAR_EN_YEAR} characters)
 
 - Day pillar (reference only): {nicchu}
 - Year influence (reference only): {tsuhen_year}
@@ -109,7 +112,7 @@ Rules:
 - 前向きで、行動や考え方の指針になるように
 """ + lang_instruction
 
-    year_fortune = _ask_openai(prompt_year)
+    year_fortune = _trim_to_max_chars(_ask_openai(prompt_year), MAX_CHAR_EN_YEAR if lang.startswith('en') else MAX_CHAR_JA)
 
     month_fortunes = []
     for i in range(12):
@@ -123,7 +126,7 @@ Write the customer's fortune for {y}-{m:02d} in natural English.
 
 Length:
 - 3–6 sentences
-- Aim for ~70–120 words (keep within about {MAX_CHAR_EN} characters)
+- Aim for ~45–70 words (keep within about {MAX_CHAR_EN_MONTH} characters)
 
 Reference info:
 - Day pillar (reference only): {nicchu}
@@ -152,7 +155,7 @@ Rules:
             label = f"{y}年{m}月の運勢"
 
         # OpenAIで生成（英語/日本語とも共通）
-        text = _ask_openai(prompt_month)
+        text = _trim_to_max_chars(_ask_openai(prompt_month), MAX_CHAR_EN_MONTH if lang.startswith('en') else MAX_CHAR_JA)
         month_fortunes.append({"label": label, "text": text})
 
     return {

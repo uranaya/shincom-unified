@@ -85,12 +85,27 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     title_h = 6 * mm
     dir_block_h = (1.5 + 5.5 + 6.0) * mm if lucky_direction else 0  # タイトル+本文想定
     rows = (len(lucky_lines) + 1) // 2  # 2列なので2行で1段
-    need_h = title_h + (rows * line_h) + dir_block_h + 10 * mm
-    bottom_margin = 18 * mm
+
+    # 改ページより「縮小」を優先（感熱紙コスト対策）
+    bottom_margin = 10 * mm
+
+    # 通常（現状）
+    need_h = title_h + (rows * line_h) + dir_block_h + 8 * mm
+
+    # 縮小（英語は特に行数が増えやすい）
+    compact_body_font = 9 if is_en else 10
+    compact_line_h = (4.6 if is_en else 5.2) * mm
+    compact_need_h = title_h + (rows * compact_line_h) + dir_block_h + 6 * mm
 
     if _ph and (y - need_h) < bottom_margin:
-        c.showPage()
-        # ヘッダーは1ページ目だけ仕様なので、ここでは描かず本文位置へ
+        # 縮小で収まるなら縮小、無理なら改ページ
+        if (y - compact_need_h) >= bottom_margin:
+            body_font = compact_body_font
+            line_h = compact_line_h
+        else:
+            c.showPage()
+            # ヘッダーは1ページ目だけ仕様なので、ここでは描かず本文位置へ
+            y = _ph - 20 * mm
         y = _ph - margin
 
     c.setFont(FONT_NAME, 12)
@@ -434,17 +449,31 @@ def draw_yearly_pages_shincom_a4(c, yearly):
 
     def draw_text_block(title, text):
         nonlocal y
+
+        # 2ページ内に必ず収めるため、1ブロックあたりの最大行数を制限
+        max_lines = 6 if title == year_label else 4
+
         c.setFont(FONT_NAME, 12)
         c.drawString(margin, y, f"■ {title}")
         y -= 5 * mm
+
         c.setFont(FONT_NAME, 10)
-        for line in wrap(text or "", 45):
+
+        lines = wrap((text or "").strip(), 45)
+        if len(lines) > max_lines:
+            lines = lines[:max_lines]
+            # 省略記号（幅に収まる範囲で）
+            if lines:
+                last = lines[-1]
+                lines[-1] = (last[:-3] + "...") if len(last) > 3 else (last + "...")
+
+        for line in lines:
             if y < 30 * mm:
-                c.showPage()
-                y = height - 30 * mm
-                c.setFont(FONT_NAME, 10)
+                # 追加改ページは行わない（2ページ縛り）。最後の行を省略して終了。
+                return
             c.drawString(margin, y, line)
             y -= 5 * mm
+
         y -= 3 * mm
 
     c.showPage()
