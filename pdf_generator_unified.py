@@ -5,6 +5,23 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import stringWidth
+from textwrap import wrap
+
+
+def smart_wrap(text: str, width: int):
+    """Wrap text for both space-delimited (EN) and non-space (JA) strings.
+    - If the text contains whitespace, defer to textwrap.wrap.
+    - If not, chunk by character count (simple and robust for Japanese).
+    """
+    if text is None:
+        return []
+    s = str(text).replace("\r", "")
+    if not s:
+        return []
+    if any(ch.isspace() for ch in s):
+        return wrap(s, width=width)
+    # No spaces (likely Japanese). Chunk by width characters.
+    return [s[i:i+width] for i in range(0, len(s), width)]
 import base64
 import io
 import os
@@ -20,21 +37,12 @@ def _get_lang(data: dict) -> str:
     lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
     lang = (lang or 'ja').strip().lower()
     return 'en' if lang.startswith('en') else 'ja'
-
-
-def wrap(text, width):
-    text = (text or "").replace("\r\n", "\n").replace("\r", "\n")
-    out = []
-    import textwrap
-    for para in text.split("\n"):
-        if not (para or "").strip():
-            out.append("")
-            continue
-        s = para.strip()
-        ascii_ratio = sum(1 for ch in s if ord(ch) < 128) / max(1, len(s))
-        w = int(width * 1.8) if (" " in s and ascii_ratio > 0.6) else width
-        out.extend(textwrap.wrap(s, width=w, break_long_words=False, break_on_hyphens=False) or [s])
-    return out
+from textwrap import wrap
+import base64
+import io
+import os
+from datetime import datetime
+import re
 
 def _normalize_month_fortune_text(text: str, kind: str) -> str:
     """Remove leading 'YYYY年M月は' style prefixes to avoid heading/body month mismatches.
@@ -55,17 +63,15 @@ def _normalize_month_fortune_text(text: str, kind: str) -> str:
 from header_utils import draw_header
 from lucky_utils import draw_lucky_section
 
+from textwrap import wrap as _wrap
 
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
-# ---- spacing constants (mm) ----
-TITLE_GAP_JA = 6 * mm
-TITLE_GAP_EN = 5 * mm
-LINE_GAP_JA  = 6 * mm
-LINE_GAP_EN  = 5 * mm
 
+def wrap(text, limit):
+    return _wrap(text, limit)
 
 
 def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='ja', page_height=None, **kwargs):
@@ -77,64 +83,27 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     if not lucky_lines:
         lucky_lines = []
 
-    # 改ページ判定（英語は本文が伸びやすく、末尾セクションが見切れがち）
-    try:
-        _ph = float(page_height) if page_height else float(getattr(c, "_pagesize", [0, 0])[1])
-    except Exception:
-        _ph = None
-
-    is_en = str(lang).lower().startswith("en")
-    title_gap = TITLE_GAP_EN if is_en else TITLE_GAP_JA
-    # 英語は少し詰めて収まりやすくする
-    body_font = 9 if is_en else 10
-    line_h = (5.0 if is_en else 5.6) * mm
-    title_h = 6 * mm
-    dir_block_h = (1.5 + 5.5 + 6.0) * mm if lucky_direction else 0  # タイトル+本文想定
-    rows = (len(lucky_lines) + 1) // 2  # 2列なので2行で1段
-
-    # 改ページより「縮小」を優先（感熱紙コスト対策）
-    bottom_margin = 10 * mm
-
-    # 通常（現状）
-    need_h = title_h + (rows * line_h) + dir_block_h + 8 * mm
-
-    # 縮小（英語は特に行数が増えやすい）
-    compact_body_font = 9 if is_en else 10
-    compact_line_h = (4.6 if is_en else 5.2) * mm
-    compact_need_h = title_h + (rows * compact_line_h) + dir_block_h + 6 * mm
-
-    if _ph and (y - need_h) < bottom_margin:
-        # 縮小で収まるなら縮小、無理なら改ページ
-        if (y - compact_need_h) >= bottom_margin:
-            body_font = compact_body_font
-            line_h = compact_line_h
-        else:
-            c.showPage()
-            # ヘッダーは1ページ目だけ仕様なので、ここでは描かず本文位置へ
-            y = _ph - 20 * mm
-        y = _ph - margin
-
     c.setFont(FONT_NAME, 12)
-    title = "■ Lucky Info (from birthdate)" if is_en else "■ ラッキー情報（生年月日より）"
+    title = "■ Lucky Info (from birthdate)" if (str(lang).lower().startswith("en")) else "■ ラッキー情報（生年月日より）"
     c.drawString(margin, y, title)
-    y -= title_gap
+    y -= 6 * mm
 
     # 2列レイアウト
-    c.setFont(FONT_NAME, body_font)
+    c.setFont(FONT_NAME, 10)
     col_gap = 8 * mm
     col_w = (width - 2 * margin - col_gap) / 2.0
-    # line_h は上で決定済み
+    line_h = 5.6 * mm
 
     def _fit_one_line(s: str, max_w: float) -> str:
         s = (s or "").strip()
         if not s:
             return ""
         # 収まるならそのまま
-        if stringWidth(s, FONT_NAME, body_font) <= max_w:
+        if stringWidth(s, FONT_NAME, 10) <= max_w:
             return s
         # 末尾省略
         ell = "…"
-        while s and stringWidth(s + ell, FONT_NAME, body_font) > max_w:
+        while s and stringWidth(s + ell, FONT_NAME, 10) > max_w:
             s = s[:-1]
         return (s + ell) if s else ell
 
@@ -151,15 +120,15 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     # 方位（必要なら最後に）
     if lucky_direction:
         y -= 1.5 * mm
-        c.setFont(FONT_NAME, body_font)
-        direction_title = "■ Lucky Directions" if is_en else "■ ラッキー方位"
+        c.setFont(FONT_NAME, 10)
+        direction_title = "■ Lucky Directions" if (str(lang).lower().startswith("en")) else "■ ラッキー方位"
         c.drawString(margin, y, direction_title)
         y -= 5.5 * mm
 
         dir_text = (lucky_direction or "").strip()
         # 1行で無理なら折り返し（左列幅いっぱいで）
         max_w = width - 2 * margin
-        if stringWidth(dir_text, FONT_NAME, body_font) <= max_w:
+        if stringWidth(dir_text, FONT_NAME, 10) <= max_w:
             c.drawString(margin, y, dir_text)
             y -= line_h
         else:
@@ -226,7 +195,7 @@ def draw_yearly_pages_renai_a4(c, yearly):
         y -= 5 * mm
 
         c.setFont(FONT_NAME, 10)
-        for line in wrap(text or "", 46):
+        for line in smart_wrap(text or "", 46):
             if y < bottom:
                 c.showPage()
                 y = top
@@ -263,10 +232,10 @@ def draw_yearly_pages_renai_b4(c, yearly):
 
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {title}")
-        y -= title_gap
+        y -= 6 * mm
 
         c.setFont(FONT_NAME, 11)
-        for line in wrap(text or "", 45):
+        for line in smart_wrap(text or "", 45):
             if y < bottom:
                 c.showPage()
                 y = top
@@ -289,12 +258,6 @@ def draw_shincom_a4(c, data, include_yearly=False):
     width, height = A4
     margin = 20 * mm
     y = height - margin
-
-    lang = _get_lang(data)
-    is_en = str(lang).lower().startswith('en')
-    title_gap = TITLE_GAP_EN if is_en else TITLE_GAP_JA
-    line_gap = LINE_GAP_EN if is_en else LINE_GAP_JA
-
     y = draw_header(c, width, margin, y)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
@@ -342,11 +305,11 @@ def draw_shincom_a4(c, data, include_yearly=False):
     c.setFont(FONT_NAME, 12)
     for i in range(3):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= title_gap
+        y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         for line in wrap(data['palm_texts'][i], 40):
             c.drawString(margin, y, line)
-            y -= title_gap
+            y -= 6 * mm
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
@@ -357,44 +320,33 @@ def draw_shincom_a4(c, data, include_yearly=False):
     c.setFont(FONT_NAME, 12)
     for i in range(3, 5):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= title_gap
+        y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         for line in wrap(data['palm_texts'][i], 40):
             c.drawString(margin, y, line)
-            y -= title_gap
+            y -= 6 * mm
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
-    # lang/title_gap/line_gap already defined at top of this function
-    title_font = 11 if is_en else 12
-    wrap_len_en = 52
-
     # 四柱推命・まとめ等（タイトルのみでも出す）
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
-        wrap_len = wrap_len_en if is_en else (36 if 'month' in key else 40)
+        wrap_len = 36 if 'month' in key else 40
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
 
         if title:
-            c.setFont(FONT_NAME, title_font)
             c.drawString(margin, y, f"◆ {title}")
-            y -= title_gap
+            y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         if content:
             for line in wrap(content, wrap_len):
                 c.drawString(margin, y, line)
-                y -= line_gap
+                y -= 6 * mm
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(
-        c, width, margin, y,
-        data.get('lucky_info', []),
-        data.get('lucky_direction', ''),
-        lang=data.get('lang', 'ja'),
-        page_height=height,
-    )
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'])
@@ -404,12 +356,6 @@ def draw_shincom_b4(c, data, include_yearly=False):
     width, height = B4
     margin = 20 * mm
     y = height - margin
-
-    lang = _get_lang(data)
-    is_en = str(lang).lower().startswith('en')
-    title_gap = TITLE_GAP_EN if is_en else (7 * mm)  # B4 baseline differs
-    line_gap = LINE_GAP_EN if is_en else (7 * mm)
-
     y = draw_header(c, width, margin, y)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
@@ -453,13 +399,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         c.setFont(FONT_NAME, 14)
 
-    y = draw_lucky_section(
-        c, width, margin, y,
-        data.get('lucky_info', []),
-        data.get('lucky_direction', ''),
-        lang=data.get('lang', 'ja'),
-        page_height=height,
-    )
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'])
@@ -470,37 +410,19 @@ def draw_yearly_pages_shincom_a4(c, yearly):
     margin = 20 * mm
     y = height - 30 * mm
 
-    # 年運のタイトル文字列（比較用）
-    year_label = yearly.get("year_label", "")
-
     def draw_text_block(title, text):
         nonlocal y
-
-        # 2ページ内に必ず収めるため、1ブロックあたりの最大行数を制限
-        # 年運（Overall fortune for YYYY）は少し多め、月別は短めに制限
-        max_lines = 6 if title == year_label else 4
-
         c.setFont(FONT_NAME, 12)
         c.drawString(margin, y, f"■ {title}")
         y -= 5 * mm
-
         c.setFont(FONT_NAME, 10)
-
-        lines = wrap((text or "").strip(), 45)
-        if len(lines) > max_lines:
-            lines = lines[:max_lines]
-            # 省略記号（幅に収まる範囲で）
-            if lines:
-                last = lines[-1]
-                lines[-1] = (last[:-3] + "...") if len(last) > 3 else (last + "...")
-
-        for line in lines:
+        for line in smart_wrap(text or "", 45):
             if y < 30 * mm:
-                # 追加改ページは行わない（2ページ縛り）。最後の行を省略して終了。
-                return
+                c.showPage()
+                y = height - 30 * mm
+                c.setFont(FONT_NAME, 10)
             c.drawString(margin, y, line)
             y -= 5 * mm
-
         y -= 3 * mm
 
     c.showPage()
@@ -523,16 +445,16 @@ def draw_yearly_pages_shincom_b4(c, yearly):
         nonlocal y
         c.setFont(FONT_NAME, 13)
         c.drawString(margin, y, f"■ {title}")
-        y -= title_gap
+        y -= 6 * mm
         c.setFont(FONT_NAME, 11)
-        for line in wrap(text or "", 45):
+        for line in smart_wrap(text or "", 45):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
                 c.setFont(FONT_NAME, 11)
             c.drawString(margin, y, line)
             y -= 7 * mm
-        y -= title_gap
+        y -= 6 * mm
 
     c.showPage()
     y = height - 30 * mm
@@ -574,11 +496,11 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     for key in main_keys:
         if key in data.get("texts", {}) and data["texts"][key].strip():
             c.drawString(margin, y, f"◆ {data['titles'].get(key, key)}")
-            y -= title_gap
+            y -= 6 * mm
             c.setFont(FONT_NAME, 10)
             for line in wrap(data["texts"][key], wrap_len):
                 c.drawString(margin, y, line)
-                y -= title_gap
+                y -= 6 * mm
             y -= 4 * mm
             c.setFont(FONT_NAME, 12)
 
@@ -590,11 +512,11 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
         c.setFont(FONT_NAME, 12)
         for section in data["themes"]:
             c.drawString(margin, y, f"◆ {section['title']}")
-            y -= title_gap
+            y -= 6 * mm
             c.setFont(FONT_NAME, 10)
             for line in wrap(section["content"], wrap_len):
                 c.drawString(margin, y, line)
-                y -= title_gap
+                y -= 6 * mm
             y -= 4 * mm
             c.setFont(FONT_NAME, 12)
 
