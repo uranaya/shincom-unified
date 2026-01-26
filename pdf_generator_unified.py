@@ -447,10 +447,14 @@ def draw_yearly_pages_shincom_a4(c, yearly):
     margin = 20 * mm
     y = height - 30 * mm
 
+    # 年運のタイトル文字列（比較用）
+    year_label = yearly.get("year_label", "")
+
     def draw_text_block(title, text):
         nonlocal y
 
         # 2ページ内に必ず収めるため、1ブロックあたりの最大行数を制限
+        # 年運（Overall fortune for YYYY）は少し多め、月別は短めに制限
         max_lines = 6 if title == year_label else 4
 
         c.setFont(FONT_NAME, 12)
