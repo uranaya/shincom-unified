@@ -60,6 +60,11 @@ FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
+# ---- spacing constants (mm) ----
+TITLE_GAP_JA = 6 * mm
+TITLE_GAP_EN = 5 * mm
+LINE_GAP_JA  = 6 * mm
+LINE_GAP_EN  = 5 * mm
 
 
 
@@ -79,6 +84,7 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
         _ph = None
 
     is_en = str(lang).lower().startswith("en")
+    title_gap = TITLE_GAP_EN if is_en else TITLE_GAP_JA
     # 英語は少し詰めて収まりやすくする
     body_font = 9 if is_en else 10
     line_h = (5.0 if is_en else 5.6) * mm
@@ -283,6 +289,12 @@ def draw_shincom_a4(c, data, include_yearly=False):
     width, height = A4
     margin = 20 * mm
     y = height - margin
+
+    lang = _get_lang(data)
+    is_en = str(lang).lower().startswith('en')
+    title_gap = TITLE_GAP_EN if is_en else TITLE_GAP_JA
+    line_gap = LINE_GAP_EN if is_en else LINE_GAP_JA
+
     y = draw_header(c, width, margin, y)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
@@ -353,11 +365,8 @@ def draw_shincom_a4(c, data, include_yearly=False):
         y -= 3 * mm
         c.setFont(FONT_NAME, 12)
 
-    lang = data.get("lang", "ja")
-    is_en = str(lang).lower().startswith("en")
+    # lang/title_gap/line_gap already defined at top of this function
     title_font = 11 if is_en else 12
-    title_gap = (5 if is_en else 6) * mm
-    line_gap = (5 if is_en else 6) * mm
     wrap_len_en = 52
 
     # 四柱推命・まとめ等（タイトルのみでも出す）
@@ -395,6 +404,12 @@ def draw_shincom_b4(c, data, include_yearly=False):
     width, height = B4
     margin = 20 * mm
     y = height - margin
+
+    lang = _get_lang(data)
+    is_en = str(lang).lower().startswith('en')
+    title_gap = TITLE_GAP_EN if is_en else (7 * mm)  # B4 baseline differs
+    line_gap = LINE_GAP_EN if is_en else (7 * mm)
+
     y = draw_header(c, width, margin, y)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
