@@ -5,7 +5,6 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import stringWidth
-from textwrap import wrap
 import base64
 import io
 import os
@@ -21,12 +20,21 @@ def _get_lang(data: dict) -> str:
     lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
     lang = (lang or 'ja').strip().lower()
     return 'en' if lang.startswith('en') else 'ja'
-from textwrap import wrap
-import base64
-import io
-import os
-from datetime import datetime
-import re
+
+
+def wrap(text, width):
+    text = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    out = []
+    import textwrap
+    for para in text.split("\n"):
+        if not (para or "").strip():
+            out.append("")
+            continue
+        s = para.strip()
+        ascii_ratio = sum(1 for ch in s if ord(ch) < 128) / max(1, len(s))
+        w = int(width * 1.8) if (" " in s and ascii_ratio > 0.6) else width
+        out.extend(textwrap.wrap(s, width=w, break_long_words=False, break_on_hyphens=False) or [s])
+    return out
 
 def _normalize_month_fortune_text(text: str, kind: str) -> str:
     """Remove leading 'YYYY年M月は' style prefixes to avoid heading/body month mismatches.
@@ -47,15 +55,12 @@ def _normalize_month_fortune_text(text: str, kind: str) -> str:
 from header_utils import draw_header
 from lucky_utils import draw_lucky_section
 
-from textwrap import wrap as _wrap
 
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
 
-def wrap(text, limit):
-    return _wrap(text, limit)
 
 
 def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='ja', page_height=None, **kwargs):
