@@ -277,7 +277,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
 
 
-def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None, lang: str = "ja"):
+def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_result: str, shichu_result: str, kyusei_text: str, now=None):
     """
     九星の直接連想（紫/9/火曜…）を避け、数秘 + タロット + 易(八卦) + 色彩心理を混ぜて
     「◆ アイテム／カラー／ナンバー／フード／デー」を1行で返す（リスト1要素）。
@@ -423,42 +423,6 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
     day = tarot_weekday
 
     # ---- 10) 最終1行フォーマット ----
-    lang_norm = (lang or "ja").lower()
-    if lang_norm.startswith("en"):
-        item_map = {
-            "お守り": "amulet", "パワーストーン": "power stone", "アロマ": "aroma", "手帳": "planner",
-            "ハンカチ": "handkerchief", "赤いペン": "red pen", "鏡": "mirror", "マグカップ": "mug",
-            "ノート": "notebook", "腕時計": "watch", "イヤホン": "earphones", "キャンドル": "candle",
-            "キーケース": "key case", "折り畳み傘": "folding umbrella", "ヘアオイル": "hair oil",
-            "ミントガム": "mint gum", "チョコ": "chocolate", "青い小物": "a small blue item",
-            "白い小物": "a small white item", "革小物": "leather accessory", "観葉植物": "houseplant",
-            "お香": "incense", "塩": "salt",
-        }
-        color_map = {
-            "赤": "red", "青": "blue", "黄": "yellow", "緑": "green", "白": "white",
-            "黒": "black", "金": "gold", "銀": "silver", "ピンク": "pink",
-        }
-        day_map = {
-            "月曜日": "Monday", "火曜日": "Tuesday", "水曜日": "Wednesday", "木曜日": "Thursday",
-            "金曜日": "Friday", "土曜日": "Saturday", "日曜日": "Sunday",
-        }
-        food_map_en = {
-            "チーズ": "cheese", "ヨーグルト": "yogurt", "鶏肉": "chicken", "卵": "eggs",
-            "しょうが": "ginger", "りんご": "apple", "梨": "pear", "ナッツ": "nuts",
-            "豆腐": "tofu", "白身魚": "white fish", "味噌汁": "miso soup", "おにぎり": "rice ball",
-            "さつまいも": "sweet potato", "かぼちゃ": "pumpkin", "雑穀ごはん": "multigrain rice",
-            "わかめ": "wakame", "しじみ汁": "clam miso soup", "寒天": "agar", "ところてん": "tokoroten",
-            "昆布だし": "kombu broth", "唐辛子せんべい": "spicy rice crackers", "チリビーンズ": "chili beans",
-            "カレー": "curry", "トマトスープ": "tomato soup", "生姜湯": "ginger tea",
-            "季節の果物": "seasonal fruit", "スープ": "soup"
-        }
-        item_en = item_map.get(item, item)
-        color_en = color_map.get(color, color)
-        food_en = food_map_en.get(food, food)
-        day_en = day_map.get(day, day)
-        line = f"◆ Item: {item_en}    ◆ Color: {color_en}    ◆ Number: {number}    ◆ Food: {food_en}    ◆ Day: {day_en}"
-        return [line]
-
     line = f"◆ アイテム：{item}　　◆ カラー：{color}　　◆ ナンバー：{number}　　◆ フード：{food}　　◆ デー：{day}"
     return [line]
 
@@ -484,7 +448,7 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     iching_result = get_iching_advice(lang=lang)
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
-    raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now, lang=lang)
+    raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, str(shichu_result_raw), kyusei_text, now=now)
 
 
     lucky_lines = []

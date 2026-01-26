@@ -5,12 +5,12 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import stringWidth
+from textwrap import wrap
 import base64
 import io
 import os
 from datetime import datetime
 import re
-import textwrap
 
 def _t(lang: str, ja: str, en: str) -> str:
     return en if (lang or 'ja') == 'en' else ja
@@ -21,42 +21,13 @@ def _get_lang(data: dict) -> str:
     lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
     lang = (lang or 'ja').strip().lower()
     return 'en' if lang.startswith('en') else 'ja'
+from textwrap import wrap
 import base64
 import io
 import os
 from datetime import datetime
 import re
-import textwrap
 
-
-def smart_wrap(text: str, limit: int, lang: str | None = None):
-    """Wrap text safely for PDF rendering.
-
-    - Japanese (and other CJK) text is wrapped by character count (no spaces).
-    - English is wrapped using textwrap.wrap with a width of `limit`.
-    """
-    if text is None:
-        return []
-    s = str(text)
-    if not s:
-        return []
-    lang = (lang or '').strip() or None
-    # Normalize newlines first
-    parts = s.splitlines() or ['']
-    out = []
-    for p in parts:
-        if not p:
-            out.append('')
-            continue
-        # Detect CJK if lang is ja OR the string contains CJK chars.
-        is_cjk = (lang == 'ja') or bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", p))
-        if is_cjk:
-            # simple fixed-width split
-            for k in range(0, len(p), max(1, limit)):
-                out.append(p[k:k+limit])
-        else:
-            out.extend(textwrap.wrap(p, width=limit, break_long_words=True, break_on_hyphens=True))
-    return out
 def _normalize_month_fortune_text(text: str, kind: str) -> str:
     """Remove leading 'YYYY年M月は' style prefixes to avoid heading/body month mismatches.
     kind: 'month' or 'next'
@@ -76,10 +47,15 @@ def _normalize_month_fortune_text(text: str, kind: str) -> str:
 from header_utils import draw_header
 from lucky_utils import draw_lucky_section
 
+from textwrap import wrap as _wrap
 
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
+
+
+def wrap(text, limit):
+    return _wrap(text, limit)
 
 
 def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='ja', page_height=None, **kwargs):
@@ -203,7 +179,7 @@ def draw_yearly_pages_renai_a4(c, yearly):
         y -= 5 * mm
 
         c.setFont(FONT_NAME, 10)
-        for line in smart_wrap(text or "", 46):
+        for line in wrap(text or "", 46):
             if y < bottom:
                 c.showPage()
                 y = top
@@ -243,7 +219,7 @@ def draw_yearly_pages_renai_b4(c, yearly):
         y -= 6 * mm
 
         c.setFont(FONT_NAME, 11)
-        for line in smart_wrap(text or "", 45):
+        for line in wrap(text or "", 45):
             if y < bottom:
                 c.showPage()
                 y = top
@@ -315,7 +291,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        for line in smart_wrap(data['palm_texts'][i], 40):
+        for line in wrap(data['palm_texts'][i], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
@@ -330,7 +306,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 10)
-        for line in smart_wrap(data['palm_texts'][i], 40):
+        for line in wrap(data['palm_texts'][i], 40):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
@@ -347,7 +323,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
             y -= 6 * mm
         c.setFont(FONT_NAME, 10)
         if content:
-            for line in smart_wrap(content, wrap_len):
+            for line in wrap(content, wrap_len):
                 c.drawString(margin, y, line)
                 y -= 6 * mm
         y -= 3 * mm
@@ -372,7 +348,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 7 * mm
         c.setFont(FONT_NAME, 12)
-        for line in smart_wrap(data['palm_texts'][i], 45):
+        for line in wrap(data['palm_texts'][i], 45):
             c.drawString(margin, y, line)
             y -= 7 * mm
         y -= 4 * mm
@@ -385,7 +361,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 7 * mm
         c.setFont(FONT_NAME, 12)
-        for line in smart_wrap(data['palm_texts'][i], 45):
+        for line in wrap(data['palm_texts'][i], 45):
             c.drawString(margin, y, line)
             y -= 7 * mm
         y -= 4 * mm
@@ -401,7 +377,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
             y -= 7 * mm
         c.setFont(FONT_NAME, 12)
         if content:
-            for line in smart_wrap(content, wrap_len):
+            for line in wrap(content, wrap_len):
                 c.drawString(margin, y, line)
                 y -= 7 * mm
         y -= 4 * mm
@@ -424,7 +400,7 @@ def draw_yearly_pages_shincom_a4(c, yearly):
         c.drawString(margin, y, f"■ {title}")
         y -= 5 * mm
         c.setFont(FONT_NAME, 10)
-        for line in smart_wrap(text or "", 45):
+        for line in wrap(text or "", 45):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
@@ -455,7 +431,7 @@ def draw_yearly_pages_shincom_b4(c, yearly):
         c.drawString(margin, y, f"■ {title}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 11)
-        for line in smart_wrap(text or "", 45):
+        for line in wrap(text or "", 45):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
@@ -480,6 +456,13 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     from reportlab.lib.units import mm
     from header_utils import draw_header
     from pdf_generator_unified import draw_yearly_pages_renai_a4, draw_yearly_pages_renai_b4, draw_lucky_section, FONT_NAME
+    from textwrap import wrap as wrap_text
+
+    def wrap(text, limit):
+        lines = []
+        for line in text.splitlines():
+            lines.extend(wrap_text(line, limit))
+        return lines
 
     width, height = A4 if size == 'a4' else B4
     margin = 20 * mm
@@ -499,7 +482,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             c.drawString(margin, y, f"◆ {data['titles'].get(key, key)}")
             y -= 6 * mm
             c.setFont(FONT_NAME, 10)
-            for line in smart_wrap(data["texts"][key], wrap_len):
+            for line in wrap(data["texts"][key], wrap_len):
                 c.drawString(margin, y, line)
                 y -= 6 * mm
             y -= 4 * mm
@@ -515,7 +498,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             c.drawString(margin, y, f"◆ {section['title']}")
             y -= 6 * mm
             c.setFont(FONT_NAME, 10)
-            for line in smart_wrap(section["content"], wrap_len):
+            for line in wrap(section["content"], wrap_len):
                 c.drawString(margin, y, line)
                 y -= 6 * mm
             y -= 4 * mm

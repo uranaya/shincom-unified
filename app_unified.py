@@ -1176,7 +1176,6 @@ def ten_shincom():
                 "eto_number": eto_number,
                 "animal": animal,
                 "honmeisei": honmeisei,
-                "output_lang": output_lang,
                 "palm_result": "\n".join(palm_texts),
                 "shichu_result": shichu_result,
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
