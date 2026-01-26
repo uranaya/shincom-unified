@@ -6,22 +6,6 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from textwrap import wrap
-
-
-def smart_wrap(text: str, width: int):
-    """Wrap text for both space-delimited (EN) and non-space (JA) strings.
-    - If the text contains whitespace, defer to textwrap.wrap.
-    - If not, chunk by character count (simple and robust for Japanese).
-    """
-    if text is None:
-        return []
-    s = str(text).replace("\r", "")
-    if not s:
-        return []
-    if any(ch.isspace() for ch in s):
-        return wrap(s, width=width)
-    # No spaces (likely Japanese). Chunk by width characters.
-    return [s[i:i+width] for i in range(0, len(s), width)]
 import base64
 import io
 import os
@@ -70,7 +54,15 @@ FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
 
-def wrap(text, limit):
+def wrap(text, limit=None, width=None, **kwargs):
+    """Compatibility wrapper.
+    - Old usage: wrap(text, limit)
+    - New usage: wrap(text, width=..)
+    """
+    if width is None:
+        width = kwargs.get('width')
+    if limit is None:
+        limit = width if width is not None else kwargs.get('limit', 40)
     return _wrap(text, limit)
 
 
@@ -195,7 +187,7 @@ def draw_yearly_pages_renai_a4(c, yearly):
         y -= 5 * mm
 
         c.setFont(FONT_NAME, 10)
-        for line in smart_wrap(text or "", 46):
+        for line in wrap(text or "", 46):
             if y < bottom:
                 c.showPage()
                 y = top
@@ -235,7 +227,7 @@ def draw_yearly_pages_renai_b4(c, yearly):
         y -= 6 * mm
 
         c.setFont(FONT_NAME, 11)
-        for line in smart_wrap(text or "", 45):
+        for line in wrap(text or "", 45):
             if y < bottom:
                 c.showPage()
                 y = top
@@ -416,7 +408,7 @@ def draw_yearly_pages_shincom_a4(c, yearly):
         c.drawString(margin, y, f"■ {title}")
         y -= 5 * mm
         c.setFont(FONT_NAME, 10)
-        for line in smart_wrap(text or "", 45):
+        for line in wrap(text or "", 45):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
@@ -447,7 +439,7 @@ def draw_yearly_pages_shincom_b4(c, yearly):
         c.drawString(margin, y, f"■ {title}")
         y -= 6 * mm
         c.setFont(FONT_NAME, 11)
-        for line in smart_wrap(text or "", 45):
+        for line in wrap(text or "", 45):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
