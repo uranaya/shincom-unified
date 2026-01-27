@@ -94,7 +94,11 @@ def _set_font(c, lang: str, size: float):
 def _wrap_len(base: int, lang: str) -> int:
     # Keep Japanese conservative; give English more horizontal capacity.
     if str(lang).lower().startswith("en"):
-        return max(base + 32, int(base * 1.8))
+        # If we keep the same max_chars as Japanese, English pages end up
+        # looking unnaturally narrow (lots of unused right-side space).
+        # Bump the effective capacity only for English to better match the
+        # actual available width.
+        return min(140, max(base + 28, int(base * 1.8)))
     return base
 
 
