@@ -6,8 +6,39 @@ from dateutil.relativedelta import relativedelta
 import openai
 import os
 import time
+import re
 
-MAX_CHAR = 120  # Max characters for monthly fortune
+# 日本語は従来通り短め（120〜160字目安）。
+MAX_CHAR_JA = 180
+
+# 英語は「文字数」で制限すると極端に短くなりやすいため、
+# 1か月あたりの文章量を増やしてページがスカスカにならないようにする。
+# （厳密な words 制限ではなく、過剰に長くなりすぎないための上限）
+MAX_CHAR_EN = 420
+MAX_CHAR_EN_YEAR = 520
+MAX_CHAR_EN_MONTH = 380
+
+
+
+# --- text helpers ---
+
+def _trim_to_max_chars(text: str, max_chars: int, add_ellipsis: bool = True) -> str:
+    """Trim text to a safe maximum length without breaking rendering.
+
+    - Collapses excessive whitespace (spaces/newlines).
+    - If over max_chars, truncates.
+      - English: appends "..." (default)
+      - Japanese: no ellipsis (set add_ellipsis=False)
+    """
+    if not text:
+        return ""
+    # Normalize whitespace so the PDF layout is predictable
+    t = re.sub(r"\s+", " ", str(text)).strip()
+    if max_chars and len(t) > max_chars:
+        if (not add_ellipsis) or max_chars <= 3:
+            return t[:max_chars]
+        return t[: max_chars - 3] + "..."
+    return t
 
 
 def _build_monthly_prompt(month_label: str, eto: str, tsuhensei_year: str, tsuhensei_month: str, lang: str) -> str:
@@ -20,8 +51,9 @@ def _build_monthly_prompt(month_label: str, eto: str, tsuhensei_year: str, tsuhe
             f"Day pillar: {eto}",
             f"Year star (Tsuhensei): {tsuhensei_year}",
             f"Month star (Tsuhensei): {tsuhensei_month}",
-            "Output: 2-3 short sentences, practical and positive.",
-            f"Limit: within {MAX_CHAR} characters (English).",
+            "Output: 3-5 sentences (roughly 70-110 words).",
+            "Keep it practical and positive. Include at least one actionable tip.",
+            f"Upper limit: about {MAX_CHAR_EN_YEAR} characters.",
         ])
     return "\n".join([
         "あなたはプロの占い師です。",
@@ -31,7 +63,7 @@ def _build_monthly_prompt(month_label: str, eto: str, tsuhensei_year: str, tsuhe
         f"年の通変星: {tsuhensei_year}",
         f"月の通変星: {tsuhensei_month}",
         "出力は2〜3文で、実用的でやさしい語り口にしてください。",
-        f"文字数上限: {MAX_CHAR}字。",
+        f"文字数上限: {MAX_CHAR_JA}字。",
     ])
 
 
@@ -75,7 +107,11 @@ def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bo
 
     if lang.startswith('en'):
         prompt_year = f"""You are a fortune-telling advisor.
-Using the information below, write a {target_year} overview for the customer in natural English (about 120–160 characters, not words).
+Using the information below, write a {target_year} overview for the customer in natural English.
+
+Length:
+- 4–7 sentences
+- Aim for ~80–110 words (keep within about {MAX_CHAR_EN_YEAR} characters)
 
 - Day pillar (reference only): {nicchu}
 - Year influence (reference only): {tsuhen_year}
@@ -83,6 +119,7 @@ Using the information below, write a {target_year} overview for the customer in 
 Rules:
 - Do NOT mention eto names or Ten-God terms; translate meanings into plain English
 - Positive, practical, and customer-friendly
+- Avoid generic filler; give concrete, usable guidance
 """ + lang_instruction
     else:
         prompt_year = f"""あなたは開運アドバイザーです。
@@ -93,11 +130,11 @@ Rules:
 
 条件：
 - 占い用語（例：比肩、印綬など）や干支名は使わず、意味に沿ってやさしい言葉に置き換えてください
-- 約120文字以内
+- 約{MAX_CHAR_JA}文字以内
 - 前向きで、行動や考え方の指針になるように
 """ + lang_instruction
 
-    year_fortune = _ask_openai(prompt_year)
+    year_fortune = _trim_to_max_chars(_ask_openai(prompt_year), MAX_CHAR_EN_YEAR if lang.startswith('en') else MAX_CHAR_JA, add_ellipsis=lang.startswith('en'))
 
     month_fortunes = []
     for i in range(12):
@@ -107,7 +144,11 @@ Rules:
         # directions are computed elsewhere for PDF; keep text clean
         if lang.startswith('en'):
             prompt_month = f"""You are a fortune-telling advisor.
-Write the customer's fortune for {y}-{m:02d} in natural English (about 120–160 characters).
+Write the customer's fortune for {y}-{m:02d} in natural English.
+
+Length:
+- 3–6 sentences
+- Aim for ~45–70 words (keep within about {MAX_CHAR_EN_MONTH} characters)
 
 Reference info:
 - Day pillar (reference only): {nicchu}
@@ -116,12 +157,13 @@ Reference info:
 Rules:
 - Do NOT mention eto names or Ten-God terms; translate meanings into plain English
 - Keep it practical and positive
-- Make each month feel different (actions, mood, relationships, etc.)
+- Make each month feel different (actions, mood, relationships, work, money, health, etc.)
+- Avoid repeating the same phrasing month to month
 """ + lang_instruction
             label = f"Fortune for {y}-{m:02d}"
         else:
             prompt_month = f"""あなたは占いの専門家です。
-以下の情報をもとに、{y}年{m}月の運気を自然な日本語で約120文字以内にまとめてください。
+以下の情報をもとに、{y}年{m}月の運気を自然な日本語で約{MAX_CHAR_JA}〜160文字程度にまとめてください。
 
 - 日柱: {nicchu}
 - 月の通変星: {tsuhen_month}
@@ -134,7 +176,8 @@ Rules:
 """ + lang_instruction
             label = f"{y}年{m}月の運勢"
 
-        text = _ask_openai(prompt_month)
+        # OpenAIで生成（英語/日本語とも共通）
+        text = _trim_to_max_chars(_ask_openai(prompt_month), MAX_CHAR_EN_MONTH if lang.startswith('en') else MAX_CHAR_JA, add_ellipsis=lang.startswith('en'))
         month_fortunes.append({"label": label, "text": text})
 
     return {
