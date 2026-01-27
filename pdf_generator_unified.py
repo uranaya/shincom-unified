@@ -6,8 +6,11 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
-# draw_header is implemented in header_utils.py
-from header_utils import draw_header
+# draw_header and Japanese font are implemented in header_utils.py
+from header_utils import draw_header, FONT_NAME as FONT_NAME_JA
+
+# English uses a built-in PDF font (no registration required)
+FONT_NAME_EN = "Helvetica"
 import base64
 import io
 import os
