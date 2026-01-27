@@ -112,9 +112,6 @@ Rules:
                 for key in ("personality", "year_fortune", "month_fortune", "next_month_fortune"):
                     if key in result:
                         result[key] = _ensure_sentence_end(str(result.get(key, "")))
-print("=== 四柱推命内容 ===")
-            for k, v in result.items():
-                print(f"{k}: {v[:50]}{'...' if len(v) > 50 else ''}")
             return result
         except json.JSONDecodeError:
             print("❌ GPTが正しいJSONを返しませんでした")
