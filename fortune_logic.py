@@ -2,7 +2,7 @@ import openai
 import os
 import re
 import hashlib, random
-from datetime import datetime, date
+from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from tesou import tesou_names, tesou_descriptions
 from nicchu_utils import get_nicchu_eto
@@ -532,17 +532,36 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text, lang=lang)
 
 
-    lucky_lines = []
+    # Lucky info is used as a small 2-column block in the PDF.
+    # IMPORTANT: Do not collapse it to a single line (regression that made only "Item" appear).
+    lucky_lines: list[str] = []
     try:
         if isinstance(raw_lucky_info, list):
-            raw_line = raw_lucky_info[0]
-        elif isinstance(raw_lucky_info, str):
-            raw_line = raw_lucky_info.strip().splitlines()[0]
+            # Expected shape: ["◆ Item: ...", "◆ Number: ...", "◆ Color: ...", "◆ Day: ...", "◆ Food: ..."]
+            lucky_lines = [str(x).strip() for x in raw_lucky_info if str(x).strip()]
+
+        elif isinstance(raw_lucky_info, dict):
+            # Defensive: accept dict-style lucky info
+            order = ["item", "number", "color", "day", "food"]
+            labels_ja = {"item": "アイテム", "number": "番号", "color": "色", "day": "曜日", "food": "食べ物"}
+            labels_en = {"item": "Item", "number": "Number", "color": "Color", "day": "Day", "food": "Food"}
+            labels = labels_en if str(lang).lower().startswith("en") else labels_ja
+            for k in order:
+                v = raw_lucky_info.get(k)
+                if v is not None and str(v).strip():
+                    lucky_lines.append(f"◆ {labels[k]}: {str(v).strip()}")
+
         else:
-            raw_line = ""
-        if "◆" in raw_line:
-            items = [item.strip() for item in raw_line.split("◆") if item.strip()]
-            lucky_lines = [f"◆ {item}" for item in items]
+            # String: keep each bullet line if present, otherwise split by newlines.
+            s = str(raw_lucky_info or "").strip()
+            lines = [ln.strip() for ln in s.splitlines() if ln.strip()]
+            # If a single line contains multiple '◆', split them into multiple lines.
+            if len(lines) == 1 and "◆" in lines[0]:
+                parts = [p.strip() for p in lines[0].split("◆") if p.strip()]
+                lucky_lines = [f"◆ {p}" for p in parts]
+            else:
+                lucky_lines = lines
+
     except Exception as e:
         print("❌ lucky_info 整形失敗:", e)
         lucky_lines = []
@@ -805,29 +824,18 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     # 5. 恋愛版ラッキー情報＆吉方位
     # =========================
     try:
-        # user_birth はフォームから文字列で来る想定だが、将来の呼び出し変更に備えて date/datetime も許容する
-        if isinstance(user_birth, datetime):
-            birth_dt = user_birth
-            user_birth_str = birth_dt.strftime("%Y-%m-%d")
-        elif isinstance(user_birth, date):
-            birth_dt = datetime(user_birth.year, user_birth.month, user_birth.day)
-            user_birth_str = user_birth.strftime("%Y-%m-%d")
-        else:
-            user_birth_str = str(user_birth).strip()
-            # YYYY/MM/DD も許容
-            if "/" in user_birth_str and "-" not in user_birth_str:
-                user_birth_str = user_birth_str.replace("/", "-")
-            birth_dt = datetime.strptime(user_birth_str, "%Y-%m-%d")
-
+        birth_date_obj = datetime.strptime(user_birth, "%Y-%m-%d")
         # 年齢も base 時点で計算（誕生日を迎えているかどうか）
-        age = base.year - birth_dt.year - ((base.month, base.day) < (birth_dt.month, birth_dt.day))
+        age = base.year - birth_date_obj.year - (
+            (base.month, base.day) < (birth_date_obj.month, birth_date_obj.day)
+        )
 
         # 吉方位テキスト（九星気学ベース）
-        kyusei_text = generate_lucky_direction(user_birth_str, base.date(), lang=lang)
+        kyusei_text = generate_lucky_direction(user_birth, base.date(), lang=lang)
 
         # ラッキー情報（恋愛版）
         lucky_info = generate_lucky_renai_info(
-            user_eto, user_birth_str, age, year_love, kyusei_text
+            user_eto, user_birth, age, year_love, kyusei_text
         )
     except Exception as e:
         print("❌ 恋愛ラッキー情報取得失敗:", e)
