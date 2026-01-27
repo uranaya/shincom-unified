@@ -8,8 +8,11 @@ import os
 import time
 import re
 
-# 日本語は従来通り短め（120〜160字目安）。
-MAX_CHAR_JA = 180
+# 日本語は「途中で切れる」と尻切れトンボになりやすく体験が悪い。
+# そこで、プロンプト側の目安（年: 140〜220 / 月: 120〜160）に合わせつつ、
+# 末尾が文として自然に閉じるようにトリム処理も改善する。
+MAX_CHAR_JA_YEAR = 220
+MAX_CHAR_JA_MONTH = 160
 
 # 英語は「文字数」で制限すると極端に短くなりやすいため、
 # 1か月あたりの文章量を増やしてページがスカスカにならないようにする。
@@ -22,22 +25,33 @@ MAX_CHAR_EN_MONTH = 380
 
 # --- text helpers ---
 
-def _trim_to_max_chars(text: str, max_chars: int, add_ellipsis: bool = True) -> str:
+def _trim_to_max_chars(text: str, max_chars: int) -> str:
     """Trim text to a safe maximum length without breaking rendering.
 
     - Collapses excessive whitespace (spaces/newlines).
-    - If over max_chars, truncates.
-      - English: appends "..." (default)
-      - Japanese: no ellipsis (set add_ellipsis=False)
+    - If over max_chars, truncates and appends "...".
     """
     if not text:
         return ""
     # Normalize whitespace so the PDF layout is predictable
     t = re.sub(r"\s+", " ", str(text)).strip()
     if max_chars and len(t) > max_chars:
-        if (not add_ellipsis) or max_chars <= 3:
+        # できるだけ「文の区切り」で自然に終わらせる（日本語優先）
+        cut = t[:max_chars]
+        # 句点/終端記号を優先
+        for punct in ["。", "！", "？", ".", "!", "?"]:
+            idx = cut.rfind(punct)
+            if idx >= int(max_chars * 0.55):
+                return cut[: idx + 1]
+        # それでも見つからなければ、読点/スペースで切る
+        for punct in ["、", " "]:
+            idx = cut.rfind(punct)
+            if idx >= int(max_chars * 0.55):
+                return cut[: idx].rstrip() + "。"
+        # 最終手段：省略記号
+        if max_chars <= 3:
             return t[:max_chars]
-        return t[: max_chars - 3] + "..."
+        return t[: max_chars - 1].rstrip() + "…"
     return t
 
 
@@ -53,7 +67,7 @@ def _build_monthly_prompt(month_label: str, eto: str, tsuhensei_year: str, tsuhe
             f"Month star (Tsuhensei): {tsuhensei_month}",
             "Output: 3-5 sentences (roughly 70-110 words).",
             "Keep it practical and positive. Include at least one actionable tip.",
-            f"Upper limit: about {MAX_CHAR_EN_YEAR} characters.",
+        f"Upper limit: about {MAX_CHAR_EN_MONTH} characters.",
         ])
     return "\n".join([
         "あなたはプロの占い師です。",
@@ -63,7 +77,7 @@ def _build_monthly_prompt(month_label: str, eto: str, tsuhensei_year: str, tsuhe
         f"年の通変星: {tsuhensei_year}",
         f"月の通変星: {tsuhensei_month}",
         "出力は2〜3文で、実用的でやさしい語り口にしてください。",
-        f"文字数上限: {MAX_CHAR_JA}字。",
+        f"文字数上限: {MAX_CHAR_JA_MONTH}字。",
     ])
 
 
@@ -130,11 +144,14 @@ Rules:
 
 条件：
 - 占い用語（例：比肩、印綬など）や干支名は使わず、意味に沿ってやさしい言葉に置き換えてください
-- 約{MAX_CHAR_JA}文字以内
+- 約{MAX_CHAR_JA_YEAR}文字以内
 - 前向きで、行動や考え方の指針になるように
 """ + lang_instruction
 
-    year_fortune = _trim_to_max_chars(_ask_openai(prompt_year), MAX_CHAR_EN_YEAR if lang.startswith('en') else MAX_CHAR_JA, add_ellipsis=lang.startswith('en'))
+    year_fortune = _trim_to_max_chars(
+        _ask_openai(prompt_year),
+        MAX_CHAR_EN_YEAR if lang.startswith('en') else MAX_CHAR_JA_YEAR,
+    )
 
     month_fortunes = []
     for i in range(12):
@@ -163,7 +180,7 @@ Rules:
             label = f"Fortune for {y}-{m:02d}"
         else:
             prompt_month = f"""あなたは占いの専門家です。
-以下の情報をもとに、{y}年{m}月の運気を自然な日本語で約{MAX_CHAR_JA}〜160文字程度にまとめてください。
+以下の情報をもとに、{y}年{m}月の運気を自然な日本語で約{MAX_CHAR_JA_MONTH}字以内にまとめてください。
 
 - 日柱: {nicchu}
 - 月の通変星: {tsuhen_month}
@@ -177,7 +194,10 @@ Rules:
             label = f"{y}年{m}月の運勢"
 
         # OpenAIで生成（英語/日本語とも共通）
-        text = _trim_to_max_chars(_ask_openai(prompt_month), MAX_CHAR_EN_MONTH if lang.startswith('en') else MAX_CHAR_JA, add_ellipsis=lang.startswith('en'))
+        text = _trim_to_max_chars(
+            _ask_openai(prompt_month),
+            MAX_CHAR_EN_MONTH if lang.startswith('en') else MAX_CHAR_JA_MONTH,
+        )
         month_fortunes.append({"label": label, "text": text})
 
     return {
