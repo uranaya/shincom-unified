@@ -238,52 +238,51 @@ No extra text, JSON only.""".strip()
         return {"good": "取得失敗", "bad": "取得失敗"}
 
 
-def get_kyusei_fortune(year: int, month: int, day: int, now=None, force_next_month: bool = False, lang: str = 'ja') -> str:
-    """九星気学の2行テキストを生成する。"""
+
+def get_kyusei_fortune(year: int, month: int, day: int, now=None, force_next_month: bool = False, lang: str = "ja") -> str:
+    """九星気学の短文（PDF末尾用）を生成する。
+
+    - lang="ja": 日本語
+    - lang="en": 英語
+    - force_next_month=True: 「今月/来月」を1ヶ月先送り（来月起点）
+    """
     try:
-        # 生年月日から本命星を取得
         honmeisei = get_honmeisei(year, month, day)
-    # 表示名（英語モードの場合は英訳名を使用）
-    if lang == "en":
-        try:
-            idx = NINE_STARS.index(honmeisei)
-            honmeisei_disp = NINE_STARS_EN[idx]
-        except ValueError:
-            honmeisei_disp = honmeisei
-    else:
+
         honmeisei_disp = honmeisei
+        if lang == "en":
+            try:
+                idx = NINE_STARS.index(honmeisei)
+                honmeisei_disp = NINE_STARS_EN[idx]
+            except Exception:
+                honmeisei_disp = honmeisei
 
-        # 今日の日付を基準に、「20日以降は翌月ベース」で年・月を判定する
-        current = now or datetime.now()
-        base = current
-        if base.day >= 20 or force_next_month:
+        base = now or datetime.now()
+        if force_next_month:
             base = base + relativedelta(months=1)
-
-        # 基準月の翌月
         next_month = base + relativedelta(months=1)
 
-        # 年盤：base.year
-        directions_year = get_directions(base.year, 0, honmeisei_disp, lang=lang)
-        # 今月：base.year / base.month
-        directions_this_month = get_directions(base.year, base.month, honmeisei_disp, lang=lang)
-        # 来月：next_month.year / next_month.month
-        directions_next_month = get_directions(next_month.year, next_month.month, honmeisei_disp, lang=lang)
+        directions_year = get_directions(base.year)
+        directions_this_month = get_directions(base.year, base.month)
+        directions_next_month = get_directions(next_month.year, next_month.month)
 
         if lang == "en":
             return (
-                f"Your main star is '{honmeisei_disp}'.
-"
-                f"Lucky direction for {base.year}: {directions_year['good']}  "
-                f"This month: {directions_this_month['good']}  "
-                f"Next month: {directions_next_month['good']}."
+                f"Your main star is '{honmeisei_disp}'.\n"
+                f"Lucky direction for {base.year}: {directions_year.get('good', 'N/A')}  "
+                f"This month: {directions_this_month.get('good', 'N/A')}  "
+                f"Next month: {directions_next_month.get('good', 'N/A')}."
             )
+
         return (
-            f"あなたの本命星は「{honmeisei_disp}」です。
-"
-            f"{base.year}年の吉方位：{directions_year['good']}　"
-            f"今月：{directions_this_month['good']}　"
-            f"来月：{directions_next_month['good']} です。"
+            f"あなたの本命星は「{honmeisei_disp}」です。\n"
+            f"{base.year}年の吉方位：{directions_year.get('good', '取得失敗')}　"
+            f"今月：{directions_this_month.get('good', '取得失敗')}　"
+            f"来月：{directions_next_month.get('good', '取得失敗')} です。"
         )
+
     except Exception as e:
         print("❌ get_kyusei_fortune エラー:", e)
-        return "吉方位を取得できませんでした"
+        if lang == "en":
+            return "Lucky direction: unavailable."
+        return "吉方位：取得失敗"
