@@ -72,12 +72,28 @@ Rules:
 
 出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。
 """
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=1500,
-            temperature=0.8
-        )
+        # OpenAI呼び出し（たまに502等が出るためリトライ）
+        import time
+        last_err = None
+        response = None
+        for attempt in range(3):
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-4",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=1500,
+                    temperature=0.8
+                )
+                last_err = None
+                break
+            except Exception as e:
+                last_err = e
+                wait = 1.0 * (2 ** attempt)
+                print(f"❌ get_shichu_fortune OpenAIエラー(try={attempt+1}/3): {e}")
+                time.sleep(wait)
+
+        if response is None:
+            raise RuntimeError(f"OpenAI call failed: {last_err}")
 
         raw = response.choices[0].message.content.strip()
         print("=== GPT四柱推命 JSONレスポンス ===")
@@ -425,6 +441,15 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
             "土": ["さつまいも", "かぼちゃ", "雑穀ごはん", "味噌汁", "おにぎり"],
             "金": ["白身魚", "ヨーグルト", "梨", "ナッツ", "豆腐"],
             "水": ["わかめ", "しじみ汁", "寒天", "ところてん", "昆布だし"]
+        "桃": "Peach",
+        "チョコレート": "Chocolate",
+        "ナッツ": "Nuts",
+        "サーモン": "Salmon",
+        "和菓子": "Japanese sweets",
+        "麺類": "Noodles",
+        "ヨーグルト": "Yogurt",
+        "オムレツ": "Omelet",
+        "スパイス料理": "Spicy food",
         }
         food = rng.choice(food_map.get(wu_xing, ["季節の果物", "ナッツ", "スープ"]))
 
@@ -442,10 +467,27 @@ def generate_lucky_info_mixed(nicchu_eto: str, birthdate: str, age: int, palm_re
             "ミントガム": "mint gum", "チョコ": "chocolate", "青い小物": "a small blue item",
             "白い小物": "a small white item", "革小物": "leather accessory", "観葉植物": "houseplant",
             "お香": "incense", "塩": "salt",
+        "スマホ充電器": "Phone charger",
+        "小さな手帳": "Small notebook",
+        "ポータブル充電器": "Portable charger",
+        "折りたたみ傘": "Foldable umbrella",
+        "ボールペン": "Ballpoint pen",
+        "ハンカチ": "Handkerchief",
+        "ミントタブレット": "Mint tablets",
+        "エコバッグ": "Reusable bag",
+        "リップクリーム": "Lip balm",
+        "アロマオイル": "Aroma oil",
         }
         color_map = {
             "赤": "red", "青": "blue", "黄": "yellow", "緑": "green", "白": "white",
             "黒": "black", "金": "gold", "銀": "silver", "ピンク": "pink",
+        "アイアンブルー": "Iron blue",
+        "ゴールド": "Gold",
+        "シルバー": "Silver",
+        "ワインレッド": "Wine red",
+        "ディープグリーン": "Deep green",
+        "オフホワイト": "Off-white",
+        "ペールピンク": "Pale pink",
         }
         day_map = {
             "月曜日": "Monday", "火曜日": "Tuesday", "水曜日": "Wednesday", "木曜日": "Thursday",
@@ -555,7 +597,7 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
 
 
 
-def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = 'a4') -> dict:
+def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = 'a4', lang: str = 'ja') -> dict:
     """
     恋愛版：相性・今年/今月/来月の恋愛運・テーマ別アドバイス・ラッキー情報・年運12ヶ月をまとめて生成する。
     ・20日境で「今月/来月」「今年」を決定

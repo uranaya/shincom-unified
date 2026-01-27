@@ -17,9 +17,9 @@ MAX_CHAR_JA_MONTH = 160
 # 英語は「文字数」で制限すると極端に短くなりやすいため、
 # 1か月あたりの文章量を増やしてページがスカスカにならないようにする。
 # （厳密な words 制限ではなく、過剰に長くなりすぎないための上限）
-MAX_CHAR_EN = 420
-MAX_CHAR_EN_YEAR = 520
-MAX_CHAR_EN_MONTH = 380
+MAX_CHAR_EN = 900
+MAX_CHAR_EN_YEAR = 2000
+MAX_CHAR_EN_MONTH = 900
 
 
 
