@@ -29,61 +29,53 @@ import re
 import textwrap
 
 
-def smart_wrap(text: str, limit: int, lang: str | None = None):
-    """Wrap text safely for PDF rendering.
+def smart_wrap(text: str, limit: int, lang: str = 'ja'):
+    """Wrap text into lines.
 
-    - Japanese (and other CJK) text is wrapped by character count (no spaces).
-    - English is wrapped using textwrap.wrap with a width of `limit`.
+    - ja/CJK: character-based.
+    - en/others: word-based (avoid splitting normal words).
     """
-    if text is None:
+    import textwrap
+
+    if not text:
         return []
-    s = str(text)
-    if not s:
-        return []
-    lang = (lang or '').strip() or None
-    # Normalize newlines first
-    parts = s.splitlines() or ['']
+
+    # Normalize newlines
+    text = str(text).replace('\r\n', '\n').replace('\r', '\n')
+    paragraphs = text.split('\n')
     out = []
-    for p in parts:
+
+    is_cjk = (lang == 'ja') or any('\u3040' <= ch <= '\u9fff' for ch in text)
+
+    for p in paragraphs:
+        p = (p or '').strip()
         if not p:
             out.append('')
             continue
-        # Detect CJK if lang is ja OR the string contains CJK chars.
-        is_cjk = (lang == 'ja') or bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", p))
+
         if is_cjk:
-            # simple fixed-width split
-            for k in range(0, len(p), max(1, limit)):
-                out.append(p[k:k+limit])
-        else:
-            out.extend(textwrap.wrap(p, width=limit, break_long_words=True, break_on_hyphens=True))
+            for i in range(0, len(p), max(1, limit)):
+                out.append(p[i:i+limit])
+            continue
+
+        # Word wrap for English/others
+        wrapped = textwrap.wrap(
+            p,
+            width=max(1, limit),
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        if not wrapped:
+            out.append(p)
+            continue
+
+        for w in wrapped:
+            if len(w) <= limit:
+                out.append(w)
+            else:
+                out.extend(textwrap.wrap(w, width=max(1, limit), break_long_words=True, break_on_hyphens=False))
+
     return out
-def _normalize_month_fortune_text(text: str, kind: str) -> str:
-    """Remove leading 'YYYY年M月は' style prefixes to avoid heading/body month mismatches.
-    kind: 'month' or 'next'
-    """
-    if not isinstance(text, str):
-        return text
-    s = text.strip()
-    # Match patterns like '2026年1月は' or '2026年1月は、'
-    s = re.sub(r'^\s*\d{4}年\s*\d{1,2}月\s*は\s*[、,]?\s*', '', s)
-    prefix = '今月は' if kind == 'month' else '来月は'
-    # If the text already starts with 今月/来月, don't double-prefix.
-    if s.startswith('今月') or s.startswith('来月'):
-        return s
-    return prefix + '、' + s if s else prefix + '。'
-
-
-from header_utils import draw_header
-from lucky_utils import draw_lucky_section
-
-
-FONT_NAME = "IPAexGothic"
-FONT_PATH = "ipaexg.ttf"
-pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
-
-# English uses built-in PDF fonts for clean rendering and predictable metrics.
-FONT_NAME_JA = FONT_NAME
-FONT_NAME_EN = "Times-Roman"
 
 def _font(lang: str) -> str:
     return FONT_NAME_EN if str(lang).lower().startswith("en") else FONT_NAME_JA
@@ -94,11 +86,7 @@ def _set_font(c, lang: str, size: float):
 def _wrap_len(base: int, lang: str) -> int:
     # Keep Japanese conservative; give English more horizontal capacity.
     if str(lang).lower().startswith("en"):
-        # If we keep the same max_chars as Japanese, English pages end up
-        # looking unnaturally narrow (lots of unused right-side space).
-        # Bump the effective capacity only for English to better match the
-        # actual available width.
-        return min(140, max(base + 28, int(base * 1.8)))
+        return max(base + 18, int(base * 1.5))
     return base
 
 
