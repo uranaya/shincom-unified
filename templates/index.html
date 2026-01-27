@@ -47,32 +47,7 @@
       width: 30%;
       padding: 8px;
     }
-  
-/* --- options (checkboxes) --- */
-.form-options{
-  display:flex;
-  flex-direction:column;
-  gap:14px;
-  margin:18px auto 22px;
-  align-items:flex-start;
-  max-width:520px;
-}
-.option{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  font-size:16px;
-  line-height:1.4;
-}
-.option input{
-  width:18px;
-  height:18px;
-}
-@media (max-width: 600px){
-  .form-options{max-width: 95%;}
-  .option{font-size:15px;}
-}
-</style>
+  </style>
 
   <!-- 🔊 効果音（静的配信） -->
   <audio id="shutterSound" src="/static/shutter.mp3" preload="auto"></audio>
@@ -104,30 +79,27 @@
   </div>
   <button onclick="convertWarekiToSeireki()">⬅ 和暦 → 西暦に反映</button>
 
+  <div style="margin: 10px 0;">
+    <input type="checkbox" id="full_year" name="full_year" value="yes" style="margin-right: 8px; vertical-align: middle;">
+    <label for="full_year" style="vertical-align: middle;">1年分の運勢を出す（＋2ページ）</label>
   
-<div class="form-options">
-  <label class="option">
-    <input type="checkbox" name="full_year" id="full_year" value="1">
-    <span>1年分の運勢を出す（+2ページ）</span>
-  </label>
+  <div style="margin: 10px 0;">
+    <input type="checkbox" id="force_next_month" name="force_next_month" value="yes" style="margin-right: 8px; vertical-align: middle;">
+    <label for="force_next_month" style="vertical-align: middle;">来月・再来月を占う（20日以前でも来月起点にする）</label>
 
-  <label class="option">
-    <input type="checkbox" name="force_next_month" id="force_next_month" value="1">
-    <span>来月・再来月を占う（20日以前でも来月起点にする）</span>
-  </label>
+<label style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+  <input type="checkbox" id="tokyo_mode" name="tokyo_mode" value="yes" />
+  <span>東京（浅草）向けの文章にする</span>
+</label>
 
-  <label class="option">
-    <input type="checkbox" name="tokyo_mode" id="tokyo_mode" value="1">
-    <span>東京（浅草）向けの文章にする</span>
-  </label>
-
-  <label class="option">
-    <input type="checkbox" name="english_output" id="english_output" value="1">
-    <span>English output</span>
-  </label>
+<label style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+  <input type="checkbox" id="english_output" name="english_output" value="yes" />
+  <span>English output</span>
+</label>
+  </div>
 </div>
 
-<button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
+  <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
   <a href="/renai" style="display:block; text-align:center; margin:10px 0;">💘 恋愛占いはこちら</a>
   <form action="/logout"><button>ログアウト</button></form>
 
