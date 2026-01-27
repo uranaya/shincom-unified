@@ -2,7 +2,7 @@ import openai
 import os
 import re
 import hashlib, random
-from datetime import datetime
+from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 from tesou import tesou_names, tesou_descriptions
 from nicchu_utils import get_nicchu_eto
@@ -804,23 +804,36 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     # =========================
     # 5. 恋愛版ラッキー情報＆吉方位
     # =========================
-    # ラッキー情報 / ラッキー方位（恋愛版）
-    age = max(0, base.year - user_birth.year - ((base.month, base.day) < (user_birth.month, user_birth.day)))
-
-    # 方位は失敗しても本文生成を止めない（営業上の優先度：ラッキー情報を必ず出す）
-    lucky_direction = ""
     try:
-        lucky_direction = generate_lucky_direction(user_birth, base.date())
-    except Exception as e:
-        print(f"❌ generate_lucky_direction error: {e}")
+        # user_birth はフォームから文字列で来る想定だが、将来の呼び出し変更に備えて date/datetime も許容する
+        if isinstance(user_birth, datetime):
+            birth_dt = user_birth
+            user_birth_str = birth_dt.strftime("%Y-%m-%d")
+        elif isinstance(user_birth, date):
+            birth_dt = datetime(user_birth.year, user_birth.month, user_birth.day)
+            user_birth_str = user_birth.strftime("%Y-%m-%d")
+        else:
+            user_birth_str = str(user_birth).strip()
+            # YYYY/MM/DD も許容
+            if "/" in user_birth_str and "-" not in user_birth_str:
+                user_birth_str = user_birth_str.replace("/", "-")
+            birth_dt = datetime.strptime(user_birth_str, "%Y-%m-%d")
 
-    # 恋愛版ラッキー情報（失敗してもプレースホルダーを返す）
-    kyusei_text = ""  # 必要なら将来ここに本命星などを追加
-    try:
-        lucky_info = generate_lucky_renai_info(user_eto, user_birth, age, year_love, kyusei_text)
+        # 年齢も base 時点で計算（誕生日を迎えているかどうか）
+        age = base.year - birth_dt.year - ((base.month, base.day) < (birth_dt.month, birth_dt.day))
+
+        # 吉方位テキスト（九星気学ベース）
+        kyusei_text = generate_lucky_direction(user_birth_str, base.date(), lang=lang)
+
+        # ラッキー情報（恋愛版）
+        lucky_info = generate_lucky_renai_info(
+            user_eto, user_birth_str, age, year_love, kyusei_text
+        )
     except Exception as e:
-        print(f"❌ generate_lucky_renai_info error: {e}")
-        lucky_info = ["・ラッキーカラー：ー", "・ラッキーアイテム：ー", "・ラッキーフード：ー"]
+        print("❌ 恋愛ラッキー情報取得失敗:", e)
+        lucky_info = []
+        kyusei_text = ""
+
     # =========================
     # 6. まとめて返却
     # =========================
@@ -846,6 +859,6 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         },
         "themes": topic_sections,
         "lucky_info": lucky_info,
-        "lucky_direction": lucky_direction,
+        "lucky_direction": kyusei_text,
         "yearly_love_fortunes": yearly_love_fortunes,
     }
