@@ -262,9 +262,10 @@ def get_kyusei_fortune(year: int, month: int, day: int, now=None, force_next_mon
             base = base + relativedelta(months=1)
         next_month = base + relativedelta(months=1)
 
-        directions_year = get_directions(base.year)
-        directions_this_month = get_directions(base.year, base.month)
-        directions_next_month = get_directions(next_month.year, next_month.month)
+        # get_directions requires (year, month, honmeisei). For yearly, use month=0.
+        directions_year = get_directions(base.year, 0, honmeisei, lang=lang)
+        directions_this_month = get_directions(base.year, base.month, honmeisei, lang=lang)
+        directions_next_month = get_directions(next_month.year, next_month.month, honmeisei, lang=lang)
 
         if lang == "en":
             return (

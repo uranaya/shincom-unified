@@ -5,6 +5,9 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import stringWidth
+
+# draw_header is implemented in header_utils.py
+from header_utils import draw_header
 import base64
 import io
 import os
