@@ -5,12 +5,6 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import stringWidth
-
-# draw_header and Japanese font are implemented in header_utils.py
-from header_utils import draw_header, FONT_NAME as FONT_NAME_JA
-
-# English uses a built-in PDF font (no registration required)
-FONT_NAME_EN = "Helvetica"
 import base64
 import io
 import os
@@ -35,53 +29,61 @@ import re
 import textwrap
 
 
-def smart_wrap(text: str, limit: int, lang: str = 'ja'):
-    """Wrap text into lines.
+def smart_wrap(text: str, limit: int, lang: str | None = None):
+    """Wrap text safely for PDF rendering.
 
-    - ja/CJK: character-based.
-    - en/others: word-based (avoid splitting normal words).
+    - Japanese (and other CJK) text is wrapped by character count (no spaces).
+    - English is wrapped using textwrap.wrap with a width of `limit`.
     """
-    import textwrap
-
-    if not text:
+    if text is None:
         return []
-
-    # Normalize newlines
-    text = str(text).replace('\r\n', '\n').replace('\r', '\n')
-    paragraphs = text.split('\n')
+    s = str(text)
+    if not s:
+        return []
+    lang = (lang or '').strip() or None
+    # Normalize newlines first
+    parts = s.splitlines() or ['']
     out = []
-
-    is_cjk = (lang == 'ja') or any('\u3040' <= ch <= '\u9fff' for ch in text)
-
-    for p in paragraphs:
-        p = (p or '').strip()
+    for p in parts:
         if not p:
             out.append('')
             continue
-
+        # Detect CJK if lang is ja OR the string contains CJK chars.
+        is_cjk = (lang == 'ja') or bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", p))
         if is_cjk:
-            for i in range(0, len(p), max(1, limit)):
-                out.append(p[i:i+limit])
-            continue
-
-        # Word wrap for English/others
-        wrapped = textwrap.wrap(
-            p,
-            width=max(1, limit),
-            break_long_words=False,
-            break_on_hyphens=False,
-        )
-        if not wrapped:
-            out.append(p)
-            continue
-
-        for w in wrapped:
-            if len(w) <= limit:
-                out.append(w)
-            else:
-                out.extend(textwrap.wrap(w, width=max(1, limit), break_long_words=True, break_on_hyphens=False))
-
+            # simple fixed-width split
+            for k in range(0, len(p), max(1, limit)):
+                out.append(p[k:k+limit])
+        else:
+            out.extend(textwrap.wrap(p, width=limit, break_long_words=True, break_on_hyphens=True))
     return out
+def _normalize_month_fortune_text(text: str, kind: str) -> str:
+    """Remove leading 'YYYY年M月は' style prefixes to avoid heading/body month mismatches.
+    kind: 'month' or 'next'
+    """
+    if not isinstance(text, str):
+        return text
+    s = text.strip()
+    # Match patterns like '2026年1月は' or '2026年1月は、'
+    s = re.sub(r'^\s*\d{4}年\s*\d{1,2}月\s*は\s*[、,]?\s*', '', s)
+    prefix = '今月は' if kind == 'month' else '来月は'
+    # If the text already starts with 今月/来月, don't double-prefix.
+    if s.startswith('今月') or s.startswith('来月'):
+        return s
+    return prefix + '、' + s if s else prefix + '。'
+
+
+from header_utils import draw_header
+from lucky_utils import draw_lucky_section
+
+
+FONT_NAME = "IPAexGothic"
+FONT_PATH = "ipaexg.ttf"
+pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
+
+# English uses built-in PDF fonts for clean rendering and predictable metrics.
+FONT_NAME_JA = FONT_NAME
+FONT_NAME_EN = "Times-Roman"
 
 def _font(lang: str) -> str:
     return FONT_NAME_EN if str(lang).lower().startswith("en") else FONT_NAME_JA
@@ -121,12 +123,13 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
         s = (s or "").strip()
         if not s:
             return ""
+        fn = _font(lang)
         # 収まるならそのまま
-        if stringWidth(s, FONT_NAME, 10) <= max_w:
+        if stringWidth(s, fn, 10) <= max_w:
             return s
         # 末尾省略
         ell = "…"
-        while s and stringWidth(s + ell, FONT_NAME, 10) > max_w:
+        while s and stringWidth(s + ell, fn, 10) > max_w:
             s = s[:-1]
         return (s + ell) if s else ell
 
@@ -151,7 +154,8 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
         dir_text = (lucky_direction or "").strip()
         # 1行で無理なら折り返し（左列幅いっぱいで）
         max_w = width - 2 * margin
-        if stringWidth(dir_text, FONT_NAME, 10) <= max_w:
+        fn = _font(lang)
+        if stringWidth(dir_text, fn, 10) <= max_w:
             c.drawString(margin, y, dir_text)
             y -= line_h
         else:
@@ -160,7 +164,7 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
             cur = ""
             for w in words:
                 candidate = (cur + " " + w).strip()
-                if stringWidth(candidate, FONT_NAME, 10) <= max_w:
+                if stringWidth(candidate, fn, 10) <= max_w:
                     cur = candidate
                 else:
                     c.drawString(margin, y, cur)
