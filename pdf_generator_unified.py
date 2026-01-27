@@ -94,7 +94,7 @@ def _set_font(c, lang: str, size: float):
 def _wrap_len(base: int, lang: str) -> int:
     # Keep Japanese conservative; give English more horizontal capacity.
     if str(lang).lower().startswith("en"):
-        return max(base + 18, int(base * 1.5))
+        return max(base + 32, int(base * 1.8))
     return base
 
 

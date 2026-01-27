@@ -804,25 +804,23 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     # =========================
     # 5. 恋愛版ラッキー情報＆吉方位
     # =========================
+    # ラッキー情報 / ラッキー方位（恋愛版）
+    age = max(0, base.year - user_birth.year - ((base.month, base.day) < (user_birth.month, user_birth.day)))
+
+    # 方位は失敗しても本文生成を止めない（営業上の優先度：ラッキー情報を必ず出す）
+    lucky_direction = ""
     try:
-        birth_date_obj = datetime.strptime(user_birth, "%Y-%m-%d")
-        # 年齢も base 時点で計算（誕生日を迎えているかどうか）
-        age = base.year - birth_date_obj.year - (
-            (base.month, base.day) < (birth_date_obj.month, birth_date_obj.day)
-        )
-
-        # 吉方位テキスト（九星気学ベース）
-        kyusei_text = generate_lucky_direction(user_birth, base.date(), lang=lang)
-
-        # ラッキー情報（恋愛版）
-        lucky_info = generate_lucky_renai_info(
-            user_eto, user_birth, age, year_love, kyusei_text
-        )
+        lucky_direction = generate_lucky_direction(user_birth, base.date())
     except Exception as e:
-        print("❌ 恋愛ラッキー情報取得失敗:", e)
-        lucky_info = []
-        kyusei_text = ""
+        print(f"❌ generate_lucky_direction error: {e}")
 
+    # 恋愛版ラッキー情報（失敗してもプレースホルダーを返す）
+    kyusei_text = ""  # 必要なら将来ここに本命星などを追加
+    try:
+        lucky_info = generate_lucky_renai_info(user_eto, user_birth, age, year_love, kyusei_text)
+    except Exception as e:
+        print(f"❌ generate_lucky_renai_info error: {e}")
+        lucky_info = ["・ラッキーカラー：ー", "・ラッキーアイテム：ー", "・ラッキーフード：ー"]
     # =========================
     # 6. まとめて返却
     # =========================
@@ -848,6 +846,6 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         },
         "themes": topic_sections,
         "lucky_info": lucky_info,
-        "lucky_direction": kyusei_text,
+        "lucky_direction": lucky_direction,
         "yearly_love_fortunes": yearly_love_fortunes,
     }
