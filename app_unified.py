@@ -24,6 +24,7 @@ from yearly_fortune_utils import generate_yearly_fortune
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
+from pdf_generator_unified_en import create_pdf_unified as create_pdf_unified_en
 from fortune_logic import generate_renai_fortune
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -203,7 +204,10 @@ else:
 # Background thread task to generate PDF and handle post-processing
 def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
     try:
-        create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
+        if result_data.get("lang") == "en":
+            create_pdf_unified_en(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
+        else:
+            create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
     except Exception as e:
         print(f"❌ PDF generation error (mode={pdf_mode}, uuid={uuid_str}):", e)
         traceback.print_exc()
