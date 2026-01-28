@@ -57,6 +57,58 @@ def smart_wrap(text: str, limit: int, lang: str | None = None):
         else:
             out.extend(textwrap.wrap(p, width=limit, break_long_words=True, break_on_hyphens=True))
     return out
+
+
+def wrap_text_by_width(text: str, font_name: str, font_size: int, max_w: float):
+    """Word-wrap by actual rendered width (ReportLab stringWidth). Best for English."""
+    if not text:
+        return []
+    text = str(text).replace("\r\n", "\n").replace("\r", "\n")
+    out: list[str] = []
+
+    for para in text.split("\n"):
+        para = para.strip()
+        if not para:
+            out.append("")
+            continue
+
+        words = [w for w in para.split(" ") if w != ""]
+        line = ""
+        for w in words:
+            cand = (line + " " + w).strip() if line else w
+            if stringWidth(cand, font_name, font_size) <= max_w:
+                line = cand
+                continue
+
+            if line:
+                out.append(line)
+                line = w
+            else:
+                line = w
+
+            # hard-wrap a single too-long token
+            while stringWidth(line, font_name, font_size) > max_w and len(line) > 1:
+                lo, hi = 1, len(line)
+                while lo < hi:
+                    mid = (lo + hi) // 2
+                    if stringWidth(line[:mid], font_name, font_size) <= max_w:
+                        lo = mid + 1
+                    else:
+                        hi = mid
+                cut = max(1, lo - 1)
+                out.append(line[:cut])
+                line = line[cut:].lstrip()
+
+        if line:
+            out.append(line)
+
+    return out
+
+def wrap_lines(text: str, lang: str, font_name: str, font_size: int, max_w: float, base_chars: int):
+    """JA: char-wrap (existing). EN: width-wrap (fills page and avoids early breaks)."""
+    if is_en(lang):
+        return wrap_text_by_width(text, font_name, font_size, max_w)
+    return smart_wrap(text, base_chars, lang=lang)
 def _normalize_month_fortune_text(text: str, kind: str) -> str:
     """Remove leading 'YYYY年M月は' style prefixes to avoid heading/body month mismatches.
     kind: 'month' or 'next'
@@ -94,10 +146,7 @@ def _set_font(c, lang: str, size: float):
 def _wrap_len(base: int, lang: str) -> int:
     # Keep Japanese conservative; give English more horizontal capacity.
     if str(lang).lower().startswith("en"):
-        # 英語版は現状「1行の使用幅」と「右の空白」がほぼ 1:1 になりやすく、
-        # wrap の文字数上限が足りないと判断できる。
-        # ここは英語のみ思い切って 2倍程度にする（日本語へ影響させない）。
-        return max(base + 25, int(base * 2.0))
+        return max(base + 18, int(base * 1.5))
     return base
 
 
@@ -223,7 +272,7 @@ def draw_yearly_pages_renai_a4(c, yearly, lang="ja"):
         y -= 5 * mm
 
         _set_font(c, lang, 10)
-        for line in smart_wrap(text or "", _wrap_len(46, lang), lang):
+        for line in wrap_lines(text or "", lang, _font(lang), 10, width - 2*margin, _wrap_len(46, lang)):
             if y < bottom:
                 c.showPage()
                 y = top
@@ -263,7 +312,7 @@ def draw_yearly_pages_renai_b4(c, yearly, lang="ja"):
         y -= 6 * mm
 
         _set_font(c, lang, 11)
-        for line in smart_wrap(text or "", _wrap_len(45, lang), lang):
+        for line in wrap_lines(text or "", lang, _font(lang), 10, width - 2*margin, _wrap_len(45, lang)):
             if y < bottom:
                 c.showPage()
                 y = top
@@ -336,7 +385,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 6 * mm
         _set_font(c, lang, 10)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len(40, lang), lang):
+        for line in wrap_lines(data['palm_texts'][i], lang, _font(lang), 10, width - 2*margin, _wrap_len(40, lang)):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
@@ -351,7 +400,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 6 * mm
         _set_font(c, lang, 10)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len(40, lang), lang):
+        for line in wrap_lines(data['palm_texts'][i], lang, _font(lang), 10, width - 2*margin, _wrap_len(40, lang)):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
@@ -368,7 +417,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
             y -= 6 * mm
         _set_font(c, lang, 10)
         if content:
-            for line in smart_wrap(content, _wrap_len(wrap_len, lang), lang):
+            for line in wrap_lines(content, lang, _font(lang), 10, width - 2*margin, _wrap_len(wrap_len, lang)):
                 c.drawString(margin, y, line)
                 y -= 6 * mm
         y -= 3 * mm
@@ -394,7 +443,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 7 * mm
         _set_font(c, lang, 12)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len(45, lang), lang):
+        for line in wrap_lines(data['palm_texts'][i], lang, _font(lang), 10, width - 2*margin, _wrap_len(45, lang)):
             c.drawString(margin, y, line)
             y -= 7 * mm
         y -= 4 * mm
@@ -407,7 +456,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 7 * mm
         _set_font(c, lang, 12)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len(45, lang), lang):
+        for line in wrap_lines(data['palm_texts'][i], lang, _font(lang), 10, width - 2*margin, _wrap_len(45, lang)):
             c.drawString(margin, y, line)
             y -= 7 * mm
         y -= 4 * mm
@@ -423,7 +472,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
             y -= 7 * mm
         _set_font(c, lang, 12)
         if content:
-            for line in smart_wrap(content, _wrap_len(wrap_len, lang), lang):
+            for line in wrap_lines(content, lang, _font(lang), 10, width - 2*margin, _wrap_len(wrap_len, lang)):
                 c.drawString(margin, y, line)
                 y -= 7 * mm
         y -= 4 * mm
@@ -446,7 +495,7 @@ def draw_yearly_pages_shincom_a4(c, yearly, lang="ja"):
         c.drawString(margin, y, f"■ {title}")
         y -= 5 * mm
         _set_font(c, lang, 10)
-        for line in smart_wrap(text or "", _wrap_len(45, lang), lang):
+        for line in wrap_lines(text or "", lang, _font(lang), 10, width - 2*margin, _wrap_len(45, lang)):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
@@ -477,7 +526,7 @@ def draw_yearly_pages_shincom_b4(c, yearly, lang="ja"):
         c.drawString(margin, y, f"■ {title}")
         y -= 6 * mm
         _set_font(c, lang, 11)
-        for line in smart_wrap(text or "", _wrap_len(45, lang), lang):
+        for line in wrap_lines(text or "", lang, _font(lang), 10, width - 2*margin, _wrap_len(45, lang)):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
@@ -522,7 +571,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             c.drawString(margin, y, f"◆ {data['titles'].get(key, key)}")
             y -= 6 * mm
             _set_font(c, lang, 10)
-            for line in smart_wrap(data["texts"][key], _wrap_len(wrap_len, lang), lang):
+            for line in wrap_lines(data["texts"][key], lang, _font(lang), 10, width - 2*margin, _wrap_len(wrap_len, lang)):
                 c.drawString(margin, y, line)
                 y -= 6 * mm
             y -= 4 * mm
@@ -538,7 +587,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             c.drawString(margin, y, f"◆ {section['title']}")
             y -= 6 * mm
             _set_font(c, lang, 10)
-            for line in smart_wrap(section["content"], _wrap_len(wrap_len, lang), lang):
+            for line in wrap_lines(section["content"], lang, _font(lang), 10, width - 2*margin, _wrap_len(wrap_len, lang)):
                 c.drawString(margin, y, line)
                 y -= 6 * mm
             y -= 4 * mm
