@@ -230,7 +230,7 @@ def analyze_palm(image_data, lang: str = 'ja'):
             )
 
         response = openai.ChatCompletion.create(
-            model="gpt-4-mini",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {
