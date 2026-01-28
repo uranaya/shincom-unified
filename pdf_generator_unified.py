@@ -161,6 +161,21 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     - lucky_lines が 1行でも2行でも崩れない
     - 呼び出し側の互換（lang/page_height/kwargs）対応
     """
+    # --- normalize inputs (string/list/None) ---
+    if isinstance(lucky_lines, str):
+        lucky_lines = [ln.strip() for ln in lucky_lines.splitlines() if ln.strip()]
+    elif isinstance(lucky_lines, (list, tuple)):
+        lucky_lines = [str(x).strip() for x in lucky_lines if str(x).strip()]
+    elif lucky_lines is None:
+        lucky_lines = []
+    else:
+        s = str(lucky_lines).strip()
+        lucky_lines = [s] if s else []
+
+    if isinstance(lucky_direction, (list, tuple)):
+        lucky_direction = '、'.join([str(x).strip() for x in lucky_direction if str(x).strip()])
+    elif lucky_direction is None:
+        lucky_direction = ''
     if not lucky_lines:
         lucky_lines = []
 
@@ -350,23 +365,63 @@ def wrap_lines(text: str, lang, font_name: str, font_size: int, max_width: float
 # Header (page 1 only)
 # ======================
 
-def draw_header(c, page_width, margin, y):
-    """Draw the standard header lines & QR placeholder area. Returns new y."""
-    # Keep it conservative: do not break existing JP layout.
-    c.setLineWidth(0.5)
-    c.line(margin, y, page_width - margin, y)
-    y -= 12
-    c.setFont(FONT_NAME_JA, 12)
-    c.drawCentredString(page_width/2, y, "シン・コンピューター占い")
-    y -= 16
-    c.setFont(FONT_NAME_JA, 10)
-    c.drawString(margin, y, "【占いの館・占い師『うらなや』監修】")
-    y -= 14
-    return y
+def draw_header(c, *args, **kwargs):
+    """Header drawer (compat).
+    Supports legacy call: draw_header(c, page_width, margin, y)
+    Supports newer call:  draw_header(c, page_width, page_height, title, lang=..., margin=..., y=...)
+    Returns the updated y position.
+    """
+    # Parse arguments safely so that y is always numeric (ReportLab requires numbers).
+    if not args:
+        raise TypeError("draw_header() missing required positional argument: page_width")
 
-# ======================
-# Lucky section (shared)
-# ======================
+    page_width = args[0]
+
+    # Defaults
+    margin = kwargs.get("margin", 36)
+    y = kwargs.get("y", None)
+
+    # Detect legacy pattern: (page_width, margin, y)
+    if len(args) >= 3 and isinstance(args[1], (int, float)) and isinstance(args[2], (int, float)):
+        margin = args[1]
+        y = args[2]
+        return _draw_header_core(c, page_width, margin, y)
+
+    # Detect newer pattern: (page_width, page_height, title, ...)
+    if len(args) >= 3 and isinstance(args[1], (int, float)) and isinstance(args[2], str):
+        page_height = args[1]
+        # title is args[2] but we intentionally do not override the store header copy here.
+        if y is None:
+            y = page_height - margin
+        return _draw_header_core(c, page_width, margin, y)
+
+    # Also allow positional (page_width, page_height, title, lang) etc.
+    if len(args) >= 2 and isinstance(args[1], (int, float)):
+        page_height = args[1]
+        if y is None:
+            y = page_height - margin
+        return _draw_header_core(c, page_width, margin, y)
+
+    raise TypeError("draw_header() received unsupported arguments: %r %r" % (args, kwargs))
+
+
+def _draw_header_core(c, page_width, margin, y):
+        """Draw the standard header lines & QR placeholder area. Returns new y."""
+        # Keep it conservative: do not break existing JP layout.
+        c.setLineWidth(0.5)
+        c.line(margin, y, page_width - margin, y)
+        y -= 12
+        c.setFont(FONT_NAME_JA, 12)
+        c.drawCentredString(page_width/2, y, "シン・コンピューター占い")
+        y -= 16
+        c.setFont(FONT_NAME_JA, 10)
+        c.drawString(margin, y, "【占いの館・占い師『うらなや』監修】")
+        y -= 14
+        return y
+
+    # ======================
+    # Lucky section (shared)
+    # ======================
 
 def draw_lucky_section(c, page_width, margin, y, lucky_info: str, lucky_direction: str = "", lang="ja"):
     """Draw lucky info (2 columns) + optional direction line. Returns new y."""
@@ -553,6 +608,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
     lang = _get_lang(data)
     width, height = A4
     margin = (14 * mm) if is_en(lang) else (20 * mm)
+    body_size = 10 if is_en(lang) else 9
     y = height - margin
     y = draw_header(c, width, margin, y)
     y = draw_palm_image(c, data["palm_image"], width, y)
@@ -1038,237 +1094,3 @@ def draw_shincom_a4(c, data, include_yearly=False):
             draw_yearly_pages_shincom_a4(c, data, lang=lang)
         except Exception:
             pass
-
-
-
-# ============================================================
-# HOTFIX (2026-01-28)
-# - draw_header: accept both legacy and new call signatures (lang/title supported)
-# - draw_lucky_section: accept str or list inputs safely
-# - draw_shincom_a4: ensure body_size defined and use robust header call
-#   (keeps existing layout logic; only stability fixes)
-# ============================================================
-
-def draw_header(c, page_width, *args, **kwargs):
-    """Draw header on the first page only.
-    Compatible signatures:
-      - draw_header(c, page_width, margin, y)
-      - draw_header(c, page_width, page_height, title, lang='ja')
-    Returns: updated y (float)
-    """
-    lang = kwargs.get("lang") or kwargs.get("output_lang") or "ja"
-    title = kwargs.get("title", None)
-
-    margin = kwargs.get("margin", None)
-    y = kwargs.get("y", None)
-
-    # Parse positional args
-    if len(args) >= 2:
-        a0, a1 = args[0], args[1]
-        # Heuristic: if first extra arg looks like a page height, treat as (page_height, title)
-        if isinstance(a0, (int, float)) and a0 > 200 and (margin is None and y is None):
-            page_height = a0
-            title = a1
-            margin = 36
-            y = page_height - margin
-        else:
-            # legacy (margin, y)
-            if margin is None: margin = a0
-            if y is None: y = a1
-    elif len(args) == 1:
-        # If only height is passed
-        a0 = args[0]
-        if isinstance(a0, (int, float)) and a0 > 200 and y is None:
-            margin = margin if margin is not None else 36
-            y = a0 - margin
-        else:
-            margin = margin if margin is not None else 36
-            y = y if y is not None else 800
-
-    if margin is None: margin = 36
-    if y is None: y = 800
-
-    # Keep your shop promo header as-is by default.
-    # If a non-empty title is provided, show it as the main title line.
-    main_title = (title or "").strip() or "シン・コンピューター占い"
-
-    # Font selection
-    try:
-        font_title = FONT_NAME_EN if is_en(lang) else FONT_NAME_JA
-        font_body  = FONT_NAME_EN if is_en(lang) else FONT_NAME_JA
-    except Exception:
-        font_title = FONT_NAME_JA
-        font_body = FONT_NAME_JA
-
-    c.setFont(font_title, 16)
-    c.drawCentredString(page_width/2, y, main_title)
-    y -= 22
-
-    c.setFont(font_body, 10)
-    # These lines are your promo copy; do not remove/replace.
-    c.drawCentredString(page_width/2, y, "あなたの手相をAIが鑑定します")
-    y -= 14
-    c.drawCentredString(page_width/2, y, "（店頭用：印刷してお渡しします）")
-    y -= 18
-
-    # separator line
-    c.setLineWidth(0.5)
-    c.line(margin, y, page_width - margin, y)
-    y -= 18
-
-    return y
-
-def _normalize_text_or_lines(v):
-    if v is None:
-        return ""
-    if isinstance(v, (list, tuple)):
-        return "\n".join([str(x) for x in v if x is not None])
-    return str(v)
-
-def draw_lucky_section(c, page_width, margin, y, lucky_info, lucky_direction, lang="ja"):
-    """Draw the lucky info block (both shincom/renai use this).
-    Accepts lucky_info/lucky_direction as either str or list of lines.
-    Returns: updated y
-    """
-    # Normalize inputs
-    lucky_info = _normalize_text_or_lines(lucky_info).strip()
-    lucky_direction = _normalize_text_or_lines(lucky_direction).strip()
-
-    # Title
-    c.setFont(_font(lang), 12)
-    c.drawString(margin, y, "◆ ラッキー情報" if not is_en(lang) else "◆ Lucky Info")
-    y -= 16
-
-    # Body
-    body_size = 10
-    c.setFont(_font(lang), body_size)
-
-    # Build lines for info and directions
-    content = lucky_info
-    if lucky_direction:
-        if content:
-            content += "\n"
-        content += (("方位: " if not is_en(lang) else "Directions: ") + lucky_direction)
-
-    if not content:
-        content = "（なし）" if not is_en(lang) else "(none)"
-
-    max_width = page_width - 2 * margin
-    for line in wrap_lines(content, lang, _font(lang), body_size, max_width,
-                           _wrap_len(60, lang) if is_en(lang) else _wrap_len(40, lang)):
-        c.drawString(margin, y, line)
-        y -= 12
-
-    y -= 6
-    return y
-
-def draw_shincom_a4(c, data, include_yearly=False):
-    """A4 layout for shincom mode.
-    This override keeps the existing layout behavior but prevents runtime errors
-    (body_size undefined / draw_header signature mismatch / lucky_info list type).
-    """
-    lang = data.get("output_lang") or data.get("lang") or ("en" if data.get("english_output") else "ja")
-    width, height = A4
-
-    margin = 36
-    y = height - margin
-
-    # Header only on page 1
-    y = draw_header(c, width, height, data.get("title", ""), lang=lang, margin=margin)
-
-    body_size = 10
-    title_size = 12
-
-    # Palm section (3 items on page 1)
-    palm_titles = data.get("palm_titles") or []
-    palm_texts = data.get("palm_texts") or data.get("palm_results") or []
-    palm_image_path = data.get("palm_image_path") or data.get("image_path") or data.get("image_file")
-
-    # Image (optional)
-    try:
-        if palm_image_path and os.path.exists(palm_image_path):
-            img_w = 170
-            img_h = 120
-            c.drawImage(palm_image_path, margin, y - img_h, width=img_w, height=img_h, preserveAspectRatio=True, mask='auto')
-    except Exception:
-        pass
-
-    # Text columns width (simple single-column safe layout)
-    text_x = margin
-    text_w = width - 2 * margin
-
-    y -= 10
-
-    def _draw_block(title, textv, y):
-        nonlocal c
-        if not title and not textv:
-            return y
-        c.setFont(_font(lang), title_size)
-        if title:
-            c.drawString(text_x, y, str(title))
-            y -= 14
-        c.setFont(_font(lang), body_size)
-        for line in wrap_lines(_normalize_text_or_lines(textv), lang, _font(lang), body_size, text_w,
-                               _wrap_len(60, lang) if is_en(lang) else _wrap_len(40, lang)):
-            c.drawString(text_x, y, line)
-            y -= 12
-            if y < margin + 60:
-                c.showPage()
-                y = height - margin
-                c.setFont(_font(lang), body_size)
-        y -= 6
-        return y
-
-    # First page palm blocks (up to 3)
-    for i in range(min(3, len(palm_titles), len(palm_texts))):
-        y = _draw_block(palm_titles[i], palm_texts[i], y)
-
-    # Lucky section at end of page 1 if room else on page 2
-    if y < margin + 120:
-        c.showPage()
-        y = height - margin
-    y = draw_lucky_section(c, width, margin, y, data.get("lucky_info"), data.get("lucky_direction", ""), lang=lang)
-
-    # Page 2 content
-    c.showPage()
-    y = height - margin
-
-    # Remaining palm blocks
-    for i in range(3, min(5, len(palm_titles), len(palm_texts))):
-        y = _draw_block(palm_titles[i], palm_texts[i], y)
-
-    # Summary blocks
-    y = _draw_block("◆ 手相総合" if not is_en(lang) else "◆ Palm Summary", data.get("palm_total", data.get("palm_summary", "")), y)
-    y = _draw_block("◆ 性格診断" if not is_en(lang) else "◆ Personality", _normalize_text_or_lines(data.get("shichu_personality") or data.get("personality")), y)
-    y = _draw_block("◆ 今年の運勢" if not is_en(lang) else "◆ Year Fortune", _normalize_text_or_lines(data.get("year_fortune")), y)
-    y = _draw_block("◆ 今月の運勢" if not is_en(lang) else "◆ This Month", _normalize_text_or_lines(data.get("month_fortune")), y)
-    y = _draw_block("◆ 来月の運勢" if not is_en(lang) else "◆ Next Month", _normalize_text_or_lines(data.get("next_month_fortune")), y)
-
-    # Lucky section at end of page 2 as well (your policy: show at the end of back page)
-    if y < margin + 120:
-        c.showPage()
-        y = height - margin
-    y = draw_lucky_section(c, width, margin, y, data.get("lucky_info"), data.get("lucky_direction", ""), lang=lang)
-
-    # Yearly pages (if include_yearly and data has yearly_fortunes)
-    if include_yearly:
-        yearly = data.get("yearly_fortunes") or data.get("yearly_love_fortunes") or []
-        if yearly:
-            c.showPage()
-            y = height - margin
-            c.setFont(_font(lang), 12)
-            c.drawString(margin, y, "◆ 年間の運勢" if not is_en(lang) else "◆ Yearly Fortunes")
-            y -= 18
-            c.setFont(_font(lang), body_size)
-            for month_text in yearly:
-                for line in wrap_lines(_normalize_text_or_lines(month_text), lang, _font(lang), body_size, width-2*margin,
-                                       _wrap_len(60, lang) if is_en(lang) else _wrap_len(40, lang)):
-                    c.drawString(margin, y, line)
-                    y -= 12
-                    if y < margin + 40:
-                        c.showPage()
-                        y = height - margin
-                        c.setFont(_font(lang), body_size)
-                y -= 8
-
-
