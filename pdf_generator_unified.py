@@ -840,3 +840,201 @@ def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
     else:
         draw_renai_pdf(c, data, size, include_yearly)
     c.save()
+
+
+# ============================================================
+# HOTFIX (2026-01-28): stabilize lucky_info types + body_size
+# - lucky_info may be list[str] or str depending on generator
+# - draw_shincom_a4 used body_size without defining it
+# These re-definitions override earlier buggy versions.
+# ============================================================
+
+def _normalize_lucky_lines(lucky_info):
+    """Return list[str] lines for lucky_info (accepts str/list/tuple/None)."""
+    if lucky_info is None:
+        return []
+    # Already list/tuple of lines
+    if isinstance(lucky_info, (list, tuple)):
+        out = []
+        for x in lucky_info:
+            if x is None:
+                continue
+            out.append(str(x).strip())
+        return [s for s in out if s]
+    # Dict -> pretty JSON-ish lines
+    if isinstance(lucky_info, dict):
+        out = []
+        for k, v in lucky_info.items():
+            s = f"{k}: {v}"
+            s = str(s).strip()
+            if s:
+                out.append(s)
+        return out
+    # Fallback: treat as text blob
+    s = str(lucky_info)
+    # Normalize newlines
+    s = s.replace("\r\n", "\n").replace("\r", "\n")
+    lines = [ln.strip() for ln in s.split("\n")]
+    return [ln for ln in lines if ln]
+
+def draw_lucky_section(c, page_width, margin, y, lucky_info, lucky_direction: str = "", lang="ja"):
+    """Draw lucky info (2 columns) + optional direction line. Returns new y."""
+    font_name = _font(lang)
+    title_size = 11 if is_en(lang) else 12
+    body_size = 10 if is_en(lang) else 10
+
+    # Title
+    c.setFont(font_name, title_size)
+    c.drawString(margin, y, "Lucky Information" if is_en(lang) else "ラッキー情報")
+    y -= (title_size + 4)
+
+    # Direction (optional)
+    if lucky_direction:
+        c.setFont(font_name, body_size)
+        for line in wrap_lines(str(lucky_direction), lang, font_name, body_size, page_width - 2*margin, _wrap_len(60, lang) if is_en(lang) else _wrap_len(40, lang)):
+            c.drawString(margin, y, line)
+            y -= (body_size + 2)
+        y -= 4
+
+    lines = _normalize_lucky_lines(lucky_info)
+    if not lines:
+        return y
+
+    col_gap = 14
+    col_w = (page_width - 2*margin - col_gap) / 2
+    left_x = margin
+    right_x = margin + col_w + col_gap
+
+    # Two-column flow
+    c.setFont(font_name, body_size)
+    left_y = y
+    right_y = y
+    use_left = True
+
+    for raw in lines:
+        # Wrap each logical line to fit in a column
+        wrapped = wrap_lines(raw, lang, font_name, body_size, col_w, _wrap_len(60, lang) if is_en(lang) else _wrap_len(40, lang))
+        for wline in wrapped:
+            if use_left:
+                c.drawString(left_x, left_y, wline)
+                left_y -= (body_size + 2)
+            else:
+                c.drawString(right_x, right_y, wline)
+                right_y -= (body_size + 2)
+        # Alternate columns by paragraph
+        use_left = not use_left
+
+    # Continue from the lower column
+    y = min(left_y, right_y) - 6
+    return y
+
+def draw_shincom_a4(c, data, include_yearly=False):
+    """A4: 1P (3 palm items + lucky), 2P (2 palm + overall + shichu + month/next) (+ yearly pages)."""
+    # Keep layout consistent with existing implementation, but fix body_size and lucky_info types.
+    lang = data.get("lang", "ja")
+    width, height = A4
+    margin = 38
+    title_size = 12 if is_en(lang) else 13
+    body_size = 10  # <-- FIX: define
+
+    # Page 1 header only
+    draw_header(c, width, height, data.get("title", ""), lang=lang)
+
+    # Palm image
+    y = height - 90
+    img_path = data.get("palm_image_path") or data.get("palm_image") or data.get("image_path")
+    if img_path:
+        try:
+            c.drawImage(img_path, margin, y-220, width=240, height=220, preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+
+    # Palm texts (first 3)
+    x_text = margin + 260
+    y_text = height - 110
+    c.setFont(_font(lang), title_size)
+    c.drawString(x_text, y_text, "Palm Reading" if is_en(lang) else "手相鑑定")
+    y_text -= 18
+
+    for i in range(min(3, len(data.get("palm_titles", [])))):
+        title = data.get("palm_titles", ["", "", ""])[i]
+        textv = data.get("palm_texts", ["", "", ""])[i]
+        c.setFont(_font(lang), 11)
+        c.drawString(x_text, y_text, str(title))
+        y_text -= 14
+        c.setFont(_font(lang), body_size)
+        for line in wrap_lines(str(textv), lang, _font(lang), body_size, width - x_text - margin, _wrap_len(60, lang) if is_en(lang) else _wrap_len(40, lang)):
+            c.drawString(x_text, y_text, line)
+            y_text -= (body_size + 2)
+        y_text -= 8
+
+    # Lucky section (page 1 bottom)
+    y = 210
+    y = draw_lucky_section(c, width, margin, y, data.get("lucky_info"), data.get("lucky_direction", ""), lang=lang)
+
+    c.showPage()
+
+    # Page 2 (no header per spec)
+    y = height - 60
+
+    # Remaining palm (2 items)
+    c.setFont(_font(lang), title_size)
+    c.drawString(margin, y, "Palm Reading (continued)" if is_en(lang) else "手相鑑定（続き）")
+    y -= 18
+
+    for i in range(3, min(5, len(data.get("palm_titles", [])))):
+        title = data.get("palm_titles", ["", "", "", "", ""])[i]
+        textv = data.get("palm_texts", ["", "", "", "", ""])[i]
+        c.setFont(_font(lang), 11)
+        c.drawString(margin, y, str(title))
+        y -= 14
+        c.setFont(_font(lang), body_size)
+        for line in wrap_lines(str(textv), lang, _font(lang), body_size, width - 2*margin, _wrap_len(60, lang) if is_en(lang) else _wrap_len(40, lang)):
+            c.drawString(margin, y, line)
+            y -= (body_size + 2)
+        y -= 8
+
+    # Palm overall
+    if data.get("palm_overall"):
+        c.setFont(_font(lang), 11)
+        c.drawString(margin, y, "Overall" if is_en(lang) else "手相総合")
+        y -= 14
+        c.setFont(_font(lang), body_size)
+        for line in wrap_lines(str(data.get("palm_overall")), lang, _font(lang), body_size, width - 2*margin, _wrap_len(60, lang) if is_en(lang) else _wrap_len(40, lang)):
+            c.drawString(margin, y, line)
+            y -= (body_size + 2)
+        y -= 10
+
+    # Shichu personality
+    if data.get("shichu_personality"):
+        c.setFont(_font(lang), 11)
+        c.drawString(margin, y, "Personality" if is_en(lang) else "性格診断")
+        y -= 14
+        c.setFont(_font(lang), body_size)
+        for line in wrap_lines(str(data.get("shichu_personality")), lang, _font(lang), body_size, width - 2*margin, _wrap_len(70, lang) if is_en(lang) else _wrap_len(40, lang)):
+            c.drawString(margin, y, line)
+            y -= (body_size + 2)
+        y -= 10
+
+    # Month fortunes
+    for key, label_en, label_ja in [
+        ("month_fortune", "This month", "今月の運勢"),
+        ("next_month_fortune", "Next month", "来月の運勢"),
+    ]:
+        if data.get(key):
+            c.setFont(_font(lang), 11)
+            c.drawString(margin, y, label_en if is_en(lang) else label_ja)
+            y -= 14
+            c.setFont(_font(lang), body_size)
+            for line in wrap_lines(str(data.get(key)), lang, _font(lang), body_size, width - 2*margin, _wrap_len(70, lang) if is_en(lang) else _wrap_len(40, lang)):
+                c.drawString(margin, y, line)
+                y -= (body_size + 2)
+            y -= 10
+
+    # Yearly pages (delegated to existing helpers if present)
+    if include_yearly and data.get("yearly_fortunes") and "draw_yearly_pages_shincom_a4" in globals():
+        c.showPage()
+        try:
+            draw_yearly_pages_shincom_a4(c, data, lang=lang)
+        except Exception:
+            pass
