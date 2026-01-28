@@ -377,8 +377,22 @@ def draw_lucky_section(c, page_width, margin, y, lucky_info: str, lucky_directio
     y -= 16
 
     # Compose lines (keep order stable)
-    info = (lucky_info or "").strip()
-    dir_txt = (lucky_direction or "").strip()
+    def _as_text(v):
+        if v is None:
+            return ""
+        # Some generators return list[str] for lucky_info; normalize to a single string.
+        if isinstance(v, list):
+            return "\n".join(str(x) for x in v if str(x).strip())
+        if isinstance(v, tuple):
+            return "\n".join(str(x) for x in v if str(x).strip())
+        if isinstance(v, dict):
+            # Keep deterministic order for common keys if present; fallback to values.
+            keys = [k for k in ["title","text","body","content","info"] if k in v] or list(v.keys())
+            return "\n".join(str(v[k]) for k in keys if str(v[k]).strip())
+        return str(v)
+
+    info = _as_text(lucky_info).strip()
+    dir_txt = _as_text(lucky_direction).strip()
     lines = []
     if dir_txt:
         lines.append(("Lucky direction: " + dir_txt) if is_en(lang) else ("ラッキー方位：" + dir_txt))
@@ -537,13 +551,6 @@ def draw_yearly_pages_renai_b4(c, yearly, lang="ja"):
 
 def draw_shincom_a4(c, data, include_yearly=False):
     lang = _get_lang(data)
-
-
-    # ★★★ これを追加 ★★★
-    body_size = 10 if is_en(lang) else 10
-    # （A4 shincom は JP/EN ともに10で問題なし。ENを少し大きくしたければ 11 でも可）
-
-
     width, height = A4
     margin = (14 * mm) if is_en(lang) else (20 * mm)
     y = height - margin
