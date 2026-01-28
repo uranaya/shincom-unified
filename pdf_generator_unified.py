@@ -92,10 +92,9 @@ def _set_font(c, lang: str, size: float):
     c.setFont(_font(lang), size)
 
 def _wrap_len(base: int, lang: str) -> int:
-    # English text easily overruns the right margin (serif fonts are wide).
-    # Wrap earlier to prevent "尻切れ".
+    # Keep Japanese conservative; give English more horizontal capacity.
     if str(lang).lower().startswith("en"):
-        return max(28, int(base * 0.68))
+        return max(base + 18, int(base * 1.5))
     return base
 
 
@@ -119,19 +118,17 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     col_gap = 8 * mm
     col_w = (width - 2 * margin - col_gap) / 2.0
     line_h = 5.6 * mm
-    font_name = _font(lang)
-    font_size = 10
 
     def _fit_one_line(s: str, max_w: float) -> str:
         s = (s or "").strip()
         if not s:
             return ""
         # 収まるならそのまま
-        if stringWidth(s, font_name, font_size) <= max_w:
+        if stringWidth(s, FONT_NAME, 10) <= max_w:
             return s
         # 末尾省略
         ell = "…"
-        while s and stringWidth(s + ell, font_name, font_size) > max_w:
+        while s and stringWidth(s + ell, FONT_NAME, 10) > max_w:
             s = s[:-1]
         return (s + ell) if s else ell
 
@@ -155,9 +152,8 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
 
         dir_text = (lucky_direction or "").strip()
         # 1行で無理なら折り返し（左列幅いっぱいで）
-        # Keep some extra right padding for English to avoid clipping.
-        max_w = width - 2 * margin - (6 * mm if str(lang).lower().startswith("en") else 0)
-        if stringWidth(dir_text, font_name, font_size) <= max_w:
+        max_w = width - 2 * margin
+        if stringWidth(dir_text, FONT_NAME, 10) <= max_w:
             c.drawString(margin, y, dir_text)
             y -= line_h
         else:
@@ -166,7 +162,7 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
             cur = ""
             for w in words:
                 candidate = (cur + " " + w).strip()
-                if stringWidth(candidate, font_name, font_size) <= max_w:
+                if stringWidth(candidate, FONT_NAME, 10) <= max_w:
                     cur = candidate
                 else:
                     c.drawString(margin, y, cur)

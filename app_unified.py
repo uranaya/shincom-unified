@@ -689,7 +689,7 @@ def selfmob_uuid(uuid_str):
             except Exception:
                 return "生年月日が不正です", 400
             try:
-                kyusei_text = get_kyusei_fortune(year, month, day, now=now, force_next_month=force_next_month, lang=output_lang)
+                kyusei_text = get_kyusei_fortune(year, month, day, now=now, force_next_month=force_next_month)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
@@ -2261,4 +2261,5 @@ def admin_invoice_staff_special_pdf():
 @app.route('/selfmob/google808abc9a83ba5e55.html')
 def google_verification_file():
     return send_from_directory('static', 'google808abc9a83ba5e55.html')
+
 

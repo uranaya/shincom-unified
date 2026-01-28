@@ -11,20 +11,6 @@ NINE_STARS = [
     "七赤金星", "八白土星", "九紫火星",
 ]
 
-# English names for Nine Star Ki (簡易英訳)
-NINE_STARS_EN = [
-    "One White Water",
-    "Two Black Earth",
-    "Three Jade Wood",
-    "Four Green Wood",
-    "Five Yellow Earth",
-    "Six White Metal",
-    "Seven Red Metal",
-    "Eight White Earth",
-    "Nine Purple Fire",
-]
-
-
 # =========================
 # 年別・固定テーブルの読み込み
 # =========================
@@ -138,48 +124,6 @@ def get_kyusei_year_from_birth(year: int, month: int, day: int) -> int:
     return year - 1 if birth < setsu else year
 
 
-
-# ---- i18n helpers (EN) ----
-import re as _re
-
-DIRECTION_JA_TO_EN = {
-    "北": "North",
-    "北東": "Northeast",
-    "東": "East",
-    "南東": "Southeast",
-    "南": "South",
-    "南西": "Southwest",
-    "西": "West",
-    "北西": "Northwest",
-}
-
-HONMEISEI_JA_TO_EN = {
-    "一白水星": "One White Water Star",
-    "二黒土星": "Two Black Earth Star",
-    "三碧木星": "Three Jade Wood Star",
-    "四緑木星": "Four Green Wood Star",
-    "五黄土星": "Five Yellow Earth Star",
-    "六白金星": "Six White Metal Star",
-    "七赤金星": "Seven Red Metal Star",
-    "八白土星": "Eight White Earth Star",
-    "九紫火星": "Nine Purple Fire Star",
-}
-
-def _dir_to_en(direction_text: str) -> str:
-    if not direction_text:
-        return ""
-    parts = _re.split(r"[／/・,、\s]+", direction_text.strip())
-    out = []
-    for part in parts:
-        part = part.strip()
-        if not part:
-            continue
-        out.append(DIRECTION_JA_TO_EN.get(part, part))
-    return "/".join(out)
-
-def _star_to_en(star_ja: str) -> str:
-    return HONMEISEI_JA_TO_EN.get(star_ja, star_ja)
-
 def get_honmeisei(year: int, month: int, day: int) -> str:
     """生年月日から本命星名（例: '四緑木星'）を取得する。"""
     kyusei_year = get_kyusei_year_from_birth(year, month, day)
@@ -189,7 +133,7 @@ def get_honmeisei(year: int, month: int, day: int) -> str:
     return KYUSEI_YEAR_TABLE[key]
 
 
-def get_directions(year: int, month: int, honmeisei: str, lang: str = "ja") -> dict:
+def get_directions(year: int, month: int, honmeisei: str) -> dict:
     """九星気学に基づき、吉方位・凶方位を OpenAI に問い合わせる。"""
     if month == 0:
         period = f"{year}年の年間"
@@ -198,21 +142,7 @@ def get_directions(year: int, month: int, honmeisei: str, lang: str = "ja") -> d
         period = f"{year}年{month}月"
         explanation = "年盤と月盤を重ねて、総合的に吉方位・凶方位を判断してください。"
 
-    if lang == "en":
-        prompt = f"""You are an expert in Nine Star Ki (Kyusei Kigaku).
-For the period: {period}
-Main star: {honmeisei}
-
-Return ONE lucky direction and ONE unlucky direction.
-Output must be JSON in English only, exactly in this format:
-{{"good": "Southeast", "bad": "Northwest"}}
-
-Directions must be chosen from:
-North, Northeast, East, Southeast, South, Southwest, West, Northwest
-
-No extra text, JSON only.""".strip()
-    else:
-        prompt = f"""あなたは九星気学の専門家です。
+    prompt = f"""あなたは九星気学の専門家です。
 {period}において、本命星「{honmeisei}」の人の
 吉方位と凶方位を、{explanation}
 次の形式で日本語のJSONのみを出力してください：
@@ -238,52 +168,34 @@ No extra text, JSON only.""".strip()
         return {"good": "取得失敗", "bad": "取得失敗"}
 
 
-
-def get_kyusei_fortune(year: int, month: int, day: int, now=None, force_next_month: bool = False, lang: str = "ja") -> str:
-    """九星気学の短文（PDF末尾用）を生成する。
-
-    - lang="ja": 日本語
-    - lang="en": 英語
-    - force_next_month=True: 「今月/来月」を1ヶ月先送り（来月起点）
-    """
+def get_kyusei_fortune(year: int, month: int, day: int, now=None, force_next_month: bool = False) -> str:
+    """九星気学の2行テキストを生成する。"""
     try:
+        # 生年月日から本命星を取得
         honmeisei = get_honmeisei(year, month, day)
 
-        honmeisei_disp = honmeisei
-        if lang == "en":
-            try:
-                idx = NINE_STARS.index(honmeisei)
-                honmeisei_disp = NINE_STARS_EN[idx]
-            except Exception:
-                honmeisei_disp = honmeisei
-
-        base = now or datetime.now()
-        if force_next_month:
+        # 今日の日付を基準に、「20日以降は翌月ベース」で年・月を判定する
+        current = now or datetime.now()
+        base = current
+        if base.day >= 20 or force_next_month:
             base = base + relativedelta(months=1)
+
+        # 基準月の翌月
         next_month = base + relativedelta(months=1)
 
-        # get_directions requires (year, month, honmeisei). For yearly, use month=0.
-        directions_year = get_directions(base.year, 0, honmeisei, lang=lang)
-        directions_this_month = get_directions(base.year, base.month, honmeisei, lang=lang)
-        directions_next_month = get_directions(next_month.year, next_month.month, honmeisei, lang=lang)
-
-        if lang == "en":
-            return (
-                f"Your main star is '{honmeisei_disp}'.\n"
-                f"Lucky direction for {base.year}: {directions_year.get('good', 'N/A')}  "
-                f"This month: {directions_this_month.get('good', 'N/A')}  "
-                f"Next month: {directions_next_month.get('good', 'N/A')}."
-            )
+        # 年盤：base.year
+        directions_year = get_directions(base.year, 0, honmeisei)
+        # 今月：base.year / base.month
+        directions_this_month = get_directions(base.year, base.month, honmeisei)
+        # 来月：next_month.year / next_month.month
+        directions_next_month = get_directions(next_month.year, next_month.month, honmeisei)
 
         return (
-            f"あなたの本命星は「{honmeisei_disp}」です。\n"
-            f"{base.year}年の吉方位：{directions_year.get('good', '取得失敗')}　"
-            f"今月：{directions_this_month.get('good', '取得失敗')}　"
-            f"来月：{directions_next_month.get('good', '取得失敗')} です。"
+            f"あなたの本命星は「{honmeisei}」です。\n"
+            f"{base.year}年の吉方位：{directions_year['good']}　"
+            f"今月：{directions_this_month['good']}　"
+            f"来月：{directions_next_month['good']} です。"
         )
-
     except Exception as e:
         print("❌ get_kyusei_fortune エラー:", e)
-        if lang == "en":
-            return "Lucky direction: unavailable."
-        return "吉方位：取得失敗"
+        return "吉方位を取得できませんでした"

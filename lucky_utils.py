@@ -41,7 +41,7 @@ def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, 
         return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
 
 
-def generate_lucky_direction(birthdate: str, today: datetime.date, lang: str = 'ja', **kwargs) -> str:
+def generate_lucky_direction(birthdate: str, today: datetime.date) -> str:
     """
     九星気学に基づく吉方位テキストを生成する。
     today の「20日以降」は翌月を「今月」とみなして計算する。
@@ -68,10 +68,10 @@ def generate_lucky_direction(birthdate: str, today: datetime.date, lang: str = '
     honmeisei = get_honmeisei(bd.year, bd.month, bd.day)
 
     # 年盤（base.year）、今月（base.month）、来月（base.month+1）
-    dir_year = get_directions(base.year, 0, honmeisei, lang=lang)
-    dir_now = get_directions(base.year, base.month, honmeisei, lang=lang)
+    dir_year = get_directions(base.year, 0, honmeisei)
+    dir_now = get_directions(base.year, base.month, honmeisei)
     next_month_date = base + relativedelta(months=1)
-    dir_next = get_directions(next_month_date.year, next_month_date.month, honmeisei, lang=lang)
+    dir_next = get_directions(next_month_date.year, next_month_date.month, honmeisei)
 
     good_dir_year = dir_year.get("good", "不明")
     good_dir_now = dir_now.get("good", "不明")

@@ -17,9 +17,9 @@ MAX_CHAR_JA_MONTH = 160
 # 英語は「文字数」で制限すると極端に短くなりやすいため、
 # 1か月あたりの文章量を増やしてページがスカスカにならないようにする。
 # （厳密な words 制限ではなく、過剰に長くなりすぎないための上限）
-MAX_CHAR_EN = 900
-MAX_CHAR_EN_YEAR = 2000
-MAX_CHAR_EN_MONTH = 900
+MAX_CHAR_EN = 420
+MAX_CHAR_EN_YEAR = 520
+MAX_CHAR_EN_MONTH = 380
 
 
 
@@ -29,11 +29,7 @@ def _trim_to_max_chars(text: str, max_chars: int) -> str:
     """Trim text to a safe maximum length without breaking rendering.
 
     - Collapses excessive whitespace (spaces/newlines).
-    - If over max_chars, truncates *cleanly*.
-
-    IMPORTANT:
-    The PDF layer already wraps and paginates. Adding "..."/"…" here makes
-    month blocks look "cut off" even when we still have room to wrap.
+    - If over max_chars, truncates and appends "...".
     """
     if not text:
         return ""
@@ -52,17 +48,10 @@ def _trim_to_max_chars(text: str, max_chars: int) -> str:
             idx = cut.rfind(punct)
             if idx >= int(max_chars * 0.55):
                 return cut[: idx].rstrip() + "。"
-        # 最終手段：そのまま切る（省略記号は付けない）
-        cut2 = cut.rstrip()
-        if not cut2:
-            return ""
-        if cut2[-1] not in ["。", "！", "？", ".", "!", "?"]:
-            # なるべく自然な終端にする（英語っぽいなら "."、それ以外は "。"）
-            if re.search(r"[A-Za-z0-9]$", cut2):
-                cut2 += "."
-            else:
-                cut2 += "。"
-        return cut2
+        # 最終手段：省略記号
+        if max_chars <= 3:
+            return t[:max_chars]
+        return t[: max_chars - 1].rstrip() + "…"
     return t
 
 
