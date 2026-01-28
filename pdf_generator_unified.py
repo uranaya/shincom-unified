@@ -537,6 +537,13 @@ def draw_yearly_pages_renai_b4(c, yearly, lang="ja"):
 
 def draw_shincom_a4(c, data, include_yearly=False):
     lang = _get_lang(data)
+
+
+    # ★★★ これを追加 ★★★
+    body_size = 10 if is_en(lang) else 10
+    # （A4 shincom は JP/EN ともに10で問題なし。ENを少し大きくしたければ 11 でも可）
+
+
     width, height = A4
     margin = (14 * mm) if is_en(lang) else (20 * mm)
     y = height - margin
