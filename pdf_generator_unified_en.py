@@ -1,4 +1,5 @@
 from reportlab.lib.pagesizes import A4, B4
+from header_utils import create_qr_code
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
@@ -21,13 +22,77 @@ def _get_lang(data: dict) -> str:
     lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
     lang = (lang or 'ja').strip().lower()
     return 'en' if lang.startswith('en') else 'ja'
-import base64
-import io
-import os
-from datetime import datetime
-import re
-import textwrap
 
+# --- EN helpers --------------------------------------------------------------
+KYUSEI_EN = {
+    '一白水星': 'One White Water',
+    '二黒土星': 'Two Black Earth',
+    '三碧木星': 'Three Jade Wood',
+    '四緑木星': 'Four Green Wood',
+    '五黄土星': 'Five Yellow Earth',
+    '六白金星': 'Six White Metal',
+    '七赤金星': 'Seven Red Metal',
+    '八白土星': 'Eight White Earth',
+    '九紫火星': 'Nine Purple Fire',
+}
+DIR_EN = {
+    '北': 'North',
+    '北東': 'Northeast',
+    '東': 'East',
+    '南東': 'Southeast',
+    '南': 'South',
+    '南西': 'Southwest',
+    '西': 'West',
+    '北西': 'Northwest',
+}
+
+PALM_TITLE_EN = {
+    '生命線': 'Life Line',
+    '運命線': 'Fate Line',
+    '金運線': 'Money Line',
+    '太陽線': 'Sun Line',
+    '幸運線': 'Lucky Line',
+}
+
+def _maybe_translate_title(title: str, lang: str) -> str:
+    if not title or not str(lang).lower().startswith('en'):
+        return title
+    t = str(title)
+    # Keep leading symbols (■◆ etc.) and translate the rest
+    for jp, en in PALM_TITLE_EN.items():
+        t = t.replace(jp, en)
+
+    # Common section headings
+    t = t.replace('手相の総合アドバイス', 'Overall Palm Reading')
+    t = t.replace('性格診断', 'Personality')
+    t = t.replace('ラッキー情報', 'Lucky Info')
+    t = t.replace('吉方位', 'Lucky Directions')
+    t = t.replace('総合運', 'Overall Fortune')
+    t = t.replace('運勢', 'Fortune')
+
+    # Patterns like "2026年1月の運勢"
+    t = re.sub(r'(\d{4})年(\d{1,2})月の運勢', lambda m: f"Fortune for {m.group(1)}-{int(m.group(2)):02d}", t)
+    t = re.sub(r'(\d{4})年の総合運', lambda m: f"Overall fortune for {m.group(1)}", t)
+
+    return t
+
+
+def _translate_lucky_direction_text(s: str, lang: str) -> str:
+    if not s or not str(lang).lower().startswith('en'):
+        return s
+    t = str(s)
+    for jp, en in KYUSEI_EN.items():
+        t = t.replace(jp, en)
+    # Replace longer direction tokens first
+    for jp in sorted(DIR_EN.keys(), key=len, reverse=True):
+        t = t.replace(jp, DIR_EN[jp])
+    t = t.replace('あなたの本命星は', 'Your main star is')
+    t = t.replace('です。', '.')
+    t = t.replace('今年', 'This year')
+    t = t.replace('今月', 'This month')
+    t = t.replace('来月', 'Next month')
+    return t
+# ----------------------------------------------------------------------------
 
 def smart_wrap(text: str, limit: int, lang: str | None = None):
     """Wrap text safely for PDF rendering.
@@ -73,10 +138,6 @@ def _normalize_month_fortune_text(text: str, kind: str) -> str:
     return prefix + '、' + s if s else prefix + '。'
 
 
-from header_utils import draw_header
-from lucky_utils import draw_lucky_section
-
-
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
 pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
@@ -92,48 +153,95 @@ def _set_font(c, lang: str, size: float):
     c.setFont(_font(lang), size)
 
 def _wrap_len(base: int, lang: str) -> int:
-    # English needs a longer wrap length because word boundaries and spaces reduce density.
-    # Use a larger heuristic length to better match the desired layout.
-    if str(lang).lower().startswith("en"):
-        return max(base, int(base * 1.50))
+    """Return wrapping length (character-based) for textwrap.
+
+    English text in a proportional font tends to look too narrow if we reuse the
+    Japanese wrap length. We intentionally widen it so lines use most of the page
+    width and reduce the chance of bottom truncation.
+    """
+    if str(lang).lower().startswith('en'):
+        # About ~2x of the JP wrap length (caps to avoid absurdly long lines).
+        return max(base, min(120, int(base * 2.35)))
     return base
 
-
 # --- English-only header (keeps Japanese version untouched by not changing header_utils.py) ---
-def draw_header(c, page_width, margin, y_pos, font_name=FONT_NAME):
-    # Same geometry as header_utils.draw_header, but copy is in English.
-    line_y_top = y_pos
-    line_y_bottom = y_pos - 22 * mm
-    qr_size = 20 * mm
-    qr_x = page_width - margin - qr_size
-    qr_y = y_pos - 20 * mm
-    text_x = margin
-    text_y = y_pos - 4 * mm
+def draw_header(c, lang='en'):
+    """English header for A4/B4.
+
+    - Generates QR dynamically via header_utils.create_qr_code().
+    - Places "SCAN HERE" as a QR caption (not inside the body text).
+    """
+    width, height = A4
+
+    # Header frame
+    left_margin = 20 * mm
+    right_margin = 20 * mm
+    header_top = height - 18 * mm
+    header_bottom = header_top - 45 * mm
+
+    # Title (center)
+    c.setStrokeColorRGB(0, 0, 0)
+    c.setLineWidth(0.5)
+    c.line(left_margin, header_top, width - right_margin, header_top)
+
+    c.setFont('Helvetica', 12)
+    c.drawCentredString(width / 2, header_top - 4.5 * mm, 'Shin · Computer Fortune')
+
     c.setLineWidth(0.3)
-    c.line(margin, line_y_top, page_width - margin, line_y_top)
-    c.line(margin, line_y_bottom, page_width - margin, line_y_bottom)
-    c.setFont(font_name, 10)
-    c.drawString(text_x, text_y, 'Shin Computer Fortune')
-    c.setFont(font_name, 9)
-    lines = [
-        'Supervised by Uranaya (Fortune House)',
-        'Your future can change through your actions.',
-        'For a deeper reading or personal concerns,',
-        'in-person, phone, and online sessions are available.',
-        'Scan here for details →',
-    ]
-    for i, line in enumerate(lines):
-        c.drawString(text_x, text_y - (i + 1) * 4.2 * mm, line)
-    # QR
+    c.line(left_margin, header_top - 7.5 * mm, width - right_margin, header_top - 7.5 * mm)
+
+    # QR (right)
+    qr_size = 28 * mm
+    qr_x = width - right_margin - qr_size
+    caption_y = header_bottom + 3.2 * mm
+    qr_y = caption_y + 4.0 * mm
+
+    qr_path = None
     try:
-        qr_path = os.path.join(os.path.dirname(__file__), 'static', 'qr.png')
-        if os.path.exists(qr_path):
-            c.drawImage(qr_path, qr_x, qr_y, width=qr_size, height=qr_size, mask='auto')
+        static_dir = os.path.join(os.path.dirname(__file__), 'static')
+        qr_path = create_qr_code(output_dir=static_dir)
     except Exception:
-        pass
-    return y_pos - 30 * mm
+        qr_path = None
 
+    if qr_path and os.path.exists(qr_path):
+        c.drawImage(qr_path, qr_x, qr_y, width=qr_size, height=qr_size,
+                    preserveAspectRatio=True, mask='auto')
 
+    c.setFont('Helvetica-Bold', 9)
+    caption = 'SCAN HERE'
+    cap_w = stringWidth(caption, 'Helvetica-Bold', 9)
+    c.drawString(qr_x + (qr_size - cap_w) / 2, caption_y, caption)
+
+    # Left text block (kept compact so it doesn't collide with QR)
+    text_left = left_margin
+    text_right = qr_x - 8 * mm
+    y = header_top - 12.5 * mm
+
+    c.setFont('Helvetica', 10)
+    lines = [
+        "[Supervised by Fortune Hall / Fortune Teller 'Uranaya']",
+        "Your fortune can change through your actions.",
+        "For a deeper reading or private concerns,",
+        "we also offer in-person / phone / online sessions.",
+        "More details →"
+    ]
+
+    for line in lines:
+        # Trim to avoid overlapping the QR block
+        if stringWidth(line, 'Helvetica', 10) > (text_right - text_left):
+            # soft-wrap once if needed
+            wrapped = smart_wrap(line, 60)
+            for w in wrapped[:2]:
+                c.drawString(text_left, y, w)
+                y -= 4.4 * mm
+        else:
+            c.drawString(text_left, y, line)
+            y -= 4.4 * mm
+
+    c.setLineWidth(0.5)
+    c.line(left_margin, header_bottom, width - right_margin, header_bottom)
+
+    return header_bottom - 8 * mm
 
 def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='ja', page_height=None, **kwargs):
     """ラッキー情報セクション
@@ -249,7 +357,7 @@ def draw_yearly_pages_renai_a4(c, yearly, lang="ja"):
     bottom = 30 * mm
 
     def draw_text_block(title, text, y):
-        # 必要ならページを切り替え
+# 必要ならページを切り替え
         if y < bottom + 15 * mm:
             c.showPage()
             y = top
@@ -289,7 +397,7 @@ def draw_yearly_pages_renai_b4(c, yearly, lang="ja"):
     bottom = 30 * mm
 
     def draw_text_block(title, text, y):
-        # 必要ならページを切り替え
+# 必要ならページを切り替え
         if y < bottom + 18 * mm:
             c.showPage()
             y = top
@@ -478,6 +586,7 @@ def draw_yearly_pages_shincom_a4(c, yearly, lang="ja"):
 
     def draw_text_block(title, text):
         nonlocal y
+        title = _maybe_translate_title(title, lang)
         _set_font(c, lang, 12)
         c.drawString(margin, y, f"■ {title}")
         y -= 5 * mm
@@ -509,6 +618,7 @@ def draw_yearly_pages_shincom_b4(c, yearly, lang="ja"):
 
     def draw_text_block(title, text):
         nonlocal y
+        title = _maybe_translate_title(title, lang)
         _set_font(c, lang, 13)
         c.drawString(margin, y, f"■ {title}")
         y -= 6 * mm
@@ -600,7 +710,7 @@ def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
     data.setdefault('lang', _get_lang(data))
     size = size.lower()
     c = canvas.Canvas(filepath, pagesize=A4 if size == 'a4' else B4)
-    c.setTitle('占い結果')
+    c.setTitle('Fortune Result')
     if mode == 'shincom':
         if size == 'a4':
             draw_shincom_a4(c, data, include_yearly)
