@@ -24,7 +24,7 @@ from yearly_fortune_utils import generate_yearly_fortune
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
-from pdf_generator_unified_en import create_pdf_unified as create_pdf_unified_en
+from pdf_generator_unified_en import create_pdf_unified_en
 from fortune_logic import generate_renai_fortune
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -760,7 +760,6 @@ def selfmob_uuid(uuid_str):
                 },
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
-                'lang': output_lang,
                 "birthdate": birthdate,
                 "palm_result": palm_result,
                 "shichu_result": shichu_result,
@@ -1122,7 +1121,7 @@ def ten_shincom():
             except Exception:
                 return "生年月日が不正です", 400
             try:
-                kyusei_text = get_kyusei_fortune(year, month, day, lang=output_lang)
+                kyusei_text = get_kyusei_fortune(year, month, day)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
@@ -1175,7 +1174,6 @@ def ten_shincom():
                 },
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
-                "lang": output_lang,
                 "birthdate": birthdate,
                 "zodiac": zodiac,
                 "eto": eto,
