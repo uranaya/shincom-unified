@@ -760,6 +760,7 @@ def selfmob_uuid(uuid_str):
                 },
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
+                'lang': output_lang,
                 "birthdate": birthdate,
                 "palm_result": palm_result,
                 "shichu_result": shichu_result,
@@ -1121,7 +1122,7 @@ def ten_shincom():
             except Exception:
                 return "生年月日が不正です", 400
             try:
-                kyusei_text = get_kyusei_fortune(year, month, day)
+                kyusei_text = get_kyusei_fortune(year, month, day, lang=output_lang)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
@@ -1174,6 +1175,7 @@ def ten_shincom():
                 },
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
+                "lang": output_lang,
                 "birthdate": birthdate,
                 "zodiac": zodiac,
                 "eto": eto,

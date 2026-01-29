@@ -92,11 +92,46 @@ def _set_font(c, lang: str, size: float):
     c.setFont(_font(lang), size)
 
 def _wrap_len(base: int, lang: str) -> int:
-    # English text easily overruns the right margin (serif fonts are wide).
-    # Wrap earlier to prevent "尻切れ".
+    # English needs a longer wrap length because word boundaries and spaces reduce density.
+    # Use a larger heuristic length to better match the desired layout.
     if str(lang).lower().startswith("en"):
-        return max(28, int(base * 0.68))
+        return max(base, int(base * 1.50))
     return base
+
+
+# --- English-only header (keeps Japanese version untouched by not changing header_utils.py) ---
+def draw_header(c, page_width, margin, y_pos, font_name=FONT_NAME):
+    # Same geometry as header_utils.draw_header, but copy is in English.
+    line_y_top = y_pos
+    line_y_bottom = y_pos - 22 * mm
+    qr_size = 20 * mm
+    qr_x = page_width - margin - qr_size
+    qr_y = y_pos - 20 * mm
+    text_x = margin
+    text_y = y_pos - 4 * mm
+    c.setLineWidth(0.3)
+    c.line(margin, line_y_top, page_width - margin, line_y_top)
+    c.line(margin, line_y_bottom, page_width - margin, line_y_bottom)
+    c.setFont(font_name, 10)
+    c.drawString(text_x, text_y, 'Shin Computer Fortune')
+    c.setFont(font_name, 9)
+    lines = [
+        'Supervised by Uranaya (Fortune House)',
+        'Your future can change through your actions.',
+        'For a deeper reading or personal concerns,',
+        'in-person, phone, and online sessions are available.',
+        'Scan here for details →',
+    ]
+    for i, line in enumerate(lines):
+        c.drawString(text_x, text_y - (i + 1) * 4.2 * mm, line)
+    # QR
+    try:
+        qr_path = os.path.join(os.path.dirname(__file__), 'static', 'qr.png')
+        if os.path.exists(qr_path):
+            c.drawImage(qr_path, qr_x, qr_y, width=qr_size, height=qr_size, mask='auto')
+    except Exception:
+        pass
+    return y_pos - 30 * mm
 
 
 
