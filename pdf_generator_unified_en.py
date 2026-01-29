@@ -130,14 +130,35 @@ def wrap_by_width(text: str, font_name: str, font_size: float, max_width: float)
     return out
 
 
+def _mostly_ascii(s: str, threshold: float = 0.15) -> bool:
+    """Heuristic: treat text as English/Latin if most visible chars are ASCII.
+
+    This is used to pick a Latin font for English paragraphs so the wrap
+    computation matches the actual glyph metrics.
+    """
+    s = s or ""
+    visible = [ch for ch in s if not ch.isspace()]
+    if not visible:
+        return True
+    non_ascii = sum(1 for ch in visible if ord(ch) > 127)
+    return (non_ascii / len(visible)) <= threshold
+
+
 def draw_wrapped(c: canvas.Canvas, x: float, y: float, text: str,
                  font_name: str, font_size: float,
                  max_width: float,
                  leading: Optional[float] = None) -> float:
     """Draw wrapped text and return the new y (below last line)."""
     leading = leading if leading is not None else (font_size + 3)
-    lines = wrap_by_width(text, font_name, font_size, max_width)
-    c.setFont(font_name, font_size)
+    # Use a Latin font for (mostly) English text so wrap width is based on
+    # correct glyph metrics. Keep the passed font for Japanese/mixed content.
+    use_font = "Helvetica" if _mostly_ascii(text) else font_name
+    draw_text = text or ""
+    # Helvetica doesn't always render the decorative bullets used in JP output.
+    if use_font == "Helvetica":
+        draw_text = draw_text.replace("■", "*").replace("◆", "*").replace("◇", "*")
+    lines = wrap_by_width(draw_text, use_font, font_size, max_width)
+    c.setFont(use_font, font_size)
     for ln in lines:
         c.drawString(x, y, ln)
         y -= leading
