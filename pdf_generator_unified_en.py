@@ -32,6 +32,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 # English-only header module (does not affect Japanese)
 from header_utils_en import draw_header_en
+import re
 
 
 @dataclass
@@ -81,6 +82,9 @@ def wrap_by_width(text: str, font_name: str, font_size: float, max_width: float)
     - If the string has no spaces (e.g., CJK), falls back to char-based wrapping.
     """
     text = (text or "").replace("\r", "")
+    if "\n" in text and _mostly_ascii(text):
+        text = repair_hardwrap_en(text)
+
     if not text:
         return []
 
@@ -144,24 +148,100 @@ def _mostly_ascii(s: str, threshold: float = 0.15) -> bool:
     return (non_ascii / len(visible)) <= threshold
 
 
-def draw_wrapped(c: canvas.Canvas, x: float, y: float, text: str,
-                 font_name: str, font_size: float,
-                 max_width: float,
-                 leading: Optional[float] = None) -> float:
-    """Draw wrapped text and return the new y (below last line)."""
-    leading = leading if leading is not None else (font_size + 3)
-    # Use a Latin font for (mostly) English text so wrap width is based on
-    # correct glyph metrics. Keep the passed font for Japanese/mixed content.
-    use_font = "Helvetica" if _mostly_ascii(text) else font_name
-    draw_text = text or ""
-    # Helvetica doesn't always render the decorative bullets used in JP output.
-    if use_font == "Helvetica":
-        draw_text = draw_text.replace("■", "*").replace("◆", "*").replace("◇", "*")
-    lines = wrap_by_width(draw_text, use_font, font_size, max_width)
-    c.setFont(use_font, font_size)
-    for ln in lines:
-        c.drawString(x, y, ln)
+
+def repair_hardwrap_en(text: str) -> str:
+    """Repair hard-wrapped English text that contains spurious newlines.
+
+    - Preserves paragraph breaks (blank lines).
+    - If a newline sits between two ASCII letters, it is removed (e.g. communi\ncat -> communicat).
+    - Otherwise, it is converted to a single space.
+    """
+    if not text:
+        return ""
+    t = text.replace("\r\n", "\n").replace("\r", "\n")
+    t = re.sub(r"\n{3,}", "\n\n", t)
+
+    marker = "\uFFFF"  # unlikely to appear in normal text
+    t = t.replace("\n\n", marker)
+
+    out = []
+    n = len(t)
+    for i, ch in enumerate(t):
+        if ch != "\n":
+            out.append(ch)
+            continue
+
+        prev = out[-1] if out else ""
+        nxt = t[i + 1] if i + 1 < n else ""
+
+        if prev.isalpha() and nxt.isalpha():
+            continue  # join word across newline
+
+        if out and out[-1] != " ":
+            out.append(" ")
+
+    res = "".join(out).replace(marker, "\n\n")
+    res = re.sub(r"[ \t]+", " ", res)
+    res = re.sub(r" *\n\n *", "\n\n", res)
+    return res.strip()
+
+def draw_wrapped(
+    c: canvas.Canvas,
+    x: float,
+    y: float,
+    text: str,
+    font_name: str,
+    font_size: int,
+    max_width: float,
+    max_lines: Optional[int] = None,
+    leading: Optional[float] = None,
+    bottom_y: Optional[float] = None,
+    top_y: Optional[float] = None,
+    allow_pagebreak: bool = True,
+) -> float:
+    """Draw wrapped text and return the next y position.
+
+    English PDFs often arrive with spurious hard-wrapped newlines (sometimes even inside words).
+    This function repairs those newlines, wraps by *width* (not character count), and auto-inserts
+    page breaks so content is never cut off at the bottom.
+    """
+    if not text:
+        return y
+
+    if "\n" in text and _mostly_ascii(text):
+        text = repair_hardwrap_en(text)
+
+    text = text.replace("•", "- ").replace("・", "- ")
+
+    if _mostly_ascii(text) and font_name not in ("Helvetica", "Times-Roman", "Courier"):
+        font_name = "Helvetica"
+
+    if leading is None:
+        leading = font_size * 1.15  # tighter leading for A4 density
+
+    if allow_pagebreak:
+        page_w, page_h = c._pagesize
+        if bottom_y is None:
+            bottom_y = 18 * mm
+        if top_y is None:
+            top_y = page_h - (18 * mm)
+
+    lines = wrap_by_width(text, font_name, font_size, max_width)
+
+    count = 0
+    for line in lines:
+        if max_lines is not None and count >= max_lines:
+            break
+
+        if allow_pagebreak and bottom_y is not None and top_y is not None and (y - leading) < bottom_y:
+            c.showPage()
+            y = top_y
+
+        c.setFont(font_name, font_size)
+        c.drawString(x, y, line)
         y -= leading
+        count += 1
+
     return y
 
 
