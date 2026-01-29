@@ -32,7 +32,6 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 # English-only header module (does not affect Japanese)
 from header_utils_en import draw_header_en
-import re
 
 
 @dataclass
@@ -67,8 +66,13 @@ def _register_fonts() -> None:
 
 
 def _pick_font() -> str:
-    # Prefer IPAexGothic if registered, otherwise Helvetica.
-    return "IPAexGothic" if "IPAexGothic" in pdfmetrics.getRegisteredFontNames() else "Helvetica"
+    """Font for English PDF.
+
+    IMPORTANT: Use a Latin font so ASCII glyphs are half-width.
+    Using Japanese fonts (IPAex*) makes ASCII full-width and
+    effectively halves usable line length.
+    """
+    return "Helvetica"
 
 
 def _safe_str(v) -> str:
@@ -82,9 +86,6 @@ def wrap_by_width(text: str, font_name: str, font_size: float, max_width: float)
     - If the string has no spaces (e.g., CJK), falls back to char-based wrapping.
     """
     text = (text or "").replace("\r", "")
-    if "\n" in text and _mostly_ascii(text):
-        text = repair_hardwrap_en(text)
-
     if not text:
         return []
 
@@ -148,100 +149,33 @@ def _mostly_ascii(s: str, threshold: float = 0.15) -> bool:
     return (non_ascii / len(visible)) <= threshold
 
 
-
-def repair_hardwrap_en(text: str) -> str:
-    """Repair hard-wrapped English text that contains spurious newlines.
-
-    - Preserves paragraph breaks (blank lines).
-    - If a newline sits between two ASCII letters, it is removed (e.g. communi\ncat -> communicat).
-    - Otherwise, it is converted to a single space.
-    """
-    if not text:
-        return ""
-    t = text.replace("\r\n", "\n").replace("\r", "\n")
-    t = re.sub(r"\n{3,}", "\n\n", t)
-
-    marker = "\uFFFF"  # unlikely to appear in normal text
-    t = t.replace("\n\n", marker)
-
-    out = []
-    n = len(t)
-    for i, ch in enumerate(t):
-        if ch != "\n":
-            out.append(ch)
-            continue
-
-        prev = out[-1] if out else ""
-        nxt = t[i + 1] if i + 1 < n else ""
-
-        if prev.isalpha() and nxt.isalpha():
-            continue  # join word across newline
-
-        if out and out[-1] != " ":
-            out.append(" ")
-
-    res = "".join(out).replace(marker, "\n\n")
-    res = re.sub(r"[ \t]+", " ", res)
-    res = re.sub(r" *\n\n *", "\n\n", res)
-    return res.strip()
-
-def draw_wrapped(
-    c: canvas.Canvas,
-    x: float,
-    y: float,
-    text: str,
-    font_name: str,
-    font_size: int,
-    max_width: float,
-    max_lines: Optional[int] = None,
-    leading: Optional[float] = None,
-    bottom_y: Optional[float] = None,
-    top_y: Optional[float] = None,
-    allow_pagebreak: bool = True,
-) -> float:
-    """Draw wrapped text and return the next y position.
-
-    English PDFs often arrive with spurious hard-wrapped newlines (sometimes even inside words).
-    This function repairs those newlines, wraps by *width* (not character count), and auto-inserts
-    page breaks so content is never cut off at the bottom.
-    """
-    if not text:
-        return y
-
-    if "\n" in text and _mostly_ascii(text):
-        text = repair_hardwrap_en(text)
-
-    text = text.replace("•", "- ").replace("・", "- ")
-
-    if _mostly_ascii(text) and font_name not in ("Helvetica", "Times-Roman", "Courier"):
-        font_name = "Helvetica"
-
-    if leading is None:
-        leading = font_size * 1.15  # tighter leading for A4 density
-
-    if allow_pagebreak:
-        page_w, page_h = c._pagesize
-        if bottom_y is None:
-            bottom_y = 18 * mm
-        if top_y is None:
-            top_y = page_h - (18 * mm)
-
-    lines = wrap_by_width(text, font_name, font_size, max_width)
-
-    count = 0
-    for line in lines:
-        if max_lines is not None and count >= max_lines:
-            break
-
-        if allow_pagebreak and bottom_y is not None and top_y is not None and (y - leading) < bottom_y:
-            c.showPage()
-            y = top_y
-
-        c.setFont(font_name, font_size)
-        c.drawString(x, y, line)
+def draw_wrapped(c: canvas.Canvas, x: float, y: float, text: str,
+                 font_name: str, font_size: float,
+                 max_width: float,
+                 leading: Optional[float] = None,
+                 page_height: Optional[float] = None,
+                 top_y: Optional[float] = None,
+                 bottom_margin: float = 40) -> float:
+    """Draw wrapped text and return the new y (below last line)."""
+    leading = leading if leading is not None else (font_size * 1.15)
+    # Use a Latin font for (mostly) English text so wrap width is based on
+    # correct glyph metrics. Keep the passed font for Japanese/mixed content.
+    use_font = "Helvetica" if _mostly_ascii(text) else font_name
+    draw_text = text or ""
+    # Helvetica doesn't always render the decorative bullets used in JP output.
+    if use_font == "Helvetica":
+        draw_text = draw_text.replace("■", "*").replace("◆", "*").replace("◇", "*")
+    lines = wrap_by_width(draw_text, use_font, font_size, max_width)
+    c.setFont(use_font, font_size)
+    for ln in lines:
+        # Page-break safety to avoid cutting text at the bottom.
+        if page_height is not None and top_y is not None:
+            if y - leading < bottom_margin:
+                c.showPage()
+                y = top_y
+                c.setFont(use_font, font_size)
+        c.drawString(x, y, ln)
         y -= leading
-        count += 1
-
     return y
 
 
@@ -289,11 +223,11 @@ def draw_lucky_section_en(c: canvas.Canvas, data: dict,
 
     yy_left = y
     for p in left_parts:
-        yy_left = draw_wrapped(c, left_x, yy_left, p, font_name, 10, col_w - 6, leading=13)
+        yy_left = draw_wrapped(c, left_x, yy_left, p, font_name, 10, col_w - 6, leading=11.5)
 
     yy_right = y
     for p in right_parts:
-        yy_right = draw_wrapped(c, right_x, yy_right, p, font_name, 10, col_w - 6, leading=13)
+        yy_right = draw_wrapped(c, right_x, yy_right, p, font_name, 10, col_w - 6, leading=11.5)
 
     y = min(yy_left, yy_right) - 8
 
@@ -302,7 +236,7 @@ def draw_lucky_section_en(c: canvas.Canvas, data: dict,
         c.drawString(margin, y, "■ Lucky Directions (Kyusei Kigaku)")
         y -= 16
         c.setFont(font_name, 10)
-        y = draw_wrapped(c, margin, y, lucky_direction, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, lucky_direction, font_name, 10, max_width, leading=11.5)
 
     return y - 8
 
@@ -336,7 +270,7 @@ def _draw_yearly_pages_en(c: canvas.Canvas, data: dict, spec: PageSpec,
             y -= 16
 
         c.setFont(font_name, 10)
-        y = draw_wrapped(c, margin, y, body, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, body, font_name, 10, max_width, leading=11.5)
         y -= 8
 
         # page break if needed
@@ -349,7 +283,10 @@ def _draw_yearly_pages_en(c: canvas.Canvas, data: dict, spec: PageSpec,
 def draw_shincom_a4_en(c: canvas.Canvas, data: dict, include_yearly: bool,
                        font_name: str) -> None:
     page_width, page_height = A4
-    margin = 18 * mm
+    margin = 12 * mm  # EN: reduce side margins to gain line length
+    top_y = page_height - margin
+    bottom_margin = margin
+
     max_width = page_width - 2 * margin
 
     y = page_height - margin
@@ -395,7 +332,7 @@ def draw_shincom_a4_en(c: canvas.Canvas, data: dict, include_yearly: bool,
         title = _safe_str(palm_titles[i])
         body = _safe_str(palm_texts[i])
         yy = _draw_section_title(c, margin, yy, f"◆ {i+1}. {title}", font_name, 12)
-        yy = draw_wrapped(c, margin, yy, body, font_name, 10, max_width, leading=13)
+        yy = draw_wrapped(c, margin, yy, body, font_name, 10, max_width, leading=11.5, page_height=page_height, top_y=top_y, bottom_margin=bottom_margin)
         return yy - 10
 
     for i in range(3):
@@ -423,14 +360,14 @@ def draw_shincom_a4_en(c: canvas.Canvas, data: dict, include_yearly: bool,
     overall = _safe_str(data.get("palm_overall") or data.get("palm_summary") or "")
     if overall:
         y = _draw_section_title(c, margin, y, "◆ Overall Palm Advice", font_name, 12)
-        y = draw_wrapped(c, margin, y, overall, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, overall, font_name, 10, max_width, leading=11.5, page_height=page_height, top_y=top_y, bottom_margin=bottom_margin)
         y -= 8
 
     # Personality diagnosis
     personality = _safe_str(data.get("personality") or "")
     if personality:
         y = _draw_section_title(c, margin, y, "◆ Personality", font_name, 12)
-        y = draw_wrapped(c, margin, y, personality, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, personality, font_name, 10, max_width, leading=11.5, page_height=page_height, top_y=top_y, bottom_margin=bottom_margin)
         y -= 8
 
     # Year / month / next month fortunes (from GPT shichu)
@@ -440,17 +377,17 @@ def draw_shincom_a4_en(c: canvas.Canvas, data: dict, include_yearly: bool,
 
     if year_f:
         y = _draw_section_title(c, margin, y, "■ 2026 Overall Fortune", font_name, 12)
-        y = draw_wrapped(c, margin, y, year_f, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, year_f, font_name, 10, max_width, leading=11.5, page_height=page_height, top_y=top_y, bottom_margin=bottom_margin)
         y -= 6
 
     if month_f:
         y = _draw_section_title(c, margin, y, "■ This Month", font_name, 12)
-        y = draw_wrapped(c, margin, y, month_f, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, month_f, font_name, 10, max_width, leading=11.5, page_height=page_height, top_y=top_y, bottom_margin=bottom_margin)
         y -= 6
 
     if next_month_f:
         y = _draw_section_title(c, margin, y, "■ Next Month", font_name, 12)
-        y = draw_wrapped(c, margin, y, next_month_f, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, next_month_f, font_name, 10, max_width, leading=11.5, page_height=page_height, top_y=top_y, bottom_margin=bottom_margin)
         y -= 6
 
     # Lucky section at end of page2
@@ -464,7 +401,7 @@ def draw_shincom_a4_en(c: canvas.Canvas, data: dict, include_yearly: bool,
 def draw_shincom_b4_en(c: canvas.Canvas, data: dict, include_yearly: bool,
                        font_name: str) -> None:
     page_width, page_height = B4
-    margin = 20 * mm
+    margin = 12 * mm  # EN: reduce side margins to gain line length
     max_width = page_width - 2 * margin
 
     y = page_height - margin
@@ -505,7 +442,7 @@ def draw_shincom_b4_en(c: canvas.Canvas, data: dict, include_yearly: bool,
         title = _safe_str(palm_titles[i])
         body = _safe_str(palm_texts[i])
         y = _draw_section_title(c, margin, y, f"◆ {i+1}. {title}", font_name, 12)
-        y = draw_wrapped(c, margin, y, body, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, body, font_name, 10, max_width, leading=11.5)
         y -= 8
         if y < margin + 80:
             break
@@ -517,13 +454,13 @@ def draw_shincom_b4_en(c: canvas.Canvas, data: dict, include_yearly: bool,
     overall = _safe_str(data.get("palm_overall") or data.get("palm_summary") or "")
     if overall:
         y = _draw_section_title(c, margin, y, "◆ Overall Palm Advice", font_name, 12)
-        y = draw_wrapped(c, margin, y, overall, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, overall, font_name, 10, max_width, leading=11.5)
         y -= 8
 
     personality = _safe_str(data.get("personality") or "")
     if personality:
         y = _draw_section_title(c, margin, y, "◆ Personality", font_name, 12)
-        y = draw_wrapped(c, margin, y, personality, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, personality, font_name, 10, max_width, leading=11.5)
         y -= 8
 
     year_f = _safe_str(data.get("year_fortune") or "")
@@ -532,17 +469,17 @@ def draw_shincom_b4_en(c: canvas.Canvas, data: dict, include_yearly: bool,
 
     if year_f:
         y = _draw_section_title(c, margin, y, "■ 2026 Overall Fortune", font_name, 12)
-        y = draw_wrapped(c, margin, y, year_f, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, year_f, font_name, 10, max_width, leading=11.5)
         y -= 6
 
     if month_f:
         y = _draw_section_title(c, margin, y, "■ This Month", font_name, 12)
-        y = draw_wrapped(c, margin, y, month_f, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, month_f, font_name, 10, max_width, leading=11.5)
         y -= 6
 
     if next_month_f:
         y = _draw_section_title(c, margin, y, "■ Next Month", font_name, 12)
-        y = draw_wrapped(c, margin, y, next_month_f, font_name, 10, max_width, leading=13)
+        y = draw_wrapped(c, margin, y, next_month_f, font_name, 10, max_width, leading=11.5)
         y -= 6
 
     y = draw_lucky_section_en(c, data, page_width, margin, y, font_name)
