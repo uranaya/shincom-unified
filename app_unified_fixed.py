@@ -24,7 +24,6 @@ from yearly_fortune_utils import generate_yearly_fortune
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
-from pdf_generator_unified_en import create_pdf_unified_en
 from fortune_logic import generate_renai_fortune
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -204,10 +203,7 @@ else:
 # Background thread task to generate PDF and handle post-processing
 def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
     try:
-        if result_data.get("lang") == "en":
-            create_pdf_unified_en(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
-        else:
-            create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
+        create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
     except Exception as e:
         print(f"❌ PDF generation error (mode={pdf_mode}, uuid={uuid_str}):", e)
         traceback.print_exc()
@@ -693,7 +689,7 @@ def selfmob_uuid(uuid_str):
             except Exception:
                 return "生年月日が不正です", 400
             try:
-                kyusei_text = get_kyusei_fortune(year, month, day, now=now, force_next_month=force_next_month, lang=output_lang)
+                kyusei_text = get_kyusei_fortune(year, month, day, now=now, force_next_month=force_next_month)
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
@@ -2011,6 +2007,79 @@ def generate_invoice_pdf(output_path, month, staff, total_taiken, total_pc, tota
 
 
 
+
+@app.route('/admin/invoice_staff_special_pdf')
+def admin_invoice_staff_special_pdf():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login_sales'))
+
+    month = request.args.get('month', datetime.today().strftime('%Y-%m'))
+    staff = request.args.get('staff')
+    if not staff:
+        return "占い師を指定してください", 400
+
+    month_start = month + "-01"
+    month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+
+        # 月合計
+        cur.execute("""
+            SELECT method, SUM(amount)
+            FROM sales
+            WHERE date >= %s AND date < %s AND staff_name = %s
+            GROUP BY method;
+        """, (month_start, month_end, staff))
+        rows = cur.fetchall()
+
+        total_taiken = sum(total for method, total in rows if normalize_method(method) == "対面")
+        total_pc = sum(total for method, total in rows if normalize_method(method) == "コンピューター")
+        total_cashless = sum(total for method, total in rows if normalize_method(method) == "現金外")
+
+        # ★特別出店料: 対面20% + コンピューター40%
+        store_fee = total_taiken * 0.20 + total_pc * 0.40
+        store_fee_tax = int(store_fee * 1.10)
+        final_invoice = store_fee_tax - total_cashless
+
+        # 日別内訳
+        cur.execute("""
+            SELECT date, method, SUM(amount)
+            FROM sales
+            WHERE date >= %s AND date < %s AND staff_name = %s
+            GROUP BY date, method
+            ORDER BY date, method;
+        """, (month_start, month_end, staff))
+        daily_rows = cur.fetchall()
+
+        cur.close()
+        conn.close()
+
+        daily_details = {}
+        for date, method, total in daily_rows:
+            date_str = date.strftime("%Y-%m-%d")
+            if date_str not in daily_details:
+                daily_details[date_str] = {"対面": 0, "コンピューター": 0, "現金外": 0}
+
+            cat = normalize_method(method)
+            if cat in daily_details[date_str]:
+                daily_details[date_str][cat] += total
+
+        pdf_path = os.path.join(UPLOAD_FOLDER, f"invoice_special_{staff}_{month}.pdf")
+        generate_invoice_pdf(
+            pdf_path, month, staff,
+            total_taiken, total_pc, total_cashless,
+            store_fee, store_fee_tax, final_invoice,
+            daily_details
+        )
+
+        return send_file(pdf_path, as_attachment=True, mimetype='application/pdf')
+
+    except Exception as e:
+        return f"❌ PDF生成エラー: {e}", 500
+
+
 @app.route('/admin/invoice_staff_pdf')
 def admin_invoice_staff_pdf():
     if not session.get('admin'):
@@ -2188,81 +2257,12 @@ def admin_sales_add_missing():
 
 
 
-@app.route('/admin/invoice_staff_special_pdf')
-def admin_invoice_staff_special_pdf():
-    if not session.get('admin'):
-        return redirect(url_for('admin_login_sales'))
 
-    month = request.args.get('month', datetime.today().strftime('%Y-%m'))
-    staff = request.args.get('staff')
-    if not staff:
-        return "占い師を指定してください", 400
-
-    month_start = month + "-01"
-    month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
-
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
-
-        # 月合計
-        cur.execute("""
-            SELECT method, SUM(amount)
-            FROM sales
-            WHERE date >= %s AND date < %s AND staff_name = %s
-            GROUP BY method;
-        """, (month_start, month_end, staff))
-        rows = cur.fetchall()
-
-        total_taiken = sum(total for method, total in rows if method == "対面")
-        total_pc = sum(total for method, total in rows if method == "コンピューター")
-        total_cashless = sum(total for method, total in rows if "現金外" in method)
-
-        # ★特別出店料: 対面20% + コンピューター40%
-        store_fee = total_taiken * 0.20 + total_pc * 0.40
-        store_fee_tax = int(store_fee * 1.10)
-        final_invoice = store_fee_tax - total_cashless
-
-        # 日別内訳（PDFに入れるため通常版と同じ粒度で取得）
-        cur.execute("""
-            SELECT date, method, SUM(amount)
-            FROM sales
-            WHERE date >= %s AND date < %s AND staff_name = %s
-            GROUP BY date, method
-            ORDER BY date, method;
-        """, (month_start, month_end, staff))
-        daily_rows = cur.fetchall()
-        cur.close()
-        conn.close()
-
-        daily_details = {}
-        for date, method, total in daily_rows:
-            date_str = date.strftime("%Y-%m-%d")
-            if date_str not in daily_details:
-                daily_details[date_str] = {"対面": 0, "コンピューター": 0, "現金外": 0}
-
-            cat = normalize_method(method)
-            if cat not in daily_details[date_str]:
-                daily_details[date_str][cat] = 0
-            daily_details[date_str][cat] += total
-
-        # PDF生成（ファイル名を通常と分ける）
-        pdf_path = os.path.join(UPLOAD_FOLDER, f"invoice_special_{staff}_{month}.pdf")
-        generate_invoice_pdf(
-            pdf_path, month, staff,
-            total_taiken, total_pc, total_cashless,
-            store_fee, store_fee_tax, final_invoice,
-            daily_details
-        )
-
-        return send_file(pdf_path, as_attachment=True, mimetype='application/pdf')
-
-    except Exception as e:
-        return f"❌ PDF生成エラー: {e}", 500
 
 
 
 @app.route('/selfmob/google808abc9a83ba5e55.html')
 def google_verification_file():
     return send_from_directory('static', 'google808abc9a83ba5e55.html')
+
 
