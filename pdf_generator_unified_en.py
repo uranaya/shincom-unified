@@ -2,6 +2,10 @@ from reportlab.lib.pagesizes import A4, B4
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
+
+# Debug marker to verify EN PDF generator is actually used (printed only when this module is invoked)
+EN_PDFGEN_MARKER = 'ENPDFGEN|wrap=90|2026-01-31'
+
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import stringWidth
@@ -566,6 +570,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
 
 def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
     data = data or {}
+    print(f"[ENPDF] {EN_PDFGEN_MARKER} file={__file__} mode={mode} size={size} include_yearly={include_yearly}", flush=True)
     data.setdefault('lang', _get_lang(data))
     size = size.lower()
     c = canvas.Canvas(filepath, pagesize=A4 if size == 'a4' else B4)

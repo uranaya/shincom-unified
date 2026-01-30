@@ -205,6 +205,12 @@ else:
 def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
     try:
         if result_data.get("lang") == "en":
+            # DEBUG marker (English only): confirms EN module is actually used
+            try:
+                import pdf_generator_unified_en as _enpdf
+                print(f"[ENPDF] ACTIVE module={_enpdf.__file__} wrap=90 fn=create_pdf_unified (aliased)", flush=True)
+            except Exception as _e:
+                print(f"[ENPDF] ACTIVE but module introspection failed: {_e}", flush=True)
             create_pdf_unified_en(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
         else:
             create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
@@ -1175,6 +1181,7 @@ def ten_shincom():
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
                 "birthdate": birthdate,
+        "lang": output_lang,
                 "zodiac": zodiac,
                 "eto": eto,
                 "eto_number": eto_number,
