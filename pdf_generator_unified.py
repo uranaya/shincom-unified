@@ -85,6 +85,10 @@ pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 FONT_NAME_JA = FONT_NAME
 FONT_NAME_EN = "Times-Roman"
 
+# English-only override for wrapping length (used via create_pdf_unified).
+_EN_WRAP_LEN_OVERRIDE = None  # type: ignore
+
+
 def _font(lang: str) -> str:
     return FONT_NAME_EN if str(lang).lower().startswith("en") else FONT_NAME_JA
 
@@ -92,13 +96,21 @@ def _set_font(c, lang: str, size: float):
     c.setFont(_font(lang), size)
 
 def _wrap_len(base: int, lang: str) -> int:
-    # English text easily overruns the right margin (serif fonts are wide).
-    # Wrap earlier to prevent "尻切れ".
-    if str(lang).lower().startswith("en"):
-        return max(28, int(base * 0.68))
+    """Return wrap length in characters.
+
+    - Japanese: use the provided base (behavior unchanged).
+    - English: if an override is set (via create_pdf_unified / create_pdf_unified_en),
+      apply it only to the main narrative blocks (base >= 46) to avoid layout overflow
+      in tighter areas such as yearly pages.
+    """
+    lang = (lang or "ja").lower()
+    if lang.startswith("en"):
+        global _EN_WRAP_LEN_OVERRIDE
+        if isinstance(_EN_WRAP_LEN_OVERRIDE, int) and _EN_WRAP_LEN_OVERRIDE > 0 and base >= 46:
+            return _EN_WRAP_LEN_OVERRIDE
+        # Default English behavior: do not shrink the wrap length.
+        return base
     return base
-
-
 
 def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='ja', page_height=None, **kwargs):
     """ラッキー情報セクション
@@ -283,12 +295,12 @@ def draw_yearly_pages_renai_b4(c, yearly, lang="ja"):
         y = draw_text_block(month.get("label", ""), month.get("text", ""), y)
 
 
-def draw_shincom_a4(c, data, include_yearly=False):
+def draw_shincom_a4(c, data, include_yearly=False, header_drawer=None):
     lang = _get_lang(data)
     width, height = A4
     margin = 20 * mm
     y = height - margin
-    y = draw_header(c, width, margin, y)
+    y = (header_drawer or draw_header)(c, width, margin, y, font_name)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
     # 生年月日・星座・干支・動物占い・本命星（手相画像の直下に表示）
@@ -382,12 +394,12 @@ def draw_shincom_a4(c, data, include_yearly=False):
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'], lang)
 
 
-def draw_shincom_b4(c, data, include_yearly=False):
+def draw_shincom_b4(c, data, include_yearly=False, header_drawer=None):
     lang = _get_lang(data)
     width, height = B4
     margin = 20 * mm
     y = height - margin
-    y = draw_header(c, width, margin, y)
+    y = (header_drawer or draw_header)(c, width, margin, y, font_name)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
     _set_font(c, lang, 14)
@@ -560,17 +572,41 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
             draw_yearly_pages_renai_b4(c, data["yearly_love_fortunes"])
 
 
-def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
+def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False, header_drawer=None, en_wrap_len=None):
+    """Unified PDF generator.
+
+    - `header_drawer`: optional function (e.g., header_utils_en.draw_header_en) to render the header.
+      If None, uses the default Japanese header drawer.
+    - `en_wrap_len`: optional int to override wrapping length for English narrative blocks (base >= 46).
+      If None, can also be provided via `data['wrap_len_en']`.
+    """
     data = data or {}
     data.setdefault('lang', _get_lang(data))
-    size = size.lower()
-    c = canvas.Canvas(filepath, pagesize=A4 if size == 'a4' else B4)
-    c.setTitle('占い結果')
-    if mode == 'shincom':
-        if size == 'a4':
-            draw_shincom_a4(c, data, include_yearly)
+    lang = _get_lang(data)
+    size = (size or 'a4').lower()
+
+    # Apply English wrapping override in a scoped way.
+    global _EN_WRAP_LEN_OVERRIDE
+    prev_wrap = _EN_WRAP_LEN_OVERRIDE
+    try:
+        if lang.lower().startswith('en'):
+            candidate = en_wrap_len if en_wrap_len is not None else data.get('wrap_len_en')
+            if isinstance(candidate, str) and candidate.isdigit():
+                candidate = int(candidate)
+            if isinstance(candidate, int) and candidate > 0:
+                _EN_WRAP_LEN_OVERRIDE = candidate
+
+        c = canvas.Canvas(filepath, pagesize=A4 if size == 'a4' else B4)
+        c.setTitle('Fortune Result' if lang.lower().startswith('en') else '占い結果')
+
+        if mode == 'shincom':
+            if size == 'a4':
+                draw_shincom_a4(c, data, include_yearly, header_drawer=header_drawer)
+            else:
+                draw_shincom_b4(c, data, include_yearly, header_drawer=header_drawer)
         else:
-            draw_shincom_b4(c, data, include_yearly)
-    else:
-        draw_renai_pdf(c, data, size, include_yearly)
-    c.save()
+            draw_renai_pdf(c, data, size, include_yearly)
+
+        c.save()
+    finally:
+        _EN_WRAP_LEN_OVERRIDE = prev_wrap
