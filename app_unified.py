@@ -24,7 +24,7 @@ from yearly_fortune_utils import generate_yearly_fortune
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
-from pdf_generator_unified_en import create_pdf_unified_en
+from pdf_generator_unified_en import create_pdf_unified as create_pdf_unified_en
 from fortune_logic import generate_renai_fortune
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -766,14 +766,6 @@ def selfmob_uuid(uuid_str):
                 "iching_result": iching_result,
                 "palm_image": image_data,
             }
-
-            # English/Japanese separation:
-            # - Only set lang flag for English so Japanese output stays unchanged.
-            # - English PDF generator expects kyusei key; map from honmeisei.
-            result_data.setdefault("kyusei", result_data.get("honmeisei", ""))
-            if output_lang == "en":
-                result_data["lang"] = "en"
-                result_data["output_lang"] = "en"
 
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, today)
