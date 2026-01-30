@@ -73,7 +73,10 @@ def _normalize_month_fortune_text(text: str, kind: str) -> str:
     return prefix + '、' + s if s else prefix + '。'
 
 
-from header_utils import draw_header
+try:
+    from header_utils_en import draw_header
+except Exception:
+    from header_utils import draw_header
 from lucky_utils import draw_lucky_section
 
 
@@ -92,10 +95,11 @@ def _set_font(c, lang: str, size: float):
     c.setFont(_font(lang), size)
 
 def _wrap_len(base: int, lang: str) -> int:
-    # English text easily overruns the right margin (serif fonts are wide).
-    # Wrap earlier to prevent "尻切れ".
-    if str(lang).lower().startswith("en"):
-        return max(28, int(base * 0.68))
+    # IMPORTANT:
+    # - Japanese output stays in pdf_generator_unified.py (stable).
+    # - This English module enforces 90 chars/line for EN paragraphs.
+    if (lang or "ja").lower().startswith("en"):
+        return 90
     return base
 
 
