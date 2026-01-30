@@ -37,7 +37,7 @@ def draw_qr(c, url: str, x: float, y: float, size: float) -> None:
 
 
 def draw_header_en(c, page_width: float, margin: float, y_pos: float,
-                   font_name: str,
+                   font_name: str = "Helvetica",
                    qr_url: str = DEFAULT_QR_URL) -> float:
     """Draw an English header on the current page and return the next y."""
 
