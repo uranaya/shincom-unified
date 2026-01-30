@@ -1,55 +1,105 @@
-# header_utils_en.py
-# English header renderer (kept separate so Japanese output is unaffected)
+# -*- coding: utf-8 -*-
+"""English header utilities.
 
-from reportlab.lib.utils import ImageReader
-from PIL import Image
-import qrcode
-from io import BytesIO
+This module is intentionally **API-compatible** with the Japanese `header_utils.draw_header`
+so that English PDF generators can call:
+
+    y = draw_header(c, page_width, margin, y_pos)
+
+It also supports the older experimental signature:
+
+    draw_header(c, page_width, page_height, title=...)
+
+"""
+
+from __future__ import annotations
+
+from reportlab.lib.units import mm
+
+try:
+    import qrcode
+    from reportlab.lib.utils import ImageReader
+except Exception:  # pragma: no cover
+    qrcode = None
+    ImageReader = None
 
 
-def create_qr_code(url: str, box_size: int = 3, border: int = 1):
-    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_M,
-                       box_size=box_size, border=border)
-    qr.add_data(url)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
-    return img
+def _make_qr_image(qr_text: str):
+    if qrcode is None or ImageReader is None:
+        return None
+    try:
+        img = qrcode.make(qr_text)
+        return ImageReader(img)
+    except Exception:
+        return None
 
 
-def draw_header(c, page_width, page_height, logo_path=None, shop_name="Uranaya", sub_title="Fortune Report",
-                url_for_qr=None, font_name="IPAexGothic"):
+def draw_header(
+    c,
+    page_width: float,
+    *args,
+    title: str = "Uranaya Fortune Report",
+    subtitle: str | None = "Palm & Fortune Reading",
+    tokyo_mode: bool = False,
+    qr_text: str = "https://uranaya.jp",
+):
+    """Draw header and return updated y position.
+
+    Supported call patterns:
+      1) (c, page_width, margin, y_pos, ...)
+      2) (c, page_width, page_height, ...)  # legacy experimental form
     """
-    Draw header on the first page only.
-    - shop_name / sub_title are English strings.
-    - url_for_qr: if provided, draws a QR code at top-right.
-    """
-    y = page_height - 40
+
+    # Resolve args
+    margin = None
+    y_pos = None
+    if len(args) >= 2:
+        margin, y_pos = args[0], args[1]
+    elif len(args) == 1:
+        page_height = args[0]
+        margin = 20 * mm
+        y_pos = page_height - margin
+    else:
+        # Fallback to canvas size
+        page_height = getattr(c, "_pagesize", (page_width, 297 * mm))[1]
+        margin = 20 * mm
+        y_pos = page_height - margin
 
     # Title
     try:
-        c.setFont(font_name, 16)
+        c.setFont("Helvetica-Bold", 18)
     except Exception:
-        c.setFont("Helvetica-Bold", 16)
-    c.drawString(40, y, shop_name)
+        pass
+    c.drawString(margin, y_pos, title)
 
-    try:
-        c.setFont(font_name, 12)
-    except Exception:
-        c.setFont("Helvetica", 12)
-    c.drawString(40, y - 18, sub_title)
+    # Subtitle / location
+    y_after = y_pos - 14
+    if subtitle:
+        try:
+            c.setFont("Helvetica", 10)
+        except Exception:
+            pass
+        c.drawString(margin, y_after, subtitle)
+        y_after -= 12
+
+    if tokyo_mode:
+        try:
+            c.setFont("Helvetica", 9)
+        except Exception:
+            pass
+        c.drawString(margin, y_after, "Tokyo / Asakusa")
+        y_after -= 10
 
     # QR code (optional)
-    if url_for_qr:
-        img = create_qr_code(url_for_qr)
-        bio = BytesIO()
-        img.save(bio, format="PNG")
-        bio.seek(0)
-        qr_reader = ImageReader(bio)
-        qr_size = 48
-        c.drawImage(qr_reader, page_width - 40 - qr_size, y - 8 - qr_size, qr_size, qr_size, mask='auto')
+    qr_img = _make_qr_image(qr_text)
+    if qr_img is not None:
+        qr_size = 20 * mm
+        qr_x = page_width - margin - qr_size
+        # Align visually near the top block
+        qr_y = y_pos - 18 * mm
+        try:
+            c.drawImage(qr_img, qr_x, qr_y, width=qr_size, height=qr_size)
+        except Exception:
+            pass
 
-    # Divider line
-    c.setLineWidth(1)
-    c.line(40, y - 28, page_width - 40, y - 28)
-
-    return y - 40
+    return y_after - 4

@@ -108,7 +108,7 @@ def _wrap_len(base: int, lang: str) -> int:
 
 
 
-def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='ja', page_height=None, **kwargs):
+def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='en', page_height=None, **kwargs):
     """ラッキー情報セクション
     - 2列表示で横幅を有効活用（余白があるのに3ページ化する問題を抑制）
     - lucky_lines が 1行でも2行でも崩れない
@@ -292,219 +292,179 @@ def draw_yearly_pages_renai_b4(c, yearly, lang="ja"):
 
 
 def draw_shincom_a4(c, data, include_yearly=False):
-    lang = _get_lang(data)
-    width, height = A4
+    """English (shincom) A4 layout.
+    Page 1: Palm image + first 3 palm sections + Lucky info
+    Page 2: Remaining 2 palm sections + Overall + Personality + This/Next month
+    Header is drawn ONLY on page 1.
+    """
+    from reportlab.lib.pagesizes import A4
+
+    page_width, page_height = A4
     margin = 20 * mm
-    y = height - margin
-    y = draw_header(c, width, margin, y)
-    y = draw_palm_image(c, data["palm_image"], width, y)
+    y = page_height - margin
 
-    # 生年月日・星座・干支・動物占い・本命星（手相画像の直下に表示）
-    birthdate = data.get("birthdate")
-    zodiac = data.get("zodiac")
-    eto = data.get("eto")
-    eto_number = data.get("eto_number")
-    animal = data.get("animal")
-    honmeisei = data.get("honmeisei")
+    lang = "en"
+    font_name = select_font_for_lang(lang)
 
-    info_lines = []
+    # Header (page 1 only)
+    y = draw_header(c, page_width, margin, y)
 
-    # 1行目：生年月日＋星座
-    line1_parts = []
-    if birthdate:
-        line1_parts.append(f"生年月日：{birthdate}")
-    if zodiac:
-        line1_parts.append(f"星座：{zodiac}")
-    if line1_parts:
-        info_lines.append(" / ".join(line1_parts))
+    # Palm image
+    y = draw_palm_image(c, data, page_width, margin, y, font_name=font_name)
 
-    # 2行目：干支番号＋動物占い＋本命星
-    line2_parts = []
-    if eto:
-        if eto_number:
-            line2_parts.append(f"干支：{eto}（{eto_number}番）")
-        else:
-            line2_parts.append(f"干支：{eto}")
-    if animal:
-        line2_parts.append(f"動物占い：{animal}")
-    if honmeisei:
-        line2_parts.append(f"本命星：{honmeisei}")
-    if line2_parts:
-        info_lines.append(" / ".join(line2_parts))
+    palm_titles = data.get("palm_titles", []) or []
+    palm_texts = data.get("palm_texts", []) or []
 
-    if info_lines:
-        _set_font(c, lang, 11)
-        for line in info_lines:
-            c.drawString(margin, y, line)
-            y -= 5 * mm
-        y -= 3 * mm
+    def ensure_space(min_needed: float):
+        nonlocal y
+        if y < (margin + min_needed):
+            c.showPage()
+            y = page_height - margin
+        return y
 
-    # 手相3項目（1ページ目）
-    _set_font(c, lang, 12)
-    for i in range(3):
-        c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 6 * mm
-        _set_font(c, lang, 10)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len(40, lang), lang):
-            c.drawString(margin, y, line)
-            y -= 6 * mm
-        y -= 3 * mm
-        _set_font(c, lang, 12)
-
-    # 新ページ：手相残り2項目 + 鑑定結果
-    c.showPage()
-    y = height - margin
-
-    _set_font(c, lang, 12)
-    for i in range(3, 5):
-        c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 6 * mm
-        _set_font(c, lang, 10)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len(40, lang), lang):
-            c.drawString(margin, y, line)
-            y -= 6 * mm
-        y -= 3 * mm
-        _set_font(c, lang, 12)
-
-    # 四柱推命・まとめ等（タイトルのみでも出す）
-    for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
-        wrap_len = 36 if 'month' in key else 40
-        title = data['titles'].get(key, "")
-        content = data['texts'].get(key, "")
-
+    def write_block(title: str, body: str):
+        nonlocal y
         if title:
+            ensure_space(18)
+            _set_font(c, font_name, 12)
             c.drawString(margin, y, f"◆ {title}")
-            y -= 6 * mm
-        _set_font(c, lang, 10)
-        if content:
-            for line in smart_wrap(content, _wrap_len(wrap_len, lang), lang):
+            y -= 14
+        if body:
+            _set_font(c, font_name, 10)
+            for line in split_text(body):
+                ensure_space(14)
                 c.drawString(margin, y, line)
-                y -= 6 * mm
-        y -= 3 * mm
-        _set_font(c, lang, 12)
+                y -= 12
+        y -= 8
 
-    # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    # --- Page 1: first 3 sections ---
+    for i in range(3):
+        title = palm_titles[i] if i < len(palm_titles) else ""
+        text = palm_texts[i] if i < len(palm_texts) else ""
+        write_block(title, text)
 
-    if include_yearly:
-        draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'], lang)
+    # Lucky info on page 1
+    y = draw_lucky_section(
+        c,
+        page_width,
+        margin,
+        y,
+        data.get("lucky_info", []) or [],
+        data.get("lucky_direction", "") or "",
+        lang=lang,
+        page_height=page_height,
+        font_name=font_name,
+    )
 
+    # Start page 2 (no header)
+    c.showPage()
+    y = page_height - margin
+
+    # --- Page 2: remaining 2 sections ---
+    for i in range(3, 5):
+        title = palm_titles[i] if i < len(palm_titles) else ""
+        text = palm_texts[i] if i < len(palm_texts) else ""
+        write_block(title, text)
+
+    titles = data.get("titles", {}) or {}
+    texts = data.get("texts", {}) or {}
+
+    # Overall palm summary
+    write_block(titles.get("palm_summary", "Overall Palm Reading"), texts.get("palm_summary", ""))
+
+    # Personality (Four Pillars)
+    write_block(titles.get("personality", "Personality"), data.get("shichu_personality", ""))
+
+    # This month / next month
+    month_text = _normalize_month_fortune_text(data.get("shichu_month_fortune", ""), data.get("birthdate", ""), lang=lang)
+    next_month_text = _normalize_next_month_fortune_text(data.get("shichu_next_month_fortune", ""), data.get("birthdate", ""), lang=lang)
+
+    write_block(titles.get("month_fortune", "This Month"), month_text)
+    write_block(titles.get("next_month_fortune", "Next Month"), next_month_text)
 
 def draw_shincom_b4(c, data, include_yearly=False):
-    lang = _get_lang(data)
-    width, height = B4
-    margin = 20 * mm
-    y = height - margin
-    y = draw_header(c, width, margin, y)
-    y = draw_palm_image(c, data["palm_image"], width, y)
+    """English (shincom) B4 layout.
+    Page 1: Palm image + palm sections (all 5)
+    Page 2: Overall + Personality + This/Next month + Lucky info
+    Header is drawn ONLY on page 1.
+    """
+    from reportlab.lib.pagesizes import B4
 
-    _set_font(c, lang, 14)
-    for i in range(3):
-        c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 7 * mm
-        _set_font(c, lang, 12)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len(45, lang), lang):
-            c.drawString(margin, y, line)
-            y -= 7 * mm
-        y -= 4 * mm
-        _set_font(c, lang, 14)
+    page_width, page_height = B4
+    margin = 18 * mm
+    y = page_height - margin
 
-    c.showPage()
-    y = height - margin
-    _set_font(c, lang, 14)
-    for i in range(3, 5):
-        c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 7 * mm
-        _set_font(c, lang, 12)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len(45, lang), lang):
-            c.drawString(margin, y, line)
-            y -= 7 * mm
-        y -= 4 * mm
-        _set_font(c, lang, 14)
+    lang = "en"
+    font_name = select_font_for_lang(lang)
 
-    for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
+    # Header (page 1 only)
+    y = draw_header(c, page_width, margin, y)
 
-        wrap_len = 40 if 'month' in key else 45
-        title = data['titles'].get(key, "")
-        content = data['texts'].get(key, "")
+    # Palm image
+    y = draw_palm_image(c, data, page_width, margin, y, font_name=font_name)
+
+    palm_titles = data.get("palm_titles", []) or []
+    palm_texts = data.get("palm_texts", []) or []
+
+    def ensure_space(min_needed: float):
+        nonlocal y
+        if y < (margin + min_needed):
+            c.showPage()
+            y = page_height - margin
+        return y
+
+    def write_block(title: str, body: str):
+        nonlocal y
         if title:
+            ensure_space(18)
+            _set_font(c, font_name, 12)
             c.drawString(margin, y, f"◆ {title}")
-            y -= 7 * mm
-        _set_font(c, lang, 12)
-        if content:
-            for line in smart_wrap(content, _wrap_len(wrap_len, lang), lang):
+            y -= 14
+        if body:
+            _set_font(c, font_name, 10)
+            for line in split_text(body):
+                ensure_space(14)
                 c.drawString(margin, y, line)
-                y -= 7 * mm
-        y -= 4 * mm
-        _set_font(c, lang, 14)
+                y -= 12
+        y -= 8
 
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    # --- Page 1: all 5 palm sections ---
+    for i in range(5):
+        title = palm_titles[i] if i < len(palm_titles) else ""
+        text = palm_texts[i] if i < len(palm_texts) else ""
+        write_block(title, text)
 
-    if include_yearly:
-        draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'], lang)
-
-
-def draw_yearly_pages_shincom_a4(c, yearly, lang="ja"):
-    width, height = A4
-    margin = 20 * mm
-    y = height - 30 * mm
-
-    def draw_text_block(title, text):
-        nonlocal y
-        _set_font(c, lang, 12)
-        c.drawString(margin, y, f"■ {title}")
-        y -= 5 * mm
-        _set_font(c, lang, 10)
-        for line in smart_wrap(text or "", _wrap_len(45, lang), lang):
-            if y < 30 * mm:
-                c.showPage()
-                y = height - 30 * mm
-                _set_font(c, lang, 10)
-            c.drawString(margin, y, line)
-            y -= 5 * mm
-        y -= 3 * mm
-
+    # Start page 2 (no header)
     c.showPage()
-    y = height - 30 * mm
-    draw_text_block(yearly["year_label"], yearly["year_text"])
-    for month in yearly["months"][:6]:
-        draw_text_block(month["label"], month["text"])
-    c.showPage()
-    y = height - 30 * mm
-    for month in yearly["months"][6:]:
-        draw_text_block(month["label"], month["text"])
+    y = page_height - margin
 
+    titles = data.get("titles", {}) or {}
+    texts = data.get("texts", {}) or {}
 
-def draw_yearly_pages_shincom_b4(c, yearly, lang="ja"):
-    width, height = B4
-    margin = 20 * mm
-    y = height - 30 * mm
+    # Overall palm summary
+    write_block(titles.get("palm_summary", "Overall Palm Reading"), texts.get("palm_summary", ""))
 
-    def draw_text_block(title, text):
-        nonlocal y
-        _set_font(c, lang, 13)
-        c.drawString(margin, y, f"■ {title}")
-        y -= 6 * mm
-        _set_font(c, lang, 11)
-        for line in smart_wrap(text or "", _wrap_len(45, lang), lang):
-            if y < 30 * mm:
-                c.showPage()
-                y = height - 30 * mm
-                _set_font(c, lang, 11)
-            c.drawString(margin, y, line)
-            y -= 7 * mm
-        y -= 6 * mm
+    # Personality
+    write_block(titles.get("personality", "Personality"), data.get("shichu_personality", ""))
 
-    c.showPage()
-    y = height - 30 * mm
-    draw_text_block(yearly["year_label"], yearly["year_text"])
-    for month in yearly["months"][:6]:
-        draw_text_block(month["label"], month["text"])
-    c.showPage()
-    y = height - 30 * mm
-    for month in yearly["months"][6:]:
-        draw_text_block(month["label"], month["text"])
+    # This month / next month
+    month_text = _normalize_month_fortune_text(data.get("shichu_month_fortune", ""), data.get("birthdate", ""), lang=lang)
+    next_month_text = _normalize_next_month_fortune_text(data.get("shichu_next_month_fortune", ""), data.get("birthdate", ""), lang=lang)
+    write_block(titles.get("month_fortune", "This Month"), month_text)
+    write_block(titles.get("next_month_fortune", "Next Month"), next_month_text)
 
+    # Lucky info at the end of page 2
+    y = draw_lucky_section(
+        c,
+        page_width,
+        margin,
+        y,
+        data.get("lucky_info", []) or [],
+        data.get("lucky_direction", "") or "",
+        lang=lang,
+        page_height=page_height,
+        font_name=font_name,
+    )
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
     lang = _get_lang(data)
