@@ -767,6 +767,14 @@ def selfmob_uuid(uuid_str):
                 "palm_image": image_data,
             }
 
+            # English/Japanese separation:
+            # - Only set lang flag for English so Japanese output stays unchanged.
+            # - English PDF generator expects kyusei key; map from honmeisei.
+            result_data.setdefault("kyusei", result_data.get("honmeisei", ""))
+            if output_lang == "en":
+                result_data["lang"] = "en"
+                result_data["output_lang"] = "en"
+
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, today)
                 result_data["yearly_fortunes"] = yearly_data
