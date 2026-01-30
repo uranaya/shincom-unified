@@ -204,7 +204,17 @@ else:
 # Background thread task to generate PDF and handle post-processing
 def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
     try:
-        if result_data.get("lang") == "en":
+        # Language routing is intentionally isolated:
+        # - English PDFs are generated ONLY via pdf_generator_unified_en.py
+        # - Japanese PDFs are generated ONLY via pdf_generator_unified.py
+        lang = "ja"
+        try:
+            if isinstance(result_data, dict):
+                lang = (result_data.get("lang") or result_data.get("output_lang") or result_data.get("language") or "ja")
+        except Exception:
+            lang = "ja"
+        lang = (lang or "ja").strip().lower()
+        if lang.startswith("en"):
             create_pdf_unified_en(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
         else:
             create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
@@ -831,6 +841,7 @@ def renaiselfmob_uuid(uuid_str):
             raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
 
             result_data = {
+                "lang": "ja",
                 "texts": {
                     "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
                     "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),
@@ -1156,6 +1167,7 @@ def ten_shincom():
                 next_month_label = f"{target2.year}年{target2.month}月の運勢"
 
             result_data = {
+                "lang": "ja",
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
@@ -1232,6 +1244,7 @@ def renai():
         raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=include_yearly)
 
         result_data = {
+            "lang": "ja",
             "texts": {
                 "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
                 "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),
