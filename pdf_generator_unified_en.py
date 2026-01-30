@@ -232,8 +232,37 @@ def draw_lucky_section_en(c: canvas.Canvas, data: dict,
     """Draw lucky info + directions (English labels)."""
     max_width = page_width - 2 * margin
 
-    lucky_info = data.get("lucky_info") or ""
-    lucky_direction = data.get("lucky_direction") or ""
+    # NOTE: In shincom-unified, lucky_info/lucky_direction may be a list or dict
+    # depending on upstream generators. Normalize to a printable string here.
+    def _to_text(v):
+        if v is None:
+            return ""
+        if isinstance(v, str):
+            return v
+        if isinstance(v, (list, tuple)):
+            parts = []
+            for it in v:
+                t = _to_text(it)
+                if t:
+                    parts.append(t)
+            return "\n".join(parts)
+        if isinstance(v, dict):
+            # common payloads: {text: ...} / {content: ...}
+            for k in ("text", "value", "content"):
+                if k in v and v[k]:
+                    t = _to_text(v[k])
+                    if t:
+                        return t
+            parts = []
+            for k, val in v.items():
+                t = _to_text(val)
+                if t:
+                    parts.append(f"{k}: {t}")
+            return "\n".join(parts)
+        return str(v)
+
+    lucky_info = _to_text(data.get("lucky_info"))
+    lucky_direction = _to_text(data.get("lucky_direction"))
 
     if not (lucky_info or lucky_direction):
         return y
