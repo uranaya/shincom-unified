@@ -29,15 +29,6 @@ import re
 import textwrap
 
 
-
-def _wrap_len_main(base, lang):
-    """Wrap width for main fortune text.
-    For English output, we intentionally allow longer lines (90 chars) to reduce vertical overflow.
-    Other sections (e.g., lucky two-column) keep their own widths."""
-    if (lang or "").lower().startswith("en"):
-        return 90
-    return base
-
 def smart_wrap(text: str, limit: int, lang: str | None = None):
     """Wrap text safely for PDF rendering.
 
@@ -83,16 +74,12 @@ def _normalize_month_fortune_text(text: str, kind: str) -> str:
 
 
 from header_utils_en import draw_header_en as draw_header
-# (english generator) lucky section implemented locally; no external import required.
+from lucky_utils import draw_lucky_section
+
+
 FONT_NAME = "IPAexGothic"
 FONT_PATH = "ipaexg.ttf"
-# Register Japanese font if available (English PDFs should not hard-fail without it)
-try:
-    if os.path.exists(FONT_PATH):
-        pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
-except Exception:
-    pass
-
+pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 
 # English uses built-in PDF fonts for clean rendering and predictable metrics.
 FONT_NAME_JA = FONT_NAME
@@ -105,12 +92,10 @@ def _set_font(c, lang: str, size: float):
     c.setFont(_font(lang), size)
 
 def _wrap_len(base: int, lang: str) -> int:
-    # English text easily overruns the right margin (serif fonts are wide).
-    # Wrap earlier to prevent "尻切れ".
-    if str(lang).lower().startswith("en"):
-        return max(28, int(base * 0.68))
+    # English: target ~90 chars per line (upper bound). Japanese: keep base.
+    if (lang or "").lower().startswith("en"):
+        return 90
     return base
-
 
 
 def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='ja', page_height=None, **kwargs):
@@ -350,7 +335,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 6 * mm
         _set_font(c, lang, 10)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len_main(40, lang), lang):
+        for line in smart_wrap(data['palm_texts'][i], _wrap_len(40, lang), lang):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
@@ -365,7 +350,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 6 * mm
         _set_font(c, lang, 10)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len_main(40, lang), lang):
+        for line in smart_wrap(data['palm_texts'][i], _wrap_len(40, lang), lang):
             c.drawString(margin, y, line)
             y -= 6 * mm
         y -= 3 * mm
@@ -408,7 +393,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 7 * mm
         _set_font(c, lang, 12)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len_main(45, lang), lang):
+        for line in smart_wrap(data['palm_texts'][i], _wrap_len(45, lang), lang):
             c.drawString(margin, y, line)
             y -= 7 * mm
         y -= 4 * mm
@@ -421,7 +406,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
         y -= 7 * mm
         _set_font(c, lang, 12)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len_main(45, lang), lang):
+        for line in smart_wrap(data['palm_texts'][i], _wrap_len(45, lang), lang):
             c.drawString(margin, y, line)
             y -= 7 * mm
         y -= 4 * mm
@@ -460,7 +445,7 @@ def draw_yearly_pages_shincom_a4(c, yearly, lang="ja"):
         c.drawString(margin, y, f"■ {title}")
         y -= 5 * mm
         _set_font(c, lang, 10)
-        for line in smart_wrap(text or "", _wrap_len_main(45, lang), lang):
+        for line in smart_wrap(text or "", _wrap_len(45, lang), lang):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
@@ -491,7 +476,7 @@ def draw_yearly_pages_shincom_b4(c, yearly, lang="ja"):
         c.drawString(margin, y, f"■ {title}")
         y -= 6 * mm
         _set_font(c, lang, 11)
-        for line in smart_wrap(text or "", _wrap_len_main(45, lang), lang):
+        for line in smart_wrap(text or "", _wrap_len(45, lang), lang):
             if y < 30 * mm:
                 c.showPage()
                 y = height - 30 * mm
@@ -588,12 +573,9 @@ def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
         draw_renai_pdf(c, data, size, include_yearly)
     c.save()
 
-# --- English wrapper (keeps Japanese generator untouched) ---
-def create_pdf_unified_en(filepath, data, pdf_mode, size="A4", include_yearly=False):
-    """English PDF generator entrypoint.
-    - Forces lang='en'
-    - Accepts the same data structure as the Japanese generator (result_data)
-    """
-    data_en = dict(data or {})
-    data_en["lang"] = "en"
-    return create_pdf_unified(filepath, data_en, pdf_mode, size=size, include_yearly=include_yearly)
+# --- English entrypoint (used by app_unified.py) ---
+def create_pdf_unified_en(filepath: str, data: dict, mode: str, size: str = "A4", include_yearly: bool = False):
+    # Keep Japanese generator untouched; force English here.
+    d = dict(data or {})
+    d["lang"] = "en"
+    return create_pdf_unified(filepath, d, mode, size=size, include_yearly=include_yearly)

@@ -768,7 +768,7 @@ def selfmob_uuid(uuid_str):
             }
 
             if full_year:
-                yearly_data = generate_yearly_fortune(birthdate, today)
+                yearly_data = generate_yearly_fortune(birthdate, today, lang=output_lang)
                 result_data["yearly_fortunes"] = yearly_data
                 result_data["titles"]["year_fortune"] = yearly_data["year_label"]
                 result_data["texts"]["year_fortune"] = yearly_data["year_text"]
@@ -831,7 +831,6 @@ def renaiselfmob_uuid(uuid_str):
             raw_result = generate_renai_fortune(user_birth, partner_birth, include_yearly=full_year)
 
             result_data = {
-            "lang": "ja",
                 "texts": {
                     "compatibility": raw_result.get("texts", {}).get("compatibility", ""),
                     "overall_love_fortune": raw_result.get("texts", {}).get("overall_love_fortune", ""),
@@ -1157,7 +1156,6 @@ def ten_shincom():
                 next_month_label = f"{target2.year}年{target2.month}月の運勢"
 
             result_data = {
-            "lang": "ja",
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
