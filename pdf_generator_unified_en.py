@@ -130,50 +130,6 @@ def wrap_by_width(text: str, font_name: str, font_size: float, max_width: float)
     return out
 
 
-# English wrapping: cap each line to 90 characters (approx), then apply width-based wrap
-# to respect the PDF column width. This prevents overly narrow wrapping when text is
-# treated with Japanese-oriented short line lengths.
-EN_WRAP_CHARS = 90
-
-def wrap_by_chars_limit(text: str, max_chars: int = EN_WRAP_CHARS) -> List[str]:
-    """Wrap mostly-ASCII text by character count (space-preferring), keeping newlines."""
-    text = (text or "").replace("\r", "")
-    if not text:
-        return []
-    raw_lines = text.split("\n")
-    out: List[str] = []
-    for raw in raw_lines:
-        if not raw.strip():
-            out.append("")
-            continue
-        words = raw.split()
-        line = ""
-        for w in words:
-            if not line:
-                if len(w) <= max_chars:
-                    line = w
-                else:
-                    # Hard split long tokens
-                    for i in range(0, len(w), max_chars):
-                        out.append(w[i:i+max_chars])
-                    line = ""
-                continue
-            if len(line) + 1 + len(w) <= max_chars:
-                line += " " + w
-            else:
-                out.append(line)
-                if len(w) <= max_chars:
-                    line = w
-                else:
-                    for i in range(0, len(w), max_chars):
-                        out.append(w[i:i+max_chars])
-                    line = ""
-        if line:
-            out.append(line)
-    return out
-
-
-
 def _mostly_ascii(s: str, threshold: float = 0.15) -> bool:
     """Heuristic: treat text as English/Latin if most visible chars are ASCII.
 
@@ -201,17 +157,7 @@ def draw_wrapped(c: canvas.Canvas, x: float, y: float, text: str,
     # Helvetica doesn't always render the decorative bullets used in JP output.
     if use_font == "Helvetica":
         draw_text = draw_text.replace("■", "*").replace("◆", "*").replace("◇", "*")
-    if _mostly_ascii(draw_text):
-        # First cap by character count to keep long English sentences from breaking too early.
-        capped = wrap_by_chars_limit(draw_text, EN_WRAP_CHARS)
-        lines: List[str] = []
-        for s in capped:
-            if s == "":
-                lines.append("")
-            else:
-                lines.extend(wrap_by_width(s, use_font, font_size, max_width))
-    else:
-        lines = wrap_by_width(draw_text, use_font, font_size, max_width)
+    lines = wrap_by_width(draw_text, use_font, font_size, max_width)
     c.setFont(use_font, font_size)
     for ln in lines:
         c.drawString(x, y, ln)
@@ -226,128 +172,145 @@ def _draw_section_title(c: canvas.Canvas, x: float, y: float, title: str,
     return y - (font_size + 6)
 
 
-def draw_lucky_section_en(c: canvas.Canvas, data: dict,
-                          page_width: float, margin: float,
-                          y: float, font_name: str) -> float:
-    """Draw lucky info + directions (English labels)."""
+def draw_lucky_section_en(c, data, page_width, margin, y, font_name):
+    """Lucky section (English).
+    Accepts lucky_info as str or list[str]."""
+    x = margin
     max_width = page_width - 2 * margin
 
-    # NOTE: In shincom-unified, lucky_info/lucky_direction may be a list or dict
-    # depending on upstream generators. Normalize to a printable string here.
-    def _to_text(v):
-        if v is None:
-            return ""
-        if isinstance(v, str):
-            return v
-        if isinstance(v, (list, tuple)):
-            parts = []
-            for it in v:
-                t = _to_text(it)
-                if t:
-                    parts.append(t)
-            return "\n".join(parts)
-        if isinstance(v, dict):
-            # common payloads: {text: ...} / {content: ...}
-            for k in ("text", "value", "content"):
-                if k in v and v[k]:
-                    t = _to_text(v[k])
-                    if t:
-                        return t
-            parts = []
-            for k, val in v.items():
-                t = _to_text(val)
-                if t:
-                    parts.append(f"{k}: {t}")
-            return "\n".join(parts)
-        return str(v)
+    c.setLineWidth(1)
+    c.line(x, y, x + max_width, y)
+    y -= 16
 
-    lucky_info = _to_text(data.get("lucky_info"))
-    lucky_direction = _to_text(data.get("lucky_direction"))
+    _set_font(c, font_name, 11)
+    c.drawString(x, y, "■ Lucky Info & Directions")
+    y -= 14
 
-    if not (lucky_info or lucky_direction):
-        return y
+    # Normalize lucky_info to a single string
+    lucky_info_raw = data.get("lucky_info")
+    if isinstance(lucky_info_raw, list):
+        lucky_info = "\n".join([_safe_str(v) for v in lucky_info_raw if v is not None])
+    elif isinstance(lucky_info_raw, dict):
+        lucky_info = _safe_str(lucky_info_raw.get("text") or lucky_info_raw.get("body") or "")
+    else:
+        lucky_info = _safe_str(lucky_info_raw or "")
 
-    c.setFont(font_name, 11)
-    c.drawString(margin, y, "■ Lucky Info (based on your birthdate)")
-    y -= 18
+    # Normalize lucky_direction to a single string
+    lucky_direction_raw = data.get("lucky_direction")
+    if isinstance(lucky_direction_raw, list):
+        lucky_direction = "\n".join([_safe_str(v) for v in lucky_direction_raw if v is not None])
+    elif isinstance(lucky_direction_raw, dict):
+        lucky_direction = _safe_str(lucky_direction_raw.get("text") or lucky_direction_raw.get("body") or "")
+    else:
+        lucky_direction = _safe_str(lucky_direction_raw or "")
 
-    # Two-column layout (keeps it compact)
-    c.setFont(font_name, 10)
-    col_w = (page_width - 2 * margin) / 2
-
-    # Lucky info lines are expected to be already short, but wrap if needed.
-    left_x = margin
-    right_x = margin + col_w
-
-    # Split into bullet-like fragments (supports both JP/EN formats)
-    parts: List[str] = []
-    for ln in lucky_info.split("\n"):
+    lines = []
+    for ln in (lucky_info.split("\n") if lucky_info else []):
         ln = ln.strip()
         if ln:
-            parts.append(ln)
+            lines.append(ln)
+    if lucky_direction.strip():
+        lines.append(lucky_direction.strip())
 
-    half = (len(parts) + 1) // 2
-    left_parts = parts[:half]
-    right_parts = parts[half:]
-
-    yy_left = y
-    for p in left_parts:
-        yy_left = draw_wrapped(c, left_x, yy_left, p, font_name, 10, col_w - 6, leading=13)
-
-    yy_right = y
-    for p in right_parts:
-        yy_right = draw_wrapped(c, right_x, yy_right, p, font_name, 10, col_w - 6, leading=13)
-
-    y = min(yy_left, yy_right) - 8
-
-    if lucky_direction:
-        c.setFont(font_name, 11)
-        c.drawString(margin, y, "■ Lucky Directions (Kyusei Kigaku)")
-        y -= 16
-        c.setFont(font_name, 10)
-        y = draw_wrapped(c, margin, y, lucky_direction, font_name, 10, max_width, leading=13)
+    _set_font(c, font_name, 10)
+    y = draw_wrapped(c, lines, x, y, max_width, font_name, 10, leading=12)
 
     return y - 8
 
 
-def _draw_yearly_pages_en(c: canvas.Canvas, data: dict, spec: PageSpec,
-                          font_name: str) -> None:
-    """Optional yearly fortune pages (English)."""
-    yearly = data.get("yearly_fortunes")
-    if not yearly:
+def _draw_yearly_pages_en(c, data, spec, font_name):
+    """
+    Yearly pages (English).
+
+    Supports multiple data shapes for backward/forward compatibility:
+      - dict: {"year_label": str, "year_text": str, "months": [{"label": str, "text": str}, ...]}
+      - list: [{"title"/"label": str, "text"/"body": str}, ...] or list[str]
+      - str: a single blob
+    """
+    yearly_raw = data.get("yearly_fortunes")
+    if not yearly_raw:
         return
 
-    page_width, page_height = spec.page_size
-    margin = spec.margin
-    max_width = page_width - 2 * margin
+    # Normalize to list[{"title":..., "text":...}]
+    blocks = []
 
+    def _parse_block_str(s: str):
+        s = _safe_str(s or "").strip()
+        if not s:
+            return {"title": "", "text": ""}
+        lines = [ln.strip() for ln in s.splitlines() if ln.strip()]
+        if len(lines) >= 2 and len(lines[0]) <= 60:
+            return {"title": _safe_str(lines[0]), "text": _safe_str("\n".join(lines[1:]))}
+        return {"title": "", "text": s}
+
+    if isinstance(yearly_raw, dict):
+        year_label = _safe_str(yearly_raw.get("year_label") or "Yearly Fortune")
+        year_text = _safe_str(yearly_raw.get("year_text") or "")
+        if year_text.strip():
+            blocks.append({"title": year_label, "text": year_text})
+
+        months = yearly_raw.get("months") or []
+        if isinstance(months, dict):
+            # Extremely defensive: if someone accidentally stores a dict, treat as a single block.
+            blocks.append(_parse_block_str(str(months)))
+        else:
+            for m in months:
+                if isinstance(m, dict):
+                    t = _safe_str(m.get("label") or m.get("title") or "")
+                    txt = _safe_str(m.get("text") or m.get("body") or "")
+                    blocks.append({"title": t, "text": txt})
+                elif isinstance(m, str):
+                    blocks.append(_parse_block_str(m))
+                else:
+                    blocks.append(_parse_block_str(str(m)))
+
+    elif isinstance(yearly_raw, list):
+        for m in yearly_raw:
+            if isinstance(m, dict):
+                t = _safe_str(m.get("title") or m.get("label") or "")
+                txt = _safe_str(m.get("text") or m.get("body") or "")
+                blocks.append({"title": t, "text": txt})
+            elif isinstance(m, str):
+                blocks.append(_parse_block_str(m))
+            else:
+                blocks.append(_parse_block_str(str(m)))
+
+    elif isinstance(yearly_raw, str):
+        blocks.append({"title": "Yearly Fortune", "text": _safe_str(yearly_raw)})
+
+    else:
+        blocks.append({"title": "Yearly Fortune", "text": _safe_str(str(yearly_raw))})
+
+    # ---- Rendering ----
     c.showPage()
-    y = page_height - margin
+    x = spec.margin
+    y = spec.height - spec.margin
+    max_width = spec.width - 2 * spec.margin
 
-    c.setFont(font_name, 16)
-    c.drawString(margin, y, "Yearly Fortune")
-    y -= 28
+    _set_font(c, font_name, 14)
+    c.drawString(x, y, "Yearly Fortune (12 months)")
+    y -= 22
 
-    c.setFont(font_name, 10)
-    for month_block in yearly:
-        title = _safe_str(month_block.get("title") or "")
-        body = _safe_str(month_block.get("text") or "")
+    _set_font(c, font_name, 10)
 
-        if title:
-            c.setFont(font_name, 11)
-            c.drawString(margin, y, title)
-            y -= 16
-
-        c.setFont(font_name, 10)
-        y = draw_wrapped(c, margin, y, body, font_name, 10, max_width, leading=13)
-        y -= 8
-
-        # page break if needed
-        if y < margin + 60:
+    for blk in blocks:
+        if y < spec.margin + 70:
             c.showPage()
-            y = page_height - margin
-            c.setFont(font_name, 10)
+            y = spec.height - spec.margin
+            _set_font(c, font_name, 10)
 
+        title = _safe_str((blk or {}).get("title") or "")
+        body = _safe_str((blk or {}).get("text") or "")
+
+        if title.strip():
+            _set_font(c, font_name, 11)
+            c.drawString(x, y, f"■ {title}")
+            y -= 14
+            _set_font(c, font_name, 10)
+
+        if body.strip():
+            y = draw_wrapped(c, body, x, y, max_width, font_name, 10, leading=12)
+            y -= 12
 
 def draw_shincom_a4_en(c: canvas.Canvas, data: dict, include_yearly: bool,
                        font_name: str) -> None:
