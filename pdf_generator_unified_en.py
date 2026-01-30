@@ -19,7 +19,6 @@ Expected entrypoint:
 from __future__ import annotations
 
 import os
-import textwrap
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Tuple, Optional
@@ -131,6 +130,50 @@ def wrap_by_width(text: str, font_name: str, font_size: float, max_width: float)
     return out
 
 
+# English wrapping: cap each line to 90 characters (approx), then apply width-based wrap
+# to respect the PDF column width. This prevents overly narrow wrapping when text is
+# treated with Japanese-oriented short line lengths.
+EN_WRAP_CHARS = 90
+
+def wrap_by_chars_limit(text: str, max_chars: int = EN_WRAP_CHARS) -> List[str]:
+    """Wrap mostly-ASCII text by character count (space-preferring), keeping newlines."""
+    text = (text or "").replace("\r", "")
+    if not text:
+        return []
+    raw_lines = text.split("\n")
+    out: List[str] = []
+    for raw in raw_lines:
+        if not raw.strip():
+            out.append("")
+            continue
+        words = raw.split()
+        line = ""
+        for w in words:
+            if not line:
+                if len(w) <= max_chars:
+                    line = w
+                else:
+                    # Hard split long tokens
+                    for i in range(0, len(w), max_chars):
+                        out.append(w[i:i+max_chars])
+                    line = ""
+                continue
+            if len(line) + 1 + len(w) <= max_chars:
+                line += " " + w
+            else:
+                out.append(line)
+                if len(w) <= max_chars:
+                    line = w
+                else:
+                    for i in range(0, len(w), max_chars):
+                        out.append(w[i:i+max_chars])
+                    line = ""
+        if line:
+            out.append(line)
+    return out
+
+
+
 def _mostly_ascii(s: str, threshold: float = 0.15) -> bool:
     """Heuristic: treat text as English/Latin if most visible chars are ASCII.
 
@@ -143,46 +186,6 @@ def _mostly_ascii(s: str, threshold: float = 0.15) -> bool:
         return True
     non_ascii = sum(1 for ch in visible if ord(ch) > 127)
     return (non_ascii / len(visible)) <= threshold
-
-EN_WRAP_CHARS = 90  # Max characters per line for English output
-
-
-def wrap_en(text: str, font_name: str, font_size: float, max_width: float, max_chars: int = EN_WRAP_CHARS) -> List[str]:
-    """English-first wrapping.
-
-    Requirement: keep each line <= max_chars (default 90) for readability,
-    then additionally ensure it fits within max_width on the page.
-    """
-    text = (text or "").replace("\r", "")
-    if not text:
-        return []
-
-    raw_lines = text.split("\n")
-    out: List[str] = []
-
-    for raw in raw_lines:
-        line = (raw or "").strip()
-        if not line:
-            out.append("")
-            continue
-
-        if _mostly_ascii(line):
-            # 1) Character-based wrap (<= max_chars)
-            chunks = textwrap.wrap(
-                line,
-                width=max_chars,
-                break_long_words=False,
-                break_on_hyphens=False,
-            ) or [line]
-
-            # 2) Width-based wrap (failsafe for very long words)
-            for ch in chunks:
-                out.extend(wrap_by_width(ch, font_name, font_size, max_width) or [""])
-        else:
-            out.extend(wrap_by_width(line, font_name, font_size, max_width) or [""])
-
-    return out
-
 
 
 def draw_wrapped(c: canvas.Canvas, x: float, y: float, text: str,
@@ -198,7 +201,17 @@ def draw_wrapped(c: canvas.Canvas, x: float, y: float, text: str,
     # Helvetica doesn't always render the decorative bullets used in JP output.
     if use_font == "Helvetica":
         draw_text = draw_text.replace("■", "*").replace("◆", "*").replace("◇", "*")
-    lines = wrap_en(draw_text, use_font, font_size, max_width)
+    if _mostly_ascii(draw_text):
+        # First cap by character count to keep long English sentences from breaking too early.
+        capped = wrap_by_chars_limit(draw_text, EN_WRAP_CHARS)
+        lines: List[str] = []
+        for s in capped:
+            if s == "":
+                lines.append("")
+            else:
+                lines.extend(wrap_by_width(s, use_font, font_size, max_width))
+    else:
+        lines = wrap_by_width(draw_text, use_font, font_size, max_width)
     c.setFont(use_font, font_size)
     for ln in lines:
         c.drawString(x, y, ln)
