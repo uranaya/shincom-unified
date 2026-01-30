@@ -1183,6 +1183,7 @@ def ten_shincom():
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
                 "birthdate": birthdate,
+                "lang": output_lang,
                 "zodiac": zodiac,
                 "eto": eto,
                 "eto_number": eto_number,
