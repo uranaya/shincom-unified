@@ -1,4 +1,3 @@
-from kyusei_utils import get_lucky_direction
 import os
 import base64
 import uuid
@@ -24,6 +23,7 @@ from dateutil.relativedelta import relativedelta
 from yearly_fortune_utils import generate_yearly_fortune
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
+from kyusei_utils import get_lucky_direction
 from pdf_generator_unified import create_pdf_unified
 from pdf_generator_unified_en import create_pdf_unified as create_pdf_unified_en
 from fortune_logic import generate_renai_fortune
@@ -150,8 +150,6 @@ if not os.path.exists("webhook_sessions.txt"):
 # --- データベース初期化 ---
 if DATABASE_URL:
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
 
@@ -196,6 +194,7 @@ if DATABASE_URL:
         cur.close()
         conn.close()
         print("✅ データベース初期化完了（shop_logs, webhook_events, sales, tellers, bookings）")
+    except Exception as e:
         print("❌ DB初期化エラー:", e)
 else:
     print("⚠️ DATABASE_URL が未設定。ローカル実行ではDB非使用。")
@@ -206,27 +205,23 @@ else:
 # Background thread task to generate PDF and handle post-processing
 def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         if result_data.get("lang") == "en":
             # DEBUG marker (English only): confirms EN module is actually used
             try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
                 import pdf_generator_unified_en as _enpdf
                 print(f"[ENPDF] ACTIVE module={_enpdf.__file__} wrap=90 fn=create_pdf_unified (aliased)", flush=True)
+            except Exception as _e:
                 print(f"[ENPDF] ACTIVE but module introspection failed: {_e}", flush=True)
             create_pdf_unified_en(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
         else:
             create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
+    except Exception as e:
         print(f"❌ PDF generation error (mode={pdf_mode}, uuid={uuid_str}):", e)
         traceback.print_exc()
         return
     # Mark UUID as used if applicable
     if uuid_str:
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             with used_file_lock:
                 lines_content = []
                 if os.path.exists(USED_UUID_FILE):
@@ -244,16 +239,16 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
                 with open(USED_UUID_FILE, "w") as f:
                     for line in updated_lines:
                         f.write(line + "\n")
+        except Exception as e:
             print(f"❌ Error updating {USED_UUID_FILE} for {uuid_str}:", e)
             traceback.print_exc()
     # Write to access_log.txt if applicable
     if shop_id and uuid_str:
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             with open("access_log.txt", "a", encoding="utf-8") as f:
                 f.write(f"{now_str},{shop_id},{uuid_str}\n")
+        except Exception as e:
             print(f"❌ Error writing access_log for {uuid_str}:", e)
             traceback.print_exc()
 
@@ -267,8 +262,6 @@ def thanks():
 
     is_paid = False
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         if DATABASE_URL:
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
@@ -278,6 +271,7 @@ def thanks():
                 is_paid = True
             cur.close()
             conn.close()
+    except Exception as e:
         print("❌ DBチェック失敗 (/thanks):", e)
 
     if not is_paid:
@@ -289,8 +283,6 @@ def thanks():
 @app.route("/verify_payment/<uuid_str>")
 def verify_payment(uuid_str):
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         if DATABASE_URL:
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
@@ -301,6 +293,7 @@ def verify_payment(uuid_str):
             if found:
                 return jsonify({"status": "valid"})
         return jsonify({"status": "invalid"})
+    except Exception as e:
         print("❌ verify_paymentエラー:", e)
         return jsonify({"status": "error"})
 
@@ -359,10 +352,9 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
     )
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         with open(USED_UUID_FILE, "a") as f:
             f.write(f"{uuid_str},,{mode_key},{shop_id},{session_id}\n")
+    except Exception as e:
         print("⚠️ UUID書き込み失敗:", e)
 
     resp = make_response(redirect(session_url))
@@ -374,8 +366,6 @@ def _generate_session_for_shop(shop_id, full_year=False, mode="selfmob"):
 
 def get_uuid_and_mode_by_session_id(session_id):
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
@@ -383,6 +373,7 @@ def get_uuid_and_mode_by_session_id(session_id):
                     uuid_str, _, mode_key, _, sid = parts
                     if sid == session_id:
                         return uuid_str, mode_key
+    except Exception as e:
         print("❌ セッションIDの検索エラー:", e)
     return None, None
 
@@ -399,8 +390,6 @@ def pay_redirect():
         return render_template("thanks.html", uuid_str="")
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         if DATABASE_URL:
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
@@ -411,6 +400,7 @@ def pay_redirect():
             if not result:
                 print("🔒 決済未確認UUID:", uuid_str)
                 return render_template("thanks.html", uuid_str="")
+    except Exception as e:
         print("❌ DB確認エラー:", e)
         return render_template("thanks.html", uuid_str="")
 
@@ -427,8 +417,6 @@ def pay_redirect():
 
 def record_shop_log_if_needed(uuid_str, mode):
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         with open(USED_UUID_FILE, "r") as f:
             lines = f.readlines()
         for line in lines:
@@ -443,8 +431,6 @@ def record_shop_log_if_needed(uuid_str, mode):
 
         if DATABASE_URL:
             try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
                 conn = psycopg2.connect(DATABASE_URL)
                 cur = conn.cursor()
                 cur.execute("""
@@ -457,12 +443,14 @@ def record_shop_log_if_needed(uuid_str, mode):
                 cur.close()
                 conn.close()
                 print(f"📝 DBカウント更新: {today} / {shop_id} / {mode}")
+            except Exception as e:
                 print("❌ DB記録失敗 (record_shop_log_if_needed):", e)
 
         with open("shop_logs.csv", "a") as log:
             log.write(f"{shop_id},{mode},{today}\n")
             print(f"🧮 CSVカウント記録: {shop_id},{mode},{today}")
 
+    except Exception as e:
         print("⚠️ カウント記録エラー:", e)
 
 
@@ -534,17 +522,14 @@ def generate_link_renai_full(shop_id):
 
 def is_paid_uuid(uuid_str):
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
                 if len(parts) >= 1 and parts[0] == uuid_str:
                     return True
+    except Exception as e:
         print("⚠️ used_orders.txt 読み込みエラー(is_paid_uuid):", e)
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         cur.execute("SELECT 1 FROM webhook_events WHERE uuid=%s AND service LIKE %s", (uuid_str, '%thanks'))
@@ -552,6 +537,7 @@ def is_paid_uuid(uuid_str):
         cur.close()
         conn.close()
         return result is not None
+    except Exception as e:
         print("❌ 決済確認エラー:", e)
         return False
 
@@ -575,15 +561,12 @@ def webhook_selfmob():
 
     if session_id:
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             with open("webhook_sessions.txt", "a") as f:
                 f.write(f"{session_id}\n")
+        except Exception as e:
             print("⚠️ Webhookセッション記録失敗:", e)
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         with open(USED_UUID_FILE, "r") as f:
             lines = f.readlines()
         for i, line in enumerate(lines):
@@ -598,12 +581,11 @@ def webhook_selfmob():
         if matched_uuid:
             with open(USED_UUID_FILE, "w") as f:
                 f.writelines(lines)
+    except Exception as e:
         print("⚠️ UUID逆照合失敗:", e)
 
     if matched_uuid:
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             if DATABASE_URL:
                 conn = psycopg2.connect(DATABASE_URL)
                 cur = conn.cursor()
@@ -617,6 +599,7 @@ def webhook_selfmob():
                 cur.close()
                 conn.close()
                 print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
+        except Exception as e:
             print("❌ Webhook DBエラー:", e)
 
     return "", 200
@@ -637,15 +620,12 @@ def webhook_renaiselfmob():
 
     if session_id:
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             with open("webhook_sessions.txt", "a") as f:
                 f.write(f"{session_id}\n")
+        except Exception as e:
             print("⚠️ Webhookセッション記録失敗:", e)
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         with open(USED_UUID_FILE, "r") as f:
             lines = f.readlines()
         for i, line in enumerate(lines):
@@ -660,12 +640,11 @@ def webhook_renaiselfmob():
         if matched_uuid:
             with open(USED_UUID_FILE, "w") as f:
                 f.writelines(lines)
+    except Exception as e:
         print("⚠️ UUID逆照合失敗:", e)
 
     if matched_uuid:
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             if DATABASE_URL:
                 conn = psycopg2.connect(DATABASE_URL)
                 cur = conn.cursor()
@@ -679,6 +658,7 @@ def webhook_renaiselfmob():
                 cur.close()
                 conn.close()
                 print(f"✅ Webhook DB記録済: {matched_uuid} / {shop_id}")
+        except Exception as e:
             print("❌ Webhook DBエラー:", e)
 
     return "", 200
@@ -693,8 +673,6 @@ def webhook_renaiselfmob():
 def selfmob_uuid(uuid_str):
     full_year = None
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
@@ -706,27 +684,24 @@ def selfmob_uuid(uuid_str):
                     break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
+    except FileNotFoundError:
         return "使用履歴が確認できません", 400
 
     if request.method == "POST":
         is_json = request.is_json
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
             now = datetime.now()
 
             try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
                 year, month, day = map(int, birthdate.split("-"))
+            except Exception:
                 return "生年月日が不正です", 400
             try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
                 kyusei_text = get_kyusei_fortune(year, month, day, now=now, force_next_month=force_next_month, lang=output_lang)
+            except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
             eto = get_nicchu_eto(birthdate)
@@ -765,16 +740,7 @@ def selfmob_uuid(uuid_str):
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
 
-            
-        # Lucky Direction generation
-        from kyusei_utils import get_lucky_direction
-        lucky_birthdate = birthdate if isinstance(birthdate, datetime) else datetime.strptime(birthdate, "%Y-%m-%d")
-        try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
-            result_data["lucky_direction"] = get_lucky_direction(lucky_birthdate)
-            print("❌ lucky_direction エラー:", e)
-result_data = {
+            result_data = {
                 "lang": output_lang,
                 "style": "default",
                 "palm_titles": palm_titles,
@@ -824,6 +790,7 @@ result_data = {
 
             redirect_url = url_for("preview", filename=filename)
             return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
+        except Exception as e:
             print("処理エラー:", e)
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
 
@@ -837,8 +804,6 @@ def renaiselfmob_uuid(uuid_str):
     full_year = None
     lines = []
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         with open(USED_UUID_FILE, "r") as f:
             lines = [line.strip() for line in f if line.strip()]
         for line in lines:
@@ -851,12 +816,11 @@ def renaiselfmob_uuid(uuid_str):
                 break
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
+    except FileNotFoundError:
         return "使用履歴が確認できません", 400
 
     if request.method == "POST":
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             user_birth = request.form.get("user_birth")
             partner_birth = request.form.get("partner_birth")
             if not user_birth or not isinstance(user_birth, str):
@@ -904,6 +868,7 @@ def renaiselfmob_uuid(uuid_str):
             ).start()
 
             return redirect(url_for("preview", filename=filename))
+        except Exception as e:
             print("処理エラー:", e)
             return "処理中にエラーが発生しました", 500
 
@@ -953,8 +918,6 @@ def view_shop_log():
     logs = []
     if DATABASE_URL:
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
             query = f"SELECT date, shop_id, service, count FROM shop_logs ORDER BY {sort_column} {sort_order};"
@@ -962,6 +925,7 @@ def view_shop_log():
             logs = cur.fetchall()
             cur.close()
             conn.close()
+        except Exception as e:
             return f"エラー: {e}"
     return render_template("shop_log.html", logs=logs, sort_column=sort_column, sort_order=sort_order)
 
@@ -978,8 +942,6 @@ def view_shop_log_monthly():
     logs = []
     if DATABASE_URL:
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
             query = f"""
@@ -992,6 +954,7 @@ def view_shop_log_monthly():
             logs = cur.fetchall()
             cur.close()
             conn.close()
+        except Exception as e:
             return f"エラー: {e}"
 
     return render_template("shop_log_monthly.html", logs=logs, sort_column=sort_column, sort_order=sort_order)
@@ -1002,8 +965,6 @@ def view_shop_log_monthly():
 def reset_shop_log():
     if DATABASE_URL:
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
             cur.execute("DELETE FROM shop_logs;")
@@ -1011,6 +972,7 @@ def reset_shop_log():
             cur.close()
             conn.close()
             print("✅ shop_logs 全リセット完了")
+        except Exception as e:
             return f"削除エラー: {e}"
     return redirect(url_for("view_shop_log"))
 
@@ -1043,8 +1005,6 @@ def ten_shincom():
     if request.method == "POST":
         is_json = request.is_json
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             data = request.get_json() if is_json else request.form
             image_data = data.get("image_data")
             birthdate = data.get("birthdate")
@@ -1153,23 +1113,23 @@ def ten_shincom():
 
             # Log once per request for fast troubleshooting
 
-            print('⛔ lucky_direction エラー:', e)
+            try:
+
                 form_keys = list(data.keys()) if hasattr(data, "keys") else []
 
                 print(f"[tenmob] output_lang={output_lang} keys={form_keys[:30]}")
 
+            except Exception:
 
                 pass
 
             try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
                 year, month, day = map(int, birthdate.split("-"))
+            except Exception:
                 return "生年月日が不正です", 400
             try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
                 kyusei_text = get_kyusei_fortune(year, month, day)
+            except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
             eto = get_nicchu_eto(birthdate)
@@ -1180,9 +1140,8 @@ def ten_shincom():
             if eto_number is not None and 1 <= eto_number <= len(ANIMAL60):
                 animal = ANIMAL60[eto_number - 1]
             try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
                 honmeisei = get_honmeisei(year, month, day)
+            except Exception as e:
                 print("❌ 本命星取得エラー:", e)
                 honmeisei = ""
             now = datetime.now()
@@ -1247,6 +1206,7 @@ def ten_shincom():
                 return jsonify({"redirect_url": redirect_url})
             else:
                 return redirect(redirect_url)
+        except Exception as e:
             traceback.print_exc()
             return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
     return render_template("index.html")
@@ -1320,16 +1280,14 @@ def selfmob_start():
 @app.route("/get_eto", methods=["POST"])
 def get_eto():
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         birthdate = request.json.get("birthdate")
+    except:
         return jsonify({"error": "無効な生年月日です"}), 400
     if not birthdate or not isinstance(birthdate, str):
         return jsonify({"error": "無効な生年月日です"}), 400
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         y, m, d = map(int, birthdate.split("-"))
+    except:
         return jsonify({"error": "無効な生年月日です"}), 400
     eto = get_nicchu_eto(birthdate)
     honmeisei = get_honmeisei(y, m, d)
@@ -1367,8 +1325,6 @@ def omikuji_top():
 @app.route("/omikuji/result", methods=["POST"])
 def result():
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         with open("omikuji_plain.json", encoding="utf-8") as f:
             OMikuji_DATA = json.load(f)
 
@@ -1376,6 +1332,7 @@ def result():
 
         return render_template("omikuji.html", omikuji=omikuji)
 
+    except Exception as e:
         print("🔴 Error in /omikuji/result:", e)
         return "エラーが発生しました。"
 
@@ -1419,24 +1376,20 @@ def aura_submit(uuid_str):
 
     # 🧠 1. 占い結果生成（テキスト）
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         result = generate_aura_fortune(image_data)
         result_text = result.get("text", "")
+    except Exception as e:
         return f"OpenAI診断エラー: {e}", 500
 
     # 🔤 2. プロンプト生成（result_textから抽出）
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         from prompt_utils import extract_prompts_from_result
         aura_color_prompt, past_prompt, spirit_prompt = extract_prompts_from_result(result_text)
+    except Exception as e:
         return f"プロンプト抽出エラー: {e}", 500
 
     # 🖼 3. 合成画像生成（オーラ色＋前世＋守護霊）
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         from aura_image_utils import generate_aura_image
         merged_image_base64 = generate_aura_image(
             user_image_base64=image_data,
@@ -1444,6 +1397,7 @@ def aura_submit(uuid_str):
             spirit_prompt=spirit_prompt,
             aura_prompt=aura_color_prompt
         )
+    except Exception as e:
         return f"画像合成エラー: {e}", 500
 
     # 🖨 4. PDF出力
@@ -1451,10 +1405,9 @@ def aura_submit(uuid_str):
     output_path = os.path.join(UPLOAD_FOLDER, filename)
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         from pdf_generator_aura import create_aura_pdf
         create_aura_pdf(output_path, merged_image_base64, result_text)
+    except Exception as e:
         return f"PDF生成エラー: {e}", 500
 
     # 📄 5. 表示またはダウンロード
@@ -1498,22 +1451,20 @@ def tarotmob_entry(uuid_str):
         return "質問文が空です", 400
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         fortune = generate_tarot_fortune(question)
         if "error" in fortune:
             return fortune["error"], 500
+    except Exception as e:
         return f"OpenAI診断エラー: {e}", 500
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         filename = f"{uuid_str}.pdf"
         save_path = os.path.join(UPLOAD_FOLDER, filename)
         create_pdf_tarot(question, fortune, save_path)
 
         record_shop_log_if_needed(uuid_str, "tarotmob")
         return redirect(url_for("static", filename=f"pdf/{filename}"))
+    except Exception as e:
         return f"PDF生成エラー: {e}", 500
 
 
@@ -1558,8 +1509,6 @@ def regi_input_form():
         method = request.form.get("method")
         amount = request.form.get("amount")
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
             cur.execute(
@@ -1569,6 +1518,7 @@ def regi_input_form():
             conn.commit()
             cur.close()
             conn.close()
+        except Exception as e:
             return f"❌ DBエラー: {e}", 500
         return redirect(url_for('regi_input_form', success=1))
 
@@ -1593,8 +1543,6 @@ def admin_dashboard_sales():
         return redirect(url_for('admin_login_sales'))
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
 
@@ -1615,6 +1563,7 @@ def admin_dashboard_sales():
         cur.close()
         conn.close()
 
+    except Exception as e:
         return f"❌ DB取得エラー: {e}", 500
 
     return render_template("admin.html", sales=sales, total=total_today)
@@ -1629,8 +1578,6 @@ def monthly_summary_sales():
         return redirect(url_for('admin_login_sales'))
     monthly_data = defaultdict(lambda: defaultdict(int))
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         cur.execute("SELECT date, staff_name, method, amount FROM sales;")
@@ -1640,6 +1587,7 @@ def monthly_summary_sales():
             monthly_data[key][(staff_name, method)] += amount
         cur.close()
         conn.close()
+    except Exception as e:
         return f"❌ 集計エラー: {e}", 500
 
     return render_template("monthly.html", data=monthly_data)
@@ -1655,8 +1603,6 @@ def export_sales_csv():
     writer = csv.writer(output)
     writer.writerow(['日付', '店員', '方法', '金額'])  # ヘッダー
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         cur.execute("SELECT date, staff_name, method, amount FROM sales ORDER BY date;")
@@ -1664,6 +1610,7 @@ def export_sales_csv():
             writer.writerow([row[0].strftime('%Y-%m-%d'), row[1], row[2], row[3]])
         cur.close()
         conn.close()
+    except Exception as e:
         return f"❌ エクスポートエラー: {e}", 500
     response = make_response(output.getvalue())
     response.headers['Content-Disposition'] = 'attachment; filename=sales_backup.csv'
@@ -1683,8 +1630,6 @@ def view_sales_by_day():
         date_str = datetime.today().strftime('%Y-%m-%d')
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         cur.execute("""
@@ -1702,6 +1647,7 @@ def view_sales_by_day():
             for r in rows
         ]
         total = sum(r["amount"] for r in sales)
+    except Exception as e:
         return f"❌ DBエラー: {e}", 500
 
     return render_template("admin_daily.html", sales=sales, date=date_str, total=total)
@@ -1723,8 +1669,6 @@ def edit_sale(sales_id):
         date = request.form.get('date')
 
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
             cur.execute("""
@@ -1735,14 +1679,13 @@ def edit_sale(sales_id):
             conn.commit()
             cur.close()
             conn.close()
+        except Exception as e:
             return f"❌ 修正エラー: {e}", 500
 
         return redirect(url_for('view_sales_by_day', date=date))
 
     # GET: 既存データ読み込み
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         cur.execute("SELECT id, date, staff_name, method, amount FROM sales WHERE id = %s;", (sales_id,))
@@ -1761,6 +1704,7 @@ def edit_sale(sales_id):
             "amount": row[4]
         }
 
+    except Exception as e:
         return f"❌ 読み込みエラー: {e}", 500
 
     return render_template(
@@ -1784,8 +1728,6 @@ def admin_invoice():
     month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
 
@@ -1844,6 +1786,7 @@ def admin_invoice():
         cur.close()
         conn.close()
 
+    except Exception as e:
         return f"❌ 集計エラー: {e}", 500
 
     return render_template(
@@ -1877,8 +1820,6 @@ def admin_invoice_staff():
     month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         cur.execute("""
@@ -1911,6 +1852,7 @@ def admin_invoice_staff():
         store_fee_tax = int(store_fee * 1.10)  # 消費税10%
         final_invoice = store_fee_tax - total_cashless  # 正確な請求額
 
+    except Exception as e:
         return f"❌ 集計エラー: {e}", 500
 
     return render_template(
@@ -1942,8 +1884,6 @@ def import_sales_csv():
             return "❌ ファイル名が空です", 400
 
         try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
             # Shift_JISで読み込み
             csv_reader = csv.DictReader(TextIOWrapper(file, encoding='shift_jis'))
             conn = psycopg2.connect(DATABASE_URL)
@@ -1980,6 +1920,7 @@ def import_sales_csv():
 
             return f"✅ インポート完了: {inserted} 件追加, {skipped} 件スキップしました"
 
+        except Exception as e:
             return f"❌ インポートエラー: {e}", 500
 
     return render_template("import_csv.html")
@@ -2092,8 +2033,6 @@ def admin_invoice_staff_pdf():
     month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
 
@@ -2144,6 +2083,7 @@ def admin_invoice_staff_pdf():
 
         return send_file(pdf_path, as_attachment=True, mimetype='application/pdf')
 
+    except Exception as e:
         return f"❌ PDF生成エラー: {e}", 500
 
 
@@ -2226,20 +2166,17 @@ def admin_sales_add_missing():
     if not date_str or not staff_name or not method or not amount_str:
         return "❌ 必須項目が未入力です。", 400
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         _ = datetime.strptime(date_str, "%Y-%m-%d")
         amount = int(amount_str)
         if amount <= 0:
             return "❌ 金額は正の整数で入力してください。", 400
+    except Exception:
         return "❌ 入力形式を確認してください。（日付 or 金額）", 400
 
     # 既存の正規化関数で表記ゆれを吸収
     method = normalize_method(method)
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         # 既存スキーマ: sales(date, method, amount, staff_name)
@@ -2250,6 +2187,7 @@ def admin_sales_add_missing():
         conn.commit()
         cur.close()
         conn.close()
+    except Exception as e:
         return f"❌ 追加に失敗しました: {e}", 500
 
     # 追加後は同月の請求集計へ
@@ -2272,8 +2210,6 @@ def admin_invoice_staff_special_pdf():
     month_end = (datetime.strptime(month_start, "%Y-%m-%d") + relativedelta(months=1)).strftime('%Y-%m-%d')
 
     try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
 
@@ -2329,6 +2265,7 @@ def admin_invoice_staff_special_pdf():
 
         return send_file(pdf_path, as_attachment=True, mimetype='application/pdf')
 
+    except Exception as e:
         return f"❌ PDF生成エラー: {e}", 500
 
 
@@ -2338,45 +2275,6 @@ def google_verification_file():
     return send_from_directory('static', 'google808abc9a83ba5e55.html')
 
 
-@app.route("/api/kyusei", methods=["POST"])
-def kyusei_fortune():
-    data = request.get_json()
-    birthdate_str = data.get("birthdate")
-    lang = data.get("lang", "ja")
-    try:
-        except Exception as e:
-            print('⛔ lucky_direction エラー:', e)
-        birthdate = datetime.strptime(birthdate_str, "%Y-%m-%d")
-        return jsonify({"error": "Invalid birthdate format"}), 400
-
-    honmeisei_num = get_honmeisei(birthdate)
-    honmeisei_name = get_honmeisei_name(birthdate, lang=lang)
-
-    today = datetime.now()
-    year = today.year
-    month = today.month
-    next_month = 1 if month == 12 else month + 1
-    next_year = year + 1 if next_month == 1 else year
-
-    dir_year = get_directions(honmeisei_num, year, 0, lang=lang).get("good", "")
-    dir_month = get_directions(honmeisei_num, year, month, lang=lang).get("good", "")
-    dir_next = get_directions(honmeisei_num, next_year, next_month, lang=lang).get("good", "")
-
-    if lang.startswith("en"):
-        return jsonify({
-            "main_star": honmeisei_name,
-            "lucky_directions": {
-                "year": dir_year,
-                "month": dir_month,
-                "next_month": dir_next
-            }
-        })
-    else:
-        return jsonify({
-            "本命星": honmeisei_name,
-            "吉方位": {
-                "年": dir_year,
-                "今月": dir_month,
-                "来月": dir_next
-            }
-        })
+if __name__ == '__main__':
+    # デバッグ実行用
+    print(get_lucky_direction())
