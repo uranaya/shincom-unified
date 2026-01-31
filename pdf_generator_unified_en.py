@@ -92,6 +92,25 @@ pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 FONT_NAME_JA = FONT_NAME
 FONT_NAME_EN = "Times-Roman"
 
+
+def select_font_for_lang(lang: str) -> str:
+    """
+    Compatibility shim for this EN PDF generator.
+
+    NOTE:
+      - This module’s `_set_font(c, lang, size)` expects a language key ("en"/"ja"),
+        not an actual font face name.
+      - Some call sites do:
+            font_name = select_font_for_lang(lang)
+            _set_font(c, font_name, size)
+        so we return "en"/"ja" here for maximum compatibility.
+
+    Returns:
+      "en" if lang starts with "en", else "ja"
+    """
+    return "en" if (lang or "").lower().startswith("en") else "ja"
+
+
 def _font(lang: str) -> str:
     return FONT_NAME_EN if str(lang).lower().startswith("en") else FONT_NAME_JA
 
@@ -186,7 +205,34 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
 
     return y
 
-def draw_palm_image(c, base64_image, width, y):
+def draw_palm_image(c, data_or_base64, width, margin_or_y=None, y=None, font_name=None):
+
+"""
+Draw palm image (EN module).
+
+Compatible with both call styles:
+  - draw_palm_image(c, base64_image, width, y)
+  - draw_palm_image(c, data_dict, page_width, margin, y, font_name=...)
+
+Notes:
+  - `font_name` is unused here (image-only), but accepted to match callers.
+"""
+# New call style: (c, data_dict, page_width, margin, y, font_name=...)
+# Old call style: (c, base64_image, width, y)
+if y is None:
+    base64_image = data_or_base64
+    y = margin_or_y
+else:
+    data = data_or_base64 or {}
+    base64_image = (
+        data.get("image_data")
+        or data.get("image_data_b64")
+        or data.get("image")
+        or ""
+    )
+
+if not base64_image:
+    return y
     try:
         image_data = base64.b64decode(base64_image.split(',')[1])
         img = ImageReader(io.BytesIO(image_data))
