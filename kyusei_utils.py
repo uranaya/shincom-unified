@@ -413,3 +413,13 @@ def get_kyusei_fortune(birthdate_str: str, now=None, lang: str = "ja") -> str:
         month_dir = (dirs.get("month", "") or "").strip()
         next_dir = (dirs.get("next_month", "") or "").strip()
         return f"あなたの本命星は「{honmeisei_name}」です。{y}年の吉方位：{year_dir}　今月：{month_dir}　来月：{next_dir}です。"
+
+
+STAR_NAMES_JP = ["一白水星", "二黒土星", "三碧木星", "四緑木星", "五黄土星", "六白金星", "七赤金星", "八白土星", "九紫火星"]
+STAR_NAMES_EN = ["Ippaku Water", "Jikoku Earth", "Sanpeki Wood", "Shiroku Wood", "Go-Ou Earth", "Roppaku Metal", "Shichiseki Metal", "Happaku Earth", "Kyushi Fire"]
+
+def get_honmeisei_name(birthdate, lang="ja"):
+    num = get_honmeisei(birthdate)
+    if lang.startswith("en"):
+        return STAR_NAMES_EN[num - 1]
+    return STAR_NAMES_JP[num - 1]

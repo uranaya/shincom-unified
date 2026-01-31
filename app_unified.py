@@ -2273,3 +2273,45 @@ def admin_invoice_staff_special_pdf():
 def google_verification_file():
     return send_from_directory('static', 'google808abc9a83ba5e55.html')
 
+
+@app.route("/api/kyusei", methods=["POST"])
+def kyusei_fortune():
+    data = request.get_json()
+    birthdate_str = data.get("birthdate")
+    lang = data.get("lang", "ja")
+    try:
+        birthdate = datetime.strptime(birthdate_str, "%Y-%m-%d")
+    except Exception:
+        return jsonify({"error": "Invalid birthdate format"}), 400
+
+    honmeisei_num = get_honmeisei(birthdate)
+    honmeisei_name = get_honmeisei_name(birthdate, lang=lang)
+
+    today = datetime.now()
+    year = today.year
+    month = today.month
+    next_month = 1 if month == 12 else month + 1
+    next_year = year + 1 if next_month == 1 else year
+
+    dir_year = get_directions(honmeisei_num, year, 0, lang=lang).get("good", "")
+    dir_month = get_directions(honmeisei_num, year, month, lang=lang).get("good", "")
+    dir_next = get_directions(honmeisei_num, next_year, next_month, lang=lang).get("good", "")
+
+    if lang.startswith("en"):
+        return jsonify({
+            "main_star": honmeisei_name,
+            "lucky_directions": {
+                "year": dir_year,
+                "month": dir_month,
+                "next_month": dir_next
+            }
+        })
+    else:
+        return jsonify({
+            "本命星": honmeisei_name,
+            "吉方位": {
+                "年": dir_year,
+                "今月": dir_month,
+                "来月": dir_next
+            }
+        })
