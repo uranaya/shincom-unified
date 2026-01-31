@@ -442,7 +442,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
     eto = (data.get("eto") or "").strip()
     eto_number = data.get("eto_number")
     animal = (data.get("animal") or "").strip()
-    honmeisei = (data.get("honmeisei") or "").strip()
+    honmeisei = str(data.get("honmeisei") or "").strip()
 
     line1_parts = []
     if birthdate:
@@ -589,7 +589,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
     eto = (data.get("eto") or "").strip()
     eto_number = data.get("eto_number")
     animal = (data.get("animal") or "").strip()
-    honmeisei = (data.get("honmeisei") or "").strip()
+    honmeisei = str(data.get("honmeisei") or "").strip()
 
     line1_parts = []
     if birthdate:
@@ -1132,7 +1132,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
     eto = (data.get("eto") or "").strip()
     eto_number = data.get("eto_number")
     animal = (data.get("animal") or "").strip()
-    honmeisei = (data.get("honmeisei") or "").strip()
+    honmeisei = str(data.get("honmeisei") or "").strip()
 
     line1_parts = []
     if birthdate:
@@ -1279,7 +1279,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
     eto = (data.get("eto") or "").strip()
     eto_number = data.get("eto_number")
     animal = (data.get("animal") or "").strip()
-    honmeisei = (data.get("honmeisei") or "").strip()
+    honmeisei = str(data.get("honmeisei") or "").strip()
 
     line1_parts = []
     if birthdate:
