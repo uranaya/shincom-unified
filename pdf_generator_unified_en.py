@@ -465,8 +465,15 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawString(margin, y, " / ".join(line1_parts))
         y -= 12
     if line2_parts:
-        c.drawString(margin, y, " / ".join(line2_parts))
+        line2_text = " / ".join(line2_parts)
+        # If main star is Japanese, render the line with JP font to avoid tofu in EN PDFs.
+        font_for_line2 = font_name
+        if honmeisei and any(ord(ch) > 127 for ch in line2_text):
+            font_for_line2 = FONT_NAME_JA
+        _set_font(c, font_for_line2, 9)
+        c.drawString(margin, y, line2_text)
         y -= 12
+        _set_font(c, font_name, 9)
     y -= 2
 
     palm_titles = data.get("palm_titles", []) or []
@@ -1148,8 +1155,15 @@ def draw_shincom_a4(c, data, include_yearly=False):
         c.drawString(margin, y, " / ".join(line1_parts))
         y -= 12
     if line2_parts:
-        c.drawString(margin, y, " / ".join(line2_parts))
+        line2_text = " / ".join(line2_parts)
+        # If main star is Japanese, render the line with JP font to avoid tofu in EN PDFs.
+        font_for_line2 = font_name
+        if honmeisei and any(ord(ch) > 127 for ch in line2_text):
+            font_for_line2 = FONT_NAME_JA
+        _set_font(c, font_for_line2, 9)
+        c.drawString(margin, y, line2_text)
         y -= 12
+        _set_font(c, font_name, 9)
     y -= 2
 
     palm_titles = data.get("palm_titles", []) or []
