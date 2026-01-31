@@ -292,7 +292,7 @@ def draw_yearly_pages_renai_a4(c, yearly, lang="ja"):
             c.showPage()
             y = top
 
-        _set_font(c, lang, 12)
+        _set_font(c, _auto_lang(f"■ {title}", lang), 12)
         c.drawString(margin, y, f"■ {title}")
         y -= 5 * mm
 
@@ -362,6 +362,38 @@ def _has_non_ascii(s: str) -> bool:
         return any(ord(ch) > 127 for ch in (s or ""))
     except Exception:
         return False
+
+
+# Auto-select language key for font switching (EN doc with a few JP strings/symbols).
+def _auto_lang(text: str, base_lang: str) -> str:
+    return "ja" if _has_non_ascii(text or "") else (base_lang or "ja")
+
+# Zodiac JA->EN (for EN PDFs we avoid Japanese here; Kyusei name stays Japanese).
+_ZODIAC_JA_EN = {
+    "牡羊座": "Aries",
+    "牡牛座": "Taurus",
+    "双子座": "Gemini",
+    "蟹座": "Cancer",
+    "獅子座": "Leo",
+    "乙女座": "Virgo",
+    "天秤座": "Libra",
+    "蠍座": "Scorpio",
+    "射手座": "Sagittarius",
+    "山羊座": "Capricorn",
+    "水瓶座": "Aquarius",
+    "魚座": "Pisces",
+}
+def _zodiac_to_en(zodiac: str) -> str:
+    z = (zodiac or "").strip()
+    return _ZODIAC_JA_EN.get(z, z)
+
+def _sanitize_en_text(t: str) -> str:
+    """Remove the Day Pillar name mention to avoid JP text in EN PDFs."""
+    if not t:
+        return t
+    # e.g. "day pillar of 丙戌," / "day pillar of ■■," -> "day pillar,"
+    t = re.sub(r"(day\s*pillar\s*of)\s+[^,\.\n]+", "day pillar", t, flags=re.IGNORECASE)
+    return t
 
 
 def split_text(text: str, lang: str = "en", base: int = 46):
@@ -502,7 +534,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
     lucky_lines = data.get("lucky_info", []) or []
     lucky_direction = data.get("lucky_direction", "") or ""
     lucky_text_blob = " ".join([str(x) for x in lucky_lines]) + " " + str(lucky_direction)
-    lucky_lang = "ja" if _has_non_ascii(lucky_text_blob) else "en"
+    lucky_lang = font_name
 
     y = draw_lucky_section(
         c,
@@ -591,7 +623,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         nonlocal y
         if title:
             ensure_space(18)
-            _set_font(c, font_name, 12)
+            _set_font(c, _auto_lang(f"◆ {title}", font_name), 12)
             c.drawString(margin, y, f"◆ {title}")
             y -= 14
         if body:
@@ -645,7 +677,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
     lucky_lines = data.get("lucky_info", []) or []
     lucky_direction = data.get("lucky_direction", "") or ""
     lucky_text_blob = " ".join([str(x) for x in lucky_lines]) + " " + str(lucky_direction)
-    lucky_lang = "ja" if _has_non_ascii(lucky_text_blob) else "en"
+    lucky_lang = font_name
 
     y = draw_lucky_section(
         c,
@@ -975,7 +1007,7 @@ def draw_yearly_pages_renai_a4(c, yearly, lang="ja"):
             c.showPage()
             y = top
 
-        _set_font(c, lang, 12)
+        _set_font(c, _auto_lang(f"■ {title}", lang), 12)
         c.drawString(margin, y, f"■ {title}")
         y -= 5 * mm
 
@@ -1185,7 +1217,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
     lucky_lines = data.get("lucky_info", []) or []
     lucky_direction = data.get("lucky_direction", "") or ""
     lucky_text_blob = " ".join([str(x) for x in lucky_lines]) + " " + str(lucky_direction)
-    lucky_lang = "ja" if _has_non_ascii(lucky_text_blob) else "en"
+    lucky_lang = font_name
 
     y = draw_lucky_section(
         c,
@@ -1274,7 +1306,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         nonlocal y
         if title:
             ensure_space(18)
-            _set_font(c, font_name, 12)
+            _set_font(c, _auto_lang(f"◆ {title}", font_name), 12)
             c.drawString(margin, y, f"◆ {title}")
             y -= 14
         if body:
@@ -1328,7 +1360,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
     lucky_lines = data.get("lucky_info", []) or []
     lucky_direction = data.get("lucky_direction", "") or ""
     lucky_text_blob = " ".join([str(x) for x in lucky_lines]) + " " + str(lucky_direction)
-    lucky_lang = "ja" if _has_non_ascii(lucky_text_blob) else "en"
+    lucky_lang = font_name
 
     y = draw_lucky_section(
         c,

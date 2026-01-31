@@ -41,56 +41,44 @@ def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, 
         return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
 
 
-def generate_lucky_direction(nicchu_eto, birthdate, now, lang="ja"):
-    """Return a short lucky-direction sentence.
-
-    Note:
-    - For EN output, the Kyusei (Main Star) name is kept in Japanese as requested.
-    - We intentionally do NOT include a section heading here (PDF side draws its own heading).
+def generate_lucky_direction(birthdate: str, today: datetime.date, lang: str = 'ja', **kwargs) -> str:
     """
-    honmeisei = get_honmeisei(birthdate)
+    九星気学に基づく吉方位テキストを生成する。
+    today の「20日以降」は翌月を「今月」とみなして計算する。
+    """
+    # 生年月日のパース
+    try:
+        bd = (
+            birthdate
+            if isinstance(birthdate, datetime.date)
+            else datetime.datetime.strptime(birthdate, "%Y-%m-%d").date()
+        )
+    except Exception as e:
+        print("⚠️ generate_lucky_direction birthdate parse error:", e)
+        bd = today if isinstance(today, datetime.date) else datetime.date.today()
 
-    base = datetime(now.year, now.month, now.day)
-    dir_year, dir_month, dir_next = get_directions(honmeisei, base.year, base.month, lang=lang)
+    # today を date 型に正規化
+    base = today.date() if isinstance(today, datetime.datetime) else today
 
-    # Normalize direction strings for EN output (in case get_directions returns JP labels)
-    def _dir_to_en(s: str) -> str:
-        if not s:
-            return s
-        # If already ASCII-ish, keep
-        if all(ord(ch) < 128 for ch in s):
-            return s
-        # Basic JP direction map
-        mp = {
-            "北": "North",
-            "北東": "Northeast",
-            "東": "East",
-            "南東": "Southeast",
-            "南": "South",
-            "南西": "Southwest",
-            "西": "West",
-            "北西": "Northwest",
-            "なし": "None",
-            "無し": "None",
-        }
-        # Replace longer keys first
-        for jp in sorted(mp.keys(), key=len, reverse=True):
-            s = s.replace(jp, mp[jp])
-        # Common separators
-        s = s.replace("・", ", ").replace("、", ", ").replace("/", ", ")
-        s = re.sub(r"\s*,\s*", ", ", s).strip()
-        return s
+    # 20日以降は翌月ベース
+    if base.day >= 20:
+        base = base + relativedelta(months=1)
 
-    if str(lang).lower().startswith("en"):
-        y = _dir_to_en(dir_year)
-        m = _dir_to_en(dir_month)
-        n = _dir_to_en(dir_next)
-        # Keep honmeisei in Japanese only
-        star = honmeisei or ""
-        return f'Your Main Star is 「{star}」. Lucky directions for {base.year}: {y}. This month: {m}. Next month: {n}.'
+    # 本命星を取得
+    honmeisei = get_honmeisei(bd.year, bd.month, bd.day)
 
-    # JA
-    return f'あなたの本命星は「{honmeisei}」です。{base.year}年の吉方位：{dir_year}　今月：{dir_month}　来月：{dir_next}です。'
+    # 年盤（base.year）、今月（base.month）、来月（base.month+1）
+    dir_year = get_directions(base.year, 0, honmeisei, lang=lang)
+    dir_now = get_directions(base.year, base.month, honmeisei, lang=lang)
+    next_month_date = base + relativedelta(months=1)
+    dir_next = get_directions(next_month_date.year, next_month_date.month, honmeisei, lang=lang)
+
+    good_dir_year = dir_year.get("good", "不明")
+    good_dir_now = dir_now.get("good", "不明")
+    good_dir_next = dir_next.get("good", "不明")
+
+    return f"{base.year}年の吉方位は{good_dir_year}、今月は{good_dir_now}、来月は{good_dir_next}です。"
+
 
 
 def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction, font_name="IPAexGothic"):
