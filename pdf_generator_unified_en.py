@@ -224,14 +224,26 @@ def draw_palm_image(c, data_or_base64, width, margin_or_y=None, y=None, font_nam
     else:
         data = data_or_base64 or {}
         base64_image = (
-            data.get("image_data")
+            data.get("palm_image")
+            or data.get("image_data")
             or data.get("image_data_b64")
+            or data.get("image_base64")
             or data.get("image")
+            or data.get("palm_image_path")
+            or data.get("image_path")
             or ""
         )
 
     if not base64_image:
         return y
+
+    # If a local file path is provided, load it directly (covers newer upload flows).
+    try:
+        if isinstance(base64_image, str) and len(base64_image) < 512 and os.path.exists(base64_image):
+            c.drawImage(ImageReader(base64_image), x, y - img_h, width=img_w, height=img_h, preserveAspectRatio=True, anchor='c')
+            return y - img_h - 8
+    except Exception:
+        pass
 
     try:
         # Handle data URL ("data:image/...;base64,XXXX") or raw base64
@@ -342,6 +354,14 @@ def draw_yearly_pages_renai_b4(c, yearly, lang="ja"):
         y = draw_text_block(month.get("label", ""), month.get("text", ""), y)
 
 
+
+def _has_non_ascii(s: str) -> bool:
+    try:
+        return any(ord(ch) > 127 for ch in (s or ""))
+    except Exception:
+        return False
+
+
 def split_text(text: str, lang: str = "en", base: int = 46):
     """Split text into wrapped lines for PDF drawing.
     EN module enforces wrap=90 via _wrap_len().
@@ -359,12 +379,14 @@ def _normalize_next_month_fortune_text(text: str, birthdate: str = "", lang: str
     return (text or "").strip()
 
 def draw_shincom_a4(c, data, include_yearly=False):
-    """English (shincom) A4 layout.
-    Page 1: Palm image + first 3 palm sections + Lucky info
-    Page 2: Remaining 2 palm sections + Overall + Personality + This/Next month
+    """English (shincom) A4 layout aligned with the Japanese A4 layout.
+    Page 1: Header + Palm image + Birth info + Palm sections (1-3)
+    Page 2: Palm sections (4-5) + Palm summary + Personality + Year/Month/Next month + Lucky info
+    (Optional) Yearly pages: 2 pages for 12 months (6 months per page)
     Header is drawn ONLY on page 1.
     """
     from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
 
     page_width, page_height = A4
     margin = 20 * mm
@@ -378,84 +400,133 @@ def draw_shincom_a4(c, data, include_yearly=False):
 
     # Palm image
     y = draw_palm_image(c, data, page_width, margin, y, font_name=font_name)
+    y -= 4
+
+    # Birth info (optional, shown under the image)
+    birthdate = (data.get("birthdate") or "").strip()
+    zodiac = (data.get("zodiac_sign") or data.get("zodiac") or "").strip()
+    eto = (data.get("eto") or "").strip()
+    eto_number = data.get("eto_number")
+    animal = (data.get("animal") or "").strip()
+    honmeisei = (data.get("honmeisei") or "").strip()
+
+    line1_parts = []
+    if birthdate:
+        line1_parts.append(f"Birthdate: {birthdate}")
+    if zodiac:
+        line1_parts.append(f"Zodiac: {zodiac}")
+    line2_parts = []
+    if eto:
+        if eto_number is not None and str(eto_number).strip() != "":
+            line2_parts.append(f"Eto: {eto} ({eto_number})")
+        else:
+            line2_parts.append(f"Eto: {eto}")
+    if animal:
+        line2_parts.append(f"Animal: {animal}")
+    if honmeisei:
+        line2_parts.append(f"Main Star: {honmeisei}")
+
+    _set_font(c, font_name, 9)
+    if line1_parts:
+        c.drawString(margin, y, " / ".join(line1_parts))
+        y -= 12
+    if line2_parts:
+        c.drawString(margin, y, " / ".join(line2_parts))
+        y -= 12
+    y -= 2
 
     palm_titles = data.get("palm_titles", []) or []
     palm_texts = data.get("palm_texts", []) or []
 
-    def ensure_space(min_needed: float):
-        nonlocal y
-        if y < (margin + min_needed):
-            c.showPage()
-            y = page_height - margin
-        return y
-
-    def write_block(title: str, body: str):
+    def write_block(title: str, body: str, font_size=10, title_size=12):
         nonlocal y
         if title:
-            ensure_space(18)
-            _set_font(c, font_name, 12)
+            _set_font(c, font_name, title_size)
             c.drawString(margin, y, f"◆ {title}")
             y -= 14
         if body:
-            _set_font(c, font_name, 10)
+            _set_font(c, font_name, font_size)
             for line in split_text(body):
-                ensure_space(14)
                 c.drawString(margin, y, line)
                 y -= 12
         y -= 8
 
-    # --- Page 1: first 3 sections ---
+    # --- Page 1: Palm sections 1-3 ---
     for i in range(3):
         title = palm_titles[i] if i < len(palm_titles) else ""
         text = palm_texts[i] if i < len(palm_texts) else ""
         write_block(title, text)
 
-    # Lucky info on page 1
-    y = draw_lucky_section(
-        c,
-        page_width,
-        margin,
-        y,
-        data.get("lucky_info", []) or [],
-        data.get("lucky_direction", "") or "",
-        lang=lang,
-        page_height=page_height,
-        font_name=font_name,
-    )
-
-    # Start page 2 (no header)
+    # --- Page 2 (no header) ---
     c.showPage()
     y = page_height - margin
 
-    # --- Page 2: remaining 2 sections ---
+    titles = data.get("titles", {}) or {}
+    texts = data.get("texts", {}) or {}
+
+    # Remaining palm sections 4-5
     for i in range(3, 5):
         title = palm_titles[i] if i < len(palm_titles) else ""
         text = palm_texts[i] if i < len(palm_texts) else ""
         write_block(title, text)
 
-    titles = data.get("titles", {}) or {}
-    texts = data.get("texts", {}) or {}
-
     # Overall palm summary
     write_block(titles.get("palm_summary", "Overall Palm Reading"), texts.get("palm_summary", ""))
 
-    # Personality (Four Pillars)
-    write_block(titles.get("personality", "Personality"), data.get("shichu_personality", ""))
+    # Personality
+    personality_text = data.get("shichu_personality") or data.get("personality") or texts.get("personality", "")
+    write_block(titles.get("personality", "Personality"), personality_text)
 
-    # This month / next month
-    month_text = _normalize_month_fortune_text(data.get("shichu_month_fortune", ""), data.get("birthdate", ""), lang=lang)
-    next_month_text = _normalize_next_month_fortune_text(data.get("shichu_next_month_fortune", ""), data.get("birthdate", ""), lang=lang)
+    # Overall fortune for the year
+    year_text_raw = data.get("shichu_year_fortune") or data.get("year_fortune") or texts.get("year_fortune", "")
+    if year_text_raw:
+        year_title = titles.get("year_fortune", "Overall fortune")
+        m = re.search(r"\b(20\d{2})\b", str(year_text_raw))
+        if m:
+            year_title = f"Overall fortune for {m.group(1)}"
+        write_block(year_title, str(year_text_raw))
+
+    # This month / next month fortunes (support multiple key names)
+    month_src = data.get("shichu_month_fortune") or data.get("month_fortune") or texts.get("month_fortune", "")
+    next_month_src = data.get("shichu_next_month_fortune") or data.get("next_month_fortune") or texts.get("next_month_fortune", "")
+
+    month_text = _normalize_month_fortune_text(month_src, birthdate, lang=lang)
+    next_month_text = _normalize_next_month_fortune_text(next_month_src, birthdate, lang=lang)
 
     write_block(titles.get("month_fortune", "This Month"), month_text)
     write_block(titles.get("next_month_fortune", "Next Month"), next_month_text)
 
+    # Lucky info at the end of page 2 (auto font if Japanese sneaks in)
+    lucky_lines = data.get("lucky_info", []) or []
+    lucky_direction = data.get("lucky_direction", "") or ""
+    lucky_text_blob = " ".join([str(x) for x in lucky_lines]) + " " + str(lucky_direction)
+    lucky_lang = "ja" if _has_non_ascii(lucky_text_blob) else "en"
+
+    y = draw_lucky_section(
+        c,
+        page_width,
+        margin,
+        y,
+        lucky_lines,
+        lucky_direction,
+        lang=lucky_lang,
+        page_height=page_height,
+        font_name=select_font_for_lang(lucky_lang),
+    )
+
+    # Optional yearly pages (2 pages / 12 months)
+    if include_yearly:
+        draw_yearly_pages_shincom_a4(c, data, lang="en")
+
 def draw_shincom_b4(c, data, include_yearly=False):
-    """English (shincom) B4 layout.
-    Page 1: Palm image + palm sections (all 5)
-    Page 2: Overall + Personality + This/Next month + Lucky info
+    """English (shincom) B4 layout aligned with the Japanese B4 layout.
+    Page 1: Header + Palm image + Birth info + Palm sections (1-5)
+    Page 2: Palm summary + Personality + Year/Month/Next month + Lucky info
+    (Optional) Yearly pages: 2 pages for 12 months (6 months per page)
     Header is drawn ONLY on page 1.
     """
     from reportlab.lib.pagesizes import B4
+    from reportlab.lib.units import mm
 
     page_width, page_height = B4
     margin = 18 * mm
@@ -469,6 +540,40 @@ def draw_shincom_b4(c, data, include_yearly=False):
 
     # Palm image
     y = draw_palm_image(c, data, page_width, margin, y, font_name=font_name)
+    y -= 4
+
+    # Birth info under the image
+    birthdate = (data.get("birthdate") or "").strip()
+    zodiac = (data.get("zodiac_sign") or data.get("zodiac") or "").strip()
+    eto = (data.get("eto") or "").strip()
+    eto_number = data.get("eto_number")
+    animal = (data.get("animal") or "").strip()
+    honmeisei = (data.get("honmeisei") or "").strip()
+
+    line1_parts = []
+    if birthdate:
+        line1_parts.append(f"Birthdate: {birthdate}")
+    if zodiac:
+        line1_parts.append(f"Zodiac: {zodiac}")
+    line2_parts = []
+    if eto:
+        if eto_number is not None and str(eto_number).strip() != "":
+            line2_parts.append(f"Eto: {eto} ({eto_number})")
+        else:
+            line2_parts.append(f"Eto: {eto}")
+    if animal:
+        line2_parts.append(f"Animal: {animal}")
+    if honmeisei:
+        line2_parts.append(f"Main Star: {honmeisei}")
+
+    _set_font(c, font_name, 10)
+    if line1_parts:
+        c.drawString(margin, y, " / ".join(line1_parts))
+        y -= 14
+    if line2_parts:
+        c.drawString(margin, y, " / ".join(line2_parts))
+        y -= 14
+    y -= 2
 
     palm_titles = data.get("palm_titles", []) or []
     palm_texts = data.get("palm_texts", []) or []
@@ -512,26 +617,49 @@ def draw_shincom_b4(c, data, include_yearly=False):
     write_block(titles.get("palm_summary", "Overall Palm Reading"), texts.get("palm_summary", ""))
 
     # Personality
-    write_block(titles.get("personality", "Personality"), data.get("shichu_personality", ""))
+    personality_text = data.get("shichu_personality") or data.get("personality") or texts.get("personality", "")
+    write_block(titles.get("personality", "Personality"), personality_text)
+
+    # Overall fortune for the year
+    year_text_raw = data.get("shichu_year_fortune") or data.get("year_fortune") or texts.get("year_fortune", "")
+    if year_text_raw:
+        year_title = titles.get("year_fortune", "Overall fortune")
+        m = re.search(r"\b(20\d{2})\b", str(year_text_raw))
+        if m:
+            year_title = f"Overall fortune for {m.group(1)}"
+        write_block(year_title, str(year_text_raw))
 
     # This month / next month
-    month_text = _normalize_month_fortune_text(data.get("shichu_month_fortune", ""), data.get("birthdate", ""), lang=lang)
-    next_month_text = _normalize_next_month_fortune_text(data.get("shichu_next_month_fortune", ""), data.get("birthdate", ""), lang=lang)
+    month_src = data.get("shichu_month_fortune") or data.get("month_fortune") or texts.get("month_fortune", "")
+    next_month_src = data.get("shichu_next_month_fortune") or data.get("next_month_fortune") or texts.get("next_month_fortune", "")
+
+    month_text = _normalize_month_fortune_text(month_src, birthdate, lang=lang)
+    next_month_text = _normalize_next_month_fortune_text(next_month_src, birthdate, lang=lang)
+
     write_block(titles.get("month_fortune", "This Month"), month_text)
     write_block(titles.get("next_month_fortune", "Next Month"), next_month_text)
 
     # Lucky info at the end of page 2
+    lucky_lines = data.get("lucky_info", []) or []
+    lucky_direction = data.get("lucky_direction", "") or ""
+    lucky_text_blob = " ".join([str(x) for x in lucky_lines]) + " " + str(lucky_direction)
+    lucky_lang = "ja" if _has_non_ascii(lucky_text_blob) else "en"
+
     y = draw_lucky_section(
         c,
         page_width,
         margin,
         y,
-        data.get("lucky_info", []) or [],
-        data.get("lucky_direction", "") or "",
-        lang=lang,
+        lucky_lines,
+        lucky_direction,
+        lang=lucky_lang,
         page_height=page_height,
-        font_name=font_name,
+        font_name=select_font_for_lang(lucky_lang),
     )
+
+    # Optional yearly pages
+    if include_yearly:
+        draw_yearly_pages_shincom_b4(c, data, lang="en")
 
 def draw_renai_pdf(c, data, size, include_yearly=False):
     lang = _get_lang(data)
