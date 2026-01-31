@@ -1551,3 +1551,357 @@ def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
     else:
         draw_renai_pdf(c, data, size, include_yearly)
     c.save()
+
+# ============================================================
+# PATCH v9: Robust yearly fortunes parsing + JP-like pagination
+# - Fix: yearly data sometimes arrives as {"months": [...], "year_label":..., "year_text":...}
+#        or stringified Python/JSON. This previously rendered as "Fortune for months" and blank page.
+# - This patch normalizes months into { "YYYY-MM": "text", ... } and draws year summary on the first yearly page.
+# ============================================================
+
+import ast as _ast
+import json as _json
+import re as _re
+import textwrap as _textwrap
+
+def _try_parse_list(value):
+    """
+    Accept:
+      - list
+      - JSON string of list
+      - Python repr string of list (e.g., "[{'label':...}, ...]")
+    Return list or None.
+    """
+    if isinstance(value, list):
+        return value
+    if not isinstance(value, str):
+        return None
+    s = value.strip()
+    if not (s.startswith("[") and s.endswith("]")):
+        return None
+    # Try JSON first
+    try:
+        return _json.loads(s)
+    except Exception:
+        pass
+    # Then Python literal
+    try:
+        return _ast.literal_eval(s)
+    except Exception:
+        return None
+
+def _normalize_month_label(label: str) -> str:
+    s = (label or "").strip()
+    # Common patterns:
+    # "Fortune for 2026-02" -> "2026-02"
+    s = _re.sub(r"^\s*fortune\s+for\s+", "", s, flags=_re.I)
+    return s.strip()
+
+def _month_sort_key(k: str):
+    m = _re.match(r"^\s*(\d{4})[-/](\d{1,2})", (k or "").strip())
+    if m:
+        return (int(m.group(1)), int(m.group(2)))
+    return (9999, 99, (k or "").strip())
+
+def _coerce_yearly_summary(data: dict):
+    """
+    Returns (year_label, year_text) if available from:
+      - top-level keys
+      - nested yearly dict (yearly_fortunes / yearly_fortunes_text / etc.)
+    """
+    if not isinstance(data, dict):
+        return ("", "")
+    year_label = (data.get("year_label") or data.get("yearly_label") or data.get("year_title") or "").strip()
+    year_text  = (data.get("year_text")  or data.get("yearly_text")  or data.get("year_fortune") or "").strip()
+
+    yearly = (data.get("yearly_fortunes_text")
+              or data.get("yearly_fortunes")
+              or data.get("yearly")
+              or data.get("yearly_fortune"))
+    if isinstance(yearly, dict):
+        if not year_label:
+            year_label = (yearly.get("year_label") or yearly.get("yearly_label") or yearly.get("year_title") or "").strip()
+        if not year_text:
+            year_text = (yearly.get("year_text") or yearly.get("yearly_text") or yearly.get("year_text_en") or "").strip()
+    return (year_label, year_text)
+
+def _coerce_yearly_fortunes(data):
+    """
+    Normalize yearly fortunes into dict: { "YYYY-MM": "text", ... }
+    Supports:
+      A) yearly dict already: {"2026-02": "...", ...}
+      B) yearly dict wrapped: {"months": [ {"label": "Fortune for 2026-02", "text": "..."}, ... ],
+                              "year_label": "...", "year_text": "..."}
+      C) months list stringified (JSON or Python repr)
+    """
+    if not isinstance(data, dict):
+        return {}
+
+    yearly = (data.get("yearly_fortunes_text")
+              or data.get("yearly_fortunes")
+              or data.get("yearly")
+              or data.get("yearly_fortune")
+              or data.get("yearly_fortunes_en"))
+
+    # Also accept top-level months payload
+    if yearly is None:
+        if any(k in data for k in ("months", "fortune_for_months")):
+            yearly = data
+
+    # If yearly is a string that may contain JSON/dict, try parse
+    if isinstance(yearly, str):
+        s = yearly.strip()
+        # Try JSON object
+        try:
+            yearly = _json.loads(s)
+        except Exception:
+            # Try python dict literal
+            try:
+                yearly = _ast.literal_eval(s)
+            except Exception:
+                yearly = None
+
+    if not isinstance(yearly, dict):
+        return {}
+
+    # If wrapped "months" style
+    months_raw = yearly.get("months")
+    if months_raw is None:
+        months_raw = yearly.get("fortune_for_months")
+    if months_raw is None:
+        months_raw = yearly.get("monthly")
+    if months_raw is None:
+        months_raw = yearly.get("month_fortunes")
+
+    month_map = {}
+
+    # Months list-of-dicts
+    months_list = _try_parse_list(months_raw)
+    if months_list is None and isinstance(months_raw, list):
+        months_list = months_raw
+
+    if isinstance(months_list, list):
+        for it in months_list:
+            if isinstance(it, dict):
+                label = it.get("label") or it.get("month") or it.get("title") or it.get("key")
+                text  = it.get("text")  or it.get("fortune") or it.get("value") or ""
+                if label:
+                    mk = _normalize_month_label(str(label))
+                    month_map[mk] = str(text or "").strip()
+            elif isinstance(it, (list, tuple)) and len(it) >= 2:
+                mk = _normalize_month_label(str(it[0]))
+                month_map[mk] = str(it[1] or "").strip()
+            elif isinstance(it, str) and it.strip():
+                # Fallback: treat as a line with unknown month
+                mk = f"month-{len(month_map)+1:02d}"
+                month_map[mk] = it.strip()
+        return month_map
+
+    # Otherwise assume direct month->text mapping; filter out meta keys
+    META = {
+        "months", "fortune_for_months", "monthly", "month_fortunes",
+        "year_label", "year_text", "year", "label", "text", "title"
+    }
+    for k, v in yearly.items():
+        if k in META:
+            continue
+        if v is None:
+            continue
+        month_map[str(k).strip()] = str(v).strip()
+
+    return month_map
+
+def draw_yearly_pages_shincom_a4(c, data, lang="en"):
+    """
+    v9 override: JP-like structure
+      - New page for yearly (page3), then another page (page4)
+      - Print year summary at top of page3 (if available)
+      - Print 12 months, split 6/6
+    """
+    yearly = _coerce_yearly_fortunes(data)
+    year_label, year_text = _coerce_yearly_summary(data)
+
+    if not yearly and not year_text:
+        return
+
+    months = sorted(yearly.keys(), key=_month_sort_key)
+    # Keep deterministic, but don't explode if fewer than 12
+    first = months[:6]
+    second = months[6:]
+
+    # layout constants
+    left = 50
+    top = 785
+    bottom = 70
+    font_size = 11
+    line_height = 14
+    max_chars = 96
+    max_lines_year = 10
+    max_lines_month = 6
+
+    font_name = select_font_for_lang(lang)
+    _set_font(c, font_name, font_size)
+
+    # PAGE 3
+    c.showPage()
+    _set_font(c, font_name, 14)
+    c.drawString(left, top, "Yearly Fortunes")
+    _set_font(c, font_name, font_size)
+
+    y = top - 30
+
+    # Year summary block (optional)
+    if year_text:
+        label = year_label or "Overall fortune"
+        c.drawString(left, y, f"■ {label}")
+        y -= line_height
+        lines = _textwrap.wrap(year_text.replace("\n", " ").strip(), max_chars)
+        if len(lines) > max_lines_year:
+            lines = lines[:max_lines_year]
+            if lines:
+                lines[-1] = lines[-1].rstrip() + "..."
+        for ln in lines:
+            c.drawString(left, y, ln)
+            y -= line_height
+            if y < bottom:
+                # If summary overflows, start months on next page (rare)
+                c.showPage()
+                _set_font(c, font_name, 14)
+                c.drawString(left, top, "Yearly Fortunes (continued)")
+                _set_font(c, font_name, font_size)
+                y = top - 30
+        y -= 6
+
+    def _draw_month_block(month_key, y):
+        c.drawString(left, y, f"■ Fortune for {month_key}")
+        y -= line_height
+        txt = (yearly.get(month_key) or "").replace("\n", " ").strip()
+        lines = _textwrap.wrap(txt, max_chars)
+        if len(lines) > max_lines_month:
+            lines = lines[:max_lines_month]
+            if lines:
+                lines[-1] = lines[-1].rstrip() + "..."
+        for ln in lines:
+            c.drawString(left, y, ln)
+            y -= line_height
+        y -= 6
+        return y
+
+    for m in first:
+        if y < bottom + (line_height * 6):
+            c.showPage()
+            _set_font(c, font_name, 14)
+            c.drawString(left, top, "Yearly Fortunes (continued)")
+            _set_font(c, font_name, font_size)
+            y = top - 30
+        y = _draw_month_block(m, y)
+
+    # PAGE 4 (only if there is content)
+    if second:
+        c.showPage()
+        _set_font(c, font_name, 14)
+        c.drawString(left, top, "Yearly Fortunes")
+        _set_font(c, font_name, font_size)
+        y = top - 30
+        for m in second:
+            if y < bottom + (line_height * 6):
+                c.showPage()
+                _set_font(c, font_name, 14)
+                c.drawString(left, top, "Yearly Fortunes (continued)")
+                _set_font(c, font_name, font_size)
+                y = top - 30
+            y = _draw_month_block(m, y)
+
+def draw_yearly_pages_shincom_b4(c, data, lang="en"):
+    """
+    v9 override for B4: same as A4 but slightly wider.
+    """
+    yearly = _coerce_yearly_fortunes(data)
+    year_label, year_text = _coerce_yearly_summary(data)
+
+    if not yearly and not year_text:
+        return
+
+    months = sorted(yearly.keys(), key=_month_sort_key)
+    first = months[:6]
+    second = months[6:]
+
+    left = 60
+    top = 1120
+    bottom = 90
+    font_size = 11
+    line_height = 14
+    max_chars = 108
+    max_lines_year = 12
+    max_lines_month = 7
+
+    font_name = select_font_for_lang(lang)
+    _set_font(c, font_name, font_size)
+
+    # PAGE 3
+    c.showPage()
+    _set_font(c, font_name, 16)
+    c.drawString(left, top, "Yearly Fortunes")
+    _set_font(c, font_name, font_size)
+
+    y = top - 35
+
+    if year_text:
+        label = year_label or "Overall fortune"
+        c.drawString(left, y, f"■ {label}")
+        y -= line_height
+        lines = _textwrap.wrap(year_text.replace("\n", " ").strip(), max_chars)
+        if len(lines) > max_lines_year:
+            lines = lines[:max_lines_year]
+            if lines:
+                lines[-1] = lines[-1].rstrip() + "..."
+        for ln in lines:
+            c.drawString(left, y, ln)
+            y -= line_height
+            if y < bottom:
+                c.showPage()
+                _set_font(c, font_name, 16)
+                c.drawString(left, top, "Yearly Fortunes (continued)")
+                _set_font(c, font_name, font_size)
+                y = top - 35
+        y -= 8
+
+    def _draw_month_block(month_key, y):
+        c.drawString(left, y, f"■ Fortune for {month_key}")
+        y -= line_height
+        txt = (yearly.get(month_key) or "").replace("\n", " ").strip()
+        lines = _textwrap.wrap(txt, max_chars)
+        if len(lines) > max_lines_month:
+            lines = lines[:max_lines_month]
+            if lines:
+                lines[-1] = lines[-1].rstrip() + "..."
+        for ln in lines:
+            c.drawString(left, y, ln)
+            y -= line_height
+        y -= 8
+        return y
+
+    for m in first:
+        if y < bottom + (line_height * 7):
+            c.showPage()
+            _set_font(c, font_name, 16)
+            c.drawString(left, top, "Yearly Fortunes (continued)")
+            _set_font(c, font_name, font_size)
+            y = top - 35
+        y = _draw_month_block(m, y)
+
+    if second:
+        c.showPage()
+        _set_font(c, font_name, 16)
+        c.drawString(left, top, "Yearly Fortunes")
+        _set_font(c, font_name, font_size)
+        y = top - 35
+        for m in second:
+            if y < bottom + (line_height * 7):
+                c.showPage()
+                _set_font(c, font_name, 16)
+                c.drawString(left, top, "Yearly Fortunes (continued)")
+                _set_font(c, font_name, font_size)
+                y = top - 35
+            y = _draw_month_block(m, y)
+
