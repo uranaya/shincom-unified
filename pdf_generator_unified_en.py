@@ -206,60 +206,65 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     return y
 
 def draw_palm_image(c, data_or_base64, width, margin_or_y=None, y=None, font_name=None):
+    """Draw palm image (EN module).
 
-"""
-Draw palm image (EN module).
+    Compatible with both call styles:
+      - draw_palm_image(c, base64_image, width, y)
+      - draw_palm_image(c, data_dict, page_width, margin, y, font_name=...)
 
-Compatible with both call styles:
-  - draw_palm_image(c, base64_image, width, y)
-  - draw_palm_image(c, data_dict, page_width, margin, y, font_name=...)
+    Notes:
+      - `font_name` is unused here (image-only), but accepted to match callers.
+      - Returns updated y (float).
+    """
+    # New call style: (c, data_dict, page_width, margin, y, font_name=...)
+    # Old call style: (c, base64_image, width, y)
+    if y is None:
+        base64_image = data_or_base64
+        y = margin_or_y
+    else:
+        data = data_or_base64 or {}
+        base64_image = (
+            data.get("image_data")
+            or data.get("image_data_b64")
+            or data.get("image")
+            or ""
+        )
 
-Notes:
-  - `font_name` is unused here (image-only), but accepted to match callers.
-"""
-# New call style: (c, data_dict, page_width, margin, y, font_name=...)
-# Old call style: (c, base64_image, width, y)
-if y is None:
-    base64_image = data_or_base64
-    y = margin_or_y
-else:
-    data = data_or_base64 or {}
-    base64_image = (
-        data.get("image_data")
-        or data.get("image_data_b64")
-        or data.get("image")
-        or ""
-    )
+    if not base64_image:
+        return y
 
-if not base64_image:
-    return y
     try:
-        image_data = base64.b64decode(base64_image.split(',')[1])
+        # Handle data URL ("data:image/...;base64,XXXX") or raw base64
+        if "," in base64_image:
+            base64_part = base64_image.split(",", 1)[1]
+        else:
+            base64_part = base64_image
+
+        image_data = base64.b64decode(base64_part)
         img = ImageReader(io.BytesIO(image_data))
         img_width, img_height = img.getSize()
 
-        # アスペクト比を保ちつつ、A4用紙の高さの約30%に収まるよう縮小
-        max_height = 0.3 * A4[1]  # 高さ制限（A4用紙の30%）
-        scale_w = (width * 0.7) / img_width  # 横幅70%を基準
-        scale_h = max_height / img_height
+        # Determine page height from width (A4 vs B4)
+        page_height = B4[1] if abs(width - B4[0]) < 1e-6 else A4[1]
+
+        # Keep aspect ratio; fit within 30% of page height; use 70% of page width as baseline
+        max_height = 0.30 * page_height
+        scale_w = (width * 0.70) / float(img_width)
+        scale_h = max_height / float(img_height)
         scale = min(scale_w, scale_h)
 
-        img_width *= scale
-        img_height *= scale
+        draw_w = float(img_width) * scale
+        draw_h = float(img_height) * scale
 
-        x_center = (width - img_width) / 2
-        y -= img_height + 5 * mm
-        c.drawImage(img, x_center, y, width=img_width, height=img_height)
+        x_center = (width - draw_w) / 2.0
+        y = float(y) - draw_h - 5 * mm
+        c.drawImage(img, x_center, y, width=draw_w, height=draw_h)
         y -= 10 * mm
     except Exception as e:
-        print("Image decode error:", e)
+        print("Image decode error:", e, flush=True)
 
     return y
 
-
-# =========================
-# 恋愛版 年運ページ（A4）
-# =========================
 def draw_yearly_pages_renai_a4(c, yearly, lang="ja"):
     """恋愛版 A4：年運＋12か月恋愛運を、テキスト量に応じて自動で複数ページに描画する。"""
     width, height = A4
@@ -336,6 +341,22 @@ def draw_yearly_pages_renai_b4(c, yearly, lang="ja"):
     for month in yearly.get("months", []):
         y = draw_text_block(month.get("label", ""), month.get("text", ""), y)
 
+
+def split_text(text: str, lang: str = "en", base: int = 46):
+    """Split text into wrapped lines for PDF drawing.
+    EN module enforces wrap=90 via _wrap_len().
+    """
+    return smart_wrap(text or "", _wrap_len(base, lang), lang)
+
+
+def _normalize_month_fortune_text(text: str, birthdate: str = "", lang: str = "en") -> str:
+    """EN shim: keep text as-is (signature-compatible with callers)."""
+    return (text or "").strip()
+
+
+def _normalize_next_month_fortune_text(text: str, birthdate: str = "", lang: str = "en") -> str:
+    """EN shim: keep text as-is (signature-compatible with callers)."""
+    return (text or "").strip()
 
 def draw_shincom_a4(c, data, include_yearly=False):
     """English (shincom) A4 layout.
