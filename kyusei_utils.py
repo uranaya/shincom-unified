@@ -360,3 +360,55 @@ def get_directions(*args, lang: str = "ja", **kwargs) -> Dict[str, str]:
 
     label_map = DIR_JP if (lang or "ja").lower().startswith("ja") else DIR_EN
     return {"good": label_map[good_dir_key]}
+# ============================
+# Backward-compat helper APIs
+# ============================
+
+_DIR_JA_EN = {
+    "北": "North",
+    "北東": "Northeast",
+    "東": "East",
+    "南東": "Southeast",
+    "南": "South",
+    "南西": "Southwest",
+    "西": "West",
+    "北西": "Northwest",
+}
+
+def _dir_ja_to_en(d: str) -> str:
+    return _DIR_JA_EN.get((d or "").strip(), (d or "").strip())
+
+def get_kyusei_fortune(birthdate_str: str, now=None, lang: str = "ja") -> str:
+    """Return a short Kyusei Kigaku summary text.
+
+    This function exists for backward-compatibility because some parts of the app import
+    `get_kyusei_fortune` from this module.
+
+    Args:
+        birthdate_str: 'YYYY-MM-DD'
+        now: datetime or None (defaults to datetime.now())
+        lang: 'ja' or 'en'
+
+    Returns:
+        Summary string (Japanese or English). In English mode, the Kyusei star name is kept in Japanese.
+    """
+    if now is None:
+        now = datetime.now()
+
+    honmeisei_num = get_honmeisei(birthdate_str)
+    honmeisei_name = KYUSEI_NAMES_JA.get(honmeisei_num, "")
+
+    dirs = get_directions(birthdate_str, now=now)
+    y = now.year
+
+    if (lang or "").lower().startswith("en"):
+        year_dir = _dir_ja_to_en(dirs.get("year", ""))
+        month_dir = _dir_ja_to_en(dirs.get("month", ""))
+        next_dir = _dir_ja_to_en(dirs.get("next_month", ""))
+        # Keep Kyusei name in Japanese per requirement
+        return f"Main Star: {honmeisei_name}. Lucky directions — {y}: {year_dir}; this month: {month_dir}; next month: {next_dir}."
+    else:
+        year_dir = (dirs.get("year", "") or "").strip()
+        month_dir = (dirs.get("month", "") or "").strip()
+        next_dir = (dirs.get("next_month", "") or "").strip()
+        return f"あなたの本命星は「{honmeisei_name}」です。{y}年の吉方位：{year_dir}　今月：{month_dir}　来月：{next_dir}です。"
