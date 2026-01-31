@@ -739,7 +739,15 @@ def selfmob_uuid(uuid_str):
                 target1 += relativedelta(months=1)
             target2 = target1 + relativedelta(months=1)
 
-            result_data = {
+            
+        # Lucky Direction generation
+        from kyusei_utils import get_lucky_direction
+        lucky_birthdate = birthdate if isinstance(birthdate, datetime) else datetime.strptime(birthdate, "%Y-%m-%d")
+        try:
+            result_data["lucky_direction"] = get_lucky_direction(lucky_birthdate)
+        except Exception as e:
+            print("❌ lucky_direction エラー:", e)
+result_data = {
                 "lang": output_lang,
                 "style": "default",
                 "palm_titles": palm_titles,
