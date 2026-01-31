@@ -1,105 +1,127 @@
-# -*- coding: utf-8 -*-
-"""English header utilities.
-
-This module is intentionally **API-compatible** with the Japanese `header_utils.draw_header`
-so that English PDF generators can call:
-
-    y = draw_header(c, page_width, margin, y_pos)
-
-It also supports the older experimental signature:
-
-    draw_header(c, page_width, page_height, title=...)
-
-"""
-
-from __future__ import annotations
-
+import os
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.units import mm
+from reportlab.graphics.barcode.qr import QrCodeWidget
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics import renderPDF
 
-try:
-    import qrcode
-    from reportlab.lib.utils import ImageReader
-except Exception:  # pragma: no cover
-    qrcode = None
-    ImageReader = None
+# Fallback JA font (if available)
+JA_FONT_NAME = "IPAexGothic"
+JA_FONT_CANDIDATES = [
+    "ipaexg.ttf",
+    "/opt/render/project/src/ipaexg.ttf",
+    "/opt/render/project/src/static/fonts/ipaexg.ttf",
+]
 
-
-def _make_qr_image(qr_text: str):
-    if qrcode is None or ImageReader is None:
-        return None
+def _ensure_ja_font():
     try:
-        img = qrcode.make(qr_text)
-        return ImageReader(img)
-    except Exception:
-        return None
-
-
-def draw_header(
-    c,
-    page_width: float,
-    *args,
-    title: str = "Uranaya Fortune Report",
-    subtitle: str | None = "Palm & Fortune Reading",
-    tokyo_mode: bool = False,
-    qr_text: str = "https://uranaya.jp",
-):
-    """Draw header and return updated y position.
-
-    Supported call patterns:
-      1) (c, page_width, margin, y_pos, ...)
-      2) (c, page_width, page_height, ...)  # legacy experimental form
-    """
-
-    # Resolve args
-    margin = None
-    y_pos = None
-    if len(args) >= 2:
-        margin, y_pos = args[0], args[1]
-    elif len(args) == 1:
-        page_height = args[0]
-        margin = 20 * mm
-        y_pos = page_height - margin
-    else:
-        # Fallback to canvas size
-        page_height = getattr(c, "_pagesize", (page_width, 297 * mm))[1]
-        margin = 20 * mm
-        y_pos = page_height - margin
-
-    # Title
-    try:
-        c.setFont("Helvetica-Bold", 18)
+        if JA_FONT_NAME in pdfmetrics.getRegisteredFontNames():
+            return True
+        for p in JA_FONT_CANDIDATES:
+            if os.path.exists(p):
+                pdfmetrics.registerFont(TTFont(JA_FONT_NAME, p))
+                return True
     except Exception:
         pass
-    c.drawString(margin, y_pos, title)
+    return False
 
-    # Subtitle / location
-    y_after = y_pos - 14
-    if subtitle:
-        try:
-            c.setFont("Helvetica", 10)
-        except Exception:
-            pass
-        c.drawString(margin, y_after, subtitle)
-        y_after -= 12
+def _has_non_ascii(s: str) -> bool:
+    try:
+        return any(ord(ch) > 127 for ch in (s or ""))
+    except Exception:
+        return False
 
-    if tokyo_mode:
-        try:
-            c.setFont("Helvetica", 9)
-        except Exception:
-            pass
-        c.drawString(margin, y_after, "Tokyo / Asakusa")
-        y_after -= 10
+def _font_for_text(text: str, default_font: str = "Times-Roman") -> str:
+    if _has_non_ascii(text):
+        if _ensure_ja_font():
+            return JA_FONT_NAME
+    return default_font
 
-    # QR code (optional)
-    qr_img = _make_qr_image(qr_text)
-    if qr_img is not None:
-        qr_size = 20 * mm
-        qr_x = page_width - margin - qr_size
-        # Align visually near the top block
-        qr_y = y_pos - 18 * mm
-        try:
-            c.drawImage(qr_img, qr_x, qr_y, width=qr_size, height=qr_size)
-        except Exception:
-            pass
+def _draw_qr(c, x, y, size, url):
+    widget = QrCodeWidget(url or "")
+    bounds = widget.getBounds()
+    w = bounds[2] - bounds[0]
+    h = bounds[3] - bounds[1]
+    d = Drawing(size, size, transform=[size / w, 0, 0, size / h, 0, 0])
+    d.add(widget)
+    renderPDF.draw(d, c, x, y)
 
-    return y_after - 4
+def draw_header(c, page_width, margin_or_page_height, y_or_qr=None, qr_url="https://uranaya.online", lang="en"):
+    """
+    Header for the English report.
+
+    New signature (used by pdf_generator_unified_en):
+        draw_header(c, page_width, margin, y_top) -> returns new y
+
+    Backward-compatible signature:
+        draw_header(c, page_width, page_height, qr_url="...") -> returns y after header
+    """
+    # --- signature normalization ---
+    if y_or_qr is None:
+        # called as (c, page_width, page_height)
+        page_height = float(margin_or_page_height)
+        margin = 40
+        y_top = page_height - margin
+        qr = qr_url
+    elif isinstance(y_or_qr, (str, bytes)):
+        # called as (c, page_width, page_height, qr_url)
+        page_height = float(margin_or_page_height)
+        margin = 40
+        y_top = page_height - margin
+        qr = y_or_qr.decode() if isinstance(y_or_qr, bytes) else y_or_qr
+    else:
+        # called as (c, page_width, margin, y_top)
+        margin = float(margin_or_page_height)
+        y_top = float(y_or_qr)
+        qr = qr_url
+
+    header_h = 42 * mm
+    box_w = page_width - 2 * margin
+    y0 = y_top - header_h
+
+    # Outline box (JP-like)
+    c.rect(margin, y0, box_w, header_h)
+
+    # QR
+    qr_size = 28 * mm
+    qr_x = margin + box_w - qr_size - 6 * mm
+    qr_y = y0 + (header_h - qr_size) / 2
+    try:
+        _draw_qr(c, qr_x, qr_y, qr_size, qr)
+    except Exception:
+        pass
+
+    # Text block
+    x_text = margin + 6 * mm
+    y_text = y_top - 10 * mm
+
+    title = "Uranaya Fortune Report"
+    subtitle = "Palm & Fortune Reading"
+    note = "Scan QR to reopen this report"
+
+    # Title
+    c.setFont(_font_for_text(title, "Times-Bold"), 18)
+    c.drawString(x_text, y_text, title)
+    y_text -= 8 * mm
+
+    # Subtitle
+    c.setFont(_font_for_text(subtitle, "Times-Roman"), 11)
+    c.drawString(x_text, y_text, subtitle)
+    y_text -= 7 * mm
+
+    # Site + note
+    site = "uranaya.online"
+    c.setFont(_font_for_text(site, "Times-Roman"), 9.5)
+    c.drawString(x_text, y_text, site)
+    y_text -= 5.5 * mm
+
+    c.setFont(_font_for_text(note, "Times-Roman"), 9)
+    c.drawString(x_text, y_text, note)
+
+    # Return baseline for content
+    return y0 - 10 * mm
+
+# Keep old name for backward compatibility (if used somewhere)
+def draw_header_en(c, page_width, page_height, qr_url="https://uranaya.online"):
+    return draw_header(c, page_width, page_height, qr_url)
