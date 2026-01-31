@@ -661,6 +661,134 @@ def draw_shincom_b4(c, data, include_yearly=False):
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data, lang="en")
 
+
+def _coerce_yearly_fortunes(data):
+    """
+    Accepts several possible shapes:
+    - dict: {"2026-02": "...", "2026-03": "...", ...}
+    - list: [{"month":"2026-02","text":"..."}, ...] or ["...", ...]
+    Returns dict[str,str].
+    """
+    yearly = (
+        data.get("yearly_fortunes")
+        or data.get("yearly_fortune")
+        or data.get("yearly_fortunes_text")
+        or {}
+    )
+    if isinstance(yearly, dict):
+        return {str(k): str(v) for k, v in yearly.items() if str(v).strip()}
+    if isinstance(yearly, list):
+        out = {}
+        for i, item in enumerate(yearly):
+            if isinstance(item, dict):
+                m = item.get("month") or item.get("ym") or item.get("title") or item.get("key")
+                t = item.get("text") or item.get("body") or item.get("fortune") or ""
+                if m and str(t).strip():
+                    out[str(m)] = str(t)
+            else:
+                t = str(item).strip()
+                if t:
+                    out[f"month-{i+1:02d}"] = t
+        return out
+    return {}
+
+def draw_yearly_pages_shincom_a4(c, data, lang="en"):
+    """Yearly fortunes for shincom (A4). Draws 2 pages (6 months per page) without headers."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+
+    yearly = _coerce_yearly_fortunes(data)
+    if not yearly:
+        return
+
+    page_width, page_height = A4
+    margin = 20 * mm
+    font_name = select_font_for_lang(lang)
+
+    def _key(m):
+        mmatch = re.match(r"(\d{4})-(\d{2})", m)
+        if mmatch:
+            return (int(mmatch.group(1)), int(mmatch.group(2)))
+        return (9999, 99, m)
+
+    months = sorted(yearly.keys(), key=_key)
+
+    def draw_page(sub_months):
+        y = page_height - margin
+        _set_font(c, font_name, 12)
+        c.drawString(margin, y, "Yearly Fortunes")
+        y -= 18
+
+        for mth in sub_months:
+            title = f"■ Fortune for {mth}"
+            _set_font(c, font_name, 11)
+            c.drawString(margin, y, title)
+            y -= 14
+
+            body = yearly.get(mth, "")
+            body_lang = "ja" if _has_non_ascii(body) else lang
+            body_font = select_font_for_lang(body_lang)
+
+            _set_font(c, body_font, 10)
+            for line in smart_wrap(body, _wrap_len(90, body_lang), body_lang):
+                c.drawString(margin, y, line)
+                y -= 12
+            y -= 10
+
+    c.showPage()
+    draw_page(months[:6])
+    c.showPage()
+    draw_page(months[6:12])
+
+def draw_yearly_pages_shincom_b4(c, data, lang="en"):
+    """Yearly fortunes for shincom (B4). Draws 2 pages (6 months per page) without headers."""
+    from reportlab.lib.pagesizes import B4
+    from reportlab.lib.units import mm
+
+    yearly = _coerce_yearly_fortunes(data)
+    if not yearly:
+        return
+
+    page_width, page_height = B4
+    margin = 18 * mm
+    font_name = select_font_for_lang(lang)
+
+    def _key(m):
+        mmatch = re.match(r"(\d{4})-(\d{2})", m)
+        if mmatch:
+            return (int(mmatch.group(1)), int(mmatch.group(2)))
+        return (9999, 99, m)
+
+    months = sorted(yearly.keys(), key=_key)
+
+    def draw_page(sub_months):
+        y = page_height - margin
+        _set_font(c, font_name, 13)
+        c.drawString(margin, y, "Yearly Fortunes")
+        y -= 20
+
+        for mth in sub_months:
+            title = f"■ Fortune for {mth}"
+            _set_font(c, font_name, 12)
+            c.drawString(margin, y, title)
+            y -= 16
+
+            body = yearly.get(mth, "")
+            body_lang = "ja" if _has_non_ascii(body) else lang
+            body_font = select_font_for_lang(body_lang)
+
+            _set_font(c, body_font, 11)
+            for line in smart_wrap(body, _wrap_len(95, body_lang), body_lang):
+                c.drawString(margin, y, line)
+                y -= 13
+            y -= 12
+
+    c.showPage()
+    draw_page(months[:6])
+    c.showPage()
+    draw_page(months[6:12])
+
+
 def draw_renai_pdf(c, data, size, include_yearly=False):
     lang = _get_lang(data)
     from reportlab.lib.pagesizes import A4, B4
