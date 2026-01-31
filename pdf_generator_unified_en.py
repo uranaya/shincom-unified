@@ -14,6 +14,8 @@ import io
 import os
 from datetime import datetime
 import re
+import json
+import ast
 import textwrap
 
 def _t(lang: str, ja: str, en: str) -> str:
@@ -661,98 +663,121 @@ def draw_shincom_b4(c, data, include_yearly=False):
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data, lang=lang)
 
-def _coerce_yearly_payload(value, fallback_year_label: str = None, fallback_year_text: str = None):
+def _coerce_yearly_payload(value):
     """
-    Normalize various yearly-fortune payload shapes into a single structure.
-
-    Expected output:
-      {
-        "year_label": str|None,
-        "year_text": str|None,
-        "months": [ {"label": str, "text": str}, ... ]
-      }
-
-    Supported inputs:
-    - dict from yearly_fortune_utils: {"year_label","year_text","months":[{"label","text"},...]}
-    - list of {"label","text"} or {"month"/"ym","text"}
-    - mapping dict: {"2026-02":"...", "2026-03":"..."}
+    Normalize yearly fortune payload into:
+      - year_label: str
+      - year_text : str
+      - months    : list[{"label": str, "text": str}]
+    Accepts a wide range of shapes:
+      - list of dicts (label/text)
+      - dict with keys months/year_label/year_text (months may be list, dict, or a serialized string)
+      - legacy dicts where months are embedded as { "2026-02": "...", ... }
+      - stringified JSON / Python repr of the above
     """
-    out = {"year_label": None, "year_text": None, "months": []}
+    def _to_str(x):
+        return "" if x is None else str(x)
+
+    def _try_parse_structured_string(s):
+        if not isinstance(s, str):
+            return s
+        ss = s.strip()
+        if not ss:
+            return None
+        # Try JSON first (true/false/null), then Python literal repr.
+        if (ss[0] in "[{") and (ss[-1] in "]}"):
+            try:
+                return json.loads(ss)
+            except Exception:
+                pass
+            try:
+                return ast.literal_eval(ss)
+            except Exception:
+                pass
+        return None
+
+    def _month_sort_key(label):
+        if not label:
+            return (9999, 99, label)
+        m = re.search(r"(\d{4})[-/](\d{1,2})", str(label))
+        if not m:
+            return (9999, 99, str(label))
+        y = int(m.group(1))
+        mo = int(m.group(2))
+        return (y, mo, str(label))
 
     if value is None:
-        out["year_label"] = fallback_year_label
-        out["year_text"] = fallback_year_text
-        return out
+        return "", "", []
 
-    # Direct string: treat as year_text
+    # If we got a string, try to parse it first.
     if isinstance(value, str):
-        out["year_label"] = fallback_year_label
-        out["year_text"] = value or fallback_year_text
-        return out
+        parsed = _try_parse_structured_string(value)
+        if parsed is not None:
+            value = parsed
+        else:
+            # plain text fallback
+            return "", _to_str(value), []
 
-    def _norm_month_item(item):
-        if not isinstance(item, dict):
-            return None
-        label = item.get("label") or item.get("month") or item.get("ym") or item.get("key")
-        text = item.get("text") or item.get("body") or item.get("value")
-        if label is None or text is None:
-            return None
-        return {"label": str(label), "text": str(text)}
-
-    # Dict input
-    if isinstance(value, dict):
-        # Already structured
-        if isinstance(value.get("months"), list):
-            out["year_label"] = value.get("year_label") or fallback_year_label
-            out["year_text"] = value.get("year_text") or fallback_year_text
-            months = []
-            for it in value.get("months") or []:
-                mi = _norm_month_item(it)
-                if mi:
-                    months.append(mi)
-            out["months"] = months
-            return out
-
-        # Mapping dict (month -> text)
-        months = []
-        for k, v in value.items():
-            if v is None:
-                continue
-            months.append({"label": str(k), "text": str(v)})
-        # Sort if keys look like YYYY-MM
-        def _sort_key(mi):
-            s = mi["label"]
-            m = re.match(r"^\s*(\d{4})[-/年](\d{1,2})", s)
-            if m:
-                return (int(m.group(1)), int(m.group(2)))
-            return (9999, 99)
-        months.sort(key=_sort_key)
-        out["year_label"] = fallback_year_label
-        out["year_text"] = fallback_year_text
-        out["months"] = months
-        return out
-
-    # List input
+    # list => months only
     if isinstance(value, list):
         months = []
         for it in value:
-            if isinstance(it, dict):
-                mi = _norm_month_item(it)
-                if mi:
-                    months.append(mi)
-        # Keep original order (often already chronological); if not, do a gentle sort
-        if months and all(re.match(r"^\s*\d{4}[-/]\d{1,2}\s*$", m["label"]) for m in months):
-            months.sort(key=lambda m: (int(m["label"].split("-")[0]), int(m["label"].split("-")[1])))
-        out["year_label"] = fallback_year_label
-        out["year_text"] = fallback_year_text
-        out["months"] = months
-        return out
+            months.append(_norm_month_item(it))
+        months.sort(key=lambda d: _month_sort_key(d.get("label", "")))
+        return "", "", months
 
-    out["year_label"] = fallback_year_label
-    out["year_text"] = fallback_year_text
-    return out
+    # dict => try to interpret structured layout first
+    if isinstance(value, dict):
+        # 1) Prefer explicit structure if present
+        structure_keys = {"months", "year_label", "year_text", "monthly", "items", "fortunes", "month_fortunes"}
+        if any(k in value for k in structure_keys):
+            year_label = _to_str(value.get("year_label") or value.get("year") or value.get("label"))
+            year_text = _to_str(value.get("year_text") or value.get("text") or value.get("yearly_text") or value.get("yearly"))
 
+            months_raw = None
+            for k in ("months", "monthly", "month_fortunes", "fortunes", "items"):
+                if k in value and value.get(k) is not None:
+                    months_raw = value.get(k)
+                    break
 
+            months_parsed = _try_parse_structured_string(months_raw) if isinstance(months_raw, str) else months_raw
+
+            months = []
+            if isinstance(months_parsed, list):
+                for it in months_parsed:
+                    months.append(_norm_month_item(it))
+            elif isinstance(months_parsed, dict):
+                for k, v in months_parsed.items():
+                    months.append(_norm_month_item({"label": _to_str(k), "text": _to_str(v)}))
+            elif months_parsed is None:
+                months = []
+            else:
+                # months provided as plain text; keep as a single entry
+                months.append(_norm_month_item({"label": "months", "text": _to_str(months_parsed)}))
+
+            # 2) If months is still empty, fall back to "month-like" keys inside dict
+            if not months:
+                month_like = []
+                for k, v in value.items():
+                    kk = str(k)
+                    if re.match(r"^\d{4}[-/]\d{1,2}$", kk) or re.match(r"^\d{4}-\d{2}", kk):
+                        month_like.append((kk, v))
+                if month_like:
+                    for kk, vv in month_like:
+                        months.append(_norm_month_item({"label": kk, "text": _to_str(vv)}))
+
+            months.sort(key=lambda d: _month_sort_key(d.get("label", "")))
+            return year_label, year_text, months
+
+        # 2) Otherwise interpret as a mapping of month-like keys or generic label->text
+        month_items = []
+        for k, v in value.items():
+            month_items.append(_norm_month_item({"label": _to_str(k), "text": _to_str(v)}))
+        month_items.sort(key=lambda d: _month_sort_key(d.get("label", "")))
+        return "", "", month_items
+
+    # fallback
+    return "", _to_str(value), []
 def _coerce_yearly_fortunes(yearly_data):
     """
     Backward-compatible helper: returns {month: text} mapping.
@@ -763,105 +788,89 @@ def _coerce_yearly_fortunes(yearly_data):
 
 def draw_yearly_pages_shincom_a4(c, data, lang="en"):
     """
-    A4 yearly pages (2 pages max): year overview + 12 monthly fortunes (6 per page).
-    Works with multiple payload shapes via _coerce_yearly_payload().
+    A4 yearly fortunes (2 pages / 12 months), aligned with the Japanese A4 layout:
+      - Page 3: Yearly title + year summary + Feb..Jul (6 months)
+      - Page 4: Yearly title + Aug..Jan (6 months)
     """
     page_width, page_height = A4
-    margin = 40
 
-    yearly_val = (
-        data.get("yearly_fortunes")
-        or data.get("yearly_fortune")
-        or data.get("yearly")
-        or None
-    )
+    # Match the Japanese layout geometry
+    x = 20 * mm
+    y_top = page_height - 30 * mm
+    usable_width = page_width - 40 * mm
 
-    payload = _coerce_yearly_payload(
-        yearly_val,
-        fallback_year_label=None,
-        fallback_year_text=None
-    )
-    months = payload.get("months") or []
-    year_label = payload.get("year_label")
-    year_text = payload.get("year_text")
+    year_label, year_text, month_items = _coerce_yearly_fortunes(data)
 
-    if not months and not (year_text or "").strip():
-        return
+    def _format_month_label(label):
+        s = (label or "").strip()
+        if not s:
+            return "Monthly fortune"
+        # If the model already gave "Fortune for XXXX-XX", keep it as-is
+        if s.lower().startswith("fortune for"):
+            return s
+        return f"Fortune for {s}"
 
-    base_font = select_font_for_lang(lang)
+    def _draw_title_and_year_block():
+        y = y_top
+        _set_font(c, lang, 12)
+        c.drawString(x, y, "Yearly Fortunes")
+        y -= 8 * mm
 
-    def _set_line_font(text, size):
-        use_lang = "ja" if _has_non_ascii(text) else lang
-        _set_font(c, select_font_for_lang(use_lang), size)
+        # Year label (optional)
+        if year_label:
+            _set_font(c, lang, 10)
+            c.drawString(x, y, str(year_label))
+            y -= 6 * mm
 
-    def _draw_header(y):
-        _set_line_font("Yearly Fortunes", 16)
-        c.drawString(margin, y, "Yearly Fortunes")
-        y -= 10 * mm
-
-        if year_label and str(year_label).strip() and str(year_label).strip().lower() != "yearly fortunes":
-            _set_line_font(str(year_label), 12)
-            c.drawString(margin, y, str(year_label))
-            y -= 8 * mm
-
-        if year_text and str(year_text).strip():
-            lines = split_text(str(year_text), 90, lang if not _has_non_ascii(str(year_text)) else "ja")
-            _set_line_font(lines[0] if lines else "", 10)
-            for line in lines:
-                _set_line_font(line, 10)
-                c.drawString(margin, y, line)
-                y -= 6 * mm
-            y -= 4 * mm
+        # Year text (optional)
+        if year_text:
+            _set_font(c, lang, 10)
+            for line in smart_wrap(str(year_text), _wrap_len(90, lang)):
+                c.drawString(x, y, line)
+                y -= 5 * mm
+            y -= 2 * mm
 
         return y
 
-    def _format_month_label(lbl: str) -> str:
-        s = (lbl or "").strip()
-        if not s:
-            return "Monthly Fortune"
-        if s.lower().startswith("fortune"):
-            return s
-        # If looks like YYYY-MM, add prefix
-        if re.match(r"^\d{4}[-/]\d{1,2}$", s):
-            return f"Fortune for {s}"
-        return s
+    def _draw_months(months, y_start):
+        y = y_start
+        _set_font(c, lang, 10)
 
-    def _draw_months(month_items):
-        y = page_height - margin
-        y = _draw_header(y)
+        for item in months:
+            label = _format_month_label(item.get("label", ""))
+            text = item.get("text", "")
 
-        for m in month_items:
-            label = _format_month_label(m.get("label", ""))
-            text = m.get("text", "")
+            # Month header
+            c.drawString(x, y, f"■ {label}")
+            y -= 5 * mm
 
-            # Section title
-            _set_line_font(label, 11)
-            c.drawString(margin, y, label)
-            y -= 7 * mm
+            # Month body
+            for line in smart_wrap(str(text), _wrap_len(90, lang)):
+                c.drawString(x, y, line)
+                y -= 5 * mm
 
-            # Body
-            body_lang = "ja" if _has_non_ascii(text) else lang
-            lines = split_text(text, 90, body_lang)
-            for line in lines:
-                _set_line_font(line, 9.8)
-                c.drawString(margin, y, line)
-                y -= 5.5 * mm
-                if y < margin + 18 * mm:
-                    # Hard page break if it unexpectedly overflows
-                    c.showPage()
-                    y = page_height - margin
-            y -= 4 * mm
+            y -= 2 * mm
+
+            # Safety: don't overrun the page
+            if y < 20 * mm:
+                break
+
+        return y
+
+    # Split into two pages
+    first_page_months = month_items[:6]
+    second_page_months = month_items[6:]
 
     # Page 3
     c.showPage()
-    _draw_months(months[:6])
+    y_after_header = _draw_title_and_year_block()
+    _draw_months(first_page_months, y_after_header)
 
-    # Page 4 only if needed
-    if len(months) > 6:
+    # Page 4 (only if there's content)
+    if second_page_months:
         c.showPage()
-        _draw_months(months[6:12])
-
-
+        y_after_header = _draw_title_and_year_block()
+        _draw_months(second_page_months, y_after_header)
 def draw_yearly_pages_shincom_b4(c, data, lang="en"):
     """
     B4 landscape yearly pages (2 pages max): year overview + 12 monthly fortunes (6 per page).
