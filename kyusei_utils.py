@@ -415,11 +415,13 @@ def get_kyusei_fortune(birthdate_str: str, now=None, lang: str = "ja") -> str:
         return f"あなたの本命星は「{honmeisei_name}」です。{y}年の吉方位：{year_dir}　今月：{month_dir}　来月：{next_dir}です。"
 
 
-STAR_NAMES_JP = ["一白水星", "二黒土星", "三碧木星", "四緑木星", "五黄土星", "六白金星", "七赤金星", "八白土星", "九紫火星"]
-STAR_NAMES_EN = ["Ippaku Water", "Jikoku Earth", "Sanpeki Wood", "Shiroku Wood", "Go-Ou Earth", "Roppaku Metal", "Shichiseki Metal", "Happaku Earth", "Kyushi Fire"]
-
-def get_honmeisei_name(birthdate, lang="ja"):
-    num = get_honmeisei(birthdate)
-    if lang.startswith("en"):
-        return STAR_NAMES_EN[num - 1]
-    return STAR_NAMES_JP[num - 1]
+def get_lucky_direction(birthdate: Optional[str] = None, year: Optional[int] = None, month: Optional[int] = None, day: Optional[int] = None) -> str:
+    from kyusei_core.fortune.honmei import get_honmeisei
+    if birthdate:
+        birth_parts = birthdate.split("-")
+        if len(birth_parts) != 3:
+            raise ValueError("birthdate must be in YYYY-MM-DD format")
+        year, month, day = map(int, birth_parts)
+    elif year is None or month is None or day is None:
+        raise ValueError("get_lucky_direction expects (year, month, day) or (birthdate)")
+    return get_honmeisei(year, month, day)
