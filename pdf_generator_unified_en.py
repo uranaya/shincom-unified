@@ -526,12 +526,15 @@ def draw_shincom_a4(c, data, include_yearly=False):
     def write_block(title: str, body: str, font_size=10, title_size=12):
         nonlocal y
         if title:
-            _set_font(c, font_name, title_size)
+            title_lang = "ja" if _has_non_ascii(title) else font_name
+            _set_font(c, title_lang, title_size)
             c.drawString(margin, y, f"◆ {title}")
             y -= 14
         if body:
-            _set_font(c, font_name, font_size)
-            for line in split_text(body):
+            # Font auto-switch per line to avoid tofu if any JA slips in.
+            for line in split_text(body, lang="en"):
+                line_lang = "ja" if _has_non_ascii(line) else font_name
+                _set_font(c, line_lang, font_size)
                 c.drawString(margin, y, line)
                 y -= 12
         y -= 8
@@ -549,6 +552,11 @@ def draw_shincom_a4(c, data, include_yearly=False):
     titles = data.get("titles", {}) or {}
     texts = data.get("texts", {}) or {}
 
+    def _title_or_fallback(key: str, fallback: str) -> str:
+        t = str(titles.get(key, "") or "").strip()
+        # If upstream accidentally sends JA titles for EN PDF, ignore to keep layout consistent.
+        return fallback if (not t) or _has_non_ascii(t) else t
+
     # Remaining palm sections 4-5
     for i in range(3, 5):
         title = palm_titles[i] if i < len(palm_titles) else ""
@@ -556,16 +564,16 @@ def draw_shincom_a4(c, data, include_yearly=False):
         write_block(title, text)
 
     # Overall palm summary
-    write_block(titles.get("palm_summary", "Overall Palm Reading"), texts.get("palm_summary", ""))
+    write_block(_title_or_fallback("palm_summary", "Overall Palm Reading"), texts.get("palm_summary", ""))
 
     # Personality
     personality_text = data.get("shichu_personality") or data.get("personality") or texts.get("personality", "")
-    write_block(titles.get("personality", "Personality"), personality_text)
+    write_block(_title_or_fallback("personality", "Personality"), personality_text)
 
     # Overall fortune for the year
     year_text_raw = data.get("shichu_year_fortune") or data.get("year_fortune") or texts.get("year_fortune", "")
     if year_text_raw:
-        year_title = titles.get("year_fortune", "Overall fortune")
+        year_title = _title_or_fallback("year_fortune", "Overall fortune")
         m = re.search(r"\b(20\d{2})\b", str(year_text_raw))
         if m:
             year_title = f"Overall fortune for {m.group(1)}"
@@ -578,8 +586,8 @@ def draw_shincom_a4(c, data, include_yearly=False):
     month_text = _normalize_month_fortune_text(month_src, birthdate, lang=lang)
     next_month_text = _normalize_next_month_fortune_text(next_month_src, birthdate, lang=lang)
 
-    write_block(titles.get("month_fortune", "This Month"), month_text)
-    write_block(titles.get("next_month_fortune", "Next Month"), next_month_text)
+    write_block(_title_or_fallback("month_fortune", "This Month"), month_text)
+    write_block(_title_or_fallback("next_month_fortune", "Next Month"), next_month_text)
 
     # Lucky info at the end of page 2 (auto font if Japanese sneaks in)
     lucky_lines = data.get("lucky_info", []) or []
@@ -696,17 +704,21 @@ def draw_shincom_b4(c, data, include_yearly=False):
     titles = data.get("titles", {}) or {}
     texts = data.get("texts", {}) or {}
 
+    def _title_or_fallback(key: str, fallback: str) -> str:
+        t = str(titles.get(key, "") or "").strip()
+        return fallback if (not t) or _has_non_ascii(t) else t
+
     # Overall palm summary
-    write_block(titles.get("palm_summary", "Overall Palm Reading"), texts.get("palm_summary", ""))
+    write_block(_title_or_fallback("palm_summary", "Overall Palm Reading"), texts.get("palm_summary", ""))
 
     # Personality
     personality_text = data.get("shichu_personality") or data.get("personality") or texts.get("personality", "")
-    write_block(titles.get("personality", "Personality"), personality_text)
+    write_block(_title_or_fallback("personality", "Personality"), personality_text)
 
     # Overall fortune for the year
     year_text_raw = data.get("shichu_year_fortune") or data.get("year_fortune") or texts.get("year_fortune", "")
     if year_text_raw:
-        year_title = titles.get("year_fortune", "Overall fortune")
+        year_title = _title_or_fallback("year_fortune", "Overall fortune")
         m = re.search(r"\b(20\d{2})\b", str(year_text_raw))
         if m:
             year_title = f"Overall fortune for {m.group(1)}"
@@ -719,8 +731,8 @@ def draw_shincom_b4(c, data, include_yearly=False):
     month_text = _normalize_month_fortune_text(month_src, birthdate, lang=lang)
     next_month_text = _normalize_next_month_fortune_text(next_month_src, birthdate, lang=lang)
 
-    write_block(titles.get("month_fortune", "This Month"), month_text)
-    write_block(titles.get("next_month_fortune", "Next Month"), next_month_text)
+    write_block(_title_or_fallback("month_fortune", "This Month"), month_text)
+    write_block(_title_or_fallback("next_month_fortune", "Next Month"), next_month_text)
 
     # Lucky info at the end of page 2
     lucky_lines = data.get("lucky_info", []) or []
@@ -1205,12 +1217,15 @@ def draw_shincom_a4(c, data, include_yearly=False):
     def write_block(title: str, body: str, font_size=10, title_size=12):
         nonlocal y
         if title:
-            _set_font(c, font_name, title_size)
+            title_lang = "ja" if _has_non_ascii(title) else font_name
+            _set_font(c, title_lang, title_size)
             c.drawString(margin, y, f"◆ {title}")
             y -= 14
         if body:
-            _set_font(c, font_name, font_size)
-            for line in split_text(body):
+            # Font auto-switch per line to avoid tofu if any JA slips in.
+            for line in split_text(body, lang="en"):
+                line_lang = "ja" if _has_non_ascii(line) else font_name
+                _set_font(c, line_lang, font_size)
                 c.drawString(margin, y, line)
                 y -= 12
         y -= 8
