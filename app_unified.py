@@ -24,7 +24,7 @@ from yearly_fortune_utils import generate_yearly_fortune
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
-from pdf_generator_unified_en import create_pdf_unified_en
+from pdf_generator_unified_en import create_pdf_unified as create_pdf_unified_en
 from fortune_logic import generate_renai_fortune
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -205,6 +205,12 @@ else:
 def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
     try:
         if result_data.get("lang") == "en":
+            # DEBUG marker (English only): confirms EN module is actually used
+            try:
+                import pdf_generator_unified_en as _enpdf
+                print(f"[ENPDF] ACTIVE module={_enpdf.__file__} wrap=90 fn=create_pdf_unified (aliased)", flush=True)
+            except Exception as _e:
+                print(f"[ENPDF] ACTIVE but module introspection failed: {_e}", flush=True)
             create_pdf_unified_en(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
         else:
             create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
@@ -767,14 +773,6 @@ def selfmob_uuid(uuid_str):
                 "palm_image": image_data,
             }
 
-            # English/Japanese separation:
-            # - Only set lang flag for English so Japanese output stays unchanged.
-            # - English PDF generator expects kyusei key; map from honmeisei.
-            result_data.setdefault("kyusei", result_data.get("honmeisei", ""))
-            if output_lang == "en":
-                result_data["lang"] = "en"
-                result_data["output_lang"] = "en"
-
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, today)
                 result_data["yearly_fortunes"] = yearly_data
@@ -1032,10 +1030,32 @@ def ten_shincom():
 
 
 
-            output_lang = (data.get("output_lang") or data.get("lang") or data.get("language") or "").strip().lower()
+            # Guard: if english_output is explicitly false, force Japanese
 
 
 
+
+            _raw_en_flag = data.get("english_output")
+
+
+
+
+            _raw_lang_val = (data.get("output_lang") or data.get("lang") or data.get("language") or "")
+
+
+
+
+            if _raw_en_flag is not None and not _truthy(_raw_en_flag):
+
+
+
+
+                _raw_lang_val = "ja"
+
+
+
+
+            output_lang = str(_raw_lang_val).strip().lower()
             # 1) Direct explicit values
 
             if output_lang in ("en", "english"):
@@ -1183,6 +1203,7 @@ def ten_shincom():
                 "lucky_info": lucky_lines,
                 "lucky_direction": kyusei_text,
                 "birthdate": birthdate,
+        "lang": output_lang,
                 "zodiac": zodiac,
                 "eto": eto,
                 "eto_number": eto_number,
@@ -1580,7 +1601,7 @@ def monthly_summary_sales():
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
-        cur.execute("SELECT date, staff_name, method, amount FROM sales;")
+        cur.execute("SELECT date, staff_name, method, amount FROM sales ORDER BY date DESC;")
         all_sales = cur.fetchall()
         for date_obj, staff_name, method, amount in all_sales:
             key = date_obj.strftime('%Y-%m')
@@ -1589,6 +1610,9 @@ def monthly_summary_sales():
         conn.close()
     except Exception as e:
         return f"❌ 集計エラー: {e}", 500
+
+    # newest month first (YYYY-MM sorts lexicographically)
+    monthly_data = dict(sorted(monthly_data.items(), key=lambda x: x[0], reverse=True))
 
     return render_template("monthly.html", data=monthly_data)
 
