@@ -14,18 +14,6 @@ import io
 import os
 from datetime import datetime
 import re
-
-def _contains_cjk(text: str) -> bool:
-    """Return True if text includes kana/kanji (for font switching in EN PDFs)."""
-    if not text:
-        return False
-    return bool(re.search(r"[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF]", str(text)))
-
-
-def _lang_for_text(text: str, default_lang: str) -> str:
-    """Choose Japanese font if CJK is present; otherwise keep default lang (usually 'en')."""
-    return "ja" if _contains_cjk(text) else default_lang
-
 import json
 import ast
 import textwrap
@@ -158,80 +146,149 @@ def _draw_info_line_auto(c, margin: float, y: float, parts, font_name: str, size
 
 
 def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='en', page_height=None, **kwargs):
-    """ラッキー情報セクション
-    - 2列表示で横幅を有効活用（余白があるのに3ページ化する問題を抑制）
-    - lucky_lines が 1行でも2行でも崩れない
-    - 呼び出し側の互換（lang/page_height/kwargs）対応
+    """Lucky info + lucky directions section (EN module).
+
+    Notes:
+      - This is the EN generator, so section headings are always English.
+      - Individual lines auto-switch fonts (JA font if non-ASCII) to avoid tofu.
+      - Lucky direction text is normalized to a compact English format when the input is Japanese.
     """
     if not lucky_lines:
         lucky_lines = []
 
-    _set_font(c, lang, 12)
-    title = "■ Lucky Info (from birthdate)" if (str(lang).lower().startswith("en")) else "■ ラッキー情報（生年月日より）"
-    c.drawString(margin, y, title)
+    # --- Headings (always English here) ---
+    c.setFont(FONT_NAME_EN, 12)
+    c.drawString(margin, y, "■ Lucky Info (from birthdate)")
     y -= 6 * mm
 
-    # 2列レイアウト
-    _set_font(c, lang, 10)
+    # --- 2-column layout for lucky info lines ---
     col_gap = 8 * mm
     col_w = (width - 2 * margin - col_gap) / 2.0
     line_h = 5.6 * mm
-    font_name = _font(lang)
     font_size = 10
+
+    def _pick_font(s: str) -> str:
+        return FONT_NAME_JA if _has_non_ascii(s) else FONT_NAME_EN
 
     def _fit_one_line(s: str, max_w: float) -> str:
         s = (s or "").strip()
         if not s:
             return ""
-        # 収まるならそのまま
-        if stringWidth(s, font_name, font_size) <= max_w:
+        fn = _pick_font(s)
+        if stringWidth(s, fn, font_size) <= max_w:
             return s
-        # 末尾省略
         ell = "…"
-        while s and stringWidth(s + ell, font_name, font_size) > max_w:
+        while s and stringWidth(s + ell, fn, font_size) > max_w:
             s = s[:-1]
         return (s + ell) if s else ell
 
-    # 2つずつ（左・右）描画。奇数なら右は空。
     for i in range(0, len(lucky_lines), 2):
         left = _fit_one_line(lucky_lines[i], col_w)
         right = _fit_one_line(lucky_lines[i + 1] if i + 1 < len(lucky_lines) else "", col_w)
 
-        c.drawString(margin, y, left)
+        if left:
+            c.setFont(_pick_font(left), font_size)
+            c.drawString(margin, y, left)
         if right:
+            c.setFont(_pick_font(right), font_size)
             c.drawString(margin + col_w + col_gap, y, right)
         y -= line_h
 
-    # 方位（必要なら最後に）
+    # --- Lucky directions ---
     if lucky_direction:
         y -= 1.5 * mm
-        _set_font(c, lang, 10)
-        direction_title = "■ Lucky Directions" if (str(lang).lower().startswith("en")) else "■ ラッキー方位"
-        c.drawString(margin, y, direction_title)
+        c.setFont(FONT_NAME_EN, 10)
+        c.drawString(margin, y, "■ Lucky Directions")
         y -= 5.5 * mm
 
-        dir_text = (lucky_direction or "").strip()
-        # 1行で無理なら折り返し（左列幅いっぱいで）
-        # Keep some extra right padding for English to avoid clipping.
-        max_w = width - 2 * margin - (6 * mm if str(lang).lower().startswith("en") else 0)
-        if stringWidth(dir_text, font_name, font_size) <= max_w:
+        def _jp_dir_to_en(d: str) -> str:
+            d = (d or "").strip()
+            mapping = {
+                "北東": "NE",
+                "南東": "SE",
+                "南西": "SW",
+                "北西": "NW",
+                "北": "N",
+                "東": "E",
+                "南": "S",
+                "西": "W",
+            }
+            return mapping.get(d, d)
+
+        def _format_lucky_direction_text(t: str) -> str:
+            t = (t or "").replace("\x00", "").replace("\u0000", "").replace("\0", "")
+            t = t.replace(chr(0), "").strip()
+            if not t:
+                return ""
+            # If it already looks like English, keep it.
+            if not _has_non_ascii(t):
+                return t
+
+            # Typical JP format:
+            # あなたの本命星は「五黄土星」です。2026年の吉方位：北東 今月：南西 来月：南西 です。
+            m = re.search(
+                r"(\d{4})年の吉方位[:：]\s*([^\s　]+)\s*今月[:：]\s*([^\s　]+)\s*来月[:：]\s*([^\s　]+)",
+                t
+            )
+            if m:
+                year, year_dir, this_dir, next_dir = m.groups()
+                return (
+                    f"Year {year}: {_jp_dir_to_en(year_dir)}  |  "
+                    f"This month: {_jp_dir_to_en(this_dir)}  |  "
+                    f"Next month: {_jp_dir_to_en(next_dir)}"
+                )
+
+            # Fallback: just replace direction tokens if present
+            repl = [
+                ("北東", "NE"), ("南東", "SE"), ("南西", "SW"), ("北西", "NW"),
+                ("北", "N"), ("東", "E"), ("南", "S"), ("西", "W"),
+            ]
+            for jp, en in repl:
+                t = t.replace(jp, en)
+            return t
+
+        dir_text = _format_lucky_direction_text(lucky_direction)
+
+        # Draw (wrap if needed)
+        max_w = width - 2 * margin - 6 * mm  # extra padding avoids right-edge clipping
+        fn = _pick_font(dir_text)
+        if stringWidth(dir_text, fn, font_size) <= max_w:
+            c.setFont(fn, font_size)
             c.drawString(margin, y, dir_text)
             y -= line_h
         else:
-            # 簡易折り返し
-            words = dir_text.split()
-            cur = ""
-            for w in words:
-                candidate = (cur + " " + w).strip()
-                if stringWidth(candidate, font_name, font_size) <= max_w:
-                    cur = candidate
-                else:
+            # ASCII: wrap by words; Non-ASCII: wrap by characters
+            if not _has_non_ascii(dir_text):
+                words = dir_text.split()
+                cur = ""
+                for w in words:
+                    candidate = (cur + " " + w).strip()
+                    if stringWidth(candidate, fn, font_size) <= max_w:
+                        cur = candidate
+                    else:
+                        c.setFont(fn, font_size)
+                        c.drawString(margin, y, cur)
+                        y -= line_h
+                        cur = w
+                if cur:
+                    c.setFont(fn, font_size)
                     c.drawString(margin, y, cur)
                     y -= line_h
-                    cur = w
-            if cur:
-                c.drawString(margin, y, cur)
-                y -= line_h
+            else:
+                cur = ""
+                for ch in dir_text:
+                    candidate = cur + ch
+                    if stringWidth(candidate, fn, font_size) <= max_w:
+                        cur = candidate
+                    else:
+                        c.setFont(fn, font_size)
+                        c.drawString(margin, y, cur)
+                        y -= line_h
+                        cur = ch
+                if cur:
+                    c.setFont(fn, font_size)
+                    c.drawString(margin, y, cur)
+                    y -= line_h
 
     return y
 
@@ -467,50 +524,16 @@ def draw_shincom_a4(c, data, include_yearly=False):
     palm_texts = data.get("palm_texts", []) or []
 
     def write_block(title: str, body: str, font_size=10, title_size=12):
-
         nonlocal y
-
-        t = (title or "").strip()
-
-
-        # Normalize a couple of Japanese section titles that may still be passed from upstream.
-
-        if (lang or "").lower() == "en":
-
-            if t == "手相の総合アドバイス":
-
-                t = "Overall Palm Advice"
-
-            elif t == "性格診断":
-
-                t = "Personality Profile"
-
-
-        if t:
-
-            title_font = select_font_for_lang("ja") if _has_non_ascii(t) else font_name
-
-            _set_font(c, title_font, title_size)
-
-            c.drawString(margin, y, f"◆ {t}")
-
+        if title:
+            _set_font(c, font_name, title_size)
+            c.drawString(margin, y, f"◆ {title}")
             y -= 14
-
-
         if body:
-
-            body_str = str(body)
-
-            body_font = select_font_for_lang("ja") if _has_non_ascii(body_str) else font_name
-
-            _set_font(c, body_font, font_size)
-
-            for line in split_text(body_str):
-
+            _set_font(c, font_name, font_size)
+            for line in split_text(body):
                 c.drawString(margin, y, line)
-
                 y -= 12
-
         y -= 8
 
     # --- Page 1: Palm sections 1-3 ---
@@ -533,16 +556,12 @@ def draw_shincom_a4(c, data, include_yearly=False):
         write_block(title, text)
 
     # Overall palm summary
-    palm_summary_title = titles.get("palm_summary") or "Overall Palm Reading"
-    if _contains_cjk(palm_summary_title):
-        palm_summary_title = "Overall Palm Reading"
-    write_block(palm_summary_title, texts.get("palm_summary", ""))
+    write_block(titles.get("palm_summary", "Overall Palm Reading"), texts.get("palm_summary", ""))
+
     # Personality
     personality_text = data.get("shichu_personality") or data.get("personality") or texts.get("personality", "")
-    personality_title = titles.get("personality") or "Personality"
-    if _contains_cjk(personality_title):
-        personality_title = "Personality"
-    write_block(personality_title, personality_text)
+    write_block(titles.get("personality", "Personality"), personality_text)
+
     # Overall fortune for the year
     year_text_raw = data.get("shichu_year_fortune") or data.get("year_fortune") or texts.get("year_fortune", "")
     if year_text_raw:
@@ -650,54 +669,18 @@ def draw_shincom_b4(c, data, include_yearly=False):
         return y
 
     def write_block(title: str, body: str):
-
         nonlocal y
-
-        t = (title or "").strip()
-
-
-        # Normalize a couple of Japanese section titles that may still be passed from upstream.
-
-        if (lang or "").lower() == "en":
-
-            if t == "手相の総合アドバイス":
-
-                t = "Overall Palm Advice"
-
-            elif t == "性格診断":
-
-                t = "Personality Profile"
-
-
-        if t:
-
+        if title:
             ensure_space(18)
-
-            title_font = select_font_for_lang("ja") if _has_non_ascii(t) else font_name
-
-            _set_font(c, title_font, 12)
-
-            c.drawString(margin, y, f"◆ {t}")
-
+            _set_font(c, font_name, 12)
+            c.drawString(margin, y, f"◆ {title}")
             y -= 14
-
-
         if body:
-
-            body_str = str(body)
-
-            body_font = select_font_for_lang("ja") if _has_non_ascii(body_str) else font_name
-
-            _set_font(c, body_font, 10)
-
-            for line in split_text(body_str):
-
+            _set_font(c, font_name, 10)
+            for line in split_text(body):
                 ensure_space(14)
-
                 c.drawString(margin, y, line)
-
                 y -= 12
-
         y -= 8
 
     # --- Page 1: all 5 palm sections ---
@@ -714,16 +697,12 @@ def draw_shincom_b4(c, data, include_yearly=False):
     texts = data.get("texts", {}) or {}
 
     # Overall palm summary
-    palm_summary_title = titles.get("palm_summary") or "Overall Palm Reading"
-    if _contains_cjk(palm_summary_title):
-        palm_summary_title = "Overall Palm Reading"
-    write_block(palm_summary_title, texts.get("palm_summary", ""))
+    write_block(titles.get("palm_summary", "Overall Palm Reading"), texts.get("palm_summary", ""))
+
     # Personality
     personality_text = data.get("shichu_personality") or data.get("personality") or texts.get("personality", "")
-    personality_title = titles.get("personality") or "Personality"
-    if _contains_cjk(personality_title):
-        personality_title = "Personality"
-    write_block(personality_title, personality_text)
+    write_block(titles.get("personality", "Personality"), personality_text)
+
     # Overall fortune for the year
     year_text_raw = data.get("shichu_year_fortune") or data.get("year_fortune") or texts.get("year_fortune", "")
     if year_text_raw:
@@ -1224,50 +1203,16 @@ def draw_shincom_a4(c, data, include_yearly=False):
     palm_texts = data.get("palm_texts", []) or []
 
     def write_block(title: str, body: str, font_size=10, title_size=12):
-
         nonlocal y
-
-        t = (title or "").strip()
-
-
-        # Normalize a couple of Japanese section titles that may still be passed from upstream.
-
-        if (lang or "").lower() == "en":
-
-            if t == "手相の総合アドバイス":
-
-                t = "Overall Palm Advice"
-
-            elif t == "性格診断":
-
-                t = "Personality Profile"
-
-
-        if t:
-
-            title_font = select_font_for_lang("ja") if _has_non_ascii(t) else font_name
-
-            _set_font(c, title_font, title_size)
-
-            c.drawString(margin, y, f"◆ {t}")
-
+        if title:
+            _set_font(c, font_name, title_size)
+            c.drawString(margin, y, f"◆ {title}")
             y -= 14
-
-
         if body:
-
-            body_str = str(body)
-
-            body_font = select_font_for_lang("ja") if _has_non_ascii(body_str) else font_name
-
-            _set_font(c, body_font, font_size)
-
-            for line in split_text(body_str):
-
+            _set_font(c, font_name, font_size)
+            for line in split_text(body):
                 c.drawString(margin, y, line)
-
                 y -= 12
-
         y -= 8
 
     # --- Page 1: Palm sections 1-3 ---
@@ -1290,16 +1235,12 @@ def draw_shincom_a4(c, data, include_yearly=False):
         write_block(title, text)
 
     # Overall palm summary
-    palm_summary_title = titles.get("palm_summary") or "Overall Palm Reading"
-    if _contains_cjk(palm_summary_title):
-        palm_summary_title = "Overall Palm Reading"
-    write_block(palm_summary_title, texts.get("palm_summary", ""))
+    write_block(titles.get("palm_summary", "Overall Palm Reading"), texts.get("palm_summary", ""))
+
     # Personality
     personality_text = data.get("shichu_personality") or data.get("personality") or texts.get("personality", "")
-    personality_title = titles.get("personality") or "Personality"
-    if _contains_cjk(personality_title):
-        personality_title = "Personality"
-    write_block(personality_title, personality_text)
+    write_block(titles.get("personality", "Personality"), personality_text)
+
     # Overall fortune for the year
     year_text_raw = data.get("shichu_year_fortune") or data.get("year_fortune") or texts.get("year_fortune", "")
     if year_text_raw:
@@ -1407,54 +1348,18 @@ def draw_shincom_b4(c, data, include_yearly=False):
         return y
 
     def write_block(title: str, body: str):
-
         nonlocal y
-
-        t = (title or "").strip()
-
-
-        # Normalize a couple of Japanese section titles that may still be passed from upstream.
-
-        if (lang or "").lower() == "en":
-
-            if t == "手相の総合アドバイス":
-
-                t = "Overall Palm Advice"
-
-            elif t == "性格診断":
-
-                t = "Personality Profile"
-
-
-        if t:
-
+        if title:
             ensure_space(18)
-
-            title_font = select_font_for_lang("ja") if _has_non_ascii(t) else font_name
-
-            _set_font(c, title_font, 12)
-
-            c.drawString(margin, y, f"◆ {t}")
-
+            _set_font(c, font_name, 12)
+            c.drawString(margin, y, f"◆ {title}")
             y -= 14
-
-
         if body:
-
-            body_str = str(body)
-
-            body_font = select_font_for_lang("ja") if _has_non_ascii(body_str) else font_name
-
-            _set_font(c, body_font, 10)
-
-            for line in split_text(body_str):
-
+            _set_font(c, font_name, 10)
+            for line in split_text(body):
                 ensure_space(14)
-
                 c.drawString(margin, y, line)
-
                 y -= 12
-
         y -= 8
 
     # --- Page 1: all 5 palm sections ---
@@ -1471,16 +1376,12 @@ def draw_shincom_b4(c, data, include_yearly=False):
     texts = data.get("texts", {}) or {}
 
     # Overall palm summary
-    palm_summary_title = titles.get("palm_summary") or "Overall Palm Reading"
-    if _contains_cjk(palm_summary_title):
-        palm_summary_title = "Overall Palm Reading"
-    write_block(palm_summary_title, texts.get("palm_summary", ""))
+    write_block(titles.get("palm_summary", "Overall Palm Reading"), texts.get("palm_summary", ""))
+
     # Personality
     personality_text = data.get("shichu_personality") or data.get("personality") or texts.get("personality", "")
-    personality_title = titles.get("personality") or "Personality"
-    if _contains_cjk(personality_title):
-        personality_title = "Personality"
-    write_block(personality_title, personality_text)
+    write_block(titles.get("personality", "Personality"), personality_text)
+
     # Overall fortune for the year
     year_text_raw = data.get("shichu_year_fortune") or data.get("year_fortune") or texts.get("year_fortune", "")
     if year_text_raw:
@@ -1916,13 +1817,13 @@ def draw_yearly_pages_shincom_a4(c, data, lang="en"):
     max_lines_month = 6
 
     font_name = select_font_for_lang(lang)
-    _set_font(c, _lang_for_text(body, font_name), font_size)
+    _set_font(c, font_name, font_size)
 
     # PAGE 3
     c.showPage()
     _set_font(c, font_name, 14)
     c.drawString(left, top, "Yearly Fortunes")
-    _set_font(c, _lang_for_text(body, font_name), font_size)
+    _set_font(c, font_name, font_size)
 
     y = top - 30
 
@@ -1944,7 +1845,7 @@ def draw_yearly_pages_shincom_a4(c, data, lang="en"):
                 c.showPage()
                 _set_font(c, font_name, 14)
                 c.drawString(left, top, "Yearly Fortunes (continued)")
-                _set_font(c, _lang_for_text(body, font_name), font_size)
+                _set_font(c, font_name, font_size)
                 y = top - 30
         y -= 6
 
@@ -1968,7 +1869,7 @@ def draw_yearly_pages_shincom_a4(c, data, lang="en"):
             c.showPage()
             _set_font(c, font_name, 14)
             c.drawString(left, top, "Yearly Fortunes (continued)")
-            _set_font(c, _lang_for_text(body, font_name), font_size)
+            _set_font(c, font_name, font_size)
             y = top - 30
         y = _draw_month_block(m, y)
 
@@ -1977,14 +1878,14 @@ def draw_yearly_pages_shincom_a4(c, data, lang="en"):
         c.showPage()
         _set_font(c, font_name, 14)
         c.drawString(left, top, "Yearly Fortunes")
-        _set_font(c, _lang_for_text(body, font_name), font_size)
+        _set_font(c, font_name, font_size)
         y = top - 30
         for m in second:
             if y < bottom + (line_height * 6):
                 c.showPage()
                 _set_font(c, font_name, 14)
                 c.drawString(left, top, "Yearly Fortunes (continued)")
-                _set_font(c, _lang_for_text(body, font_name), font_size)
+                _set_font(c, font_name, font_size)
                 y = top - 30
             y = _draw_month_block(m, y)
 
@@ -2012,13 +1913,13 @@ def draw_yearly_pages_shincom_b4(c, data, lang="en"):
     max_lines_month = 7
 
     font_name = select_font_for_lang(lang)
-    _set_font(c, _lang_for_text(body, font_name), font_size)
+    _set_font(c, font_name, font_size)
 
     # PAGE 3
     c.showPage()
     _set_font(c, font_name, 16)
     c.drawString(left, top, "Yearly Fortunes")
-    _set_font(c, _lang_for_text(body, font_name), font_size)
+    _set_font(c, font_name, font_size)
 
     y = top - 35
 
@@ -2038,7 +1939,7 @@ def draw_yearly_pages_shincom_b4(c, data, lang="en"):
                 c.showPage()
                 _set_font(c, font_name, 16)
                 c.drawString(left, top, "Yearly Fortunes (continued)")
-                _set_font(c, _lang_for_text(body, font_name), font_size)
+                _set_font(c, font_name, font_size)
                 y = top - 35
         y -= 8
 
@@ -2062,7 +1963,7 @@ def draw_yearly_pages_shincom_b4(c, data, lang="en"):
             c.showPage()
             _set_font(c, font_name, 16)
             c.drawString(left, top, "Yearly Fortunes (continued)")
-            _set_font(c, _lang_for_text(body, font_name), font_size)
+            _set_font(c, font_name, font_size)
             y = top - 35
         y = _draw_month_block(m, y)
 
@@ -2070,14 +1971,14 @@ def draw_yearly_pages_shincom_b4(c, data, lang="en"):
         c.showPage()
         _set_font(c, font_name, 16)
         c.drawString(left, top, "Yearly Fortunes")
-        _set_font(c, _lang_for_text(body, font_name), font_size)
+        _set_font(c, font_name, font_size)
         y = top - 35
         for m in second:
             if y < bottom + (line_height * 7):
                 c.showPage()
                 _set_font(c, font_name, 16)
                 c.drawString(left, top, "Yearly Fortunes (continued)")
-                _set_font(c, _lang_for_text(body, font_name), font_size)
+                _set_font(c, font_name, font_size)
                 y = top - 35
             y = _draw_month_block(m, y)
 
