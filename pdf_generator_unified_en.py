@@ -126,7 +126,23 @@ def _wrap_len(base: int, lang: str) -> int:
     if (lang or "ja").lower().startswith("en"):
         return 90
     return base
+def _has_non_ascii(s: str) -> bool:
+    return any(ord(ch) > 127 for ch in (s or ""))
 
+def _draw_info_line_auto(c, margin: float, y: float, parts, font_name: str, size: float = 9, step: float = 12) -> float:
+    """Draw a single info line; auto-switch to JP font when the text contains non-ASCII.
+
+    `font_name` is a language key ("en"/"ja") used by `_set_font`.
+    """
+    if not parts:
+        return y
+    s = " / ".join([p for p in parts if p])
+    if not s:
+        return y
+    use_lang = "ja" if _has_non_ascii(s) else font_name
+    _set_font(c, use_lang, size)
+    c.drawString(margin, y, s)
+    return y - step
 
 
 def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='en', page_height=None, **kwargs):
@@ -428,13 +444,11 @@ def draw_shincom_a4(c, data, include_yearly=False):
     if honmeisei:
         line2_parts.append(f"Main Star: {honmeisei}")
 
-    _set_font(c, font_name, 9)
     if line1_parts:
-        c.drawString(margin, y, " / ".join(line1_parts))
-        y -= 12
+        y = _draw_info_line_auto(c, margin, y, line1_parts, font_name, 9)
     if line2_parts:
-        c.drawString(margin, y, " / ".join(line2_parts))
-        y -= 12
+        y = _draw_info_line_auto(c, margin, y, line2_parts, font_name, 9)
+    _set_font(c, font_name, 9)
     y -= 2
 
     palm_titles = data.get("palm_titles", []) or []
@@ -568,13 +582,11 @@ def draw_shincom_b4(c, data, include_yearly=False):
     if honmeisei:
         line2_parts.append(f"Main Star: {honmeisei}")
 
-    _set_font(c, font_name, 10)
     if line1_parts:
-        c.drawString(margin, y, " / ".join(line1_parts))
-        y -= 14
+        y = _draw_info_line_auto(c, margin, y, line1_parts, font_name, 10, 14)
     if line2_parts:
-        c.drawString(margin, y, " / ".join(line2_parts))
-        y -= 14
+        y = _draw_info_line_auto(c, margin, y, line2_parts, font_name, 10, 14)
+    _set_font(c, font_name, 10)
     y -= 2
 
     palm_titles = data.get("palm_titles", []) or []
@@ -1111,13 +1123,11 @@ def draw_shincom_a4(c, data, include_yearly=False):
     if honmeisei:
         line2_parts.append(f"Main Star: {honmeisei}")
 
-    _set_font(c, font_name, 9)
     if line1_parts:
-        c.drawString(margin, y, " / ".join(line1_parts))
-        y -= 12
+        y = _draw_info_line_auto(c, margin, y, line1_parts, font_name, 9)
     if line2_parts:
-        c.drawString(margin, y, " / ".join(line2_parts))
-        y -= 12
+        y = _draw_info_line_auto(c, margin, y, line2_parts, font_name, 9)
+    _set_font(c, font_name, 9)
     y -= 2
 
     palm_titles = data.get("palm_titles", []) or []
@@ -1251,13 +1261,11 @@ def draw_shincom_b4(c, data, include_yearly=False):
     if honmeisei:
         line2_parts.append(f"Main Star: {honmeisei}")
 
-    _set_font(c, font_name, 10)
     if line1_parts:
-        c.drawString(margin, y, " / ".join(line1_parts))
-        y -= 14
+        y = _draw_info_line_auto(c, margin, y, line1_parts, font_name, 10, 14)
     if line2_parts:
-        c.drawString(margin, y, " / ".join(line2_parts))
-        y -= 14
+        y = _draw_info_line_auto(c, margin, y, line2_parts, font_name, 10, 14)
+    _set_font(c, font_name, 10)
     y -= 2
 
     palm_titles = data.get("palm_titles", []) or []
