@@ -605,56 +605,6 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
             palm_titles.append(title.strip())
             palm_texts.append(body[0].strip() if body else "")
 
-    
-    # --- Safety: ensure we always have 5 palm sections + 1 overall comment (so PDF never crashes) ---
-    min_blocks = 6  # 5 lines + overall
-    if lang == "en":
-        fallback_titles = [
-            "Life Line",
-            "Head Line",
-            "Heart Line",
-            "Special Line 1",
-            "Special Line 2",
-            "Overall Palm Reading",
-        ]
-        fallback_text = (
-            "This part couldn't be clearly identified from the photo. "
-            "If you can, please retake the photo with better lighting and focus."
-        )
-    else:
-        fallback_titles = [
-            "生命線",
-            "頭脳線",
-            "感情線",
-            "特殊線①",
-            "特殊線②",
-            "手相総合アドバイス",
-        ]
-        fallback_text = "※画像からこの項目を明確に判定できませんでした。可能なら明るい場所で撮り直してください。"
-
-    # Normalize list lengths
-    while len(palm_titles) < min_blocks:
-        palm_titles.append(fallback_titles[min(len(palm_titles), len(fallback_titles) - 1)])
-    while len(palm_texts) < min_blocks:
-        palm_texts.append(fallback_text)
-
-    # Trim excessive blocks (keep first 5 + overall)
-    if len(palm_titles) > min_blocks:
-        palm_titles = palm_titles[:min_blocks]
-    if len(palm_texts) > min_blocks:
-        palm_texts = palm_texts[:min_blocks]
-
-    # Ensure non-empty titles/texts for the first 5 blocks
-    for i in range(5):
-        if not (palm_titles[i] or "").strip():
-            palm_titles[i] = fallback_titles[i]
-        if not (palm_texts[i] or "").strip():
-            palm_texts[i] = fallback_text
-    # Ensure the overall comment exists
-    if not (palm_texts[5] or "").strip():
-        palm_texts[5] = fallback_text
-
-
     return palm_titles, palm_texts, shichu_texts, iching_result, lucky_lines
 
 
