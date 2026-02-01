@@ -25,6 +25,56 @@ from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicc
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
 from pdf_generator_unified_en import create_pdf_unified as create_pdf_unified_en
+
+# ------------------------------------------------------------
+# PDF language guard
+#
+# Prevent a common deployment accident: pdf_generator_unified.py (JA)
+# is accidentally replaced by the EN module. When both files are identical,
+# "日本語通常版"でも英語PDF生成ロジックが走り、
+# フォントやwrap設定が不整合になって文字化け・崩れの原因になります。
+# ------------------------------------------------------------
+def _pdf_lang_guard():
+    try:
+        import pdf_generator_unified as _ja
+        import pdf_generator_unified_en as _en
+        import os
+        import hashlib
+
+        ja_path = os.path.abspath(getattr(_ja, "__file__", ""))
+        en_path = os.path.abspath(getattr(_en, "__file__", ""))
+
+        if not (ja_path and en_path):
+            print("⚠️ [PDF-LANG-GUARD] __file__ not available", flush=True)
+            return
+
+        if ja_path == en_path:
+            print(f"❌ [PDF-LANG-GUARD] JA/EN generator points to same file: {ja_path}", flush=True)
+            return
+
+        def md5(path: str) -> str:
+            h = hashlib.md5()
+            with open(path, "rb") as f:
+                for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                    h.update(chunk)
+            return h.hexdigest()
+
+        ja_md5 = md5(ja_path)
+        en_md5 = md5(en_path)
+        if ja_md5 == en_md5:
+            print(
+                "❌ [PDF-LANG-GUARD] pdf_generator_unified.py と pdf_generator_unified_en.py が同一内容です。\n"
+                "    → 日本語出力でも英語PDFロジックが走り、文字化け・レイアウト崩れの原因になります。\n"
+                "    → 修正: pdf_generator_unified.py を日本語版に戻してください。",
+                flush=True,
+            )
+        else:
+            print("✅ [PDF-LANG-GUARD] pdf generators OK", flush=True)
+    except Exception as e:
+        print(f"⚠️ [PDF-LANG-GUARD] check skipped: {e}", flush=True)
+
+
+_pdf_lang_guard()
 from fortune_logic import generate_renai_fortune
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -204,7 +254,17 @@ else:
 # Background thread task to generate PDF and handle post-processing
 def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_yearly=False, uuid_str=None, shop_id=None):
     try:
-        if result_data.get("lang") == "en":
+        # 言語判定は"lang"を優先しつつ、欠落時は"output_lang"も参照する。
+        # （フォーム側の揺れや将来の変更に強くする）
+        lang = (result_data.get("lang") or result_data.get("output_lang") or "").strip().lower()
+        use_en = lang.startswith("en")
+
+        print(
+            f"[PDFGEN] lang={lang or 'ja'} use={'EN' if use_en else 'JA'} file={filepath} mode={pdf_mode} size={size} include_yearly={include_yearly}",
+            flush=True,
+        )
+
+        if use_en:
             # DEBUG marker (English only): confirms EN module is actually used
             try:
                 import pdf_generator_unified_en as _enpdf
@@ -1030,32 +1090,10 @@ def ten_shincom():
 
 
 
-            # Guard: if english_output is explicitly false, force Japanese
+            output_lang = (data.get("output_lang") or data.get("lang") or data.get("language") or "").strip().lower()
 
 
 
-
-            _raw_en_flag = data.get("english_output")
-
-
-
-
-            _raw_lang_val = (data.get("output_lang") or data.get("lang") or data.get("language") or "")
-
-
-
-
-            if _raw_en_flag is not None and not _truthy(_raw_en_flag):
-
-
-
-
-                _raw_lang_val = "ja"
-
-
-
-
-            output_lang = str(_raw_lang_val).strip().lower()
             # 1) Direct explicit values
 
             if output_lang in ("en", "english"):
