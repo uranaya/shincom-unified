@@ -1579,7 +1579,7 @@ def monthly_summary_sales():
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
-        cur.execute("SELECT date, staff_name, method, amount FROM sales;")
+        cur.execute("SELECT date, staff_name, method, amount FROM sales ORDER BY date DESC;")
         all_sales = cur.fetchall()
         for date_obj, staff_name, method, amount in all_sales:
             key = date_obj.strftime('%Y-%m')
@@ -1588,6 +1588,9 @@ def monthly_summary_sales():
         conn.close()
     except Exception as e:
         return f"❌ 集計エラー: {e}", 500
+
+    # newest month first (YYYY-MM sorts lexicographically)
+    monthly_data = dict(sorted(monthly_data.items(), key=lambda x: x[0], reverse=True))
 
     return render_template("monthly.html", data=monthly_data)
 
