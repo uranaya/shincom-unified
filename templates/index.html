@@ -121,16 +121,18 @@
       <span>来月・再来月を占う（20日以前でも来月起点にする）</span>
     </label>
 
-    <label for="output_mode" style="display:block; margin-top:16px; font-weight:600;">出力モード：</label>
-    <select id="output_mode">
-      <option value="ja" selected>日本語（標準）</option>
-      <option value="tokyo">日本語（東京・浅草）</option>
-      <option value="en">English</option>
-      <option value="zh">中文（简体）</option>
-    </select>
+    <label class="option-label" for="tokyo_mode">
+      <input type="checkbox" id="tokyo_mode" name="tokyo_mode" value="yes">
+      <span>東京（浅草）向けの文章にする</span>
+    </label>
+
+    <label class="option-label" for="english_output">
+      <input type="checkbox" id="english_output" name="english_output" value="yes">
+      <span>English output</span>
+    </label>
   </div>
 
-<button id=\"submitBtn\" onclick="submitForm()">送信してPDF生成</button>
+<button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
   <a href="/renai" style="display:block; text-align:center; margin:10px 0;">💘 恋愛占いはこちら</a>
   <form action="/logout"><button>ログアウト</button></form>
 
@@ -349,11 +351,9 @@
 
       const forceNextMonth = document.getElementById("force_next_month")?.checked || false;
 
-      const mode = document.getElementById("output_mode")?.value || "ja";
-
-      const tokyoMode = (mode === "tokyo");
-      const outputLang = (mode === "en") ? "en" : ((mode === "zh") ? "zh" : "ja");
-      const englishOutput = (outputLang === "en");
+      const tokyoMode = document.getElementById("tokyo_mode")?.checked || false;
+      const englishOutput = document.getElementById("english_output")?.checked || false;
+      const outputLang = englishOutput ? "en" : "ja";
 
       const payload = { image_data: imageData, birthdate, full_year: fullYear, force_next_month: forceNextMonth,
                         tokyo_mode: tokyoMode, english_output: englishOutput, output_lang: outputLang };

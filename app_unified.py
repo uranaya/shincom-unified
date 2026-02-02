@@ -1104,10 +1104,6 @@ def ten_shincom():
 
                 output_lang = "ja"
 
-            elif output_lang in ("zh", "zh-cn", "zh-hans", "chinese", "cn", "中文", "简体", "簡体"):
-
-                output_lang = "zh"
-
             else:
 
                 output_lang = ""
@@ -1168,7 +1164,7 @@ def ten_shincom():
 
             output_lang = output_lang or "ja"
 
-            if output_lang not in ("ja", "en", "zh"):
+            if output_lang not in ("ja", "en"):
 
                 output_lang = "ja"
 
