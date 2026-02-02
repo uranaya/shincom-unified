@@ -25,6 +25,7 @@ from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicc
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
 from pdf_generator_unified_en import create_pdf_unified as create_pdf_unified_en
+from pdf_generator_unified_zh import create_pdf_unified as create_pdf_unified_zh
 
 # ------------------------------------------------------------
 # PDF language guard
@@ -258,9 +259,12 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
         # （フォーム側の揺れや将来の変更に強くする）
         lang = (result_data.get("lang") or result_data.get("output_lang") or "").strip().lower()
         use_en = lang.startswith("en")
+        use_zh = lang.startswith("zh")
+
+        use_tag = 'EN' if use_en else ('ZH' if use_zh else 'JA')
 
         print(
-            f"[PDFGEN] lang={lang or 'ja'} use={'EN' if use_en else 'JA'} file={filepath} mode={pdf_mode} size={size} include_yearly={include_yearly}",
+            f"[PDFGEN] lang={lang or 'ja'} use={use_tag} file={filepath} mode={pdf_mode} size={size} include_yearly={include_yearly}",
             flush=True,
         )
 
@@ -272,6 +276,13 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
             except Exception as _e:
                 print(f"[ENPDF] ACTIVE but module introspection failed: {_e}", flush=True)
             create_pdf_unified_en(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
+        elif use_zh:
+            try:
+                import pdf_generator_unified_zh as _zhpdf
+                print(f"[ZHPDF] ACTIVE module={_zhpdf.__file__} fn=create_pdf_unified", flush=True)
+            except Exception as _e:
+                print(f"[ZHPDF] ACTIVE but module introspection failed: {_e}", flush=True)
+            create_pdf_unified_zh(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
         else:
             create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
     except Exception as e:
@@ -1100,6 +1111,8 @@ def ten_shincom():
 
                 output_lang = "en"
 
+            elif output_lang in ("zh", "cn", "chinese", "zh-cn", "zh_cn", "zh-hans", "zh_hans"):
+                output_lang = "zh"
             elif output_lang in ("ja", "jp", "japanese"):
 
                 output_lang = "ja"
@@ -1164,8 +1177,7 @@ def ten_shincom():
 
             output_lang = output_lang or "ja"
 
-            if output_lang not in ("ja", "en"):
-
+            if output_lang not in ("ja", "en", "zh"):
                 output_lang = "ja"
 
 
