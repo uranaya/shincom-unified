@@ -6,6 +6,7 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import stringWidth
 import base64
@@ -23,7 +24,11 @@ def _get_lang(data: dict) -> str:
         return 'ja'
     lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
     lang = (lang or 'ja').strip().lower()
-    return 'en' if lang.startswith('en') else 'ja'
+    if lang.startswith('en'):
+        return 'en'
+    if lang.startswith('zh'):
+        return 'zh'
+    return 'ja'
 import base64
 import io
 import os
@@ -52,7 +57,7 @@ def smart_wrap(text: str, limit: int, lang: str | None = None):
             out.append('')
             continue
         # Detect CJK if lang is ja OR the string contains CJK chars.
-        is_cjk = (lang == 'ja') or bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", p))
+        is_cjk = (lang in ('ja','zh')) or bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", p))
         if is_cjk:
             # simple fixed-width split
             for k in range(0, len(p), max(1, limit)):
@@ -86,9 +91,21 @@ pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 # English uses built-in PDF fonts for clean rendering and predictable metrics.
 FONT_NAME_JA = FONT_NAME
 FONT_NAME_EN = "Times-Roman"
+FONT_NAME_ZH = "STSong-Light"
+
+# Chinese (Simplified) uses built-in CID font (no TTF file required).
+try:
+    pdfmetrics.registerFont(UnicodeCIDFont(FONT_NAME_ZH))
+except Exception as e:
+    print("CID font registration error:", e)
 
 def _font(lang: str) -> str:
-    return FONT_NAME_EN if str(lang).lower().startswith("en") else FONT_NAME_JA
+    ll = str(lang).lower()
+    if ll.startswith('en'):
+        return FONT_NAME_EN
+    if ll.startswith('zh'):
+        return FONT_NAME_ZH
+    return FONT_NAME_JA
 
 def _set_font(c, lang: str, size: float):
     c.setFont(_font(lang), size)
@@ -112,7 +129,13 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
         lucky_lines = []
 
     _set_font(c, lang, 12)
-    title = "■ Lucky Info (from birthdate)" if (str(lang).lower().startswith("en")) else "■ ラッキー情報（生年月日より）"
+    ll = str(lang).lower()
+    if ll.startswith("en"):
+        title = "■ Lucky Info (from birthdate)"
+    elif ll.startswith("zh"):
+        title = "■ 幸运信息（根据出生日期）"
+    else:
+        title = "■ ラッキー情報（生年月日より）"
     c.drawString(margin, y, title)
     y -= 6 * mm
 
@@ -151,7 +174,13 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     if lucky_direction:
         y -= 1.5 * mm
         _set_font(c, lang, 10)
-        direction_title = "■ Lucky Directions" if (str(lang).lower().startswith("en")) else "■ ラッキー方位"
+        ll = str(lang).lower()
+        if ll.startswith("en"):
+            direction_title = "■ Lucky Directions"
+        elif ll.startswith("zh"):
+            direction_title = "■ 吉方位"
+        else:
+            direction_title = "■ ラッキー方位"
         c.drawString(margin, y, direction_title)
         y -= 5.5 * mm
 
@@ -163,20 +192,26 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
             c.drawString(margin, y, dir_text)
             y -= line_h
         else:
-            # 簡易折り返し
-            words = dir_text.split()
-            cur = ""
-            for w in words:
-                candidate = (cur + " " + w).strip()
-                if stringWidth(candidate, font_name, font_size) <= max_w:
-                    cur = candidate
-                else:
+            # 簡易折り返し（英語は単語単位、CJKは文字数で）
+            ll = str(lang).lower()
+            if ll.startswith("zh") or ll.startswith("ja") or (" " not in dir_text):
+                for line in smart_wrap(dir_text, 24 if ll.startswith("en") else 30, lang):
+                    c.drawString(margin, y, line)
+                    y -= line_h
+            else:
+                words = dir_text.split()
+                cur = ""
+                for w in words:
+                    candidate = (cur + " " + w).strip()
+                    if stringWidth(candidate, font_name, font_size) <= max_w:
+                        cur = candidate
+                    else:
+                        c.drawString(margin, y, cur)
+                        y -= line_h
+                        cur = w
+                if cur:
                     c.drawString(margin, y, cur)
                     y -= line_h
-                    cur = w
-            if cur:
-                c.drawString(margin, y, cur)
-                y -= line_h
 
     return y
 
@@ -306,21 +341,34 @@ def draw_shincom_a4(c, data, include_yearly=False):
     # 1行目：生年月日＋星座
     line1_parts = []
     if birthdate:
-        line1_parts.append(f"生年月日：{birthdate}")
+        if str(lang).lower().startswith("zh"):
+            line1_parts.append(f"出生日期：{birthdate}")
+        else:
+            line1_parts.append(f"生年月日：{birthdate}")
     if zodiac:
-        line1_parts.append(f"星座：{zodiac}")
+        if str(lang).lower().startswith("zh"):
+            line1_parts.append(f"星座：{zodiac}")
+        else:
+            line1_parts.append(f"星座：{zodiac}")
     if line1_parts:
         info_lines.append(" / ".join(line1_parts))
 
     # 2行目：干支番号＋動物占い＋本命星
     line2_parts = []
+    ll = str(lang).lower()
     if eto:
         if eto_number:
-            line2_parts.append(f"干支：{eto}（{eto_number}番）")
+            if ll.startswith("zh"):
+                line2_parts.append(f"干支：{eto}（{eto_number}号）")
+            else:
+                line2_parts.append(f"干支：{eto}（{eto_number}番）")
         else:
             line2_parts.append(f"干支：{eto}")
     if animal:
-        line2_parts.append(f"動物占い：{animal}")
+        if ll.startswith("zh"):
+            line2_parts.append(f"动物占卜：{animal}")
+        else:
+            line2_parts.append(f"動物占い：{animal}")
     if honmeisei:
         line2_parts.append(f"本命星：{honmeisei}")
     if line2_parts:
