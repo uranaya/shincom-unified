@@ -81,14 +81,21 @@ def generate_lucky_direction(birthdate: str, today: datetime.date, lang: str = '
 
 
 
-def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction, font_name="IPAexGothic"):
+def draw_lucky_section(c, width, margin, y, lucky_info, lucky_direction, font_name="IPAexGothic", lang: str | None = None, **kwargs):
     """
     Draw the Lucky Info section (lucky items and lucky direction) at the current y position.
     Returns the updated y position.
     """
     # Section header
     c.setFont(font_name, 12)
-    c.drawString(margin, y, "■ ラッキー情報（生年月日より）")
+    l = (lang or "ja").lower()
+    if l.startswith("en"):
+        title = "■ Lucky Info (from birthdate)"
+    elif l.startswith("zh"):
+        title = "■ 幸运信息（根据出生日期）"
+    else:
+        title = "■ ラッキー情報（生年月日より）"
+    c.drawString(margin, y, title)
     y -= 8 * mm
     c.setFont(font_name, 10)
     # Lucky items (two-column layout)

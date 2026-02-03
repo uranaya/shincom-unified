@@ -23,7 +23,7 @@ def _get_lang(data: dict) -> str:
         return 'ja'
     lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
     lang = (lang or 'ja').strip().lower()
-    return 'en' if lang.startswith('en') else 'ja'
+    return 'en' if lang.startswith('en') else ('zh' if lang.startswith('zh') else 'ja')
 import base64
 import io
 import os
@@ -112,7 +112,13 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
         lucky_lines = []
 
     _set_font(c, lang, 12)
-    title = "■ Lucky Info (from birthdate)" if (str(lang).lower().startswith("en")) else "■ ラッキー情報（生年月日より）"
+    l = str(lang).lower()
+    if l.startswith("en"):
+        title = "■ Lucky Info (from birthdate)"
+    elif l.startswith("zh"):
+        title = "■ 幸运信息（根据出生日期）"
+    else:
+        title = "■ ラッキー情報（生年月日より）"
     c.drawString(margin, y, title)
     y -= 6 * mm
 
@@ -151,7 +157,13 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     if lucky_direction:
         y -= 1.5 * mm
         _set_font(c, lang, 10)
-        direction_title = "■ Lucky Directions" if (str(lang).lower().startswith("en")) else "■ ラッキー方位"
+        l = str(lang).lower()
+        if l.startswith("en"):
+            direction_title = "■ Lucky Directions"
+        elif l.startswith("zh"):
+            direction_title = "■ 吉方位"
+        else:
+            direction_title = "■ ラッキー方位"
         c.drawString(margin, y, direction_title)
         y -= 5.5 * mm
 
