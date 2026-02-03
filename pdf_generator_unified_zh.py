@@ -408,7 +408,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         _set_font(c, lang, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=lang)
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'], lang)
@@ -462,7 +462,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         _set_font(c, lang, 14)
 
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=lang)
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'], lang)
@@ -535,7 +535,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     from reportlab.lib.pagesizes import A4, B4
     from reportlab.lib.units import mm
     from header_utils_zh import draw_header
-    from pdf_generator_unified import draw_yearly_pages_renai_a4, draw_yearly_pages_renai_b4, draw_lucky_section, FONT_NAME
+    from pdf_generator_unified import draw_yearly_pages_renai_a4, draw_yearly_pages_renai_b4, FONT_NAME
 
     width, height = A4 if size == 'a4' else B4
     margin = 20 * mm
@@ -581,7 +581,8 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     y = draw_lucky_section(
         c, width, margin, y,
         data.get("lucky_info", []),
-        data.get("lucky_direction", "")
+        data.get("lucky_direction", ""),
+        lang=lang
     )
 
     # 年運（オプション）
