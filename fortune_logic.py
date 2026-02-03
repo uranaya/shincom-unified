@@ -18,6 +18,9 @@ from pdf_generator_unified import create_pdf_unified
 
 def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang: str = 'ja'):
     import json
+    lang_norm = (lang or 'ja').lower()
+    is_en = lang_norm.startswith('en')
+    is_zh = lang_norm.startswith('zh') or lang_norm.startswith('cn')
     eto = get_nicchu_eto(birthdate)
     try:
         today = now or datetime.today()
@@ -35,7 +38,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang
         tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
         tsuhen_month2 = get_tsuhensei_for_date(birthdate, target2.year, target2.month)
 
-        if (lang or 'ja').lower().startswith('en'):
+        if is_en:
             prompt = f"""You are a Four Pillars (BaZi) reading advisor.
 - Day pillar (eto): {eto}
 - Ten-God for the year: {tsuhen_year}
@@ -53,6 +56,26 @@ Return ONLY JSON in the following schema:
 Rules:
 - Do NOT mention eto names or Ten-God terms; translate meanings into plain English
 - Positive, practical, and customer-friendly
+"""
+        elif is_zh:
+            # 简体中文
+            prompt = f"""你是一位四柱推命（八字）解读顾问。
+- 日柱（仅供参考）: {eto}
+- 年度影响（通变星，仅供参考）: {tsuhen_year}
+- {target1.year}-{target1.month:02d} 的影响（通变星，仅供参考）: {tsuhen_month1}
+- {target2.year}-{target2.month:02d} 的影响（通变星，仅供参考）: {tsuhen_month2}
+
+请只输出以下结构的 JSON（不要输出任何多余文本）：
+{{
+  "personality": "用自然、友好的中文写一段性格描述（约 260 字以内）",
+  "year_fortune": "{this_year} 年的整体运势（约 260 字以内）",
+  "month_fortune": "{target1.year} 年 {target1.month} 月的运势（约 200 字以内）",
+  "next_month_fortune": "{target2.year} 年 {target2.month} 月的运势（约 200 字以内）"
+}}
+
+规则：
+- 绝对不要在正文中提到干支名、通变星名或任何占术术语；请把含义翻译成日常语言
+- 积极、具体、可执行（至少给 1 条行动建议）
 """
         else:
             prompt = f"""あなたは四柱推命の専門家です。
@@ -103,18 +126,21 @@ Rules:
             result = json.loads(raw)
             # 月表記のズレ対策（GPTが本文先頭で別月を出すことがあるため矯正）
             import re
-            def _fix_month_prefix(s, y, m):
+            def _fix_month_prefix(s, y, m, zh: bool = False):
                 if not isinstance(s, str):
                     return s
                 s = s.strip()
-                s = re.sub(r"^\s*(?:\d{4}年\s*\d{1,2}月|今月|来月)\s*は\s*[、,]?\s*", "", s)
+                if zh:
+                    s = re.sub(r"^\s*(?:\d{4}年\s*\d{1,2}月|本月|下月|这个月|下个月)\s*[是:,，]?\s*", "", s)
+                else:
+                    s = re.sub(r"^\s*(?:\d{4}年\s*\d{1,2}月|今月|来月)\s*は\s*[、,]?\s*", "", s)
                 if not s:
-                    return f"{y}年{m}月は"
-                return f"{y}年{m}月は、" + s
+                    return (f"{y}年{m}月" + ("是" if zh else "は"))
+                return (f"{y}年{m}月" + ("是，" if zh else "は、")) + s
 
-            if isinstance(result, dict) and not (lang or "ja").lower().startswith("en"):
-                result["month_fortune"] = _fix_month_prefix(result.get("month_fortune", ""), target1.year, target1.month)
-                result["next_month_fortune"] = _fix_month_prefix(result.get("next_month_fortune", ""), target2.year, target2.month)
+            if isinstance(result, dict) and (not is_en):
+                result["month_fortune"] = _fix_month_prefix(result.get("month_fortune", ""), target1.year, target1.month, zh=is_zh)
+                result["next_month_fortune"] = _fix_month_prefix(result.get("next_month_fortune", ""), target2.year, target2.month, zh=is_zh)
 
                 # 文章が尻切れトンボに見えないよう、末尾が句点等で終わっていなければ補完
                 def _ensure_sentence_end(s: str) -> str:
@@ -131,34 +157,55 @@ Rules:
             return result
         except json.JSONDecodeError:
             print("❌ GPTが正しいJSONを返しませんでした")
-            return ({
+            if is_en:
+                return {
                 "personality": "Could not retrieve the result.",
                 "year_fortune": f"Could not retrieve the fortune for {this_year}.",
                 "month_fortune": f"Could not retrieve the fortune for {target1.year}-{target1.month:02d}.",
                 "next_month_fortune": f"Could not retrieve the fortune for {target2.year}-{target2.month:02d}."
-            } if (lang or 'ja').lower().startswith('en') else {
+                }
+            if is_zh:
+                return {
+                    "personality": "未能取得结果。",
+                    "year_fortune": f"未能取得 {this_year} 年的运势。",
+                    "month_fortune": f"未能取得 {target1.year} 年 {target1.month} 月的运势。",
+                    "next_month_fortune": f"未能取得 {target2.year} 年 {target2.month} 月的运势。",
+                }
+            return {
                 "personality": "取得できませんでした",
                 "year_fortune": f"{this_year}年の運勢は取得できませんでした",
                 "month_fortune": f"{target1.year}年{target1.month}月の運勢は取得できませんでした",
                 "next_month_fortune": f"{target2.year}年{target2.month}月の運勢は取得できませんでした"
-            })
+            }
     except Exception as e:
         print("❌ get_shichu_fortune エラー:", e)
-        return ({
+        if is_en:
+            return {
                 "personality": "Could not retrieve the result.",
                 "year_fortune": f"Could not retrieve the fortune for {this_year}.",
                 "month_fortune": f"Could not retrieve the fortune for {target1.year}-{target1.month:02d}.",
                 "next_month_fortune": f"Could not retrieve the fortune for {target2.year}-{target2.month:02d}."
-            } if (lang or 'ja').lower().startswith('en') else {
+            }
+        if is_zh:
+            return {
+                "personality": "未能取得结果。",
+                "year_fortune": f"未能取得 {this_year} 年的运势。",
+                "month_fortune": f"未能取得 {target1.year} 年 {target1.month} 月的运势。",
+                "next_month_fortune": f"未能取得 {target2.year} 年 {target2.month} 月的运势。",
+            }
+        return {
                 "personality": "取得できませんでした",
                 "year_fortune": f"{this_year}年の運勢は取得できませんでした",
                 "month_fortune": f"{target1.year}年{target1.month}月の運勢は取得できませんでした",
                 "next_month_fortune": f"{target2.year}年{target2.month}月の運勢は取得できませんでした"
-            })
+            }
 
 
 def analyze_palm(image_data, lang: str = 'ja'):
     try:
+        lang_norm = (lang or 'ja').lower()
+        is_en = lang_norm.startswith('en')
+        is_zh = lang_norm.startswith('zh') or lang_norm.startswith('cn')
         # Data URL形式 or base64のみの両方に対応
         if "," in image_data:
             base64data = image_data.split(",", 1)[1]
@@ -178,7 +225,7 @@ def analyze_palm(image_data, lang: str = 'ja'):
         )
 
         # 特殊線をより魅力的に出すようにした system_prompt（語り口・優先順位調整版）
-        if (lang or 'ja').lower().startswith('en'):
+        if is_en:
             system_prompt = (
                 "You are a professional palm reader. Follow the constraints and interpret the palm image in a warm, inspiring tone.\n\n"
                 "[Output rules]\n"
@@ -200,6 +247,29 @@ def analyze_palm(image_data, lang: str = 'ja'):
                 "### Overall Advice\n(A gentle, uplifting wrap-up)\n\n"
                 "- Keep it poetic but clear\n"
                 "- End with a hopeful, action-oriented closing"
+            )
+        elif is_zh:
+            system_prompt = (
+                "你是一位专业的手相解读师。请根据以下约束，从手相图像中解读并用温暖、鼓励的语气写给顾客。\n\n"
+                "[输出规则]\n"
+                "- 必须包含：1) 生命线 2) 命运线 3) 金钱线\n"
+                "- 另外选择两条‘特殊线’，尽量从下面列表中选（即使是细微迹象也可以，但要用积极的方式表达）：\n"
+                f"{special_lines_text}\n"
+                "- 若确实无法选出两条特殊线，可自然地用感情线/头脑线替代\n\n"
+                "[含义参考]\n"
+                f"{description_text}\n\n"
+                "请用自然的简体中文，不要用‘没有/缺乏’等否定措辞，尽量写成潜力与倾向。"
+            )
+            user_prompt = (
+                "请严格按以下格式输出：\n"
+                "### 1. 生命线\n（约 150–220 字）\n\n"
+                "### 2. 命运线\n（约 150–220 字）\n\n"
+                "### 3. 金钱线\n（约 150–220 字）\n\n"
+                "### 4. 特殊线 1\n（约 150–220 字）\n\n"
+                "### 5. 特殊线 2\n（约 150–220 字）\n\n"
+                "### 总体建议\n（温柔、积极的收尾）\n\n"
+                "- 文风可以略带诗意但要清晰\n"
+                "- 结尾给出1条可执行的小建议"
             )
         else:
             system_prompt = (
@@ -260,7 +330,13 @@ def analyze_palm(image_data, lang: str = 'ja'):
 
 def get_iching_advice(lang: str = 'ja'):
     try:
-        prompt = ("You are an I Ching advisor. Give a gentle, positive message the customer needs right now in natural English (about 180–220 characters)." if (lang or "ja").lower().startswith("en") else "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。")
+        lang_norm = (lang or 'ja').lower()
+        if lang_norm.startswith('en'):
+            prompt = "You are an I Ching advisor. Give a gentle, positive message the customer needs right now in natural English (about 180–220 characters)."
+        elif lang_norm.startswith('zh') or lang_norm.startswith('cn'):
+            prompt = "你是一位易经占卜顾问。请用温柔、积极、可执行的语气，给出当下最需要的一段提醒（约150–220字，简体中文）。不要出现任何卦名或术语。"
+        else:
+            prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -269,7 +345,11 @@ def get_iching_advice(lang: str = 'ja'):
         return response.choices[0].message.content.strip()
     except Exception as e:
         print("❌ 易占い取得失敗:", e)
-        return ("Could not retrieve the I Ching message right now." if (lang or "ja").lower().startswith("en") else "現在、易占いの結果が取得できませんでした。")
+        if (lang or 'ja').lower().startswith('en'):
+            return "Could not retrieve the I Ching message right now."
+        if (lang or 'ja').lower().startswith(('zh', 'cn')):
+            return "目前无法取得易经信息。"
+        return "現在、易占いの結果が取得できませんでした。"
 
 
 def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
@@ -388,8 +468,10 @@ def generate_lucky_info_mixed(
     else:
         food_ja = rng.choice(sum(food_map_ja.values(), []))
 
+    lang_norm = (lang or 'ja').lower()
+
     # 英語化（ラベル + 主要値）
-    if (lang or "ja").lower().startswith("en"):
+    if lang_norm.startswith("en"):
         item_en = {
             "スマホ充電器": "Phone charger",
             "小さなノート": "Pocket notebook",
@@ -504,6 +586,87 @@ def generate_lucky_info_mixed(
             f"◆ Food: {food}",
         ]
 
+    # 中文化（ラベル + 主要値）
+    if lang_norm.startswith(("zh", "cn")):
+        item_zh = {
+            "スマホ充電器": "手机充电器",
+            "小さなノート": "随身小本",
+            "ハンドクリーム": "护手霜",
+            "ミントガム": "薄荷口香糖",
+            "折りたたみ傘": "折叠伞",
+            "白いハンカチ": "白色手帕",
+            "イヤホン": "耳机",
+            "水筒": "水壶",
+            "目薬": "眼药水",
+            "入浴剤": "浴盐",
+            "エコバッグ": "环保袋",
+            "観葉植物": "室内绿植",
+            "腕時計": "手表",
+            "小さな鏡": "小镜子",
+        }
+        color_zh = {
+            "ネイビー": "海军蓝",
+            "スカイブルー": "天蓝",
+            "モスグリーン": "苔藓绿",
+            "ミントグリーン": "薄荷绿",
+            "ワインレッド": "酒红",
+            "ローズピンク": "玫瑰粉",
+            "ゴールド": "金色",
+            "シルバー": "银色",
+            "アイボリー": "象牙白",
+            "ホワイト": "白色",
+            "ブラック": "黑色",
+        }
+        day_zh = {
+            "月曜日": "周一",
+            "火曜日": "周二",
+            "水曜日": "周三",
+            "木曜日": "周四",
+            "金曜日": "周五",
+            "土曜日": "周六",
+            "日曜日": "周日",
+        }
+        food_zh = {
+            "小松菜": "小松菜",
+            "ブロッコリー": "西兰花",
+            "枝豆": "毛豆",
+            "抹茶": "抹茶",
+            "緑茶": "绿茶",
+            "トマト": "番茄",
+            "唐辛子": "辣椒",
+            "赤身肉": "瘦肉",
+            "いちご": "草莓",
+            "カカオ": "可可",
+            "さつまいも": "红薯",
+            "かぼちゃ": "南瓜",
+            "味噌汁": "味噌汤",
+            "玄米": "糙米",
+            "きなこ": "黄豆粉",
+            "大根": "白萝卜",
+            "白ねぎ": "大葱",
+            "豆腐": "豆腐",
+            "梨": "梨",
+            "白ごま": "白芝麻",
+            "わかめ": "裙带菜",
+            "しじみ汁": "蜆汤",
+            "寒天": "琼脂",
+            "ところてん": "心太",
+            "昆布だし": "昆布高汤",
+        }
+
+        item = item_zh.get(item_ja, item_ja)
+        color = color_zh.get(color_ja, color_ja)
+        day = day_zh.get(day_ja, day_ja)
+        food = food_zh.get(food_ja, food_ja)
+
+        return [
+            f"◆ 物品: {item}",
+            f"◆ 数字: {number}",
+            f"◆ 星期: {day}",
+            f"◆ 颜色: {color}",
+            f"◆ 食物: {food}",
+        ]
+
     return [
         f"◆ アイテム: {item_ja}",
         f"◆ 数字: {number}",
@@ -514,9 +677,14 @@ def generate_lucky_info_mixed(
 
 def _lang_pack(lang: str):
     """Return (system_prompt, lang_note) for OpenAI calls."""
-    if (lang or 'ja').lower().startswith('en'):
+    lang_norm = (lang or 'ja').lower()
+    if lang_norm.startswith('en'):
         system = "You are a professional fortune teller. Write clear, natural English for customers. Do not mention Japanese astrology jargon, eto names, or Ten-God terms; translate meanings into plain English."
         note = "\n\nWrite in English. Do NOT include eto names or Ten-God terms. Keep it friendly, practical, and positive."
+        return system, note
+    if lang_norm.startswith(('zh', 'cn')):
+        system = "你是一位专业的占卜师。请用自然的简体中文写给顾客：积极、具体、可执行。不要出现干支名、通变星名或任何占术术语；请把含义翻译成日常语言。"
+        note = "\n\n请用简体中文输出。不要出现干支名、通变星名或任何占术术语。语气友好、具体、正向。"
         return system, note
     system = "あなたは占いのプロです。お客様に寄り添い、前向きで具体的なアドバイスを自然な日本語で書いてください。占い用語や干支名は出さず、意味をやさしい言葉に置き換えてください。"
     note = ""
@@ -545,7 +713,14 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
             order = ["item", "number", "color", "day", "food"]
             labels_ja = {"item": "アイテム", "number": "番号", "color": "色", "day": "曜日", "food": "食べ物"}
             labels_en = {"item": "Item", "number": "Number", "color": "Color", "day": "Day", "food": "Food"}
-            labels = labels_en if str(lang).lower().startswith("en") else labels_ja
+            labels_zh = {"item": "物品", "number": "数字", "color": "颜色", "day": "星期", "food": "食物"}
+            lang_norm = str(lang).lower()
+            if lang_norm.startswith("en"):
+                labels = labels_en
+            elif lang_norm.startswith(("zh", "cn")):
+                labels = labels_zh
+            else:
+                labels = labels_ja
             for k in order:
                 v = raw_lucky_info.get(k)
                 if v is not None and str(v).strip():
@@ -608,7 +783,8 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     
     # --- Safety: ensure we always have 5 palm sections + 1 overall comment (so PDF never crashes) ---
     min_blocks = 6  # 5 lines + overall
-    if lang == "en":
+    lang_norm = (lang or 'ja').lower()
+    if lang_norm.startswith("en"):
         fallback_titles = [
             "Life Line",
             "Head Line",
@@ -621,6 +797,16 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
             "This part couldn't be clearly identified from the photo. "
             "If you can, please retake the photo with better lighting and focus."
         )
+    elif lang_norm.startswith(("zh", "cn")):
+        fallback_titles = [
+            "生命线",
+            "头脑线",
+            "感情线",
+            "特殊线 1",
+            "特殊线 2",
+            "手相总体建议",
+        ]
+        fallback_text = "※从图片中无法清晰判断该项目。建议在更明亮、对焦清晰的环境重新拍摄。"
     else:
         fallback_titles = [
             "生命線",

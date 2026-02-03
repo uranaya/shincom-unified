@@ -21,6 +21,11 @@ MAX_CHAR_EN = 900
 MAX_CHAR_EN_YEAR = 2000
 MAX_CHAR_EN_MONTH = 900
 
+# 中国語（簡体字）は「文字数」ベースで日本語に近い密度になるため、
+# 日本語より少しだけ余裕を持たせる。
+MAX_CHAR_ZH_YEAR = 260
+MAX_CHAR_ZH_MONTH = 180
+
 
 
 # --- text helpers ---
@@ -48,7 +53,7 @@ def _trim_to_max_chars(text: str, max_chars: int) -> str:
             if idx >= int(max_chars * 0.55):
                 return cut[: idx + 1]
         # それでも見つからなければ、読点/スペースで切る
-        for punct in ["、", " "]:
+        for punct in ["、", "，", ",", " "]:
             idx = cut.rfind(punct)
             if idx >= int(max_chars * 0.55):
                 return cut[: idx].rstrip() + "。"
@@ -67,7 +72,8 @@ def _trim_to_max_chars(text: str, max_chars: int) -> str:
 
 
 def _build_monthly_prompt(month_label: str, eto: str, tsuhensei_year: str, tsuhensei_month: str, lang: str) -> str:
-    if lang == "en":
+    lang_norm = (lang or "ja").lower()
+    if lang_norm.startswith("en"):
         return "\n".join([
             "You are a professional fortune teller.",
             "Write in natural, friendly English for customers.",
@@ -79,6 +85,18 @@ def _build_monthly_prompt(month_label: str, eto: str, tsuhensei_year: str, tsuhe
             "Output: 3-5 sentences (roughly 70-110 words).",
             "Keep it practical and positive. Include at least one actionable tip.",
         f"Upper limit: about {MAX_CHAR_EN_MONTH} characters.",
+        ])
+    if lang_norm.startswith(("zh", "cn")):
+        return "\n".join([
+            "你是一位专业的占卜师。",
+            "请使用简体中文，语气温柔、积极、具象，并给出可执行的建议。",
+            "不要出现干支名、通变星等术语（只可用于理解，不要写出来）。",
+            f"月份: {month_label}",
+            f"日柱(仅参考): {eto}",
+            f"年影响(仅参考): {tsuhensei_year}",
+            f"月影响(仅参考): {tsuhensei_month}",
+            "输出：3-5句话，避免空话，至少给出一个行动建议。",
+            f"字符上限：约 {MAX_CHAR_ZH_MONTH} 字。",
         ])
     return "\n".join([
         "あなたはプロの占い師です。",
@@ -93,7 +111,14 @@ def _build_monthly_prompt(month_label: str, eto: str, tsuhensei_year: str, tsuhe
 
 
 
-def _ask_openai(prompt: str, retries=3, delay=2) -> str:
+def _ask_openai(prompt: str, lang: str = "ja", retries: int = 3, delay: int = 2) -> str:
+    lang_norm = (lang or "ja").lower()
+    if lang_norm.startswith("en"):
+        system_text = "You are a professional fortune teller. Write clear, natural English for customers."
+    elif lang_norm.startswith(("zh", "cn")):
+        system_text = "你是一位专业的占卜师。请用简体中文，为顾客写出清晰、自然、积极的建议。"
+    else:
+        system_text = "あなたは四柱推命のプロの占い師です。"
     for attempt in range(retries):
         try:
             response = openai.ChatCompletion.create(
@@ -101,7 +126,7 @@ def _ask_openai(prompt: str, retries=3, delay=2) -> str:
                 max_tokens=2000,
                 temperature=0.7,
                 messages=[
-                    {"role": "system", "content": "あなたは四柱推命のプロの占い師です。"},
+                    {"role": "system", "content": system_text},
                     {"role": "user", "content": prompt}
                 ]
             )
@@ -115,8 +140,13 @@ def _ask_openai(prompt: str, retries=3, delay=2) -> str:
 
 def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bool = False, lang: str = 'ja'):
     """Generate yearly + 12-month fortunes (text only)."""
-    lang = (lang or 'ja').lower()
-    lang_instruction = "\n\nWrite in English. Do NOT include eto names or Ten-God terms." if lang.startswith('en') else ""
+    lang_norm = (lang or 'ja').lower()
+    if lang_norm.startswith('en'):
+        lang_instruction = "\n\nWrite in English. Do NOT include eto names or Ten-God terms."
+    elif lang_norm.startswith(('zh', 'cn')):
+        lang_instruction = "\n\n请用简体中文。不要出现干支名、通变星等术语（只可用于理解，不要写出来）。"
+    else:
+        lang_instruction = ""
     nicchu = get_nicchu_eto(user_birth)
     born = datetime.strptime(user_birth, "%Y-%m-%d")
     honmeisei = get_honmeisei(born.year, born.month, born.day)
@@ -130,7 +160,7 @@ def generate_yearly_fortune(user_birth: str, now: datetime, force_next_month: bo
 
     tsuhen_year = get_tsuhensei_for_year(user_birth, target_year)
 
-    if lang.startswith('en'):
+    if lang_norm.startswith('en'):
         prompt_year = f"""You are a fortune-telling advisor.
 Using the information below, write a {target_year} overview for the customer in natural English.
 
@@ -146,6 +176,23 @@ Rules:
 - Positive, practical, and customer-friendly
 - Avoid generic filler; give concrete, usable guidance
 """ + lang_instruction
+    elif lang_norm.startswith(('zh', 'cn')):
+        prompt_year = f"""你是开运建议的顾问。
+请根据下面的信息，用简体中文为顾客写出 {target_year} 年的整体运势概览。
+
+长度：
+- 4～7句话
+- 控制在约 {MAX_CHAR_ZH_YEAR} 字以内（不要写得过长）
+
+参考信息：
+- 日柱（仅参考）：{nicchu}
+- 年影响（仅参考）：{tsuhen_year}
+
+规则：
+- 不要出现干支名、通变星等术语；把含义翻译成日常表达
+- 积极、实用、可执行
+- 避免空话，给出具体建议（工作、人际、金钱、健康等）
+""" + lang_instruction
     else:
         prompt_year = f"""あなたは開運アドバイザーです。
 以下の情報をもとに、{target_year}年における「あなた」の全体運を自然な日本語で表現してください。
@@ -159,9 +206,10 @@ Rules:
 - 前向きで、行動や考え方の指針になるように
 """ + lang_instruction
 
+    max_year = MAX_CHAR_EN_YEAR if lang_norm.startswith('en') else (MAX_CHAR_ZH_YEAR if lang_norm.startswith(('zh', 'cn')) else MAX_CHAR_JA_YEAR)
     year_fortune = _trim_to_max_chars(
-        _ask_openai(prompt_year),
-        MAX_CHAR_EN_YEAR if lang.startswith('en') else MAX_CHAR_JA_YEAR,
+        _ask_openai(prompt_year, lang=lang_norm),
+        max_year,
     )
 
     month_fortunes = []
@@ -170,7 +218,7 @@ Rules:
         y, m = target.year, target.month
         tsuhen_month = get_tsuhensei_for_date(user_birth, y, m)
         # directions are computed elsewhere for PDF; keep text clean
-        if lang.startswith('en'):
+        if lang_norm.startswith('en'):
             prompt_month = f"""You are a fortune-telling advisor.
 Write the customer's fortune for {y}-{m:02d} in natural English.
 
@@ -189,6 +237,25 @@ Rules:
 - Avoid repeating the same phrasing month to month
 """ + lang_instruction
             label = f"Fortune for {y}-{m:02d}"
+        elif lang_norm.startswith(('zh', 'cn')):
+            prompt_month = f"""你是占卜顾问。
+请用简体中文写出顾客在 {y}年{m}月 的运势。
+
+长度：
+- 3～6句话
+- 控制在约 {MAX_CHAR_ZH_MONTH} 字以内
+
+参考信息：
+- 日柱（仅参考）：{nicchu}
+- 月影响（仅参考）：{tsuhen_month}
+
+规则：
+- 不要出现干支名、通变星等术语；用日常语言表达含义
+- 积极、实用、有行动建议
+- 每个月要有变化（行动、情绪、人际、工作、金钱、健康等）
+- 避免每个月都用同样的句式
+""" + lang_instruction
+            label = f"{y}年{m}月的运势"
         else:
             prompt_month = f"""あなたは占いの専門家です。
 以下の情報をもとに、{y}年{m}月の運気を自然な日本語で約{MAX_CHAR_JA_MONTH}字以内にまとめてください。
@@ -205,14 +272,22 @@ Rules:
             label = f"{y}年{m}月の運勢"
 
         # OpenAIで生成（英語/日本語とも共通）
+        max_month = MAX_CHAR_EN_MONTH if lang_norm.startswith('en') else (MAX_CHAR_ZH_MONTH if lang_norm.startswith(('zh', 'cn')) else MAX_CHAR_JA_MONTH)
         text = _trim_to_max_chars(
-            _ask_openai(prompt_month),
-            MAX_CHAR_EN_MONTH if lang.startswith('en') else MAX_CHAR_JA_MONTH,
+            _ask_openai(prompt_month, lang=lang_norm),
+            max_month,
         )
         month_fortunes.append({"label": label, "text": text})
 
+    if lang_norm.startswith('en'):
+        year_label = f"Overall fortune for {target_year}"
+    elif lang_norm.startswith(('zh', 'cn')):
+        year_label = f"{target_year}年的整体运势"
+    else:
+        year_label = f"{target_year}年の総合運"
+
     return {
-        "year_label": (f"Overall fortune for {target_year}" if lang.startswith('en') else f"{target_year}年の総合運"),
+        "year_label": year_label,
         "year_text": year_fortune,
         "months": month_fortunes
     }
