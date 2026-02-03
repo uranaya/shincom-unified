@@ -811,7 +811,8 @@ def selfmob_uuid(uuid_str):
             target2 = target1 + relativedelta(months=1)
 
             result_data = {
-                "lang": output_lang,
+                        "lang": output_lang,
+                "output_lang": output_lang,
                 "style": "default",
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
@@ -1198,11 +1199,20 @@ def ten_shincom():
                 year, month, day = map(int, birthdate.split("-"))
             except Exception:
                 return "生年月日が不正です", 400
+
+            # ここで now を確定し、九星気学テキストも言語に合わせて生成する
+            now = datetime.now()
             try:
-                kyusei_text = get_kyusei_fortune(year, month, day)
+                kyusei_text = get_kyusei_fortune(
+                    year, month, day,
+                    now=now,
+                    force_next_month=force_next_month,
+                    lang=output_lang,
+                )
             except Exception as e:
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
+
             eto = get_nicchu_eto(birthdate)
             # 生年月日から星座・干支番号・動物占い・本命星を算出（PDF用）
             zodiac = get_zodiac_sign(month, day)
@@ -1215,7 +1225,6 @@ def ten_shincom():
             except Exception as e:
                 print("❌ 本命星取得エラー:", e)
                 honmeisei = ""
-            now = datetime.now()
             palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month, lang=output_lang)
             summary_text = ""
             if len(palm_texts) == 6:
@@ -1228,17 +1237,27 @@ def ten_shincom():
                 year_label = f"Fortune for {target1.year}"
                 month_label = f"Fortune for {target1.year}-{target1.month:02d}"
                 next_month_label = f"Fortune for {target2.year}-{target2.month:02d}"
+                palm_summary_title = "Palm Reading Summary"
+                personality_title = "Personality Profile"
+            elif output_lang == "zh":
+                year_label = f"{target1.year}年运势"
+                month_label = f"{target1.year}年{target1.month}月运势"
+                next_month_label = f"{target2.year}年{target2.month}月运势"
+                palm_summary_title = "手相综合建议"
+                personality_title = "性格诊断"
             else:
                 year_label = f"{target1.year}年の運勢"
                 month_label = f"{target1.year}年{target1.month}月の運勢"
                 next_month_label = f"{target2.year}年{target2.month}月の運勢"
+                palm_summary_title = "手相の総合アドバイス"
+                personality_title = "性格診断"
 
             result_data = {
                 "palm_titles": palm_titles,
                 "palm_texts": palm_texts,
                 "titles": {
-                    "palm_summary": "手相の総合アドバイス",
-                    "personality": "性格診断",
+                    "palm_summary": palm_summary_title,
+                    "personality": personality_title,
                     "year_fortune": year_label,
                     "month_fortune": month_label,
                     "next_month_fortune": next_month_label
