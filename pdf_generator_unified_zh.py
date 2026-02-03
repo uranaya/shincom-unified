@@ -125,37 +125,44 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     - 2列表示で横幅を有効活用（余白があるのに3ページ化する問題を抑制）
     - lucky_lines が 1行でも2行でも崩れない
     - 呼び出し側の互換（lang/page_height/kwargs）対応
+
+    NOTE:
+      Chinese (zh) A4 page2 is the tightest layout (month/next-month + lucky blocks).
+      We slightly tighten spacing and font size for zh only to prevent bottom overflow.
     """
     if not lucky_lines:
         lucky_lines = []
 
-    _set_font(c, lang, 12)
     l = str(lang).lower()
+    is_zh = l.startswith('zh')
+
+    # Title
+    title_size = 11 if is_zh else 12
+    _set_font(c, lang, title_size)
     if l.startswith("en"):
         title = "■ Lucky Info (from birthdate)"
-    elif l.startswith("zh"):
+    elif is_zh:
         title = "■ 幸运信息（根据出生日期）"
     else:
         title = "■ ラッキー情報（生年月日より）"
     c.drawString(margin, y, title)
-    y -= 6 * mm
+    y -= (5.0 if is_zh else 6.0) * mm
 
     # 2列レイアウト
-    _set_font(c, lang, 10)
+    body_size = 9 if is_zh else 10
+    _set_font(c, lang, body_size)
     col_gap = 8 * mm
     col_w = (width - 2 * margin - col_gap) / 2.0
-    line_h = 5.6 * mm
+    line_h = (5.0 if is_zh else 5.6) * mm
     font_name = _font(lang)
-    font_size = 10
+    font_size = body_size
 
     def _fit_one_line(s: str, max_w: float) -> str:
         s = (s or "").strip()
         if not s:
             return ""
-        # 収まるならそのまま
         if stringWidth(s, font_name, font_size) <= max_w:
             return s
-        # 末尾省略
         ell = "…"
         while s and stringWidth(s + ell, font_name, font_size) > max_w:
             s = s[:-1]
@@ -173,40 +180,48 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
 
     # 方位（必要なら最後に）
     if lucky_direction:
-        y -= 1.5 * mm
-        _set_font(c, lang, 10)
-        l = str(lang).lower()
+        y -= (1.2 if is_zh else 1.5) * mm
+        _set_font(c, lang, body_size)
         if l.startswith("en"):
             direction_title = "■ Lucky Directions"
-        elif l.startswith("zh"):
+        elif is_zh:
             direction_title = "■ 吉方位"
         else:
             direction_title = "■ ラッキー方位"
         c.drawString(margin, y, direction_title)
-        y -= 5.5 * mm
+        y -= (4.8 if is_zh else 5.5) * mm
 
         dir_text = (lucky_direction or "").strip()
-        # 1行で無理なら折り返し（左列幅いっぱいで）
         # Keep some extra right padding for English to avoid clipping.
-        max_w = width - 2 * margin - (6 * mm if str(lang).lower().startswith("en") else 0)
+        max_w = width - 2 * margin - (6 * mm if l.startswith("en") else 0)
+
         if stringWidth(dir_text, font_name, font_size) <= max_w:
             c.drawString(margin, y, dir_text)
             y -= line_h
         else:
-            # 簡易折り返し
-            words = dir_text.split()
-            cur = ""
-            for w in words:
-                candidate = (cur + " " + w).strip()
-                if stringWidth(candidate, font_name, font_size) <= max_w:
-                    cur = candidate
-                else:
+            # 簡易折り返し（英語用）。CJKは基本スペース分割できないので、英語以外は安全側で文字数wrap。
+            if l.startswith('en'):
+                words = dir_text.split()
+                cur = ""
+                for w in words:
+                    candidate = (cur + " " + w).strip()
+                    if stringWidth(candidate, font_name, font_size) <= max_w:
+                        cur = candidate
+                    else:
+                        if cur:
+                            c.drawString(margin, y, cur)
+                            y -= line_h
+                        cur = w
+                if cur:
                     c.drawString(margin, y, cur)
                     y -= line_h
-                    cur = w
-            if cur:
-                c.drawString(margin, y, cur)
-                y -= line_h
+            else:
+                # CJK: wrap by char count based on width
+                # Rough estimate: 1 char ~ font_size points; keep conservative.
+                approx_chars = max(10, int((max_w / (font_size * 0.55))))
+                for line in smart_wrap(dir_text, approx_chars, lang='ja'):
+                    c.drawString(margin, y, line)
+                    y -= line_h
 
     return y
 
@@ -535,7 +550,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     from reportlab.lib.pagesizes import A4, B4
     from reportlab.lib.units import mm
     from header_utils_zh import draw_header
-    from pdf_generator_unified import draw_yearly_pages_renai_a4, draw_yearly_pages_renai_b4, FONT_NAME
+    from pdf_generator_unified import draw_yearly_pages_renai_a4, draw_yearly_pages_renai_b4, draw_lucky_section, FONT_NAME
 
     width, height = A4 if size == 'a4' else B4
     margin = 20 * mm
@@ -581,8 +596,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     y = draw_lucky_section(
         c, width, margin, y,
         data.get("lucky_info", []),
-        data.get("lucky_direction", ""),
-        lang=lang
+        data.get("lucky_direction", "")
     )
 
     # 年運（オプション）
