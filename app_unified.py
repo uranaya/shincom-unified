@@ -26,6 +26,7 @@ from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from pdf_generator_unified import create_pdf_unified
 from pdf_generator_unified_en import create_pdf_unified as create_pdf_unified_en
 from pdf_generator_unified_zh import create_pdf_unified as create_pdf_unified_zh
+from pdf_generator_unified_ko import create_pdf_unified as create_pdf_unified_ko
 
 # ------------------------------------------------------------
 # PDF language guard
@@ -260,8 +261,9 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
         lang = (result_data.get("lang") or result_data.get("output_lang") or "").strip().lower()
         use_en = lang.startswith("en")
         use_zh = lang.startswith("zh")
+        use_ko = lang.startswith("ko")
 
-        use_tag = 'EN' if use_en else ('ZH' if use_zh else 'JA')
+        use_tag = 'EN' if use_en else ('ZH' if use_zh else ('KO' if use_ko else 'JA'))
 
         print(
             f"[PDFGEN] lang={lang or 'ja'} use={use_tag} file={filepath} mode={pdf_mode} size={size} include_yearly={include_yearly}",
@@ -283,6 +285,13 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
             except Exception as _e:
                 print(f"[ZHPDF] ACTIVE but module introspection failed: {_e}", flush=True)
             create_pdf_unified_zh(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
+        elif use_ko:
+            try:
+                import pdf_generator_unified_ko as _kopdf
+                print(f"[KOPDF] ACTIVE module={_kopdf.__file__} fn=create_pdf_unified", flush=True)
+            except Exception as _e:
+                print(f"[KOPDF] ACTIVE but module introspection failed: {_e}", flush=True)
+            create_pdf_unified_ko(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
         else:
             create_pdf_unified(filepath, result_data, pdf_mode, size=size, include_yearly=include_yearly)
     except Exception as e:
@@ -1106,25 +1115,22 @@ def ten_shincom():
 
 
 
-            # 1) Direct explicit values
+	            # 1) Direct explicit values
 
             if output_lang in ("en", "english"):
-
                 output_lang = "en"
-
             elif output_lang in ("zh", "cn", "chinese", "zh-cn", "zh_cn", "zh-hans", "zh_hans"):
                 output_lang = "zh"
+            elif output_lang in ("ko", "kr", "korean", "ko-kr", "ko_kr"):
+                output_lang = "ko"
             elif output_lang in ("ja", "jp", "japanese"):
-
                 output_lang = "ja"
-
             else:
-
                 output_lang = ""
 
 
 
-            # 2) Checkbox / flag style keys (common patterns)
+# 2) Checkbox / flag style keys (common patterns)
 
             if not output_lang:
 
@@ -1178,7 +1184,7 @@ def ten_shincom():
 
             output_lang = output_lang or "ja"
 
-            if output_lang not in ("ja", "en", "zh"):
+            if output_lang not in ("ja", "en", "zh", "ko"):
                 output_lang = "ja"
 
 
@@ -1245,6 +1251,12 @@ def ten_shincom():
                 next_month_label = f"{target2.year}年{target2.month}月运势"
                 palm_summary_title = "手相综合建议"
                 personality_title = "性格诊断"
+            elif output_lang == "ko":
+                year_label = f"{target1.year}년 운세"
+                month_label = f"{target1.year}년 {target1.month}월 운세"
+                next_month_label = f"{target2.year}년 {target2.month}월 운세"
+                palm_summary_title = "손금 종합 조언"
+                personality_title = "성격 진단"
             else:
                 year_label = f"{target1.year}年の運勢"
                 month_label = f"{target1.year}年{target1.month}月の運勢"

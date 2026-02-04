@@ -126,6 +126,7 @@
       <option value="tokyo">日本語（東京・浅草）</option>
       <option value="en">English</option>
       <option value="zh">中文（简体）</option>
+      <option value="ko">한국어</option>
     </select>
 
     <!-- 互換用（既存JS/バックエンドが参照しても壊れないように保持） -->
@@ -371,7 +372,7 @@
 
       const tokyoMode = (mode === "tokyo");
       const englishOutput = (mode === "en");
-      const outputLang = (mode === "zh") ? "zh" : (englishOutput ? "en" : "ja");
+      const outputLang = (mode === "zh") ? "zh" : ((mode === "ko") ? "ko" : (englishOutput ? "en" : "ja"));
 
       const payload = { image_data: imageData, birthdate, full_year: fullYear, force_next_month: forceNextMonth,
                         tokyo_mode: tokyoMode, english_output: englishOutput, output_lang: outputLang };
