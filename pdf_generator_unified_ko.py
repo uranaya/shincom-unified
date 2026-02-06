@@ -186,10 +186,10 @@ def _wrap_len(base: int, lang: str) -> int:
     # English text easily overruns the right margin (serif fonts are wide).
     if l.startswith("en"):
         return max(28, int(base * 0.68))
-    # Korean glyphs are wide; wrap a bit earlier.
+    # Korean: keep lines longer to reduce vertical overflow on A4 page2.
+    # (Korean uses spaces, so word-aware wrapping stays readable even with a larger width.)
     if l.startswith("ko") or l.startswith("kr"):
-        # Korean can use longer lines (space-separated words). Keep close to base.
-        return max(32, int(base * 0.95))
+        return max(34, int(base * 1.10))
     # Chinese also benefits from slightly earlier wrapping.
     if l.startswith("zh"):
         return max(30, int(base * 0.85))
@@ -206,33 +206,7 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     if not lucky_lines:
         lucky_lines = []
 
-    # ---
-    # Prevent bottom overflow:
-    # If this block is rendered too close to the bottom edge, automatically
-    # switch to a compact layout (slightly smaller font + tighter line height).
-    # This is meant to stabilize KO output when the preceding text is long.
-    bottom_guard = margin if page_height else (20 * mm)
-
-    # rough height estimation (2-col rows + titles + optional direction block)
-    rows = (len(lucky_lines) + 1) // 2 if lucky_lines else 0
-    est_dir_lines = 0
-    if lucky_direction:
-        # direction title + 1-2 lines is typical
-        est_dir_lines = 2
-
-    # default (normal) metrics
-    title_h = 6 * mm
-    row_h = 5.6 * mm
-    dir_title_h = 5.5 * mm
-    extra_gap = 1.5 * mm
-
-    est_needed = title_h + (rows * row_h) + (extra_gap + dir_title_h + (est_dir_lines * row_h) if lucky_direction else 0)
-    compact = (y - est_needed) < bottom_guard and str(lang).lower().startswith(("ko", "kr"))
-
-    title_font = 11 if compact else 12
-    title_gap = 5.0 * mm if compact else 6.0 * mm
-
-    _set_font(c, lang, title_font)
+    _set_font(c, lang, 12)
     l = str(lang).lower()
     if l.startswith("en"):
         title = "■ Lucky Info (from birthdate)"
@@ -243,15 +217,15 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     else:
         title = "■ ラッキー情報（生年月日より）"
     c.drawString(margin, y, title)
-    y -= title_gap
+    y -= 6 * mm
 
     # 2列レイアウト
-    _set_font(c, lang, 9 if compact and str(lang).lower().startswith(("ko", "kr")) else 10)
+    _set_font(c, lang, 10)
     col_gap = 8 * mm
     col_w = (width - 2 * margin - col_gap) / 2.0
-    line_h = (4.9 * mm) if (compact and str(lang).lower().startswith(("ko", "kr"))) else (5.6 * mm)
+    line_h = 5.6 * mm
     font_name = _font(lang)
-    font_size = 9 if (compact and str(lang).lower().startswith(("ko", "kr"))) else 10
+    font_size = 10
 
     def _fit_one_line(s: str, max_w: float) -> str:
         s = (s or "").strip()
@@ -278,8 +252,8 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
 
     # 方位（必要なら最後に）
     if lucky_direction:
-        y -= (1.0 * mm) if (compact and str(lang).lower().startswith(("ko", "kr"))) else (1.5 * mm)
-        _set_font(c, lang, 9 if compact and str(lang).lower().startswith(("ko", "kr")) else 10)
+        y -= 1.5 * mm
+        _set_font(c, lang, 10)
         l = str(lang).lower()
         if l.startswith("en"):
             direction_title = "■ Lucky Directions"
@@ -290,7 +264,7 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
         else:
             direction_title = "■ ラッキー方位"
         c.drawString(margin, y, direction_title)
-        y -= (4.8 * mm) if (compact and str(lang).lower().startswith(("ko", "kr"))) else (5.5 * mm)
+        y -= 5.5 * mm
 
         dir_text = (lucky_direction or "").strip()
         # 1行で無理なら折り返し（左列幅いっぱいで）
@@ -522,6 +496,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         _set_font(c, lang, 12)
 
     # 四柱推命・まとめ等（タイトルのみでも出す）
+    line_step = (5.5 * mm) if (str(lang).lower().startswith('ko') or str(lang).lower().startswith('kr')) else (6 * mm)
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
         wrap_len = 36 if 'month' in key else 40
         title = data['titles'].get(key, "")
@@ -534,18 +509,12 @@ def draw_shincom_a4(c, data, include_yearly=False):
         if content:
             for line in smart_wrap(content, _wrap_len(wrap_len, lang), lang):
                 c.drawString(margin, y, line)
-                y -= 6 * mm
+                y -= line_step
         y -= 3 * mm
         _set_font(c, lang, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(
-        c, width, margin, y,
-        data.get('lucky_info', []),
-        data.get('lucky_direction', ''),
-        lang=lang,
-        page_height=height,
-    )
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'], lang)
@@ -599,13 +568,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         _set_font(c, lang, 14)
 
-    y = draw_lucky_section(
-        c, width, margin, y,
-        data.get('lucky_info', []),
-        data.get('lucky_direction', ''),
-        lang=lang,
-        page_height=height,
-    )
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'], lang)
