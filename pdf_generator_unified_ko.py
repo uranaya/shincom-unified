@@ -109,8 +109,10 @@ def smart_wrap(text: str, limit: int, lang: str | None = None):
             out.extend(textwrap.wrap(
                 p,
                 width=max(1, limit),
-                break_long_words=True,
+                break_long_words=False,
                 break_on_hyphens=False,
+                replace_whitespace=False,
+                drop_whitespace=False,
             ))
             continue
 
@@ -173,7 +175,7 @@ def _font(lang: str) -> str:
     if l.startswith("en"):
         return FONT_NAME_EN
     if l.startswith("ko") or l.startswith("kr"):
-        return max(36, int(base * 1.10))
+        return FONT_NAME_KO
     return FONT_NAME_JA
 
 def _set_font(c, lang: str, size: float):
@@ -187,7 +189,7 @@ def _wrap_len(base: int, lang: str) -> int:
     # Korean glyphs are wide; wrap a bit earlier.
     if l.startswith("ko") or l.startswith("kr"):
         # Korean can use longer lines (space-separated words). Keep close to base.
-        return max(32, int(base * 1.10))
+        return max(38, int(base * 1.25))
     # Chinese also benefits from slightly earlier wrapping.
     if l.startswith("zh"):
         return max(30, int(base * 0.85))
@@ -399,12 +401,6 @@ def draw_shincom_a4(c, data, include_yearly=False):
     width, height = A4
     margin = 20 * mm
     y = height - margin
-    # KO page2 can overflow due to longer Korean text; tighten spacing to match EN/ZH successful layout.
-    is_ko = str(lang).lower().startswith(('ko','kr'))
-    txt_size = 9 if is_ko else 10
-    line_step = (5 * mm) if is_ko else (6 * mm)
-    title_step = (5 * mm) if is_ko else (6 * mm)
-    block_gap = (2 * mm) if is_ko else (3 * mm)
     y = draw_header(c, width, margin, y)
     y = draw_palm_image(c, data["palm_image"], width, y)
 
@@ -469,19 +465,19 @@ def draw_shincom_a4(c, data, include_yearly=False):
         _set_font(c, lang, 11)
         for line in info_lines:
             c.drawString(margin, y, line)
-            y -= (4 * mm if is_ko else 5 * mm)
-        y -= block_gap
+            y -= 5 * mm
+        y -= 3 * mm
 
     # 手相3項目（1ページ目）
     _set_font(c, lang, 12)
     for i in range(3):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= title_step
-        _set_font(c, lang, txt_size)
+        y -= 6 * mm
+        _set_font(c, lang, 10)
         for line in smart_wrap(data['palm_texts'][i], _wrap_len(40, lang), lang):
             c.drawString(margin, y, line)
-            y -= line_step
-        y -= block_gap
+            y -= 6 * mm
+        y -= 3 * mm
         _set_font(c, lang, 12)
 
     # 新ページ：手相残り2項目 + 鑑定結果
@@ -491,12 +487,12 @@ def draw_shincom_a4(c, data, include_yearly=False):
     _set_font(c, lang, 12)
     for i in range(3, 5):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= title_step
-        _set_font(c, lang, txt_size)
+        y -= 6 * mm
+        _set_font(c, lang, 10)
         for line in smart_wrap(data['palm_texts'][i], _wrap_len(40, lang), lang):
             c.drawString(margin, y, line)
-            y -= line_step
-        y -= block_gap
+            y -= 6 * mm
+        y -= 3 * mm
         _set_font(c, lang, 12)
 
     # 四柱推命・まとめ等（タイトルのみでも出す）
@@ -507,17 +503,17 @@ def draw_shincom_a4(c, data, include_yearly=False):
 
         if title:
             c.drawString(margin, y, f"◆ {title}")
-            y -= title_step
-        _set_font(c, lang, txt_size)
+            y -= 6 * mm
+        _set_font(c, lang, 10)
         if content:
             for line in smart_wrap(content, _wrap_len(wrap_len, lang), lang):
                 c.drawString(margin, y, line)
-                y -= line_step
-        y -= block_gap
+                y -= 6 * mm
+        y -= 3 * mm
         _set_font(c, lang, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=lang)
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'], lang)
@@ -571,7 +567,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         _set_font(c, lang, 14)
 
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=lang)
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'], lang)
@@ -715,3 +711,37 @@ def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
     else:
         draw_renai_pdf(c, data, size, include_yearly)
     c.save()
+
+# ----------------------------
+# HOTFIX (2026-02-06)
+# - Some prior patches accidentally broke _font() (NameError: base) on Render.
+# - Keep last-definition-wins: re-define _font/_set_font and _wrap_len at EOF.
+#   This mirrors the stable EN/ZH generators: _font returns a *font face name*.
+# ----------------------------
+
+def _font(lang: str) -> str:
+    l = str(lang or "").lower()
+    if l.startswith("en"):
+        return FONT_NAME_EN
+    if l.startswith("ko") or l.startswith("kr"):
+        return FONT_NAME_KO
+    if l.startswith("zh"):
+        # KO generator shouldn't be used for zh, but keep safe.
+        return FONT_NAME_KO
+    return FONT_NAME_JA
+
+
+def _set_font(c, lang: str, size: float):
+    c.setFont(_font(lang), size)
+
+
+def _wrap_len(base: int, lang: str) -> int:
+    l = str(lang or "").lower()
+    if l.startswith("en"):
+        return max(28, int(base * 0.68))
+    if l.startswith("ko") or l.startswith("kr"):
+        # Use wider logical width to match EN/ZH layout (reduce line count).
+        return max(38, int(base * 1.25))
+    if l.startswith("zh"):
+        return max(30, int(base * 0.85))
+    return base
