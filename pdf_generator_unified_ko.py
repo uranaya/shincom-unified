@@ -25,6 +25,54 @@ def _get_lang(data: dict) -> str:
     lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
     lang = (lang or 'ja').strip().lower()
     return 'en' if lang.startswith('en') else ('zh' if lang.startswith('zh') else ('ko' if (lang.startswith('ko') or lang.startswith('kr')) else 'ja'))
+
+# ----------------------------
+# Korean label mapping helpers
+# ----------------------------
+# In KO mode we want key labels (zodiac / 九星) to appear in Korean.
+# These helpers are intentionally defensive: if the input is already Korean
+# or unknown, we return it unchanged.
+
+_KO_ZODIAC_MAP = {
+    '牡羊座': '양자리',
+    '牡牛座': '황소자리',
+    '双子座': '쌍둥이자리',
+    '蟹座': '게자리',
+    '獅子座': '사자자리',
+    '乙女座': '처녀자리',
+    '天秤座': '천칭자리',
+    '蠍座': '전갈자리',
+    '射手座': '사수자리',
+    '山羊座': '염소자리',
+    '水瓶座': '물병자리',
+    '魚座': '물고기자리',
+}
+
+_KO_KYUSEI_MAP = {
+    '一白水星': '일백수성',
+    '二黒土星': '이흑토성',
+    '三碧木星': '삼벽목성',
+    '四緑木星': '사록목성',
+    '五黄土星': '오황토성',
+    '六白金星': '육백금성',
+    '七赤金星': '칠적금성',
+    '八白土星': '팔백토성',
+    '九紫火星': '구자화성',
+}
+
+
+def _ko_map_zodiac(z: str) -> str:
+    if not z:
+        return z
+    s = str(z).strip()
+    return _KO_ZODIAC_MAP.get(s, s)
+
+
+def _ko_map_star(star: str) -> str:
+    if not star:
+        return star
+    s = str(star).strip()
+    return _KO_KYUSEI_MAP.get(s, s)
 import base64
 import io
 import os
