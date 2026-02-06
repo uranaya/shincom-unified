@@ -189,7 +189,7 @@ def _wrap_len(base: int, lang: str) -> int:
     # Korean glyphs are wide; wrap a bit earlier.
     if l.startswith("ko") or l.startswith("kr"):
         # Korean can use longer lines (space-separated words). Keep close to base.
-        return max(38, int(base * 1.25))
+        return max(32, int(base * 0.95))
     # Chinese also benefits from slightly earlier wrapping.
     if l.startswith("zh"):
         return max(30, int(base * 0.85))
@@ -513,7 +513,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         _set_font(c, lang, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=lang, page_height=height)
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'], lang)
@@ -567,7 +567,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         _set_font(c, lang, 14)
 
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=lang, page_height=height)
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'], lang)
@@ -640,7 +640,7 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     from reportlab.lib.pagesizes import A4, B4
     from reportlab.lib.units import mm
     from header_utils_ko import draw_header
-    from pdf_generator_unified import draw_yearly_pages_renai_a4, draw_yearly_pages_renai_b4, draw_lucky_section, FONT_NAME
+    from pdf_generator_unified import draw_yearly_pages_renai_a4, draw_yearly_pages_renai_b4, FONT_NAME
 
     width, height = A4 if size == 'a4' else B4
     margin = 20 * mm
@@ -686,7 +686,8 @@ def draw_renai_pdf(c, data, size, include_yearly=False):
     y = draw_lucky_section(
         c, width, margin, y,
         data.get("lucky_info", []),
-        data.get("lucky_direction", "")
+        data.get("lucky_direction", ""),
+        lang=lang, page_height=height
     )
 
     # 年運（オプション）
@@ -711,37 +712,3 @@ def create_pdf_unified(filepath, data, mode, size='a4', include_yearly=False):
     else:
         draw_renai_pdf(c, data, size, include_yearly)
     c.save()
-
-# ----------------------------
-# HOTFIX (2026-02-06)
-# - Some prior patches accidentally broke _font() (NameError: base) on Render.
-# - Keep last-definition-wins: re-define _font/_set_font and _wrap_len at EOF.
-#   This mirrors the stable EN/ZH generators: _font returns a *font face name*.
-# ----------------------------
-
-def _font(lang: str) -> str:
-    l = str(lang or "").lower()
-    if l.startswith("en"):
-        return FONT_NAME_EN
-    if l.startswith("ko") or l.startswith("kr"):
-        return FONT_NAME_KO
-    if l.startswith("zh"):
-        # KO generator shouldn't be used for zh, but keep safe.
-        return FONT_NAME_KO
-    return FONT_NAME_JA
-
-
-def _set_font(c, lang: str, size: float):
-    c.setFont(_font(lang), size)
-
-
-def _wrap_len(base: int, lang: str) -> int:
-    l = str(lang or "").lower()
-    if l.startswith("en"):
-        return max(28, int(base * 0.68))
-    if l.startswith("ko") or l.startswith("kr"):
-        # Use wider logical width to match EN/ZH layout (reduce line count).
-        return max(38, int(base * 1.25))
-    if l.startswith("zh"):
-        return max(30, int(base * 0.85))
-    return base
