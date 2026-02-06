@@ -26,7 +26,10 @@ MAX_CHAR_EN_MONTH = 900
 MAX_CHAR_ZH_YEAR = 260
 MAX_CHAR_ZH_MONTH = 180
 
-
+# 韓国語（ko）は英語より文字密度が高く、日本語よりはスペースが入るため、
+# 日本語より少し余裕を持たせつつ、PDFの見切れを起こしにくい上限にする。
+MAX_CHAR_KO_YEAR = 260
+MAX_CHAR_KO_MONTH = 180
 
 # --- text helpers ---
 
@@ -193,6 +196,24 @@ Rules:
 - 积极、实用、可执行
 - 避免空话，给出具体建议（工作、人际、金钱、健康等）
 """ + lang_instruction
+    elif lang_norm.startswith(("ko", "kr")):
+        prompt_year = f"""당신은 개운 상담가(운세 어드바이저)입니다.
+아래 정보를 참고하여 고객의 {target_year}년 전체 운세를 자연스러운 한국어로 작성하세요.
+
+길이:
+- 4~7문장
+- 약 {MAX_CHAR_KO_YEAR}자 이내(너무 길게 쓰지 마세요)
+
+참고 정보:
+- 일주(참고용): {nicchu}
+- 연의 영향(참고용): {tsuhen_year}
+
+규칙:
+- 간지명, 통변성 등 전문 용어는 절대 쓰지 말고, 의미를 일상적인 표현으로 풀어주세요
+- 긍정적이고 실용적이며 실행 가능한 조언 중심
+- 공허한 말은 피하고(일, 인간관계, 금전, 건강 등) 구체적으로
+""" + lang_instruction
+
     else:
         prompt_year = f"""あなたは開運アドバイザーです。
 以下の情報をもとに、{target_year}年における「あなた」の全体運を自然な日本語で表現してください。
@@ -206,7 +227,7 @@ Rules:
 - 前向きで、行動や考え方の指針になるように
 """ + lang_instruction
 
-    max_year = MAX_CHAR_EN_YEAR if lang_norm.startswith('en') else (MAX_CHAR_ZH_YEAR if lang_norm.startswith(('zh', 'cn')) else MAX_CHAR_JA_YEAR)
+    max_year = (MAX_CHAR_EN_YEAR if lang_norm.startswith('en') else (MAX_CHAR_ZH_YEAR if lang_norm.startswith(('zh', 'cn')) else (MAX_CHAR_KO_YEAR if lang_norm.startswith(('ko', 'kr')) else MAX_CHAR_JA_YEAR)))
     year_fortune = _trim_to_max_chars(
         _ask_openai(prompt_year, lang=lang_norm),
         max_year,
@@ -256,6 +277,26 @@ Rules:
 - 避免每个月都用同样的句式
 """ + lang_instruction
             label = f"{y}年{m}月的运势"
+        elif lang_norm.startswith(("ko", "kr")):
+            prompt_month = f"""당신은 운세 상담가입니다.
+아래 정보를 참고하여 고객의 {y}년 {m}월 운세를 자연스러운 한국어로 작성하세요.
+
+길이:
+- 3~6문장
+- 약 {MAX_CHAR_KO_MONTH}자 이내
+
+참고 정보:
+- 일주(참고용): {nicchu}
+- 월의 영향(참고용): {tsuhen_month}
+
+규칙:
+- 간지명, 통변성 등 전문 용어는 절대 쓰지 말고, 의미를 일상적인 표현으로 풀어주세요
+- 실용적이고 긍정적으로, 행동 제안 포함
+- 월마다 분위기/초점이 달라지도록(행동, 기분, 인간관계, 일, 금전, 건강 등)
+- 매달 같은 문장 패턴 반복 금지
+""" + lang_instruction
+            label = f"{y}년 {m}월 운세"
+
         else:
             prompt_month = f"""あなたは占いの専門家です。
 以下の情報をもとに、{y}年{m}月の運気を自然な日本語で約{MAX_CHAR_JA_MONTH}字以内にまとめてください。
@@ -272,7 +313,7 @@ Rules:
             label = f"{y}年{m}月の運勢"
 
         # OpenAIで生成（英語/日本語とも共通）
-        max_month = MAX_CHAR_EN_MONTH if lang_norm.startswith('en') else (MAX_CHAR_ZH_MONTH if lang_norm.startswith(('zh', 'cn')) else MAX_CHAR_JA_MONTH)
+        max_month = (MAX_CHAR_EN_MONTH if lang_norm.startswith('en') else (MAX_CHAR_ZH_MONTH if lang_norm.startswith(('zh', 'cn')) else (MAX_CHAR_KO_MONTH if lang_norm.startswith(('ko', 'kr')) else MAX_CHAR_JA_MONTH)))
         text = _trim_to_max_chars(
             _ask_openai(prompt_month, lang=lang_norm),
             max_month,
@@ -283,6 +324,8 @@ Rules:
         year_label = f"Overall fortune for {target_year}"
     elif lang_norm.startswith(('zh', 'cn')):
         year_label = f"{target_year}年的整体运势"
+    elif lang_norm.startswith(('ko', 'kr')):
+        year_label = f"{target_year}년 종합운"
     else:
         year_label = f"{target_year}年の総合運"
 
