@@ -191,12 +191,22 @@ def get_honmeisei(year: int, month: int, day: int) -> str:
     return KYUSEI_YEAR_TABLE[key]
 
 
+
 def get_directions(year: int, month: int, honmeisei: str, lang: str = "ja") -> dict:
-    """九星気学に基づき、吉方位・凶方位を OpenAI に問い合わせる。"""
+    """九星気学に基づき、吉方位・凶方位を OpenAI に問い合わせる。
+
+    month == 0 の場合は「年盤（年間）」として扱う。
+    """
+    lang_norm = (lang or "ja").lower()
+
     if month == 0:
-        period = f"{year}年の年間"
+        period = f"{year}年（年間）"
         explanation = "年盤を元に判断してください。"
-    elif lang_norm.startswith(("ko", "kr")):
+    else:
+        period = f"{year}年{month}月"
+        explanation = "年盤と月盤を重ねて、総合的に吉方位・凶方位を判断してください。"
+
+    if lang_norm.startswith(("ko", "kr")):
         prompt = f"""당신은 구세이 기학(九星氣學, Nine Star Ki)의 전문가입니다.
 기간: {period}
 본명성(메인 스타): {honmeisei}
@@ -210,13 +220,7 @@ def get_directions(year: int, month: int, honmeisei: str, lang: str = "ja") -> d
 
 추가 설명 금지, JSON만 출력.""".strip()
 
-    else:
-        period = f"{year}年{month}月"
-        explanation = "年盤と月盤を重ねて、総合的に吉方位・凶方位を判断してください。"
-
-    lang_norm = (lang or "ja").lower()
-
-    if lang_norm.startswith("en"):
+    elif lang_norm.startswith("en"):
         prompt = f"""You are an expert in Nine Star Ki (Kyusei Kigaku).
 For the period: {period}
 Main star: {honmeisei}
@@ -229,6 +233,7 @@ Directions must be chosen from:
 North, Northeast, East, Southeast, South, Southwest, West, Northwest
 
 No extra text, JSON only.""".strip()
+
     elif lang_norm.startswith(("zh", "cn")):
         prompt = f"""你是九星气学（九星気学）的专家。
 时期：{period}
@@ -242,6 +247,7 @@ No extra text, JSON only.""".strip()
 北, 东北, 东, 东南, 南, 西南, 西, 西北
 
 不要额外说明，不要换行解释，只输出JSON。""".strip()
+
     else:
         prompt = f"""あなたは九星気学の専門家です。
 {period}において、本命星「{honmeisei}」の人の
@@ -275,24 +281,52 @@ No extra text, JSON only.""".strip()
         return {"good": "取得失敗", "bad": "取得失敗"}
 
 
-
 def get_kyusei_fortune(year: int, month: int, day: int, now=None, force_next_month: bool = False, lang: str = "ja") -> str:
     """九星気学の短文（PDF末尾用）を生成する。
 
     - lang="ja": 日本語
     - lang="en": 英語
+    - lang="zh": 中国語（簡体）
+    - lang="ko": 韓国語
     - force_next_month=True: 「今月/来月」を1ヶ月先送り（来月起点）
+
+    注意: 動物占いは ko では表示しない方針のため、本関数は九星のみ。
     """
     try:
         honmeisei = get_honmeisei(year, month, day)
-
         lang_norm = (lang or "ja").lower()
 
+        # 表示名（言語別）
         honmeisei_disp = honmeisei
+        if lang_norm.startswith("en"):
+            honmeisei_disp = _star_to_en(honmeisei)
+        elif lang_norm.startswith(("ko", "kr")):
+            try:
+                idx = NINE_STARS.index(honmeisei)
+                honmeisei_disp = NINE_STARS_KO[idx]
+            except Exception:
+                honmeisei_disp = honmeisei
+
+        # 基準日
+        base_dt = now if now is not None else datetime.now()
+        if isinstance(base_dt, date) and not isinstance(base_dt, datetime):
+            base_dt = datetime(base_dt.year, base_dt.month, base_dt.day)
+
+        if force_next_month:
+            base_dt = base_dt + relativedelta(months=1)
+
+        # 年・今月・来月（ko はプロンプトも ko の星名で統一した方が混在しにくい）
+        star_for_prompt = honmeisei_disp if lang_norm.startswith(("ko", "kr")) else honmeisei
+
+        directions_year = get_directions(base_dt.year, 0, star_for_prompt, lang=lang_norm)
+        directions_this_month = get_directions(base_dt.year, base_dt.month, star_for_prompt, lang=lang_norm)
+        next_dt = base_dt + relativedelta(months=1)
+        directions_next_month = get_directions(next_dt.year, next_dt.month, star_for_prompt, lang=lang_norm)
+
         if lang_norm.startswith("en"):
             return (
                 f"Your main star is '{honmeisei_disp}'.\n"
-                f"Lucky direction for {base.year}: {directions_year.get('good', 'N/A')}  "
+                f"Lucky direction for {base_dt.year}: {directions_year.get('good', 'N/A')}  "
                 f"This month: {directions_this_month.get('good', 'N/A')}  "
                 f"Next month: {directions_next_month.get('good', 'N/A')}."
             )
@@ -300,7 +334,7 @@ def get_kyusei_fortune(year: int, month: int, day: int, now=None, force_next_mon
         if lang_norm.startswith(("zh", "cn")):
             return (
                 f"你的本命星是「{honmeisei_disp}」。\n"
-                f"{base.year}年的吉方位：{directions_year.get('good', '无法获取')}　"
+                f"{base_dt.year}年的吉方位：{directions_year.get('good', '无法获取')}　"
                 f"本月：{directions_this_month.get('good', '无法获取')}　"
                 f"下月：{directions_next_month.get('good', '无法获取')}。"
             )
@@ -308,14 +342,14 @@ def get_kyusei_fortune(year: int, month: int, day: int, now=None, force_next_mon
         if lang_norm.startswith(("ko", "kr")):
             return (
                 f"당신의 본명성은 '{honmeisei_disp}' 입니다.\n"
-                f"{base.year}년의 길한 방향: {directions_year.get('good', '불가')}  "
+                f"{base_dt.year}년의 길한 방향: {directions_year.get('good', '불가')}  "
                 f"이번 달: {directions_this_month.get('good', '불가')}  "
                 f"다음 달: {directions_next_month.get('good', '불가')} 입니다."
             )
 
         return (
             f"あなたの本命星は「{honmeisei_disp}」です。\n"
-            f"{base.year}年の吉方位：{directions_year.get('good', '取得失敗')}　"
+            f"{base_dt.year}年の吉方位：{directions_year.get('good', '取得失敗')}　"
             f"今月：{directions_this_month.get('good', '取得失敗')}　"
             f"来月：{directions_next_month.get('good', '取得失敗')} です。"
         )
@@ -328,3 +362,4 @@ def get_kyusei_fortune(year: int, month: int, day: int, now=None, force_next_mon
         if (lang or "ja").lower().startswith(("ko", "kr")):
             return "길한 방향: 불가"
         return "吉方位：取得失敗"
+
