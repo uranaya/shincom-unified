@@ -84,30 +84,53 @@ import textwrap
 def smart_wrap(text: str, limit: int, lang: str | None = None):
     """Wrap text safely for PDF rendering.
 
-    - Japanese (and other CJK) text is wrapped by character count (no spaces).
-    - English is wrapped using textwrap.wrap with a width of `limit`.
+    - Japanese/Chinese: wrapped by fixed character count (no spaces).
+    - Korean: wrapped with word-aware wrapping (Korean uses spaces).
+    - English: wrapped with textwrap.wrap.
     """
     if text is None:
         return []
     s = str(text)
     if not s:
         return []
-    lang = (lang or '').strip() or None
+    lang = (lang or '').strip().lower() or None
+
     # Normalize newlines first
     parts = s.splitlines() or ['']
-    out = []
+    out: list[str] = []
+
     for p in parts:
-        if not p:
+        if p == '':
             out.append('')
             continue
-        # Detect CJK if lang is ja OR the string contains CJK chars.
-        is_cjk = (lang in ('ja','zh','ko')) or bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]", p))
-        if is_cjk:
-            # simple fixed-width split
+
+        # Korean: use space-aware wrapping to avoid overly short lines.
+        if lang in ('ko', 'kr') or bool(re.search(r"[\uac00-\ud7af]", p)):
+            out.extend(textwrap.wrap(
+                p,
+                width=max(1, limit),
+                break_long_words=False,
+                break_on_hyphens=False,
+                replace_whitespace=False,
+                drop_whitespace=False,
+            ))
+            continue
+
+        # Japanese/Chinese: no spaces → fixed-width split by characters.
+        is_ja_zh = (lang in ('ja', 'zh')) or bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", p))
+        if is_ja_zh:
             for k in range(0, len(p), max(1, limit)):
                 out.append(p[k:k+limit])
-        else:
-            out.extend(textwrap.wrap(p, width=limit, break_long_words=True, break_on_hyphens=True))
+            continue
+
+        # Default (English etc.)
+        out.extend(textwrap.wrap(
+            p,
+            width=max(1, limit),
+            break_long_words=True,
+            break_on_hyphens=True,
+        ))
+
     return out
 def _normalize_month_fortune_text(text: str, kind: str) -> str:
     """Remove leading 'YYYY年M月は' style prefixes to avoid heading/body month mismatches.
@@ -165,7 +188,8 @@ def _wrap_len(base: int, lang: str) -> int:
         return max(28, int(base * 0.68))
     # Korean glyphs are wide; wrap a bit earlier.
     if l.startswith("ko") or l.startswith("kr"):
-        return max(28, int(base * 0.78))
+        # Korean can use longer lines (space-separated words). Keep close to base.
+        return max(32, int(base * 0.95))
     # Chinese also benefits from slightly earlier wrapping.
     if l.startswith("zh"):
         return max(30, int(base * 0.85))
