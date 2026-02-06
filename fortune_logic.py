@@ -4,7 +4,7 @@ import re
 import hashlib, random
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from tesou import tesou_names, tesou_descriptions, build_shape_guide_text
+from tesou import tesou_names, tesou_descriptions
 from nicchu_utils import get_nicchu_eto
 from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 from lucky_utils import generate_lucky_info, generate_lucky_direction
@@ -256,23 +256,17 @@ def analyze_palm(image_data, lang: str = 'ja'):
             if name in tesou_descriptions
         )
 
-        # 形状別の意味ガイド（線の長短・濃淡・途切れ等）
-        shape_guide_text = build_shape_guide_text(lang_norm)
-
         # 特殊線をより魅力的に出すようにした system_prompt（語り口・優先順位調整版）
         if is_en:
             system_prompt = (
                 "You are a professional palm reader. Follow the constraints and interpret the palm image in a warm, inspiring tone.\n\n"
                 "[Output rules]\n"
                 "- Always include: 1) Life line, 2) Fate line, 3) Money line\n"
-                "- For each base line, mention the visible shape (e.g., long/short/faint/broken/double/forked) if you can see it, and tailor the interpretation accordingly. If uncertain, describe it neutrally.\n"
                 "- Choose two additional 'special lines' preferably from this list (even subtle signs are OK if described positively):\n"
                 f"{special_lines_text}\n"
                 "- If you truly cannot pick two special lines, you may naturally use Heart line or Head line instead\n\n"
                 "[Meaning guide]\n"
                 f"{description_text}\n\n"
-                "[Shape variations guide]\n"
-                f"{shape_guide_text}\n\n"
                 "Write in natural, customer-friendly English. Avoid negative wording like 'none' or 'lacking'; reframe as potential."
             )
             user_prompt = (
@@ -291,14 +285,11 @@ def analyze_palm(image_data, lang: str = 'ja'):
                 "你是一位专业的手相解读师。请根据以下约束，从手相图像中解读并用温暖、鼓励的语气写给顾客。\n\n"
                 "[输出规则]\n"
                 "- 必须包含：1) 生命线 2) 命运线 3) 金钱线\n"
-                "- 对每一条基础线，请尽量描述你看到的形状特征（如：长/短/深/浅/断续/分叉/双重等）并据此解释；不确定时用中性说法。\n"
                 "- 另外选择两条‘特殊线’，尽量从下面列表中选（即使是细微迹象也可以，但要用积极的方式表达）：\n"
                 f"{special_lines_text}\n"
                 "- 若确实无法选出两条特殊线，可自然地用感情线/头脑线替代\n\n"
                 "[含义参考]\n"
                 f"{description_text}\n\n"
-                "[形状参考]\n"
-                f"{shape_guide_text}\n\n"
                 "请用自然的简体中文，不要用‘没有/缺乏’等否定措辞，尽量写成潜力与倾向。"
             )
             user_prompt = (
@@ -318,14 +309,11 @@ def analyze_palm(image_data, lang: str = 'ja'):
                 "당신은 프로 손금 감정가입니다. 아래 조건을 지켜 손금 이미지를 해석하고, 따뜻하고 고무적인 톤으로 작성하세요.\n\n"
                 "[출력 규칙]\n"
                 "- 반드시 포함: 1) 생명선 2) 운명선 3) 금전선\n"
-                "- 각 기본선은 보이는 형태(예: 길다/짧다/진하다/옅다/끊김/갈라짐/이중 등)를 가능하면 언급하고 그에 맞춰 해석하세요. 불확실하면 중립적으로 표현하세요.\n"
                 "- 추가로 '특수선' 2개를 아래 목록에서 가급적 선택 (미묘해도 긍정적으로 표현 가능):\n"
                 f"{special_lines_text}\n"
                 "- 정말로 특수선을 2개 고르기 어렵다면, 자연스럽게 감정선/두뇌선을 사용해도 됩니다\n\n"
                 "[의미 가이드]\n"
                 f"{description_text}\n\n"
-                "[형태 가이드]\n"
-                f"{shape_guide_text}\n\n"
                 "한국어로 자연스럽고 고객 친화적으로 작성하세요. '없다/부족하다' 같은 부정 표현은 피하고 잠재력으로 재구성하세요."
             )
             user_prompt = (
@@ -341,21 +329,23 @@ def analyze_palm(image_data, lang: str = 'ja'):
             )
         else:
             system_prompt = (
-                "あなたはプロの手相鑑定士です。以下の条件に従って、手相画像から5つの線・相を選び、"
-                "それぞれの意味と印象を、聞いた人が『ほう…！』と唸るような語り口で魅力的に解説してください。\n\n"
+                "あなたはプロの手相鑑定士です。手相画像を読み取り、鑑定文を日本語で作成してください。\n\n"
+                "【最重要ルール】\n"
+                "1) 仮定・あいまい表現は禁止：『もし』『〜なら』『かもしれない』『可能性』『〜があれば/あるなら』を使わない\n"
+                "2) 画像から読み取った事実として描写し、『〜が見えます』『〜が出ています』『〜と読めます』で言い切る\n"
+                "3) 同じ内容の言い換え反復は禁止（各項目は一度で言い切る）\n"
+                "4) ネガティブ断定は禁止。課題は『整えるコツ』『伸びしろ』として優しく示す\n\n"
                 "【出力構成】\n"
                 "・1. 生命線、2. 運命線、3. 金運線は必ず含める\n"
-                "・各基本線について、見える範囲で形状（長い/短い/濃い/薄い/途切れ/枝分かれ/二重/鎖状など）を必ず触れ、その特徴に沿って解釈する\n"
-                "・4. 特殊線1、5. 特殊線2は以下の中から“あると嬉しいもの”を優先して選ぶ：\n"
+                "・4. 特殊線1、5. 特殊線2は以下の候補から優先して選ぶ（候補外は原則選ばない）:\n"
                 f"{special_lines_text}\n"
-                "・特殊線は、兆し・傾向レベルでもポジティブに採用して構いません\n"
-                "・特に幸運・守護・才能・使命を感じさせる線を優先して選んでください\n"
-                "・2つの特殊線がどうしても見つからない場合のみ、感情線や頭脳線などで自然に補ってください\n\n"
+                "・生命線/運命線/金運線は、形状タグを最低1つ入れる（例：長い/短い/濃い/薄い/途切れ/枝分かれ/二重/鎖状）\n\n"
                 "【各線の意味ガイド】\n"
                 f"{description_text}\n\n"
-                "全体を通して、読み手が安心し前向きになれるような、優しく包み込むような文体でまとめてください。"
+                "読み手が安心して前向きになれるよう、やさしく詩的だが具体的な文章でまとめてください。"
             )
             user_prompt = (
+
                 "以下の形式で出力してください：\n"
                 "### 1. 生命線\n（説明文）\n\n"
                 "### 2. 運命線\n（説明文）\n\n"
@@ -388,7 +378,49 @@ def analyze_palm(image_data, lang: str = 'ja'):
             max_tokens=3000,
             temperature=0.8,
         )
-        return response.choices[0].message.content.strip()
+        raw = response.choices[0].message.content.strip()
+        # Post-process to reduce hedge wording and duplicate lines (especially Japanese)
+        def _polish_palm_text(t: str) -> str:
+            if not t:
+                return t
+            t = t.replace('もし', '')
+            # Convert common '〜なら' hedges into assertive phrasing
+            t = re.sub(r'この線が([^。\n]{0,30}?)なら、', r'この線は\1ので、', t)
+            t = re.sub(r'([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら、', r'\1は\2ので、', t)
+            t = re.sub(r'([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら。', r'\1は\2です。', t)
+            t = t.replace('あるなら、', 'あり、')
+            t = t.replace('現れているなら、', '現れており、')
+            t = t.replace('見えるなら、', '見えており、')
+            t = t.replace('なら、', 'ので、')
+            t = t.replace('なら。', 'です。')
+            # De-duplicate identical lines within each section
+            lines = [ln.rstrip() for ln in t.split('\n')]
+            out = []
+            prev = None
+            seen_in_section = set()
+            for ln in lines:
+                key = re.sub(r'\s+', '', ln)
+                if key.startswith('###') or key.startswith('◆'):
+                    seen_in_section = set()
+                if not key:
+                    out.append(ln)
+                    prev = key
+                    continue
+                if key == prev:
+                    continue
+                if key in seen_in_section:
+                    continue
+                seen_in_section.add(key)
+                out.append(ln)
+                prev = key
+            return '\n'.join(out).strip()
+
+        try:
+            if (lang_norm or 'ja').lower().startswith('ja'):
+                raw = _polish_palm_text(raw)
+        except Exception:
+            pass
+        return raw
 
     except Exception as e:
         print("❌ Vision APIエラー:", e)
@@ -413,7 +445,49 @@ def get_iching_advice(lang: str = 'ja'):
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300
         )
-        return response.choices[0].message.content.strip()
+        raw = response.choices[0].message.content.strip()
+        # Post-process to reduce hedge wording and duplicate lines (especially Japanese)
+        def _polish_palm_text(t: str) -> str:
+            if not t:
+                return t
+            t = t.replace('もし', '')
+            # Convert common '〜なら' hedges into assertive phrasing
+            t = re.sub(r'この線が([^。\n]{0,30}?)なら、', r'この線は\1ので、', t)
+            t = re.sub(r'([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら、', r'\1は\2ので、', t)
+            t = re.sub(r'([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら。', r'\1は\2です。', t)
+            t = t.replace('あるなら、', 'あり、')
+            t = t.replace('現れているなら、', '現れており、')
+            t = t.replace('見えるなら、', '見えており、')
+            t = t.replace('なら、', 'ので、')
+            t = t.replace('なら。', 'です。')
+            # De-duplicate identical lines within each section
+            lines = [ln.rstrip() for ln in t.split('\n')]
+            out = []
+            prev = None
+            seen_in_section = set()
+            for ln in lines:
+                key = re.sub(r'\s+', '', ln)
+                if key.startswith('###') or key.startswith('◆'):
+                    seen_in_section = set()
+                if not key:
+                    out.append(ln)
+                    prev = key
+                    continue
+                if key == prev:
+                    continue
+                if key in seen_in_section:
+                    continue
+                seen_in_section.add(key)
+                out.append(ln)
+                prev = key
+            return '\n'.join(out).strip()
+
+        try:
+            if (lang_norm or 'ja').lower().startswith('ja'):
+                raw = _polish_palm_text(raw)
+        except Exception:
+            pass
+        return raw
     except Exception as e:
         print("❌ 易占い取得失敗:", e)
         if (lang or 'ja').lower().startswith('en'):
