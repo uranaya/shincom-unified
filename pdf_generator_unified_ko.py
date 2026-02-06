@@ -186,10 +186,11 @@ def _wrap_len(base: int, lang: str) -> int:
     # English text easily overruns the right margin (serif fonts are wide).
     if l.startswith("en"):
         return max(28, int(base * 0.68))
-    # Korean: keep lines longer to reduce vertical overflow on A4 page2.
-    # (Korean uses spaces, so word-aware wrapping stays readable even with a larger width.)
+    # Korean: prefer *longer* lines (space-separated words) to reduce
+    # vertical growth (page overflow) while keeping the same margins.
+    # (The actual PDF width is still constrained by the page margins.)
     if l.startswith("ko") or l.startswith("kr"):
-        return max(34, int(base * 1.10))
+        return max(40, int(base * 1.25))
     # Chinese also benefits from slightly earlier wrapping.
     if l.startswith("zh"):
         return max(30, int(base * 0.85))
@@ -468,15 +469,20 @@ def draw_shincom_a4(c, data, include_yearly=False):
             y -= 5 * mm
         y -= 3 * mm
 
+    # 行送り：KOは行数が増えやすいので少し詰める
+    is_ko = str(lang).lower().startswith(('ko', 'kr'))
+    line_step = (5.2 if is_ko else 6.0) * mm
+    title_step = (5.8 if is_ko else 6.0) * mm
+
     # 手相3項目（1ページ目）
     _set_font(c, lang, 12)
     for i in range(3):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 6 * mm
+        y -= title_step
         _set_font(c, lang, 10)
         for line in smart_wrap(data['palm_texts'][i], _wrap_len(40, lang), lang):
             c.drawString(margin, y, line)
-            y -= 6 * mm
+            y -= line_step
         y -= 3 * mm
         _set_font(c, lang, 12)
 
@@ -487,24 +493,24 @@ def draw_shincom_a4(c, data, include_yearly=False):
     _set_font(c, lang, 12)
     for i in range(3, 5):
         c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 6 * mm
+        y -= title_step
         _set_font(c, lang, 10)
         for line in smart_wrap(data['palm_texts'][i], _wrap_len(40, lang), lang):
             c.drawString(margin, y, line)
-            y -= 6 * mm
+            y -= line_step
         y -= 3 * mm
         _set_font(c, lang, 12)
 
     # 四柱推命・まとめ等（タイトルのみでも出す）
-    line_step = (5.5 * mm) if (str(lang).lower().startswith('ko') or str(lang).lower().startswith('kr')) else (6 * mm)
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
-        wrap_len = 36 if 'month' in key else 40
+        # KOは行数を抑えるため、月運系も少し長めに折り返す
+        wrap_len = 40 if ('month' in key and is_ko) else (36 if 'month' in key else 40)
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
 
         if title:
             c.drawString(margin, y, f"◆ {title}")
-            y -= 6 * mm
+            y -= title_step
         _set_font(c, lang, 10)
         if content:
             for line in smart_wrap(content, _wrap_len(wrap_len, lang), lang):
@@ -514,7 +520,17 @@ def draw_shincom_a4(c, data, include_yearly=False):
         _set_font(c, lang, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    # ラッキー情報は言語とフォントが重要。lang を必ず渡す。
+    y = draw_lucky_section(
+        c,
+        width,
+        margin,
+        y,
+        data.get('lucky_info'),
+        data.get('lucky_direction', ''),
+        lang=lang,
+        page_height=height,
+    )
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'], lang)
@@ -568,7 +584,17 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         _set_font(c, lang, 14)
 
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    # KO: 必ず lang を渡して、韓国語フォント／見出しが有効になるようにする
+    y = draw_lucky_section(
+        c,
+        width,
+        margin,
+        y,
+        data['lucky_info'],
+        data.get('lucky_direction', ''),
+        lang=lang,
+        page_height=height,
+    )
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'], lang)
