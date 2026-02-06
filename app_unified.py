@@ -784,8 +784,11 @@ def selfmob_uuid(uuid_str):
                 print("❌ lucky_direction 取得エラー:", e)
                 kyusei_text = ""
             eto = get_nicchu_eto(birthdate)
+            # NOTE: output_lang(ja/en/zh/ko) を fortune_logic 側へ渡す。
+            # これにより「ラッキー情報/ラッキーナンバー」等が言語に合わせて出力され、
+            # KOフォントでの文字化け（□表示）も回避できます。
             palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
-                image_data, birthdate, kyusei_text
+                image_data, birthdate, kyusei_text, lang=output_lang
             )
             palm_result = "\n".join(palm_texts)
             summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
