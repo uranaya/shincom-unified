@@ -24,6 +24,8 @@ NINE_STARS_EN = [
     "Nine Purple Fire",
 ]
 
+NINE_STARS_KO = ["일백수성", "이흑토성", "삼벽목성", "사록목성", "오황토성", "육백금성", "칠적금성", "팔백토성", "구자화성"]
+
 
 # =========================
 # 年別・固定テーブルの読み込み
@@ -194,6 +196,20 @@ def get_directions(year: int, month: int, honmeisei: str, lang: str = "ja") -> d
     if month == 0:
         period = f"{year}年の年間"
         explanation = "年盤を元に判断してください。"
+    elif lang_norm.startswith(("ko", "kr")):
+        prompt = f"""당신은 구세이 기학(九星氣學, Nine Star Ki)의 전문가입니다.
+기간: {period}
+본명성(메인 스타): {honmeisei}
+
+【하나】의 길한 방향과 【하나】의 흉한 방향을 반환하세요.
+출력은 한국어 JSON만, 정확히 아래 형식으로:
+{{"good": "남동", "bad": "북서"}}
+
+방향은 아래 8방위 중에서 각각 1개씩만 선택:
+북, 북동, 동, 남동, 남, 남서, 서, 북서
+
+추가 설명 금지, JSON만 출력.""".strip()
+
     else:
         period = f"{year}年{month}月"
         explanation = "年盤と月盤を重ねて、総合的に吉方位・凶方位を判断してください。"
@@ -254,6 +270,8 @@ No extra text, JSON only.""".strip()
             return {"good": "unavailable", "bad": "unavailable"}
         if lang_norm.startswith(("zh", "cn")):
             return {"good": "无法获取", "bad": "无法获取"}
+        if lang_norm.startswith(("ko", "kr")):
+            return {"good": "불가", "bad": "불가"}
         return {"good": "取得失敗", "bad": "取得失敗"}
 
 
@@ -272,23 +290,6 @@ def get_kyusei_fortune(year: int, month: int, day: int, now=None, force_next_mon
 
         honmeisei_disp = honmeisei
         if lang_norm.startswith("en"):
-            try:
-                idx = NINE_STARS.index(honmeisei)
-                honmeisei_disp = NINE_STARS_EN[idx]
-            except Exception:
-                honmeisei_disp = honmeisei
-
-        base = now or datetime.now()
-        if force_next_month:
-            base = base + relativedelta(months=1)
-        next_month = base + relativedelta(months=1)
-
-        # get_directions requires (year, month, honmeisei). For yearly, use month=0.
-        directions_year = get_directions(base.year, 0, honmeisei, lang=lang)
-        directions_this_month = get_directions(base.year, base.month, honmeisei, lang=lang)
-        directions_next_month = get_directions(next_month.year, next_month.month, honmeisei, lang=lang)
-
-        if lang_norm.startswith("en"):
             return (
                 f"Your main star is '{honmeisei_disp}'.\n"
                 f"Lucky direction for {base.year}: {directions_year.get('good', 'N/A')}  "
@@ -304,17 +305,26 @@ def get_kyusei_fortune(year: int, month: int, day: int, now=None, force_next_mon
                 f"下月：{directions_next_month.get('good', '无法获取')}。"
             )
 
+        if lang_norm.startswith(("ko", "kr")):
+            return (
+                f"당신의 본명성은 '{honmeisei_disp}' 입니다.\n"
+                f"{base.year}년의 길한 방향: {directions_year.get('good', '불가')}  "
+                f"이번 달: {directions_this_month.get('good', '불가')}  "
+                f"다음 달: {directions_next_month.get('good', '불가')} 입니다."
+            )
+
         return (
             f"あなたの本命星は「{honmeisei_disp}」です。\n"
             f"{base.year}年の吉方位：{directions_year.get('good', '取得失敗')}　"
             f"今月：{directions_this_month.get('good', '取得失敗')}　"
             f"来月：{directions_next_month.get('good', '取得失敗')} です。"
         )
-
     except Exception as e:
         print("❌ get_kyusei_fortune エラー:", e)
         if (lang or "ja").lower().startswith("en"):
             return "Lucky direction: unavailable."
         if (lang or "ja").lower().startswith(("zh", "cn")):
             return "吉方位：无法获取"
+        if (lang or "ja").lower().startswith(("ko", "kr")):
+            return "길한 방향: 불가"
         return "吉方位：取得失敗"

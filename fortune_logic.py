@@ -21,6 +21,7 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang
     lang_norm = (lang or 'ja').lower()
     is_en = lang_norm.startswith('en')
     is_zh = lang_norm.startswith('zh') or lang_norm.startswith('cn')
+    is_ko = lang_norm.startswith('ko') or lang_norm.startswith('kr')
     eto = get_nicchu_eto(birthdate)
     try:
         today = now or datetime.today()
@@ -77,6 +78,26 @@ Rules:
 - 绝对不要在正文中提到干支名、通变星名或任何占术术语；请把含义翻译成日常语言
 - 积极、具体、可执行（至少给 1 条行动建议）
 """
+
+        elif is_ko:
+            prompt = f"""당신은 사주(사주명리) 상담가입니다.
+- 일주(참고용): {eto}
+- {this_year}년의 영향(통변성/십성, 참고용): {tsuhen_year}
+- {target1.year}-{target1.month:02d}의 영향(통변성/십성, 참고용): {tsuhen_month1}
+- {target2.year}-{target2.month:02d}의 영향(통변성/십성, 참고용): {tsuhen_month2}
+
+아래 스키마의 JSON만 출력하세요(추가 문장 금지):
+{{
+  "personality": "자연스러운 한국어 문단(약 260자 이내)",
+  "year_fortune": "{this_year}년의 전체 운세(약 260자 이내)",
+  "month_fortune": "{target1.year}년 {target1.month}월 운세(약 200자 이내)",
+  "next_month_fortune": "{target2.year}년 {target2.month}월 운세(약 200자 이내)"
+}}
+
+규칙:
+- 본문에 간지명, 통변성/십성명, 전문 용어를 절대 쓰지 말고 일상적인 말로 의미만 풀어주세요
+- 긍정적이고 실천 가능한 조언을 최소 1개 포함
+"""
         else:
             prompt = f"""あなたは四柱推命の専門家です。
 - 日柱: {eto}
@@ -126,21 +147,31 @@ Rules:
             result = json.loads(raw)
             # 月表記のズレ対策（GPTが本文先頭で別月を出すことがあるため矯正）
             import re
-            def _fix_month_prefix(s, y, m, zh: bool = False):
+            def _fix_month_prefix(s, y, m, zh: bool = False, ko: bool = False):
                 if not isinstance(s, str):
                     return s
                 s = s.strip()
                 if zh:
                     s = re.sub(r"^\s*(?:\d{4}年\s*\d{1,2}月|本月|下月|这个月|下个月)\s*[是:,，]?\s*", "", s)
+                elif ko:
+                    s = re.sub(r"^\s*(?:\d{4}년\s*\d{1,2}월|이번\s*달|다음\s*달)\s*(?:은|는)?\s*[:;,，]?\s*", "", s)
                 else:
                     s = re.sub(r"^\s*(?:\d{4}年\s*\d{1,2}月|今月|来月)\s*は\s*[、,]?\s*", "", s)
                 if not s:
-                    return (f"{y}年{m}月" + ("是" if zh else "は"))
-                return (f"{y}年{m}月" + ("是，" if zh else "は、")) + s
+                    if zh:
+                        return f"{y}年{m}月是"
+                    if ko:
+                        return f"{y}년 {m}월은"
+                    return f"{y}年{m}月は"
+                if zh:
+                    return f"{y}年{m}月是，" + s
+                if ko:
+                    return f"{y}년 {m}월은, " + s
+                return f"{y}年{m}月は、" + s
 
             if isinstance(result, dict) and (not is_en):
-                result["month_fortune"] = _fix_month_prefix(result.get("month_fortune", ""), target1.year, target1.month, zh=is_zh)
-                result["next_month_fortune"] = _fix_month_prefix(result.get("next_month_fortune", ""), target2.year, target2.month, zh=is_zh)
+                result["month_fortune"] = _fix_month_prefix(result.get("month_fortune", ""), target1.year, target1.month, zh=is_zh, ko=is_ko)
+                result["next_month_fortune"] = _fix_month_prefix(result.get("next_month_fortune", ""), target2.year, target2.month, zh=is_zh, ko=is_ko)
 
                 # 文章が尻切れトンボに見えないよう、末尾が句点等で終わっていなければ補完
                 def _ensure_sentence_end(s: str) -> str:
@@ -206,6 +237,7 @@ def analyze_palm(image_data, lang: str = 'ja'):
         lang_norm = (lang or 'ja').lower()
         is_en = lang_norm.startswith('en')
         is_zh = lang_norm.startswith('zh') or lang_norm.startswith('cn')
+        is_ko = lang_norm.startswith('ko') or lang_norm.startswith('kr')
         # Data URL形式 or base64のみの両方に対応
         if "," in image_data:
             base64data = image_data.split(",", 1)[1]
@@ -271,6 +303,30 @@ def analyze_palm(image_data, lang: str = 'ja'):
                 "- 文风可以略带诗意但要清晰\n"
                 "- 结尾给出1条可执行的小建议"
             )
+
+        elif is_ko:
+            system_prompt = (
+                "당신은 프로 손금 감정가입니다. 아래 조건을 지켜 손금 이미지를 해석하고, 따뜻하고 고무적인 톤으로 작성하세요.\n\n"
+                "[출력 규칙]\n"
+                "- 반드시 포함: 1) 생명선 2) 운명선 3) 금전선\n"
+                "- 추가로 '특수선' 2개를 아래 목록에서 가급적 선택 (미묘해도 긍정적으로 표현 가능):\n"
+                f"{special_lines_text}\n"
+                "- 정말로 특수선을 2개 고르기 어렵다면, 자연스럽게 감정선/두뇌선을 사용해도 됩니다\n\n"
+                "[의미 가이드]\n"
+                f"{description_text}\n\n"
+                "한국어로 자연스럽고 고객 친화적으로 작성하세요. '없다/부족하다' 같은 부정 표현은 피하고 잠재력으로 재구성하세요."
+            )
+            user_prompt = (
+                "아래 형식을 반드시 지켜 출력하세요:\n"
+                "### 1. 생명선\n(약 150–220자)\n\n"
+                "### 2. 운명선\n(약 150–220자)\n\n"
+                "### 3. 금전선\n(약 150–220자)\n\n"
+                "### 4. 특수선 1\n(약 150–220자)\n\n"
+                "### 5. 특수선 2\n(약 150–220자)\n\n"
+                "### 종합 조언\n(부드럽고 긍정적인 마무리)\n\n"
+                "- 문체는 약간 시적이어도 좋지만 명확하게\n"
+                "- 마지막에 실행 가능한 작은 조언 1개를 포함"
+            )
         else:
             system_prompt = (
                 "あなたはプロの手相鑑定士です。以下の条件に従って、手相画像から5つの線・相を選び、"
@@ -335,6 +391,8 @@ def get_iching_advice(lang: str = 'ja'):
             prompt = "You are an I Ching advisor. Give a gentle, positive message the customer needs right now in natural English (about 180–220 characters)."
         elif lang_norm.startswith('zh') or lang_norm.startswith('cn'):
             prompt = "你是一位易经占卜顾问。请用温柔、积极、可执行的语气，给出当下最需要的一段提醒（约150–220字，简体中文）。不要出现任何卦名或术语。"
+        elif lang_norm.startswith('ko') or lang_norm.startswith('kr'):
+            prompt = "당신은 주역(I Ching) 조언자입니다. 지금 고객에게 필요한 메시지를 따뜻하고 긍정적이며 실행 가능하게 한국어로 150–220자 정도로 전해주세요. 괘명이나 전문 용어는 절대 쓰지 마세요."
         else:
             prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
         response = openai.ChatCompletion.create(
@@ -349,6 +407,8 @@ def get_iching_advice(lang: str = 'ja'):
             return "Could not retrieve the I Ching message right now."
         if (lang or 'ja').lower().startswith(('zh', 'cn')):
             return "目前无法取得易经信息。"
+        if (lang or 'ja').lower().startswith(('ko', 'kr')):
+            return "현재 주역 메시지를 가져올 수 없습니다."
         return "現在、易占いの結果が取得できませんでした。"
 
 
@@ -667,6 +727,92 @@ def generate_lucky_info_mixed(
             f"◆ 食物: {food}",
         ]
 
+
+    # 한국어화（라벨 + 주요 값）
+    if lang_norm.startswith(("ko", "kr")):
+        item_ko = {
+            "スマホ充電器": "휴대폰 충전기",
+            "小さなノート": "작은 노트",
+            "ハンドクリーム": "핸드크림",
+            "ミントガム": "민트껌",
+            "折りたたみ傘": "접이식 우산",
+            "白いハンカチ": "흰 손수건",
+            "イヤホン": "이어폰",
+            "水筒": "물병",
+            "目薬": "안약",
+            "入浴剤": "입욕제",
+            "エコバッグ": "에코백",
+            "観葉植物": "실내 식물",
+            "腕時計": "손목시계",
+            "小さな鏡": "작은 거울",
+        }
+        color_ko = {
+            "アイアンブルー": "아이언 블루",
+            "ネイビー": "네이비",
+            "スカイブルー": "스카이 블루",
+            "モスグリーン": "모스 그린",
+            "オリーブ": "올리브",
+            "ミントグリーン": "민트 그린",
+            "ワインレッド": "와인 레드",
+            "ボルドー": "보르도",
+            "ローズピンク": "로즈 핑크",
+            "ゴールド": "골드",
+            "シルバー": "실버",
+            "アイボリー": "아이보리",
+            "ホワイト": "화이트",
+            "ブラック": "블랙",
+        }
+        day_ko = {
+            "月曜日": "월요일",
+            "火曜日": "화요일",
+            "水曜日": "수요일",
+            "木曜日": "목요일",
+            "金曜日": "금요일",
+            "土曜日": "토요일",
+            "日曜日": "일요일",
+        }
+        food_ko = {
+            "小松菜": "코마츠나",
+            "ブロッコリー": "브로콜리",
+            "枝豆": "에다마메",
+            "抹茶": "말차",
+            "緑茶": "녹차",
+            "トマト": "토마토",
+            "唐辛子": "고추",
+            "赤身肉": "살코기",
+            "いちご": "딸기",
+            "カカオ": "카카오",
+            "さつまいも": "고구마",
+            "かぼちゃ": "호박",
+            "味噌汁": "된장국",
+            "玄米": "현미",
+            "きなこ": "콩가루",
+            "大根": "무",
+            "白ねぎ": "대파",
+            "豆腐": "두부",
+            "梨": "배",
+            "白ごま": "흰깨",
+            "わかめ": "미역",
+            "しじみ汁": "재첩국",
+            "寒天": "한천",
+            "ところてん": "도코로텐",
+            "昆布だし": "다시마 육수",
+        }
+
+        item = item_ko.get(item_ja, item_ja)
+        color = color_ko.get(color_ja, color_ja)
+        day = day_ko.get(day_ja, day_ja)
+        food = food_ko.get(food_ja, food_ja)
+
+        return [
+            f"◆ 아이템: {item}",
+            f"◆ 숫자: {number}",
+            f"◆ 요일: {day}",
+            f"◆ 컬러: {color}",
+            f"◆ 푸드: {food}",
+        ]
+
+
     return [
         f"◆ アイテム: {item_ja}",
         f"◆ 数字: {number}",
@@ -686,6 +832,11 @@ def _lang_pack(lang: str):
         system = "你是一位专业的占卜师。请用自然的简体中文写给顾客：积极、具体、可执行。不要出现干支名、通变星名或任何占术术语；请把含义翻译成日常语言。"
         note = "\n\n请用简体中文输出。不要出现干支名、通变星名或任何占术术语。语气友好、具体、正向。"
         return system, note
+    if lang_norm.startswith(('ko', 'kr')):
+        system = "당신은 전문 점술가입니다. 고객이 편안해지고 희망을 얻을 수 있도록 자연스러운 한국어로, 긍정적이고 구체적인 조언을 작성하세요. 간지명/통변성/점술 용어는 쓰지 말고 의미를 일상어로 풀어주세요."
+        note = "\n\n한국어로 출력하세요. 간지명, 통변성/십성, 전문 용어는 절대 쓰지 마세요. 친절하고 실천 가능한 조언으로 작성하세요."
+        return system, note
+
     system = "あなたは占いのプロです。お客様に寄り添い、前向きで具体的なアドバイスを自然な日本語で書いてください。占い用語や干支名は出さず、意味をやさしい言葉に置き換えてください。"
     note = ""
     return system, note

@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
-# NOTE: This is the CHINESE (Simplified) PDF generator.
-#       Japanese output uses pdf_generator_unified.py.
+# NOTE: This is the JAPANESE PDF generator.
 #       English output uses pdf_generator_unified_en.py.
 from reportlab.lib.pagesizes import A4, B4
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase.pdfmetrics import stringWidth
 import base64
 import io
@@ -25,7 +24,7 @@ def _get_lang(data: dict) -> str:
         return 'ja'
     lang = (data.get('lang') or data.get('output_lang') or data.get('language') or 'ja')
     lang = (lang or 'ja').strip().lower()
-    return 'en' if lang.startswith('en') else ('zh' if lang.startswith('zh') else 'ja')
+    return 'en' if lang.startswith('en') else ('zh' if lang.startswith('zh') else ('ko' if (lang.startswith('ko') or lang.startswith('kr')) else 'ja'))
 import base64
 import io
 import os
@@ -54,7 +53,7 @@ def smart_wrap(text: str, limit: int, lang: str | None = None):
             out.append('')
             continue
         # Detect CJK if lang is ja OR the string contains CJK chars.
-        is_cjk = (lang == 'ja') or bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", p))
+        is_cjk = (lang in ('ja','zh','ko')) or bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]", p))
         if is_cjk:
             # simple fixed-width split
             for k in range(0, len(p), max(1, limit)):
@@ -81,41 +80,47 @@ def _normalize_month_fortune_text(text: str, kind: str) -> str:
 from header_utils_ko import draw_header
 
 
+# Fonts
+# - Japanese: IPAexGothic (bundled TTF in this project)
+# - Korean: ReportLab bundled CID font (no external TTF required)
 FONT_NAME_JA = "IPAexGothic"
 FONT_PATH_JA = "ipaexg.ttf"
-
 FONT_NAME_EN = "Times-Roman"
+FONT_NAME_KO = "HYGothic-Medium"
 
-# CID font for Simplified Chinese (bundled with ReportLab)
-FONT_NAME_ZH = "STSong-Light"
-
-# Register fonts
+# Register fonts (safe on servers where some fonts may be missing)
 try:
     pdfmetrics.registerFont(TTFont(FONT_NAME_JA, FONT_PATH_JA))
 except Exception as e:
-    print("Font registration error in pdf_generator_unified_zh (JA):", e)
+    print("Font registration error (JA):", e)
 
 try:
-    pdfmetrics.registerFont(UnicodeCIDFont(FONT_NAME_ZH))
+    pdfmetrics.registerFont(UnicodeCIDFont(FONT_NAME_KO))
 except Exception as e:
-    print("Font registration error in pdf_generator_unified_zh (ZH):", e)
+    print("Font registration error (KO):", e)
 
 def _font(lang: str) -> str:
     l = str(lang).lower()
-    if l.startswith('en'):
+    if l.startswith("en"):
         return FONT_NAME_EN
-    if l.startswith('zh'):
-        return FONT_NAME_ZH
+    if l.startswith("ko") or l.startswith("kr"):
+        return FONT_NAME_KO
     return FONT_NAME_JA
 
 def _set_font(c, lang: str, size: float):
     c.setFont(_font(lang), size)
 
 def _wrap_len(base: int, lang: str) -> int:
+    l = str(lang).lower()
     # English text easily overruns the right margin (serif fonts are wide).
-    # Wrap earlier to prevent "尻切れ".
-    if str(lang).lower().startswith("en"):
+    if l.startswith("en"):
         return max(28, int(base * 0.68))
+    # Korean glyphs are wide; wrap a bit earlier.
+    if l.startswith("ko") or l.startswith("kr"):
+        return max(28, int(base * 0.78))
+    # Chinese also benefits from slightly earlier wrapping.
+    if l.startswith("zh"):
+        return max(30, int(base * 0.85))
     return base
 
 
@@ -125,44 +130,39 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     - 2列表示で横幅を有効活用（余白があるのに3ページ化する問題を抑制）
     - lucky_lines が 1行でも2行でも崩れない
     - 呼び出し側の互換（lang/page_height/kwargs）対応
-
-    NOTE:
-      Chinese (zh) A4 page2 is the tightest layout (month/next-month + lucky blocks).
-      We slightly tighten spacing and font size for zh only to prevent bottom overflow.
     """
     if not lucky_lines:
         lucky_lines = []
 
+    _set_font(c, lang, 12)
     l = str(lang).lower()
-    is_zh = l.startswith('zh')
-
-    # Title
-    title_size = 11 if is_zh else 12
-    _set_font(c, lang, title_size)
     if l.startswith("en"):
         title = "■ Lucky Info (from birthdate)"
-    elif is_zh:
+    elif l.startswith("zh"):
         title = "■ 幸运信息（根据出生日期）"
+    elif l.startswith("ko") or l.startswith("kr"):
+        title = "■ 행운 정보(생년월일 기준)"
     else:
         title = "■ ラッキー情報（生年月日より）"
     c.drawString(margin, y, title)
-    y -= (5.0 if is_zh else 6.0) * mm
+    y -= 6 * mm
 
     # 2列レイアウト
-    body_size = 9 if is_zh else 10
-    _set_font(c, lang, body_size)
+    _set_font(c, lang, 10)
     col_gap = 8 * mm
     col_w = (width - 2 * margin - col_gap) / 2.0
-    line_h = (5.0 if is_zh else 5.6) * mm
+    line_h = 5.6 * mm
     font_name = _font(lang)
-    font_size = body_size
+    font_size = 10
 
     def _fit_one_line(s: str, max_w: float) -> str:
         s = (s or "").strip()
         if not s:
             return ""
+        # 収まるならそのまま
         if stringWidth(s, font_name, font_size) <= max_w:
             return s
+        # 末尾省略
         ell = "…"
         while s and stringWidth(s + ell, font_name, font_size) > max_w:
             s = s[:-1]
@@ -180,48 +180,42 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
 
     # 方位（必要なら最後に）
     if lucky_direction:
-        y -= (1.2 if is_zh else 1.5) * mm
-        _set_font(c, lang, body_size)
+        y -= 1.5 * mm
+        _set_font(c, lang, 10)
+        l = str(lang).lower()
         if l.startswith("en"):
             direction_title = "■ Lucky Directions"
-        elif is_zh:
+        elif l.startswith("zh"):
             direction_title = "■ 吉方位"
+        elif l.startswith("ko") or l.startswith("kr"):
+            direction_title = "■ 행운 방향"
         else:
             direction_title = "■ ラッキー方位"
         c.drawString(margin, y, direction_title)
-        y -= (4.8 if is_zh else 5.5) * mm
+        y -= 5.5 * mm
 
         dir_text = (lucky_direction or "").strip()
+        # 1行で無理なら折り返し（左列幅いっぱいで）
         # Keep some extra right padding for English to avoid clipping.
-        max_w = width - 2 * margin - (6 * mm if l.startswith("en") else 0)
-
+        max_w = width - 2 * margin - (6 * mm if str(lang).lower().startswith("en") else 0)
         if stringWidth(dir_text, font_name, font_size) <= max_w:
             c.drawString(margin, y, dir_text)
             y -= line_h
         else:
-            # 簡易折り返し（英語用）。CJKは基本スペース分割できないので、英語以外は安全側で文字数wrap。
-            if l.startswith('en'):
-                words = dir_text.split()
-                cur = ""
-                for w in words:
-                    candidate = (cur + " " + w).strip()
-                    if stringWidth(candidate, font_name, font_size) <= max_w:
-                        cur = candidate
-                    else:
-                        if cur:
-                            c.drawString(margin, y, cur)
-                            y -= line_h
-                        cur = w
-                if cur:
+            # 簡易折り返し
+            words = dir_text.split()
+            cur = ""
+            for w in words:
+                candidate = (cur + " " + w).strip()
+                if stringWidth(candidate, font_name, font_size) <= max_w:
+                    cur = candidate
+                else:
                     c.drawString(margin, y, cur)
                     y -= line_h
-            else:
-                # CJK: wrap by char count based on width
-                # Rough estimate: 1 char ~ font_size points; keep conservative.
-                approx_chars = max(10, int((max_w / (font_size * 0.55))))
-                for line in smart_wrap(dir_text, approx_chars, lang='ja'):
-                    c.drawString(margin, y, line)
-                    y -= line_h
+                    cur = w
+            if cur:
+                c.drawString(margin, y, cur)
+                y -= line_h
 
     return y
 
@@ -345,29 +339,53 @@ def draw_shincom_a4(c, data, include_yearly=False):
     eto_number = data.get("eto_number")
     animal = data.get("animal")
     honmeisei = data.get("honmeisei")
+    # KO: avoid mixed Japanese values and omit animal fortune (A)
+    zodiac = _ko_map_zodiac(zodiac)
+    honmeisei = _ko_map_star(honmeisei)
+    animal = ""
 
     info_lines = []
 
-    # 1行目：出生日期＋星座
+    def _lang_is_ko(v: str) -> bool:
+        l = str(v).lower()
+        return l.startswith('ko') or l.startswith('kr')
+
+    # Label translations for the info block
+    if _lang_is_ko(lang):
+        _lbl_birth = "생년월일"
+        _lbl_zodiac = "별자리"
+        _lbl_eto = "간지"
+        _lbl_animal = "동물점"
+        _lbl_star = "본명성"
+        _eto_num_suffix = "번"
+    else:
+        _lbl_birth = "生年月日"
+        _lbl_zodiac = "星座"
+        _lbl_eto = "干支"
+        _lbl_animal = "動物占い"
+        _lbl_star = "本命星"
+        _eto_num_suffix = "番"
+
+    # 1行目：生年月日＋星座
     line1_parts = []
     if birthdate:
-        line1_parts.append(f"出生日期：{birthdate}")
+        line1_parts.append(f"{_lbl_birth}：{birthdate}")
     if zodiac:
-        line1_parts.append(f"星座：{zodiac}")
+        line1_parts.append(f"{_lbl_zodiac}：{zodiac}")
     if line1_parts:
         info_lines.append(" / ".join(line1_parts))
 
-    # 2行目：干支编号＋动物占卜＋本命星
+    # 2行目：干支番号＋動物占い＋本命星
     line2_parts = []
     if eto:
         if eto_number:
-            line2_parts.append(f"干支：{eto}（第{eto_number}号）")
+            line2_parts.append(f"{_lbl_eto}：{eto}（{eto_number}{_eto_num_suffix}）")
         else:
-            line2_parts.append(f"干支：{eto}")
+            line2_parts.append(f"{_lbl_eto}：{eto}")
     if animal:
-        line2_parts.append(f"动物占卜：{animal}")
+        line2_parts.append(f"{_lbl_animal}：{animal}")
     if honmeisei:
-        line2_parts.append(f"本命星：{honmeisei}")
+        line2_parts.append(f"{_lbl_star}：{honmeisei}")
     if line2_parts:
         info_lines.append(" / ".join(line2_parts))
 
@@ -423,7 +441,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
         _set_font(c, lang, 12)
 
     # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=lang)
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'], lang)
@@ -477,7 +495,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
         y -= 4 * mm
         _set_font(c, lang, 14)
 
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=lang)
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
 
     if include_yearly:
         draw_yearly_pages_shincom_b4(c, data['yearly_fortunes'], lang)

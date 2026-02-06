@@ -261,7 +261,7 @@ def background_generate_pdf(filepath, result_data, pdf_mode, size="a4", include_
         lang = (result_data.get("lang") or result_data.get("output_lang") or "").strip().lower()
         use_en = lang.startswith("en")
         use_zh = lang.startswith("zh")
-        use_ko = lang.startswith("ko")
+        use_ko = lang.startswith("ko") or lang.startswith("kr")
 
         use_tag = 'EN' if use_en else ('ZH' if use_zh else ('KO' if use_ko else 'JA'))
 
@@ -1115,22 +1115,27 @@ def ten_shincom():
 
 
 
-	            # 1) Direct explicit values
+            # 1) Direct explicit values
 
             if output_lang in ("en", "english"):
+
                 output_lang = "en"
+
             elif output_lang in ("zh", "cn", "chinese", "zh-cn", "zh_cn", "zh-hans", "zh_hans"):
                 output_lang = "zh"
-            elif output_lang in ("ko", "kr", "korean", "ko-kr", "ko_kr"):
+            elif output_lang in ("ko", "kr", "korean"):
                 output_lang = "ko"
             elif output_lang in ("ja", "jp", "japanese"):
+
                 output_lang = "ja"
+
             else:
+
                 output_lang = ""
 
 
 
-# 2) Checkbox / flag style keys (common patterns)
+            # 2) Checkbox / flag style keys (common patterns)
 
             if not output_lang:
 
@@ -1184,6 +1189,10 @@ def ten_shincom():
 
             output_lang = output_lang or "ja"
 
+            # KO is allowed only on /tenmob (do not affect /ten)
+            if output_lang == "ko" and request.path != "/tenmob":
+                output_lang = "ja"
+
             if output_lang not in ("ja", "en", "zh", "ko"):
                 output_lang = "ja"
 
@@ -1226,6 +1235,10 @@ def ten_shincom():
             animal = ""
             if eto_number is not None and 1 <= eto_number <= len(ANIMAL60):
                 animal = ANIMAL60[eto_number - 1]
+
+            # KO: 動物占いは表示しない（A方針）
+            if output_lang == "ko":
+                animal = ""
             try:
                 honmeisei = get_honmeisei(year, month, day)
             except Exception as e:
@@ -1253,8 +1266,8 @@ def ten_shincom():
                 personality_title = "性格诊断"
             elif output_lang == "ko":
                 year_label = f"{target1.year}년 운세"
-                month_label = f"{target1.year}년 {target1.month}월 운세"
-                next_month_label = f"{target2.year}년 {target2.month}월 운세"
+                month_label = f"{target1.year}년{target1.month}월 운세"
+                next_month_label = f"{target2.year}년{target2.month}월 운세"
                 palm_summary_title = "손금 종합 조언"
                 personality_title = "성격 진단"
             else:
