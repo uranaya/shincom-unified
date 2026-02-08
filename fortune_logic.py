@@ -479,7 +479,9 @@ def analyze_palm(image_data, lang: str = 'ja', style: str = 'normal'):
                     "- 禁止：子供っぽい語（とっても／だね連打／一緒に頑張ろうね）\n"
                     "- 例：標準『焦らず優先順位を決めることが鍵です。』→ ユタ『うん、今は焦らなくていい。優先順位を一つ決めて、順番に形にしなさい。大丈夫。』\n"
                 )
-            response = openai.ChatCompletion.create(
+
+        # ---- Vision call (all languages) ----
+        response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
