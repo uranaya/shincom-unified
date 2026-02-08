@@ -1200,6 +1200,33 @@ def ten_shincom():
                 output_lang = "ja"
 
 
+            # ----------------------------
+            # Output style selection (JA-only)
+            # - Keep other languages 100% unchanged.
+            # - Accept many possible front-end keys to avoid mismatches.
+            # ----------------------------
+            output_style = (data.get("output_style") or data.get("style") or data.get("outputStyle") or "").strip().lower()
+            output_mode = (data.get("output_mode") or data.get("mode") or "").strip().lower()
+            yuta_flag = data.get("yuta_mode") or data.get("yuta")
+            tokyo_flag = data.get("tokyo_mode") or data.get("tokyo")
+
+            if not output_style:
+                # Derive from the dropdown mode if present
+                if output_mode in ("yuta_safe", "yuta") or _truthy(yuta_flag):
+                    output_style = "yuta_safe"
+                elif output_mode in ("tokyo", "asakusa") or _truthy(tokyo_flag):
+                    output_style = "tokyo"
+                else:
+                    output_style = "normal"
+
+            if output_style not in ("normal", "tokyo", "yuta_safe"):
+                output_style = "normal"
+
+            # Hard guard: style is JA-only (no side effects on en/zh/ko)
+            if output_lang != "ja":
+                output_style = "normal"
+
+
 
             # Log once per request for fast troubleshooting
 
@@ -1247,7 +1274,16 @@ def ten_shincom():
             except Exception as e:
                 print("❌ 本命星取得エラー:", e)
                 honmeisei = ""
-            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(image_data, birthdate, kyusei_text, now=now, force_next_month=force_next_month, lang=output_lang)
+
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(
+                image_data,
+                birthdate,
+                kyusei_text,
+                now=now,
+                force_next_month=force_next_month,
+                style=output_style,
+                lang=output_lang,
+            )
             summary_text = ""
             if len(palm_texts) == 6:
                 summary_text = palm_texts.pop()

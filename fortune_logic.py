@@ -16,7 +16,7 @@ from pdf_generator_unified import create_pdf_unified
 
 
 
-def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang: str = 'ja'):
+def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, style: str = 'normal', lang: str = 'ja'):
     import json
     lang_norm = (lang or 'ja').lower()
     is_en = lang_norm.startswith('en')
@@ -116,6 +116,20 @@ Rules:
 
 出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。
 """
+
+        # ----------------------------
+        # Style add-on (JA-only): Yuta-like safe tone
+        # ----------------------------
+        if (not is_en) and (not is_zh) and (not is_ko):
+            s = (style or 'normal').strip().lower()
+            if s == 'yuta_safe':
+                prompt += (
+                    "\n\n【追加スタイル：ユタ調・安全版】\n"
+                    "- 霊・呪い・祟り・除霊などの断定や宗教的指示は禁止。病気や死も扱わない。\n"
+                    "- 表現は『気配』『流れ』『空気』など比喩に留め、現実的な行動アドバイスに必ず落とす。\n"
+                    "- 口調は沖縄のユタ風のあたたかい語り口を“少しだけ”混ぜる（例：『〜さぁ』『〜してごらんね』）。\n"
+                    "- 不安を煽らず、最後は安心感と前向きさで締める。\n"
+                )
         # OpenAI呼び出し（たまに502等が出るためリトライ）
         import time
         last_err = None
@@ -232,7 +246,7 @@ Rules:
             }
 
 
-def analyze_palm(image_data, lang: str = 'ja'):
+def analyze_palm(image_data, lang: str = 'ja', style: str = 'normal'):
     try:
         lang_norm = (lang or 'ja').lower()
         is_en = lang_norm.startswith('en')
@@ -344,6 +358,17 @@ def analyze_palm(image_data, lang: str = 'ja'):
                 f"{description_text}\n\n"
                 "読み手が安心して前向きになれるよう、やさしく詩的だが具体的な文章でまとめてください。"
             )
+
+            # Style add-on (JA-only): Yuta-like safe tone
+            s = (style or 'normal').strip().lower()
+            if s == 'yuta_safe':
+                system_prompt += (
+                    "\n\n【追加スタイル：ユタ調・安全版】\n"
+                    "- 霊・呪い・祟り・除霊などの断定や宗教的指示は禁止。病気や死も扱わない。\n"
+                    "- 『気配』『流れ』『空気』などの比喩表現を使ってよいが、必ず現実的な行動アドバイスに落とす。\n"
+                    "- 口調は沖縄のユタ風の温かい語り口を“少しだけ”混ぜる（例：『〜さぁ』『〜してごらんね』）。\n"
+                    "- 不安を煽らず、最後は安心感と前向きさで締める。\n"
+                )
             user_prompt = (
 
                 "以下の形式で出力してください：\n"
@@ -429,7 +454,7 @@ def analyze_palm(image_data, lang: str = 'ja'):
 
 
 
-def get_iching_advice(lang: str = 'ja'):
+def get_iching_advice(lang: str = 'ja', style: str = 'normal'):
     try:
         lang_norm = (lang or 'ja').lower()
         if lang_norm.startswith('en'):
@@ -440,6 +465,11 @@ def get_iching_advice(lang: str = 'ja'):
             prompt = "당신은 주역(I Ching) 조언자입니다. 지금 고객에게 필요한 메시지를 따뜻하고 긍정적이며 실행 가능하게 한국어로 150–220자 정도로 전해주세요. 괘명이나 전문 용어는 절대 쓰지 마세요."
         else:
             prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
+        # Style add-on (JA-only)
+        if (lang_norm.startswith('ja') or lang_norm == ''):
+            s = (style or 'normal').strip().lower()
+            if s == 'yuta_safe':
+                prompt += "\n\n【追加スタイル：ユタ調・安全版】霊・呪い・祟り・除霊などの断定や宗教的指示は禁止。不安を煽らず『気配』『流れ』程度に留め、必ず現実的な行動アドバイスで締める。語尾は少しだけユタ風で。"
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -930,9 +960,9 @@ def _lang_pack(lang: str):
 
 def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool=False, style: str='normal', lang: str='ja', **kwargs):
     import re
-    palm_result = analyze_palm(image_data, lang=lang)
-    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, lang=lang)
-    iching_result = get_iching_advice(lang=lang)
+    palm_result = analyze_palm(image_data, lang=lang, style=style)
+    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, style=style, lang=lang)
+    iching_result = get_iching_advice(lang=lang, style=style)
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
     raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text, lang=lang)
@@ -1169,7 +1199,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 
     topic_sections = []
     try:
-        iching_result = get_iching_advice()
+	        iching_result = get_iching_advice(lang=lang, style=style)
     except Exception as e:
         print("⚠ 易占い取得エラー（テーマ用）:", e)
         iching_result = "（易占い結果取得エラー）"
