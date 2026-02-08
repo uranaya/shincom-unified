@@ -358,16 +358,16 @@ def draw_shincom_a4(c, data, include_yearly=False):
         title_step = 6 * mm
         body_size = 10
         line_step = 6 * mm
-        wrap_len = _wrap_len(40, lang)
+        wrap_len = _wrap_len(45, lang)
         lines = smart_wrap(body, wrap_len, lang)
         need_h = title_step + len(lines) * line_step + 3 * mm
 
-        # 入りきらない場合はコンパクトへ
+        # 入りきらない場合は、フォントは落とさずに『折り返し』と『行間』で安全側へ
         if (y - need_h) < BOTTOM_P1:
-            title_step = 5.2 * mm
-            body_size = 9.2
-            line_step = 5.3 * mm
-            wrap_len = _wrap_len(42, lang)  # 少し横を使って縦を削る
+            title_step = 5.4 * mm
+            body_size = 10
+            line_step = 5.4 * mm
+            wrap_len = _wrap_len(46, lang)  # さらに横を使って縦を削る（尻すぼみ防止）
             lines = smart_wrap(body, wrap_len, lang)
             need_h = title_step + len(lines) * line_step + 2 * mm
 
