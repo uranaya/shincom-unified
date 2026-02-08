@@ -12,6 +12,76 @@ from yearly_love_fortune_utils import generate_yearly_love_fortune
 from pdf_generator_unified import create_pdf_unified
 
 
+def polish_ja_text(text: str, *, yuta: bool = False) -> str:
+    """Post-process Japanese outputs to reduce hedging, duplicates, and obvious grammar artifacts.
+    This is intentionally conservative to avoid breaking other languages/modes.
+    """
+    if not text:
+        return text
+    t = str(text)
+
+    # Hard bans / hedges
+    t = t.replace("例えば、", "")
+    t = t.replace("例えば", "")
+    t = t.replace("もし", "")
+
+    # Reduce excessive hedging (keep meaning but avoid fuzziness)
+    t = t.replace("可能性があります", "傾向があります")
+    t = t.replace("可能性が高い", "傾向が強い")
+
+    # Convert common conditional phrasing into assertive wording
+    t = re.sub(r"この線が([^。\n]{0,30}?)なら、", r"この線は\1ので、", t)
+    t = re.sub(r"([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら、", r"\1は\2ので、", t)
+    t = t.replace("あるなら、", "あり、")
+    t = t.replace("現れているなら、", "現れており、")
+    t = t.replace("見えるなら、", "見えており、")
+    t = t.replace("なら、", "ので、")
+    t = t.replace("なら。", "です。")
+
+    # Fix frequent malformed polite forms seen in outputs
+    t = t.replace("できるです。", "できます。")
+    t = t.replace("できるです", "できます")
+    t = t.replace("していけるです。", "していけます。")
+    t = t.replace("していけるです", "していけます")
+
+    # Fix duplicated month header like: "2026年3月は、2026年3月には..."
+    t = re.sub(r"(\d{4}年\d{1,2}月)は、\1には", r"\1は、", t)
+
+    if yuta:
+        # Avoid overly childish/cutesy expressions that tend to feel "変"
+        t = t.replace("とっても", "")
+        t = t.replace("一緒に頑張ろうね。", "大丈夫。焦らず進めば整います。")
+        t = t.replace("一緒に頑張ろうね", "大丈夫。焦らず進めば整います")
+
+        # Too many "だね" reads childish; soften but keep warmth
+        t = t.replace("だね。", "だよ。")
+        t = t.replace("だね", "だよ")
+
+    # De-duplicate identical lines within each section (### or ◆ boundaries)
+    lines = [ln.rstrip() for ln in t.split("\n")]
+    out = []
+    prev_key = None
+    seen_in_section = set()
+    for ln in lines:
+        key = re.sub(r"\s+", "", ln)
+        if key.startswith("###") or key.startswith("◆"):
+            seen_in_section = set()
+        if not key:
+            out.append(ln)
+            prev_key = key
+            continue
+        if key == prev_key:
+            continue
+        if key in seen_in_section:
+            continue
+        seen_in_section.add(key)
+        out.append(ln)
+        prev_key = key
+
+    return "\n".join(out).strip()
+
+
+
 
 
 
@@ -138,6 +208,9 @@ Rules:
                     "- 方言：『〜さ』『〜だよ』は“段落に1回まで”。毎文末に付けない。『さぁ』は使わない。\n"
                     "- 禁止：霊・呪い・祟り・除霊・先祖の断定／病気・死／恐怖を煽る言い方。\n"
                     "- 最後：必ず『大丈夫。』など安心させる一文で締める。\n"
+                    "- 文体：基本は『です/ます』で整える。口語（だよ/さ）は要所だけ。\n"
+                    "- 禁止：子供っぽい語（とっても／だね連打／一緒に頑張ろうね）\n"
+                    "- 例：標準『焦らず優先順位を決めることが鍵です。』→ ユタ『うん、今は焦らなくていい。優先順位を一つ決めて、順番に形にしなさい。大丈夫。』\n"
                 )
         # OpenAI呼び出し（たまに502等が出るためリトライ）
         import time
@@ -208,6 +281,15 @@ Rules:
                 for key in ("personality", "year_fortune", "month_fortune", "next_month_fortune"):
                     if key in result:
                         result[key] = _ensure_sentence_end(str(result.get(key, "")))
+
+                # Extra polish for Yuta style (JA-only)
+                try:
+                    if (not is_en) and (not is_zh) and (not is_ko) and ((style or '').strip().lower() == 'yuta_safe'):
+                        for key in ("personality", "year_fortune", "month_fortune", "next_month_fortune"):
+                            if key in result:
+                                result[key] = polish_ja_text(str(result.get(key, "")), yuta=True)
+                except Exception:
+                    pass
             return result
         except json.JSONDecodeError:
             print("❌ GPTが正しいJSONを返しませんでした")
@@ -393,6 +475,9 @@ def analyze_palm(image_data, lang: str = 'ja', style: str = 'normal'):
                     "- 禁止：霊・呪い・祟り・除霊・先祖の断定／病気・死／恐怖を煽る言い方。\n"
                     "- 禁止語：『例えば』。曖昧語（かもしれません/でしょう/可能性）の多用も禁止（各項目1回以内）。\n"
                     "- 最後：Overall Advice の最後は必ず『大丈夫。』など安心させる一文で締める。\n"
+                    "- 文体：基本は『です/ます』で整える。口語（だよ/さ）は要所だけ。\n"
+                    "- 禁止：子供っぽい語（とっても／だね連打／一緒に頑張ろうね）\n"
+                    "- 例：標準『焦らず優先順位を決めることが鍵です。』→ ユタ『うん、今は焦らなくていい。優先順位を一つ決めて、順番に形にしなさい。大丈夫。』\n"
                 )
             response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
@@ -415,56 +500,11 @@ def analyze_palm(image_data, lang: str = 'ja', style: str = 'normal'):
             temperature=0.8,
         )
         raw = response.choices[0].message.content.strip()
-        # Post-process to reduce hedge wording and duplicate lines (especially Japanese)
-        def _polish_palm_text(t: str) -> str:
-            if not t:
-                return t
-            # remove common hedge starters
-            t = t.replace('もし', '')
-            t = t.replace('例えば、', '')
-            t = t.replace('例えば', '')
-            t = t.replace('かもしれません', 'です')
-            t = t.replace('でしょう', 'です')
-            t = t.replace('可能性があります', '傾向があります')
-            t = t.replace('可能性が高い', '傾向が強い')
-            t = t.replace('例えば、', '')
-            t = t.replace('例えば', '')
-            t = t.replace('かもしれません', 'でしょう')
-            t = t.replace('可能性があります', '傾向があります')
-            # Convert common '〜なら' hedges into assertive phrasing
-            t = re.sub(r'この線が([^。\n]{0,30}?)なら、', r'この線は\1ので、', t)
-            t = re.sub(r'([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら、', r'\1は\2ので、', t)
-            t = re.sub(r'([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら。', r'\1は\2です。', t)
-            t = t.replace('あるなら、', 'あり、')
-            t = t.replace('現れているなら、', '現れており、')
-            t = t.replace('見えるなら、', '見えており、')
-            t = t.replace('なら、', 'ので、')
-            t = t.replace('なら。', 'です。')
-            # De-duplicate identical lines within each section
-            lines = [ln.rstrip() for ln in t.split('\n')]
-            out = []
-            prev = None
-            seen_in_section = set()
-            for ln in lines:
-                key = re.sub(r'\s+', '', ln)
-                if key.startswith('###') or key.startswith('◆'):
-                    seen_in_section = set()
-                if not key:
-                    out.append(ln)
-                    prev = key
-                    continue
-                if key == prev:
-                    continue
-                if key in seen_in_section:
-                    continue
-                seen_in_section.add(key)
-                out.append(ln)
-                prev = key
-            return '\n'.join(out).strip()
+        # Post-process (JA-only)
 
         try:
             if (lang_norm or 'ja').lower().startswith('ja'):
-                raw = _polish_palm_text(raw)
+                raw = polish_ja_text(raw, yuta=((style or '').strip().lower() == 'yuta_safe'))
         except Exception:
             pass
         return raw
@@ -504,6 +544,9 @@ def get_iching_advice(lang: str = 'ja', style: str = 'normal'):
                     "- 方言：『〜さ』『〜だよ』は“段落に1回まで”。毎文末に付けない。『さぁ』は使わない。\n"
                     "- 禁止：霊・呪い・祟り・除霊・先祖の断定／病気・死／恐怖を煽る言い方。\n"
                     "- 最後：必ず『大丈夫。』など安心させる一文で締める。\n"
+                    "- 文体：基本は『です/ます』で整える。口語（だよ/さ）は要所だけ。\n"
+                    "- 禁止：子供っぽい語（とっても／だね連打／一緒に頑張ろうね）\n"
+                    "- 例：標準『焦らず優先順位を決めることが鍵です。』→ ユタ『うん、今は焦らなくていい。優先順位を一つ決めて、順番に形にしなさい。大丈夫。』\n"
                 )
         response = openai.ChatCompletion.create(
             model="gpt-4",
@@ -511,51 +554,11 @@ def get_iching_advice(lang: str = 'ja', style: str = 'normal'):
             max_tokens=300
         )
         raw = response.choices[0].message.content.strip()
-        # Post-process to reduce hedge wording and duplicate lines (especially Japanese)
-        def _polish_palm_text(t: str) -> str:
-            if not t:
-                return t
-            t = t.replace('もし', '')
-            t = t.replace('例えば、', '')
-            t = t.replace('例えば', '')
-            t = t.replace('かもしれません', 'です')
-            t = t.replace('でしょう', 'です')
-            t = t.replace('可能性があります', '傾向があります')
-            t = t.replace('可能性が高い', '傾向が強い')
-            # Convert common '〜なら' hedges into assertive phrasing
-            t = re.sub(r'この線が([^。\n]{0,30}?)なら、', r'この線は\1ので、', t)
-            t = re.sub(r'([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら、', r'\1は\2ので、', t)
-            t = re.sub(r'([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら。', r'\1は\2です。', t)
-            t = t.replace('あるなら、', 'あり、')
-            t = t.replace('現れているなら、', '現れており、')
-            t = t.replace('見えるなら、', '見えており、')
-            t = t.replace('なら、', 'ので、')
-            t = t.replace('なら。', 'です。')
-            # De-duplicate identical lines within each section
-            lines = [ln.rstrip() for ln in t.split('\n')]
-            out = []
-            prev = None
-            seen_in_section = set()
-            for ln in lines:
-                key = re.sub(r'\s+', '', ln)
-                if key.startswith('###') or key.startswith('◆'):
-                    seen_in_section = set()
-                if not key:
-                    out.append(ln)
-                    prev = key
-                    continue
-                if key == prev:
-                    continue
-                if key in seen_in_section:
-                    continue
-                seen_in_section.add(key)
-                out.append(ln)
-                prev = key
-            return '\n'.join(out).strip()
+        # Post-process (JA-only)
 
         try:
             if (lang_norm or 'ja').lower().startswith('ja'):
-                raw = _polish_palm_text(raw)
+                raw = polish_ja_text(raw, yuta=((style or '').strip().lower() == 'yuta_safe'))
         except Exception:
             pass
         return raw
