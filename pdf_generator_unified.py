@@ -349,15 +349,50 @@ def draw_shincom_a4(c, data, include_yearly=False):
         y -= 3 * mm
 
     # 手相3項目（1ページ目）
-    _set_font(c, lang, 12)
-    for i in range(3):
-        c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 6 * mm
-        _set_font(c, lang, 10)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len(40, lang), lang):
+    # 1ページ目は「画像 + 基本情報 + 3項目 + ラッキー情報」で下端ギリギリになりやすい。
+    # ここは保険として、残りスペースが少ない場合は自動でコンパクト描画に切り替える。
+    BOTTOM_P1 = 20 * mm
+
+    def _draw_palm_block_p1(title: str, body: str, y: float) -> float:
+        # 見積もり（通常）
+        title_step = 6 * mm
+        body_size = 10
+        line_step = 6 * mm
+        wrap_len = _wrap_len(40, lang)
+        lines = smart_wrap(body, wrap_len, lang)
+        need_h = title_step + len(lines) * line_step + 3 * mm
+
+        # 入りきらない場合はコンパクトへ
+        if (y - need_h) < BOTTOM_P1:
+            title_step = 5.2 * mm
+            body_size = 9.2
+            line_step = 5.3 * mm
+            wrap_len = _wrap_len(42, lang)  # 少し横を使って縦を削る
+            lines = smart_wrap(body, wrap_len, lang)
+            need_h = title_step + len(lines) * line_step + 2 * mm
+
+        # それでも入らない場合は末尾を省略して必ず収める
+        max_lines = int(max(0, (y - BOTTOM_P1 - title_step) // line_step))
+        if max_lines and len(lines) > max_lines:
+            lines = lines[:max_lines]
+            if lines:
+                lines[-1] = (lines[-1].rstrip("…") + "…")
+
+        _set_font(c, lang, 12)
+        c.drawString(margin, y, f"◆ {title}")
+        y -= title_step
+
+        _set_font(c, lang, body_size)
+        for line in lines:
+            if y < BOTTOM_P1:
+                break
             c.drawString(margin, y, line)
-            y -= 6 * mm
-        y -= 3 * mm
+            y -= line_step
+
+        return y - 2.5 * mm
+
+    for i in range(3):
+        y = _draw_palm_block_p1(data['palm_titles'][i], data['palm_texts'][i], y)
         _set_font(c, lang, 12)
 
     # 新ページ：手相残り2項目 + 鑑定結果
