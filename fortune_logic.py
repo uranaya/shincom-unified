@@ -48,14 +48,38 @@ def polish_ja_text(text: str, *, yuta: bool = False) -> str:
     t = re.sub(r"(\d{4}年\d{1,2}月)は、\1には", r"\1は、", t)
 
     if yuta:
-        # Avoid overly childish/cutesy expressions that tend to feel "変"
-        t = t.replace("とっても", "")
-        t = t.replace("一緒に頑張ろうね。", "大丈夫。焦らず進めば整います。")
-        t = t.replace("一緒に頑張ろうね", "大丈夫。焦らず進めば整います")
+        # --- Yuta-safe normalizer ---
+        # 目的：
+        # - 口調を「やさしい口語」に寄せる（標準語 + 少しユタっぽい温度感）
+        # - 「です/ます」と「だよ/さ」の混在で変になるのを抑える
+        # - 子どもっぽい語尾や過剰な相槌を減らす
 
-        # Too many "だね" reads childish; soften but keep warmth
+        # cutesy words
+        t = t.replace("とっても", "")
+        t = t.replace("すごく", "")
+
+        # remove forced cheerleading
+        t = t.replace("一緒に頑張ろうね。", "大丈夫。焦らず進めば整うよ。")
+        t = t.replace("一緒に頑張ろうね", "大丈夫。焦らず進めば整うよ")
+
+        # unify to casual-ish endings (common polite -> casual)
+        t = t.replace("できます。", "できるよ。")
+        t = t.replace("します。", "するよ。")
+        t = t.replace("あります。", "あるよ。")
+        t = t.replace("なります。", "なるよ。")
+        t = t.replace("です。", "だよ。")
+        t = t.replace("でした。", "だったよ。")
+        t = t.replace("でしょう。", "だろうね。")
+
+        # Too many "だね" reads childish; make it a bit firmer
         t = t.replace("だね。", "だよ。")
         t = t.replace("だね", "だよ")
+
+        # remove repeated filler "ね" at sentence starts
+        t = re.sub(r"(^|\n)(ね、?\s*)+", r"\1", t)
+
+        # collapse duplicate endings like "だよ。だよ。"
+        t = re.sub(r"(だよ。)\s*\1+", r"\1", t)
 
     # De-duplicate identical lines within each section (### or ◆ boundaries)
     lines = [ln.rstrip() for ln in t.split("\n")]

@@ -111,9 +111,12 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     if not lucky_lines:
         lucky_lines = []
 
-    _set_font(c, lang, 12)
+    # A4 2ページ目末尾で収まりやすいよう、CJK は少しコンパクトに描画する。
     l = str(lang).lower()
-    if l.startswith("en"):
+    is_en = l.startswith("en")
+
+    _set_font(c, lang, 12 if is_en else 11)
+    if is_en:
         title = "■ Lucky Info (from birthdate)"
     elif l.startswith("zh"):
         title = "■ 幸运信息（根据出生日期）"
@@ -123,12 +126,12 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     y -= 6 * mm
 
     # 2列レイアウト
-    _set_font(c, lang, 10)
-    col_gap = 8 * mm
+    _set_font(c, lang, 10 if is_en else 9.2)
+    col_gap = (8 * mm) if is_en else (6 * mm)
     col_w = (width - 2 * margin - col_gap) / 2.0
-    line_h = 5.6 * mm
+    line_h = (5.6 * mm) if is_en else (5.0 * mm)
     font_name = _font(lang)
-    font_size = 10
+    font_size = 10 if is_en else 9.2
 
     def _fit_one_line(s: str, max_w: float) -> str:
         s = (s or "").strip()
@@ -156,7 +159,7 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
     # 方位（必要なら最後に）
     if lucky_direction:
         y -= 1.5 * mm
-        _set_font(c, lang, 10)
+        _set_font(c, lang, 10 if is_en else 9.2)
         l = str(lang).lower()
         if l.startswith("en"):
             direction_title = "■ Lucky Directions"
@@ -372,22 +375,59 @@ def draw_shincom_a4(c, data, include_yearly=False):
         y -= 3 * mm
         _set_font(c, lang, 12)
 
-    # 四柱推命・まとめ等（タイトルのみでも出す）
+    # 四柱推命・まとめ等（A4 2ページ目はテキストが増えやすいので自動で詰める）
+    # - 行間を少し詰める
+    # - 必要ならフォントを段階的に落としてオーバーフローを防ぐ
+    BOTTOM = 22 * mm
+
+    def _draw_block(title: str, content: str, y: float, wrap_base: int) -> float:
+        nonlocal c
+        if title:
+            _set_font(c, lang, 12)
+            c.drawString(margin, y, f"◆ {title}")
+            y -= 5.5 * mm
+
+        if not content:
+            return y - 2.5 * mm
+
+        # まず通常モードで必要行数を見積もり、入りきらない場合は compact に切り替える。
+        lines_normal = smart_wrap(content, _wrap_len(wrap_base, lang), lang)
+        need_h_normal = len(lines_normal) * (5.6 * mm)
+
+        compact = (y - need_h_normal) < BOTTOM
+        if compact:
+            body_size = 9.2
+            line_step = 5.0 * mm
+            wrap_len = _wrap_len(wrap_base + 2, lang)  # 少し横を使って縦を削る
+        else:
+            body_size = 10
+            line_step = 5.6 * mm
+            wrap_len = _wrap_len(wrap_base, lang)
+
+        _set_font(c, lang, body_size)
+        lines = smart_wrap(content, wrap_len, lang)
+
+        # それでも入らない場合は最後を省略して…で閉じる（はみ出しを絶対に出さない）
+        max_lines = int(max(0, (y - BOTTOM) // line_step))
+        if max_lines and len(lines) > max_lines:
+            lines = lines[:max_lines]
+            if lines:
+                lines[-1] = (lines[-1].rstrip("…") + "…")
+
+        for line in lines:
+            if y < BOTTOM:
+                break
+            c.drawString(margin, y, line)
+            y -= line_step
+
+        return y - 2.5 * mm
+
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
-        wrap_len = 36 if 'month' in key else 40
+        # month/next は文字量が増えやすいので、以前の36→40へ（縦を削る）
+        wrap_len = 40 if 'month' in key else 42
         title = data['titles'].get(key, "")
         content = data['texts'].get(key, "")
-
-        if title:
-            c.drawString(margin, y, f"◆ {title}")
-            y -= 6 * mm
-        _set_font(c, lang, 10)
-        if content:
-            for line in smart_wrap(content, _wrap_len(wrap_len, lang), lang):
-                c.drawString(margin, y, line)
-                y -= 6 * mm
-        y -= 3 * mm
-        _set_font(c, lang, 12)
+        y = _draw_block(title, content, y, wrap_len)
 
     # ラッキー情報を2ページ目末尾に移動
     y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
