@@ -381,7 +381,6 @@ def analyze_palm(image_data, lang: str = 'ja', style: str = 'normal'):
                     "- 最後：Overall Advice の最後は必ず『大丈夫。』など安心させる一文で締める。\n"
                 )
             response = openai.ChatCompletion.create(
-response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -473,11 +472,13 @@ def get_iching_advice(lang: str = 'ja', style: str = 'normal'):
         elif lang_norm.startswith('ko') or lang_norm.startswith('kr'):
             prompt = "당신은 주역(I Ching) 조언자입니다. 지금 고객에게 필요한 메시지를 따뜻하고 긍정적이며 실행 가능하게 한국어로 150–220자 정도로 전해주세요. 괘명이나 전문 용어는 절대 쓰지 마세요."
         else:
-            prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。
-追加ルール：『例えば』は禁止。『かもしれません』『でしょう』『可能性』は多用せず、結論→理由→具体策1つ→安心で締める。
-- 禁止：例えば
-- 曖昧語（かもしれません/でしょう/可能性）の多用は禁止
-- 結論→理由→具体策1つ→安心、で締める"
+            prompt = (
+                "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。\n"
+                "追加ルール：『例えば』は禁止。『かもしれません』『でしょう』『可能性』は多用せず、結論→理由→具体策1つ→安心で締める。\n"
+                "- 禁止：例えば\n"
+                "- 曖昧語（かもしれません/でしょう/可能性）の多用は禁止\n"
+                "- 結論→理由→具体策1つ→安心、で締める"
+            )
         # Style add-on (JA-only)
         if (lang_norm.startswith('ja') or lang_norm == ''):
             s = (style or 'normal').strip().lower()
