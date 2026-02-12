@@ -5,4 +5,3 @@ __pycache__/
 *.pyd
 *.db
 *.sqlite3
-webhook_sessions.txt

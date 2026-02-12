@@ -19,7 +19,6 @@ from sqlalchemy import create_engine, text
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response,render_template_string
 from fortune_logic import generate_fortune
 from dotenv import load_dotenv
-load_dotenv()
 from dateutil.relativedelta import relativedelta
 from yearly_fortune_utils import generate_yearly_fortune
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
