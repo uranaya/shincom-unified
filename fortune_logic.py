@@ -575,7 +575,7 @@ def get_iching_advice(lang: str = 'ja', style: str = 'normal'):
                     "- 例：標準『焦らず優先順位を決めることが鍵です。』→ ユタ『うん、今は焦らなくていい。優先順位を一つ決めて、順番に形にしなさい。大丈夫。』\n"
                 )
         response = openai.ChatCompletion.create(
-            model="gpt-5.1",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300
         )
@@ -1245,14 +1245,14 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 200文字で具体的に教えてください。"""
 
         comp_text = openai.ChatCompletion.create(
-            model="gpt-5.1",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt_comp}],
             max_tokens=400,
             temperature=0.9
         ).choices[0].message.content.strip()
 
         future_text = openai.ChatCompletion.create(
-            model="gpt-5.1",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt_future}],
             max_tokens=400,
             temperature=0.9
@@ -1292,7 +1292,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 """
 
             topic_text = openai.ChatCompletion.create(
-                model="gpt-5.1",
+                model="gpt-5-mini",
                 messages=[{"role": "user", "content": topic_prompt}],
                 max_tokens=600,
                 temperature=0.9
@@ -1351,19 +1351,19 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 来月（{next_month}月）の恋愛運を150文字でやさしく教えてください。"""
 
         year_love = openai.ChatCompletion.create(
-            model="gpt-5.1",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt_year}],
             max_tokens=400
         ).choices[0].message.content.strip()
 
         month_love = openai.ChatCompletion.create(
-            model="gpt-5.1",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt_month}],
             max_tokens=400
         ).choices[0].message.content.strip()
 
         next_month_love = openai.ChatCompletion.create(
-            model="gpt-5.1",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt_next}],
             max_tokens=400
         ).choices[0].message.content.strip()
