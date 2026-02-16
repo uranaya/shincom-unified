@@ -12,105 +12,11 @@ from yearly_love_fortune_utils import generate_yearly_love_fortune
 from pdf_generator_unified import create_pdf_unified
 
 
-def polish_ja_text(text: str, *, yuta: bool = False) -> str:
-    """Post-process Japanese outputs to reduce hedging, duplicates, and obvious grammar artifacts.
-    This is intentionally conservative to avoid breaking other languages/modes.
-    """
-    if not text:
-        return text
-    t = str(text)
-
-    # Hard bans / hedges
-    t = t.replace("例えば、", "")
-    t = t.replace("例えば", "")
-    t = t.replace("もし", "")
-
-    # Reduce excessive hedging (keep meaning but avoid fuzziness)
-    t = t.replace("可能性があります", "傾向があります")
-    t = t.replace("可能性が高い", "傾向が強い")
-
-    # Convert common conditional phrasing into assertive wording
-    t = re.sub(r"この線が([^。\n]{0,30}?)なら、", r"この線は\1ので、", t)
-    t = re.sub(r"([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら、", r"\1は\2ので、", t)
-    t = t.replace("あるなら、", "あり、")
-    t = t.replace("現れているなら、", "現れており、")
-    t = t.replace("見えるなら、", "見えており、")
-    t = t.replace("なら、", "ので、")
-    t = t.replace("なら。", "です。")
-
-    # Fix frequent malformed polite forms seen in outputs
-    t = t.replace("できるです。", "できます。")
-    t = t.replace("できるです", "できます")
-    t = t.replace("していけるです。", "していけます。")
-    t = t.replace("していけるです", "していけます")
-
-    # Fix duplicated month header like: "2026年3月は、2026年3月には..."
-    t = re.sub(r"(\d{4}年\d{1,2}月)は、\1には", r"\1は、", t)
-
-    if yuta:
-        # --- Yuta-safe normalizer ---
-        # 目的：
-        # - 口調を「やさしい口語」に寄せる（標準語 + 少しユタっぽい温度感）
-        # - 「です/ます」と「だよ/さ」の混在で変になるのを抑える
-        # - 子どもっぽい語尾や過剰な相槌を減らす
-
-        # cutesy words
-        t = t.replace("とっても", "")
-        t = t.replace("すごく", "")
-
-        # remove forced cheerleading
-        t = t.replace("一緒に頑張ろうね。", "大丈夫。焦らず進めば整うよ。")
-        t = t.replace("一緒に頑張ろうね", "大丈夫。焦らず進めば整うよ")
-
-        # unify to casual-ish endings (common polite -> casual)
-        t = t.replace("できます。", "できるよ。")
-        t = t.replace("します。", "するよ。")
-        t = t.replace("あります。", "あるよ。")
-        t = t.replace("なります。", "なるよ。")
-        t = t.replace("です。", "だよ。")
-        t = t.replace("でした。", "だったよ。")
-        t = t.replace("でしょう。", "だろうね。")
-
-        # Too many "だね" reads childish; make it a bit firmer
-        t = t.replace("だね。", "だよ。")
-        t = t.replace("だね", "だよ")
-
-        # remove repeated filler "ね" at sentence starts
-        t = re.sub(r"(^|\n)(ね、?\s*)+", r"\1", t)
-
-        # collapse duplicate endings like "だよ。だよ。"
-        t = re.sub(r"(だよ。)\s*\1+", r"\1", t)
-
-    # De-duplicate identical lines within each section (### or ◆ boundaries)
-    lines = [ln.rstrip() for ln in t.split("\n")]
-    out = []
-    prev_key = None
-    seen_in_section = set()
-    for ln in lines:
-        key = re.sub(r"\s+", "", ln)
-        if key.startswith("###") or key.startswith("◆"):
-            seen_in_section = set()
-        if not key:
-            out.append(ln)
-            prev_key = key
-            continue
-        if key == prev_key:
-            continue
-        if key in seen_in_section:
-            continue
-        seen_in_section.add(key)
-        out.append(ln)
-        prev_key = key
-
-    return "\n".join(out).strip()
 
 
 
 
-
-
-
-def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, style: str = 'normal', lang: str = 'ja'):
+def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang: str = 'ja'):
     import json
     lang_norm = (lang or 'ja').lower()
     is_en = lang_norm.startswith('en')
@@ -209,33 +115,7 @@ Rules:
 }}
 
 出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。
-追加ルール：
-- 『例えば』は禁止。
-- 『かもしれません』『でしょう』『可能性』は多用しない（各項目1回以内）。
-- 断定は柔らかく、根拠→具体策1つ→安心の締め、の流れで書く。
-
-- 禁止：『例えば』
-- 曖昧語（かもしれません/でしょう/可能性）の多用は禁止（各項目1回以内）
-- 各項目は『結論→理由→具体策1つ』で、読み手が動ける形にしてください。
 """
-        # ----------------------------
-        # Style add-on (JA-only): Yuta-like safe tone
-        # ----------------------------
-        if (not is_en) and (not is_zh) and (not is_ko):
-            s = (style or 'normal').strip().lower()
-            if s == 'yuta_safe':
-                prompt += (
-                    "\n\n【追加スタイル：ユタ調・安全版】\n"
-                    "- 目的：内容（意味・事実関係）は変えず、温かい口語の“語り”に整える。\n"
-                    "- リズム：短文中心で『結論→理由→具体策1つ→安心の締め』。\n"
-                    "- 口調：導入は『うん、今ね、』/『ほら、今はね、』のように話しかける。断定は柔らかく。\n"
-                    "- 方言：『〜さ』『〜だよ』は“段落に1回まで”。毎文末に付けない。『さぁ』は使わない。\n"
-                    "- 禁止：霊・呪い・祟り・除霊・先祖の断定／病気・死／恐怖を煽る言い方。\n"
-                    "- 最後：必ず『大丈夫。』など安心させる一文で締める。\n"
-                    "- 文体：基本は『です/ます』で整える。口語（だよ/さ）は要所だけ。\n"
-                    "- 禁止：子供っぽい語（とっても／だね連打／一緒に頑張ろうね）\n"
-                    "- 例：標準『焦らず優先順位を決めることが鍵です。』→ ユタ『うん、今は焦らなくていい。優先順位を一つ決めて、順番に形にしなさい。大丈夫。』\n"
-                )
         # OpenAI呼び出し（たまに502等が出るためリトライ）
         import time
         last_err = None
@@ -243,7 +123,7 @@ Rules:
         for attempt in range(3):
             try:
                 response = openai.ChatCompletion.create(
-                    model="gtp-5.1",
+                    model="gpt-4",
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=1500,
                     temperature=0.8
@@ -305,15 +185,6 @@ Rules:
                 for key in ("personality", "year_fortune", "month_fortune", "next_month_fortune"):
                     if key in result:
                         result[key] = _ensure_sentence_end(str(result.get(key, "")))
-
-                # Extra polish for Yuta style (JA-only)
-                try:
-                    if (not is_en) and (not is_zh) and (not is_ko) and ((style or '').strip().lower() == 'yuta_safe'):
-                        for key in ("personality", "year_fortune", "month_fortune", "next_month_fortune"):
-                            if key in result:
-                                result[key] = polish_ja_text(str(result.get(key, "")), yuta=True)
-                except Exception:
-                    pass
             return result
         except json.JSONDecodeError:
             print("❌ GPTが正しいJSONを返しませんでした")
@@ -361,7 +232,7 @@ Rules:
             }
 
 
-def analyze_palm(image_data, lang: str = 'ja', style: str = 'normal'):
+def analyze_palm(image_data, lang: str = 'ja'):
     try:
         lang_norm = (lang or 'ja').lower()
         is_en = lang_norm.startswith('en')
@@ -383,20 +254,6 @@ def analyze_palm(image_data, lang: str = 'ja', style: str = 'normal'):
             f"{name}：{tesou_descriptions[name]}"
             for name in tesou_names
             if name in tesou_descriptions
-        )
-
-        # Default (Japanese) user prompt. Other languages override this below.
-        user_prompt = (
-            "必ず次の形式で出力してください（見出しはこのまま）:\n"
-            "### 1. 生命線\n（200〜260文字。形状タグを1つ以上入れる）\n\n"
-            "### 2. 運命線\n（200〜260文字。形状タグを1つ以上入れる）\n\n"
-            "### 3. 金運線\n（200〜260文字。形状タグを1つ以上入れる）\n\n"
-            "### 4. 特殊線①\n（200〜260文字。候補リストから選ぶ。『例えば』『もし』『〜なら』は禁止）\n\n"
-            "### 5. 特殊線②\n（200〜260文字。候補リストから選ぶ。『例えば』『もし』『〜なら』は禁止）\n\n"
-            "### 手相の総合アドバイス\n（220〜320文字。結論→理由→具体策1つ→安心の締め）\n\n"
-            "【共通ルール】\n"
-            "- 『例えば』『可能性』『かもしれません』『でしょう』の多用は禁止\n"
-            "- 断定は柔らかく、具体的に。ネガティブ断定は避ける\n"
         )
 
         # 特殊線をより魅力的に出すようにした system_prompt（語り口・優先順位調整版）
@@ -474,7 +331,7 @@ def analyze_palm(image_data, lang: str = 'ja', style: str = 'normal'):
             system_prompt = (
                 "あなたはプロの手相鑑定士です。手相画像を読み取り、鑑定文を日本語で作成してください。\n\n"
                 "【最重要ルール】\n"
-                "1) 仮定・あいまい表現は禁止：『もし』『〜なら』『かもしれない』『可能性』『〜があれば/あるなら』『例えば』を使わない\n"
+                "1) 仮定・あいまい表現は禁止：『もし』『〜なら』『かもしれない』『可能性』『〜があれば/あるなら』を使わない\n"
                 "2) 画像から読み取った事実として描写し、『〜が見えます』『〜が出ています』『〜と読めます』で言い切る\n"
                 "3) 同じ内容の言い換え反復は禁止（各項目は一度で言い切る）\n"
                 "4) ネガティブ断定は禁止。課題は『整えるコツ』『伸びしろ』として優しく示す\n\n"
@@ -487,26 +344,22 @@ def analyze_palm(image_data, lang: str = 'ja', style: str = 'normal'):
                 f"{description_text}\n\n"
                 "読み手が安心して前向きになれるよう、やさしく詩的だが具体的な文章でまとめてください。"
             )
-            # Style add-on (JA-only): Yuta-like safe tone
-            s = (style or 'normal').strip().lower()
-            if s == 'yuta_safe':
-                system_prompt += (
-                    "\n\n【追加スタイル：ユタ調・安全版】\n"
-                    "- 目的：内容（意味・事実関係）は変えず、温かい口語の“語り”に整える。\n"
-                    "- リズム：各項目は『結論→理由→今日からの具体策1つ』。短文中心。\n"
-                    "- 口調：段落冒頭の呼びかけは“全体で1〜2回まで”。語尾の連打は禁止。\n"
-                    "- 方言：『〜さ』『〜だよ』は“段落に1回まで”。毎文末に付けない。『さぁ』は使わない。\n"
-                    "- 禁止：霊・呪い・祟り・除霊・先祖の断定／病気・死／恐怖を煽る言い方。\n"
-                    "- 禁止語：『例えば』。曖昧語（かもしれません/でしょう/可能性）の多用も禁止（各項目1回以内）。\n"
-                    "- 最後：Overall Advice の最後は必ず『大丈夫。』など安心させる一文で締める。\n"
-                    "- 文体：基本は『です/ます』で整える。口語（だよ/さ）は要所だけ。\n"
-                    "- 禁止：子供っぽい語（とっても／だね連打／一緒に頑張ろうね）\n"
-                    "- 例：標準『焦らず優先順位を決めることが鍵です。』→ ユタ『うん、今は焦らなくていい。優先順位を一つ決めて、順番に形にしなさい。大丈夫。』\n"
-                )
+            user_prompt = (
 
-        # ---- Vision call (all languages) ----
+                "以下の形式で出力してください：\n"
+                "### 1. 生命線\n（説明文）\n\n"
+                "### 2. 運命線\n（説明文）\n\n"
+                "### 3. 金運線\n（説明文）\n\n"
+                "### 4. 特殊線1\n（説明文）\n\n"
+                "### 5. 特殊線2\n（説明文）\n\n"
+                "### 総合的なアドバイス\n（全体のバランスを見たまとめ）\n\n"
+                "・各項目は200文字前後で、やわらかく詩的で心に残る表現にしてください\n"
+                "・“無い”や“不足”という否定的な表現は避け、可能性や伸びしろとして前向きに表現してください\n"
+                "・心に灯をともすような、やさしく前向きな締めくくりで終えてください"
+            )
+
         response = openai.ChatCompletion.create(
-            model="gpt-5-mini",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {
@@ -526,11 +379,45 @@ def analyze_palm(image_data, lang: str = 'ja', style: str = 'normal'):
             temperature=0.8,
         )
         raw = response.choices[0].message.content.strip()
-        # Post-process (JA-only)
+        # Post-process to reduce hedge wording and duplicate lines (especially Japanese)
+        def _polish_palm_text(t: str) -> str:
+            if not t:
+                return t
+            t = t.replace('もし', '')
+            # Convert common '〜なら' hedges into assertive phrasing
+            t = re.sub(r'この線が([^。\n]{0,30}?)なら、', r'この線は\1ので、', t)
+            t = re.sub(r'([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら、', r'\1は\2ので、', t)
+            t = re.sub(r'([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら。', r'\1は\2です。', t)
+            t = t.replace('あるなら、', 'あり、')
+            t = t.replace('現れているなら、', '現れており、')
+            t = t.replace('見えるなら、', '見えており、')
+            t = t.replace('なら、', 'ので、')
+            t = t.replace('なら。', 'です。')
+            # De-duplicate identical lines within each section
+            lines = [ln.rstrip() for ln in t.split('\n')]
+            out = []
+            prev = None
+            seen_in_section = set()
+            for ln in lines:
+                key = re.sub(r'\s+', '', ln)
+                if key.startswith('###') or key.startswith('◆'):
+                    seen_in_section = set()
+                if not key:
+                    out.append(ln)
+                    prev = key
+                    continue
+                if key == prev:
+                    continue
+                if key in seen_in_section:
+                    continue
+                seen_in_section.add(key)
+                out.append(ln)
+                prev = key
+            return '\n'.join(out).strip()
 
         try:
             if (lang_norm or 'ja').lower().startswith('ja'):
-                raw = polish_ja_text(raw, yuta=((style or '').strip().lower() == 'yuta_safe'))
+                raw = _polish_palm_text(raw)
         except Exception:
             pass
         return raw
@@ -542,7 +429,7 @@ def analyze_palm(image_data, lang: str = 'ja', style: str = 'normal'):
 
 
 
-def get_iching_advice(lang: str = 'ja', style: str = 'normal'):
+def get_iching_advice(lang: str = 'ja'):
     try:
         lang_norm = (lang or 'ja').lower()
         if lang_norm.startswith('en'):
@@ -552,39 +439,52 @@ def get_iching_advice(lang: str = 'ja', style: str = 'normal'):
         elif lang_norm.startswith('ko') or lang_norm.startswith('kr'):
             prompt = "당신은 주역(I Ching) 조언자입니다. 지금 고객에게 필요한 메시지를 따뜻하고 긍정적이며 실행 가능하게 한국어로 150–220자 정도로 전해주세요. 괘명이나 전문 용어는 절대 쓰지 마세요."
         else:
-            prompt = (
-                "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。\n"
-                "追加ルール：『例えば』は禁止。『かもしれません』『でしょう』『可能性』は多用せず、結論→理由→具体策1つ→安心で締める。\n"
-                "- 禁止：例えば\n"
-                "- 曖昧語（かもしれません/でしょう/可能性）の多用は禁止\n"
-                "- 結論→理由→具体策1つ→安心、で締める"
-            )
-        # Style add-on (JA-only)
-        if (lang_norm.startswith('ja') or lang_norm == ''):
-            s = (style or 'normal').strip().lower()
-            if s == 'yuta_safe':
-                prompt += (
-                    "\n\n【追加スタイル：ユタ調・安全版】\n"
-                    "- 目的：内容（意味・事実関係）は変えず、温かい口語の“語り”に整える。\n"
-                    "- リズム：短文中心で『結論→理由→具体策1つ→安心の締め』。\n"
-                    "- 方言：『〜さ』『〜だよ』は“段落に1回まで”。毎文末に付けない。『さぁ』は使わない。\n"
-                    "- 禁止：霊・呪い・祟り・除霊・先祖の断定／病気・死／恐怖を煽る言い方。\n"
-                    "- 最後：必ず『大丈夫。』など安心させる一文で締める。\n"
-                    "- 文体：基本は『です/ます』で整える。口語（だよ/さ）は要所だけ。\n"
-                    "- 禁止：子供っぽい語（とっても／だね連打／一緒に頑張ろうね）\n"
-                    "- 例：標準『焦らず優先順位を決めることが鍵です。』→ ユタ『うん、今は焦らなくていい。優先順位を一つ決めて、順番に形にしなさい。大丈夫。』\n"
-                )
+            prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
         response = openai.ChatCompletion.create(
-            model="gpt-5-mini",
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300
         )
         raw = response.choices[0].message.content.strip()
-        # Post-process (JA-only)
+        # Post-process to reduce hedge wording and duplicate lines (especially Japanese)
+        def _polish_palm_text(t: str) -> str:
+            if not t:
+                return t
+            t = t.replace('もし', '')
+            # Convert common '〜なら' hedges into assertive phrasing
+            t = re.sub(r'この線が([^。\n]{0,30}?)なら、', r'この線は\1ので、', t)
+            t = re.sub(r'([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら、', r'\1は\2ので、', t)
+            t = re.sub(r'([一-龥ぁ-んァ-ンA-Za-z0-9_]+)が([^。\n]{0,30}?)なら。', r'\1は\2です。', t)
+            t = t.replace('あるなら、', 'あり、')
+            t = t.replace('現れているなら、', '現れており、')
+            t = t.replace('見えるなら、', '見えており、')
+            t = t.replace('なら、', 'ので、')
+            t = t.replace('なら。', 'です。')
+            # De-duplicate identical lines within each section
+            lines = [ln.rstrip() for ln in t.split('\n')]
+            out = []
+            prev = None
+            seen_in_section = set()
+            for ln in lines:
+                key = re.sub(r'\s+', '', ln)
+                if key.startswith('###') or key.startswith('◆'):
+                    seen_in_section = set()
+                if not key:
+                    out.append(ln)
+                    prev = key
+                    continue
+                if key == prev:
+                    continue
+                if key in seen_in_section:
+                    continue
+                seen_in_section.add(key)
+                out.append(ln)
+                prev = key
+            return '\n'.join(out).strip()
 
         try:
             if (lang_norm or 'ja').lower().startswith('ja'):
-                raw = polish_ja_text(raw, yuta=((style or '').strip().lower() == 'yuta_safe'))
+                raw = _polish_palm_text(raw)
         except Exception:
             pass
         return raw
@@ -617,7 +517,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 
     try:
         response = openai.ChatCompletion.create(
-            model="gtp-5.1",
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
@@ -1030,9 +930,9 @@ def _lang_pack(lang: str):
 
 def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool=False, style: str='normal', lang: str='ja', **kwargs):
     import re
-    palm_result = analyze_palm(image_data, lang=lang, style=style)
-    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, style=style, lang=lang)
-    iching_result = get_iching_advice(lang=lang, style=style)
+    palm_result = analyze_palm(image_data, lang=lang)
+    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, lang=lang)
+    iching_result = get_iching_advice(lang=lang)
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
     raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text, lang=lang)
@@ -1245,14 +1145,14 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 200文字で具体的に教えてください。"""
 
         comp_text = openai.ChatCompletion.create(
-            model="gpt-5-mini",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_comp}],
             max_tokens=400,
             temperature=0.9
         ).choices[0].message.content.strip()
 
         future_text = openai.ChatCompletion.create(
-            model="gpt-5-mini",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_future}],
             max_tokens=400,
             temperature=0.9
@@ -1269,7 +1169,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 
     topic_sections = []
     try:
-	        iching_result = get_iching_advice(lang=lang, style=style)
+        iching_result = get_iching_advice()
     except Exception as e:
         print("⚠ 易占い取得エラー（テーマ用）:", e)
         iching_result = "（易占い結果取得エラー）"
@@ -1292,7 +1192,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 """
 
             topic_text = openai.ChatCompletion.create(
-                model="gpt-5-mini",
+                model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": topic_prompt}],
                 max_tokens=600,
                 temperature=0.9
@@ -1351,19 +1251,19 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 来月（{next_month}月）の恋愛運を150文字でやさしく教えてください。"""
 
         year_love = openai.ChatCompletion.create(
-            model="gpt-5-mini",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_year}],
             max_tokens=400
         ).choices[0].message.content.strip()
 
         month_love = openai.ChatCompletion.create(
-            model="gpt-5-mini",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_month}],
             max_tokens=400
         ).choices[0].message.content.strip()
 
         next_month_love = openai.ChatCompletion.create(
-            model="gpt-5-mini",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_next}],
             max_tokens=400
         ).choices[0].message.content.strip()
