@@ -83,6 +83,57 @@
             <div class="muted">
               <label><input type="checkbox" name="is_accepting" value="1" {% if teller and teller.is_accepting %}checked{% elif mode=="new" %}checked{% endif %}/> 受付する</label>
             </div>
+
+            <hr style="margin:14px 0; border:none; border-top:1px solid #eee;" />
+
+            <h3 style="margin:0 0 6px;">事務局用（非公開）</h3>
+            <div class="muted" style="margin-bottom:8px;">※ここに入力した情報はお客様画面では表示しません。</div>
+
+            <label>占い師メール（CC送信先にも使用）</label>
+            <input name="admin_email" value="{{ teller.admin_email if teller else '' }}" placeholder="example@domain.com" />
+
+            <label>占い師電話番号</label>
+            <input name="admin_phone" value="{{ teller.admin_phone if teller else '' }}" placeholder="090-xxxx-xxxx" />
+
+            <label>予約通知CCメール（任意：未入力なら占い師メールを使用）</label>
+            <input name="notify_email" value="{{ teller.notify_email if teller else '' }}" placeholder="cc@domain.com" />
+
+            <div class="row">
+              <div>
+                <label>振込先：銀行名</label>
+                <input name="bank_name" value="{{ teller.bank_name if teller else '' }}" placeholder="○○銀行" />
+              </div>
+              <div>
+                <label>支店名</label>
+                <input name="bank_branch" value="{{ teller.bank_branch if teller else '' }}" placeholder="△△支店" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div>
+                <label>口座種別</label>
+                <input name="bank_account_type" value="{{ teller.bank_account_type if teller else '' }}" placeholder="普通 / 当座" />
+              </div>
+              <div>
+                <label>口座番号</label>
+                <input name="bank_account_number" value="{{ teller.bank_account_number if teller else '' }}" placeholder="1234567" />
+              </div>
+            </div>
+
+            <label>口座名義（カナ）</label>
+            <input name="bank_account_holder" value="{{ teller.bank_account_holder if teller else '' }}" placeholder="ヤマダ タロウ" />
+
+            <hr style="margin:14px 0; border:none; border-top:1px solid #eee;" />
+
+            <h3 style="margin:0 0 6px;">対応可能メニュー（お客様向け）</h3>
+            <div class="muted" style="margin-bottom:8px;">予約フォームの「鑑定メニュー」を、占い師ごとに出し分けします。</div>
+
+            <div class="muted" style="display:grid; gap:6px;">
+              <label><input type="checkbox" name="menu_video_call" value="1" {% if teller and teller.menu_video_call %}checked{% elif mode=="new" %}checked{% endif %}/> ビデオ通話（30分）</label>
+              <label><input type="checkbox" name="menu_phone_call" value="1" {% if teller and teller.menu_phone_call %}checked{% elif mode=="new" %}checked{% endif %}/> 通話（30分）</label>
+              <label><input type="checkbox" name="menu_video" value="1" {% if teller and teller.menu_video %}checked{% elif mode=="new" %}checked{% endif %}/> 鑑定動画（後日送付）</label>
+              <label><input type="checkbox" name="menu_pdf" value="1" {% if teller and teller.menu_pdf %}checked{% elif mode=="new" %}checked{% endif %}/> 鑑定PDF（後日送付）</label>
+            </div>
           </div>
         </div>
 

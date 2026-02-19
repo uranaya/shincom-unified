@@ -93,17 +93,16 @@
               </div>
 
               <div class="field">
-  		<label>鑑定メニュー（税抜／税込）</label>
-  		<select name="mode" required>
-    		<option value="ビデオ通話30分_5000" selected>ビデオ通話（30分）5,000円／5,500円</option>
-    		<option value="通話30分_5000">通話（30分）5,000円／5,500円</option>
-    		<option value="鑑定動画_3000">鑑定動画（後日送付）3,000円／3,300円</option>
-    		<option value="鑑定PDF_2000">鑑定PDF（後日送付）2,000円／2,200円</option>
-  		</select>
-  		<div class="muted" style="margin-top:6px;font-size:12px;">
-    		※表示は税抜です。税込（10%）を併記しています。
-  		</div>
-	      </div>
+                <label>鑑定メニュー（税抜／税込）</label>
+                <select name="mode" id="mode_select" required>
+                  {% for opt in mode_options %}
+                    <option value="{{ opt.code }}" {% if loop.first %}selected{% endif %}>{{ opt.label }}</option>
+                  {% endfor %}
+                </select>
+                <div class="muted" style="margin-top:6px;font-size:12px;">
+                  ※表示は税抜です。税込（10%）を併記しています。
+                </div>
+              </div>
 
 
               <div class="field grid-2">
@@ -133,17 +132,39 @@
                   <input type="text" name="name" required>
                 </div>
                 <div>
-                  <label>連絡手段</label>
-                  <select name="contact_type" required>
-                    <option value="メール" selected>メール</option>
-                    <option value="LINE">LINE</option>
+                  <label>お支払い方法</label>
+                  <select name="payment_method" required>
+                    <option value="" selected>選択してください</option>
+                    <option value="クレジットカード">クレジットカード</option>
+                    <option value="PayPay">PayPay</option>
+                    <option value="口座振込">口座振込</option>
                   </select>
                 </div>
               </div>
 
+              <div class="field grid-2">
+                <div>
+                  <label>電話番号</label>
+                  <input type="tel" name="customer_phone" autocomplete="tel" placeholder="090-1234-5678" required>
+                </div>
+                <div>
+                  <label>メールアドレス</label>
+                  <input type="email" name="customer_email" autocomplete="email" placeholder="example@email.com" required>
+                </div>
+              </div>
+
               <div class="field">
-                <label>連絡先（メールまたはLINE ID）</label>
-                <input type="text" name="contact" required>
+                <label>LINE ID（任意）</label>
+                <input type="text" name="customer_line_id" placeholder="任意（LINE連絡希望の場合は入力してください）">
+              </div>
+
+              <div class="field">
+                <label>ご希望の連絡手段</label>
+                <select name="contact_type" required>
+                  <option value="メール" selected>メール</option>
+                  <option value="LINE">LINE</option>
+                </select>
+                <div class="muted" style="margin-top:6px;font-size:12px;">※LINEをご希望の場合は、上の「LINE ID（任意）」にIDを入力してください。</div>
               </div>
 
               <div class="field checkbox">
@@ -172,5 +193,63 @@
       </div>
     </section>
   </main>
+
+  <script>
+    // 公開情報のみ（admin_email等は含めない）
+    const TELLERS = {{ tellers | tojson }};
+    const MODE_OPTIONS = {{ mode_options | tojson }};
+
+    function byId(id){ return document.getElementById(id); }
+
+    function getTeller(tellerId){
+      const tid = String(tellerId || '');
+      return TELLERS.find(t => String(t.id) === tid);
+    }
+
+    function rebuildModeOptions(allowed, keepValue){
+      const sel = byId('mode_select');
+      if(!sel) return;
+      const cur = keepValue || sel.value;
+
+      sel.innerHTML = '';
+      const allowedSet = new Set(allowed || []);
+      const opts = MODE_OPTIONS.filter(o => allowedSet.size === 0 || allowedSet.has(o.code));
+
+      for (const o of opts) {
+        const op = document.createElement('option');
+        op.value = o.code;
+        op.textContent = o.label;
+        sel.appendChild(op);
+      }
+
+      // 以前の選択が残っていれば優先、無ければ先頭
+      const still = Array.from(sel.options).some(op => op.value === cur);
+      sel.value = still ? cur : (sel.options[0] ? sel.options[0].value : '');
+    }
+
+    function onTellerChange(){
+      const tellerSel = document.querySelector('select[name="teller_select"]');
+      const t = getTeller(tellerSel ? tellerSel.value : '');
+      const allowed = (t && t.allowed_modes) ? t.allowed_modes : [];
+      rebuildModeOptions(allowed);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const tellerSel = document.querySelector('select[name="teller_select"]');
+      if (tellerSel) {
+        tellerSel.addEventListener('change', onTellerChange);
+      }
+
+      // 初期：selected_teller がある場合はそれに合わせて絞り込み
+      const initialTid = '{{ selected_teller.id if selected_teller else "" }}';
+      if (initialTid) {
+        const t = getTeller(initialTid);
+        rebuildModeOptions(t ? t.allowed_modes : []);
+      } else {
+        // 未選択でも、まずは全メニューで表示
+        rebuildModeOptions([]);
+      }
+    });
+  </script>
 </body>
 </html>

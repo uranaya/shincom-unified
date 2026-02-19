@@ -38,6 +38,7 @@
           <th>担当</th>
           <th>カテゴリ</th>
           <th>方式</th>
+          <th>支払</th>
           <th>希望日時</th>
           <th>お客様</th>
           <th>連絡</th>
@@ -53,6 +54,7 @@
           <td>{{ b.teller_name }}</td>
           <td>{{ b.category }}</td>
           <td>{{ b.mode }}</td>
+          <td>{{ b.payment_method or '' }}</td>
           <td>
             <div>{{ b.slot1 }}</div>
             {% if b.slot2 %}<div class="muted">{{ b.slot2 }}</div>{% endif %}
@@ -60,8 +62,10 @@
           </td>
           <td><strong>{{ b.name }}</strong></td>
           <td>
-            <div>{{ b.contact_type }}</div>
-            <div class="muted">{{ b.contact }}</div>
+            <div><strong>希望:</strong> {{ b.contact_type }} / <span class="muted">{{ b.contact }}</span></div>
+            <div class="muted">TEL: {{ b.customer_phone or '-' }}</div>
+            <div class="muted">MAIL: {{ b.customer_email or '-' }}</div>
+            <div class="muted">LINE: {{ b.customer_line_id or '-' }}</div>
           </td>
           <td>
             <details>
@@ -72,7 +76,7 @@
           <td><code>{{ b.status }}</code></td>
         </tr>
         {% else %}
-        <tr><td colspan="10" class="muted">まだ予約がありません。</td></tr>
+        <tr><td colspan="11" class="muted">まだ予約がありません。</td></tr>
         {% endfor %}
       </tbody>
     </table>

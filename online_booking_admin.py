@@ -37,6 +37,38 @@ from flask import jsonify, render_template, request, redirect, session, abort
 
 
 # ---------------------------
+# Public menu definitions
+# ---------------------------
+
+# NOTE:
+# - code: DB保存値 / 予約メールにも載る
+# - label: 画面表示
+# - flag: tellers テーブルの可否フラグ列
+MODE_OPTIONS: List[Dict[str, str]] = [
+    {
+        "code": "ビデオ通話30分_5000",
+        "label": "ビデオ通話（30分）5,000円／5,500円",
+        "flag": "menu_video_call",
+    },
+    {
+        "code": "通話30分_5000",
+        "label": "通話（30分）5,000円／5,500円",
+        "flag": "menu_phone_call",
+    },
+    {
+        "code": "鑑定動画_3000",
+        "label": "鑑定動画（後日送付）3,000円／3,300円",
+        "flag": "menu_video",
+    },
+    {
+        "code": "鑑定PDF_2000",
+        "label": "鑑定PDF（後日送付）2,000円／2,200円",
+        "flag": "menu_pdf",
+    },
+]
+
+
+# ---------------------------
 # Helpers
 # ---------------------------
 
@@ -80,11 +112,35 @@ def _guess_contact_type(contact: str) -> str:
     return "phone"
 
 
+def _allowed_modes_from_teller(t: Dict[str, Any]) -> List[str]:
+    """tellersテーブルのメニューフラグから、許可されている mode(code) を返す。"""
+    allowed: List[str] = []
+    for opt in MODE_OPTIONS:
+        flag = opt["flag"]
+        if bool(t.get(flag)):
+            allowed.append(opt["code"])
+    return allowed
+
+
+def _attach_allowed_modes(t: Dict[str, Any]) -> Dict[str, Any]:
+    if t is None:
+        return t
+    t["allowed_modes"] = _allowed_modes_from_teller(t)
+    return t
+
+
 # ---------------------------
 # Email (optional)
 # ---------------------------
 
-def send_booking_email(subject: str, body: str) -> None:
+def _split_emails(v: str) -> List[str]:
+    """Comma/space/semicolon separated emails -> list."""
+    raw = (v or "").replace(";", ",")
+    parts = [p.strip() for p in raw.split(",")]
+    return [p for p in parts if p]
+
+
+def send_booking_email(subject: str, body: str, cc: Optional[List[str]] = None) -> None:
     """
     Send a notification email to BOOKING_NOTIFY_TO.
     If required env vars are missing, this becomes a no-op.
@@ -97,19 +153,26 @@ def send_booking_email(subject: str, body: str) -> None:
       SMTP_PASS
       SMTP_FROM          optional (e.g. '"うらなや予約" <noreply@...>')
     """
-    to_addr = os.getenv("BOOKING_NOTIFY_TO", "").strip()
+    to_addr_raw = os.getenv("BOOKING_NOTIFY_TO", "").strip()
     host = os.getenv("SMTP_HOST", "").strip()
     port = int(os.getenv("SMTP_PORT", "587"))
     user = os.getenv("SMTP_USER", "").strip()
     pwd = os.getenv("SMTP_PASS", "").strip()
     from_raw = os.getenv("SMTP_FROM", "").strip()
 
-    if not (to_addr and host and user and pwd):
+    to_addrs = _split_emails(to_addr_raw)
+    cc_addrs = [a.strip() for a in (cc or []) if (a or "").strip()]
+    # 重複除去
+    cc_addrs = [a for a in cc_addrs if a not in to_addrs]
+
+    if not (to_addrs and host and user and pwd):
         return  # no-op
 
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["To"] = to_addr
+    msg["To"] = ", ".join(to_addrs)
+    if cc_addrs:
+        msg["Cc"] = ", ".join(cc_addrs)
     msg["From"] = from_raw if from_raw else formataddr(("うらなや予約", user))
     msg.set_content(body)
 
@@ -117,7 +180,7 @@ def send_booking_email(subject: str, body: str) -> None:
         smtp.ehlo()
         smtp.starttls()
         smtp.login(user, pwd)
-        smtp.send_message(msg)
+        smtp.send_message(msg, to_addrs=(to_addrs + cc_addrs))
 
 
 # ---------------------------
@@ -143,6 +206,23 @@ def init_online_tables(conn) -> None:
               art3 TEXT DEFAULT '',
               photo_url TEXT DEFAULT '',
               tags_json TEXT DEFAULT '[]',
+
+              -- 管理用（非公開）
+              admin_email TEXT DEFAULT '',
+              admin_phone TEXT DEFAULT '',
+              notify_email TEXT DEFAULT '',
+              bank_name TEXT DEFAULT '',
+              bank_branch TEXT DEFAULT '',
+              bank_account_type TEXT DEFAULT '',
+              bank_account_number TEXT DEFAULT '',
+              bank_account_holder TEXT DEFAULT '',
+
+              -- お客様向け：対応メニュー可否
+              menu_video_call BOOLEAN DEFAULT TRUE,
+              menu_phone_call BOOLEAN DEFAULT TRUE,
+              menu_video BOOLEAN DEFAULT TRUE,
+              menu_pdf BOOLEAN DEFAULT TRUE,
+
               is_active BOOLEAN DEFAULT TRUE,
               is_accepting BOOLEAN DEFAULT TRUE,
               sort_order INT DEFAULT 100,
@@ -156,6 +236,22 @@ def init_online_tables(conn) -> None:
         cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS art1 TEXT DEFAULT '';""")
         cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS art2 TEXT DEFAULT '';""")
         cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS art3 TEXT DEFAULT '';""")
+
+        # Admin-only columns
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS admin_email TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS admin_phone TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS notify_email TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS bank_name TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS bank_branch TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS bank_account_type TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS bank_account_number TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS bank_account_holder TEXT DEFAULT '';""")
+
+        # Public menu availability
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS menu_video_call BOOLEAN DEFAULT TRUE;""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS menu_phone_call BOOLEAN DEFAULT TRUE;""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS menu_video BOOLEAN DEFAULT TRUE;""")
+        cur.execute("""ALTER TABLE tellers ADD COLUMN IF NOT EXISTS menu_pdf BOOLEAN DEFAULT TRUE;""")
 
         cur.execute("""
             CREATE TABLE IF NOT EXISTS bookings (
@@ -171,11 +267,21 @@ def init_online_tables(conn) -> None:
               name TEXT NOT NULL,
               contact_type TEXT NOT NULL,
               contact TEXT NOT NULL,
+              customer_phone TEXT DEFAULT '',
+              customer_email TEXT DEFAULT '',
+              customer_line_id TEXT DEFAULT '',
+              payment_method TEXT DEFAULT '',
               agree BOOLEAN DEFAULT FALSE,
               memo TEXT DEFAULT '',
               created_at TIMESTAMP DEFAULT NOW()
             );
         """)
+
+        # Customer contact + payment columns (idempotent)
+        cur.execute("""ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_phone TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_email TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_line_id TEXT DEFAULT '';""")
+        cur.execute("""ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT '';""")
 
         # Indexes
         cur.execute("""CREATE INDEX IF NOT EXISTS idx_tellers_active_order ON tellers(is_active, sort_order, id);""")
@@ -200,7 +306,8 @@ def register_online_routes(app, database_url: str) -> None:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
                     SELECT id, slug, display_name, short_bio, long_bio, art1, art2, art3,
-                           photo_url, tags_json, is_active, is_accepting, sort_order
+                           photo_url, tags_json, is_active, is_accepting, sort_order,
+                           menu_video_call, menu_phone_call, menu_video, menu_pdf
                     FROM tellers
                     WHERE is_active = TRUE
                     ORDER BY sort_order ASC, id ASC;
@@ -208,6 +315,7 @@ def register_online_routes(app, database_url: str) -> None:
                 rows = cur.fetchall()
                 for r in rows:
                     r["tags"] = _parse_tags(r.get("tags_json"))
+                    _attach_allowed_modes(r)
                 return rows
         finally:
             conn.close()
@@ -218,7 +326,11 @@ def register_online_routes(app, database_url: str) -> None:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
                     SELECT id, slug, display_name, short_bio, long_bio, art1, art2, art3,
-                           photo_url, tags_json, is_active, is_accepting, sort_order,
+                           photo_url, tags_json,
+                           admin_email, admin_phone, notify_email,
+                           bank_name, bank_branch, bank_account_type, bank_account_number, bank_account_holder,
+                           menu_video_call, menu_phone_call, menu_video, menu_pdf,
+                           is_active, is_accepting, sort_order,
                            created_at, updated_at
                     FROM tellers
                     ORDER BY sort_order ASC, id ASC;
@@ -226,6 +338,7 @@ def register_online_routes(app, database_url: str) -> None:
                 rows = cur.fetchall()
                 for r in rows:
                     r["tags"] = _parse_tags(r.get("tags_json"))
+                    _attach_allowed_modes(r)
                 return rows
         finally:
             conn.close()
@@ -236,7 +349,11 @@ def register_online_routes(app, database_url: str) -> None:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
                     SELECT id, slug, display_name, short_bio, long_bio, art1, art2, art3,
-                           photo_url, tags_json, is_active, is_accepting, sort_order,
+                           photo_url, tags_json,
+                           admin_email, admin_phone, notify_email,
+                           bank_name, bank_branch, bank_account_type, bank_account_number, bank_account_holder,
+                           menu_video_call, menu_phone_call, menu_video, menu_pdf,
+                           is_active, is_accepting, sort_order,
                            created_at, updated_at
                     FROM tellers
                     WHERE id = %s
@@ -246,6 +363,7 @@ def register_online_routes(app, database_url: str) -> None:
                 if not r:
                     return None
                 r["tags"] = _parse_tags(r.get("tags_json"))
+                _attach_allowed_modes(r)
                 return r
         finally:
             conn.close()
@@ -256,7 +374,9 @@ def register_online_routes(app, database_url: str) -> None:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
                     SELECT id, slug, display_name, short_bio, long_bio, art1, art2, art3,
-                           photo_url, tags_json, is_active, is_accepting, sort_order,
+                           photo_url, tags_json,
+                           menu_video_call, menu_phone_call, menu_video, menu_pdf,
+                           is_active, is_accepting, sort_order,
                            created_at, updated_at
                     FROM tellers
                     WHERE slug = %s
@@ -266,6 +386,7 @@ def register_online_routes(app, database_url: str) -> None:
                 if not r:
                     return None
                 r["tags"] = _parse_tags(r.get("tags_json"))
+                _attach_allowed_modes(r)
                 return r
         finally:
             conn.close()
@@ -276,8 +397,9 @@ def register_online_routes(app, database_url: str) -> None:
             with conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO bookings
-                    (teller_id, category, mode, slot1, slot2, slot3, message, name, contact_type, contact, agree)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    (teller_id, category, mode, slot1, slot2, slot3, message, name,
+                     contact_type, contact, customer_phone, customer_email, customer_line_id, payment_method, agree)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     RETURNING id;
                 """, (
                     payload["teller_id"],
@@ -290,6 +412,10 @@ def register_online_routes(app, database_url: str) -> None:
                     payload["name"],
                     payload["contact_type"],
                     payload["contact"],
+                    payload.get("customer_phone", ""),
+                    payload.get("customer_email", ""),
+                    payload.get("customer_line_id", ""),
+                    payload.get("payment_method", ""),
                     payload["agree"],
                 ))
                 booking_id = cur.fetchone()[0]
@@ -341,10 +467,32 @@ def register_online_routes(app, database_url: str) -> None:
                 if not agree:
                     raise ValueError("利用規約・プライバシーポリシーへの同意が必要です。")
 
-                contact = _ensure_text(request.form.get("contact")) or _ensure_text(request.form.get("email"))
-                contact_type = _ensure_text(request.form.get("contact_type"))
+                # Customer contact + payment
+                customer_phone = _ensure_text(request.form.get("customer_phone") or request.form.get("phone"))
+                customer_email = _ensure_text(request.form.get("customer_email") or request.form.get("email"))
+                customer_line_id = _ensure_text(request.form.get("customer_line_id") or request.form.get("line_id"))
+                payment_method = _ensure_text(request.form.get("payment_method"))
+
+                # Backward compatible: old form may still post contact/contact_type
+                contact_type = _ensure_text(request.form.get("contact_type")) or "メール"
+                contact = _ensure_text(request.form.get("contact"))
+                if not contact:
+                    if contact_type == "LINE":
+                        contact = customer_line_id
+                    else:
+                        contact = customer_email
+
                 if contact and not contact_type:
                     contact_type = _guess_contact_type(contact)
+
+                if not customer_phone:
+                    raise ValueError("お電話番号を入力してください。")
+                if not customer_email:
+                    raise ValueError("メールアドレスを入力してください。")
+                if contact_type == "LINE" and not customer_line_id:
+                    raise ValueError("LINEでの連絡をご希望の場合は、LINE ID（任意欄）にIDを入力してください。")
+                if payment_method not in ("クレジットカード", "PayPay", "口座振込"):
+                    raise ValueError("お支払い方法を選択してください。")
 
                 payload = {
                     "teller_id": int(teller_id),
@@ -357,13 +505,26 @@ def register_online_routes(app, database_url: str) -> None:
                     "name": _ensure_text(request.form.get("name")),
                     "contact_type": contact_type,
                     "contact": contact,
+                    "customer_phone": customer_phone,
+                    "customer_email": customer_email,
+                    "customer_line_id": customer_line_id,
+                    "payment_method": payment_method,
                     "agree": agree,
                 }
 
-                must = ["category", "mode", "slot1", "message", "name", "contact_type", "contact"]
+                must = [
+                    "category", "mode", "slot1", "message", "name",
+                    "customer_phone", "customer_email", "payment_method",
+                    "contact_type", "contact",
+                ]
                 for k in must:
                     if not payload.get(k):
                         raise ValueError("未入力の必須項目があります。")
+
+                # Teller menu availability check
+                allowed = set((selected_teller.get("allowed_modes") or []))
+                if payload["mode"] not in allowed:
+                    raise ValueError("選択された占い師は、この鑑定メニューに対応していません。")
 
                 booking_id = insert_booking(payload)
                 success = f"予約リクエストを受け付けました（受付番号：{booking_id}）。折り返しご連絡します。"
@@ -377,17 +538,25 @@ def register_online_routes(app, database_url: str) -> None:
                         f"占い師: {teller_name} (id={payload['teller_id']})",
                         f"カテゴリ: {payload['category']}",
                         f"鑑定メニュー: {payload['mode']}",
+                        f"支払方法: {payload.get('payment_method','-')}",
                         f"希望日時1: {payload['slot1']}",
                         f"希望日時2: {payload.get('slot2') or '-'}",
                         f"希望日時3: {payload.get('slot3') or '-'}",
                         f"名前: {payload['name']}",
+                        f"電話: {payload.get('customer_phone','-')}",
+                        f"メール: {payload.get('customer_email','-')}",
+                        f"LINE ID: {payload.get('customer_line_id') or '-'}",
                         f"連絡手段: {payload['contact_type']}",
                         f"連絡先: {payload['contact']}",
                         "",
                         "相談内容:",
                         payload["message"],
                     ])
-                    send_booking_email(subject, body)
+
+                    # CC to teller (if email is registered)
+                    cc_email = (selected_teller.get("notify_email") or selected_teller.get("admin_email") or "").strip()
+                    cc_list = [cc_email] if cc_email else []
+                    send_booking_email(subject, body, cc=cc_list)
                 except Exception as e:
                     print("⚠️ booking mail failed:", e)
 
@@ -398,6 +567,7 @@ def register_online_routes(app, database_url: str) -> None:
             "online/booking.html",
             tellers=tellers,
             selected_teller=selected_teller,
+            mode_options=MODE_OPTIONS,
             error=error,
             success=success,
         )
@@ -490,6 +660,22 @@ def register_online_routes(app, database_url: str) -> None:
                 is_active = (request.form.get("is_active") == "1")
                 is_accepting = (request.form.get("is_accepting") == "1")
 
+                # Admin-only
+                admin_email = _ensure_text(request.form.get("admin_email"))
+                admin_phone = _ensure_text(request.form.get("admin_phone"))
+                notify_email = _ensure_text(request.form.get("notify_email"))
+                bank_name = _ensure_text(request.form.get("bank_name"))
+                bank_branch = _ensure_text(request.form.get("bank_branch"))
+                bank_account_type = _ensure_text(request.form.get("bank_account_type"))
+                bank_account_number = _ensure_text(request.form.get("bank_account_number"))
+                bank_account_holder = _ensure_text(request.form.get("bank_account_holder"))
+
+                # Public menu availability
+                menu_video_call = (request.form.get("menu_video_call") == "1")
+                menu_phone_call = (request.form.get("menu_phone_call") == "1")
+                menu_video = (request.form.get("menu_video") == "1")
+                menu_pdf = (request.form.get("menu_pdf") == "1")
+
                 if not slug or not display_name:
                     raise ValueError("slug と表示名は必須です。")
 
@@ -502,11 +688,25 @@ def register_online_routes(app, database_url: str) -> None:
                         cur.execute("""
                             INSERT INTO tellers
                               (slug, display_name, short_bio, long_bio, art1, art2, art3,
-                               photo_url, tags_json, is_active, is_accepting, sort_order, updated_at)
+                               photo_url, tags_json,
+                               admin_email, admin_phone, notify_email,
+                               bank_name, bank_branch, bank_account_type, bank_account_number, bank_account_holder,
+                               menu_video_call, menu_phone_call, menu_video, menu_pdf,
+                               is_active, is_accepting, sort_order, updated_at)
                             VALUES
-                              (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW());
-                        """, (slug, display_name, short_bio, long_bio, art1, art2, art3,
-                              photo_url, tags_json, is_active, is_accepting, sort_order))
+                              (%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                               %s,%s,%s,
+                               %s,%s,%s,%s,%s,
+                               %s,%s,%s,%s,
+                               %s,%s,%s,NOW());
+                        """, (
+                            slug, display_name, short_bio, long_bio, art1, art2, art3,
+                            photo_url, tags_json,
+                            admin_email, admin_phone, notify_email,
+                            bank_name, bank_branch, bank_account_type, bank_account_number, bank_account_holder,
+                            menu_video_call, menu_phone_call, menu_video, menu_pdf,
+                            is_active, is_accepting, sort_order
+                        ))
                         conn.commit()
                 finally:
                     conn.close()
@@ -543,6 +743,22 @@ def register_online_routes(app, database_url: str) -> None:
                 is_active = (request.form.get("is_active") == "1")
                 is_accepting = (request.form.get("is_accepting") == "1")
 
+                # Admin-only
+                admin_email = _ensure_text(request.form.get("admin_email"))
+                admin_phone = _ensure_text(request.form.get("admin_phone"))
+                notify_email = _ensure_text(request.form.get("notify_email"))
+                bank_name = _ensure_text(request.form.get("bank_name"))
+                bank_branch = _ensure_text(request.form.get("bank_branch"))
+                bank_account_type = _ensure_text(request.form.get("bank_account_type"))
+                bank_account_number = _ensure_text(request.form.get("bank_account_number"))
+                bank_account_holder = _ensure_text(request.form.get("bank_account_holder"))
+
+                # Public menu availability
+                menu_video_call = (request.form.get("menu_video_call") == "1")
+                menu_phone_call = (request.form.get("menu_phone_call") == "1")
+                menu_video = (request.form.get("menu_video") == "1")
+                menu_pdf = (request.form.get("menu_pdf") == "1")
+
                 if not slug or not display_name:
                     raise ValueError("slug と表示名は必須です。")
 
@@ -563,13 +779,34 @@ def register_online_routes(app, database_url: str) -> None:
                                 art3=%s,
                                 photo_url=%s,
                                 tags_json=%s,
+
+                                admin_email=%s,
+                                admin_phone=%s,
+                                notify_email=%s,
+                                bank_name=%s,
+                                bank_branch=%s,
+                                bank_account_type=%s,
+                                bank_account_number=%s,
+                                bank_account_holder=%s,
+
+                                menu_video_call=%s,
+                                menu_phone_call=%s,
+                                menu_video=%s,
+                                menu_pdf=%s,
+
                                 is_active=%s,
                                 is_accepting=%s,
                                 sort_order=%s,
                                 updated_at=NOW()
                             WHERE id=%s;
-                        """, (slug, display_name, short_bio, long_bio, art1, art2, art3,
-                              photo_url, tags_json, is_active, is_accepting, sort_order, teller_id))
+                        """, (
+                            slug, display_name, short_bio, long_bio, art1, art2, art3,
+                            photo_url, tags_json,
+                            admin_email, admin_phone, notify_email,
+                            bank_name, bank_branch, bank_account_type, bank_account_number, bank_account_holder,
+                            menu_video_call, menu_phone_call, menu_video, menu_pdf,
+                            is_active, is_accepting, sort_order, teller_id
+                        ))
                         conn.commit()
                 finally:
                     conn.close()
@@ -628,6 +865,10 @@ def register_online_routes(app, database_url: str) -> None:
                       b.name,
                       b.contact_type,
                       b.contact,
+                      b.customer_phone,
+                      b.customer_email,
+                      b.customer_line_id,
+                      b.payment_method,
                       b.message,
                       COALESCE(t.display_name, '') AS teller_name
                     FROM bookings b
