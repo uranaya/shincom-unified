@@ -234,17 +234,17 @@ Rules:
 
 def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mode="normal", lang=None, **kwargs):
     """
-    画像から手相を分析して、5項目（生命線/運命線/金運線/特殊線1/特殊線2）の鑑定文を返す。
-    2026-02: Excel由来の詳細DB（tesou.PALM_DETAIL_*）を使い、
-      ① 画像判定（番号・名称の選択）→ ② 詳細本文を根拠に鑑定文生成
-    の2段階に分離して精度を上げる。
+    画像から手相を分析して、6項目（生命線/運命線/金運線/特殊線①/特殊線②/総合）の鑑定文を返す。
+
+    重要: generate_fortune() 側は "### " 見出しで分割して palm_titles/palm_texts を作るため、
+    返却テキストは必ず "### " で始まる見出しを6つ含む形式にする。
     """
     import json
 
     # -------------------------
     # base64正規化
     # -------------------------
-    if image_data.startswith("data:image"):
+    if isinstance(image_data, str) and image_data.startswith("data:image"):
         base64data = image_data.split(",", 1)[1]
     else:
         base64data = image_data
@@ -271,7 +271,7 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
     # -------------------------
     base_lines = ["生命線", "頭脳線", "感情線", "運命線", "金運線"]
 
-    # Excel由来の特殊線候補も混ぜる（存在しない場合でも落ちないように）
+    # Excel由来の詳細DB（存在しない環境でも落ちないように）
     try:
         from tesou import (
             PALM_DETAIL_BY_ID,
@@ -287,7 +287,8 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
         def get_palm_detail_text_by_id(_id):  # type: ignore
             return ""
 
-    special_from_excel = []
+    # tesou.py 既存の名称・説明（旧DB）
+    # ※ tesou_names / tesou_descriptions は元ファイル側で import 済み
     try:
         special_from_excel = [name for _id, name in PALM_DETAIL_INDEX_BY_CATEGORY.get("特殊な線", [])]
     except Exception:
@@ -316,8 +317,7 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
     def _safe_json_load(text: str):
         if not text:
             return None
-        text = text.strip()
-        # ```json ... ``` を剥がす
+        text = str(text).strip()
         text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
         text = re.sub(r"\s*```$", "", text)
         try:
@@ -395,45 +395,51 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
     except Exception:
         detect = None
 
-    # 判定が取れない場合は、従来方式（意味ガイド全文をモデルに渡す）にフォールバック
+    # -------------------------
+    # 判定が取れない場合はフォールバック（旧DBガイドを渡して直接生成）
+    # ※ この場合でも必ず "### " 6見出し形式で返す
+    # -------------------------
     if not isinstance(detect, dict):
-        # 旧: 線の説明ガイドをそのまま渡す
         description_text = "\n".join([f"{k}: {v}" for k, v in tesou_descriptions.items()])
         special_lines_text = ", ".join(special_line_candidates)
 
         if is_en:
             system_prompt = (
-                "You are a friendly palmistry reader. Use ONLY the given meaning guide. "
-                "Return a reading with exactly 5 sections and headings:\n"
-                "【Life Line】, 【Fate Line】, 【Money Line】, 【Special Lines】, 【Overall】\n"
-                "Each section should be ~80-120 characters (not words)."
+                "You are a friendly palmistry reader. Use ONLY the given meaning guide.\n"
+                "Return EXACTLY 6 sections with headings that start with '### ' in this order:\n"
+                "### 1. Life Line\n### 2. Fate Line\n### 3. Money Line\n### 4. Special Line 1 (if none, use Head Line)\n"
+                "### 5. Special Line 2 (if none, use Heart Line)\n### Overall Advice\n"
+                "Each section should be ~80-120 characters (not words). Do NOT use '###' anywhere else."
             )
         elif is_zh:
             system_prompt = (
-                "你是一位温和、实用的手相解读师。只使用提供的含义指南。"
-                "请输出5个段落并带标题：\n"
-                "【生命线】, 【命运线】, 【金运线】, 【特殊线】, 【综合】\n"
-                "每段约80-120个汉字。"
+                "你是一位温和、实用的手相解读师。只使用提供的含义指南。\n"
+                "必须输出6段，并且每个标题都以 '### ' 开头，顺序固定：\n"
+                "### 1. 生命线\n### 2. 命运线\n### 3. 金运线\n### 4. 特殊线①（没有就用 智慧线）\n"
+                "### 5. 特殊线②（没有就用 感情线）\n### 综合建议\n"
+                "每段约80-120个汉字。不要在正文里再出现'###'。"
             )
         elif is_ko:
             system_prompt = (
-                "당신은 친절한 손금 해석가입니다. 제공된 의미 가이드만 사용하세요. "
-                "5개 섹션과 제목을 정확히 출력:\n"
-                "【생명선】, 【운명선】, 【금운선】, 【특수선】, 【종합】\n"
-                "각 섹션은 약 80~120자."
+                "당신은 친절하고 실용적인 손금 해석가입니다. 제공된 의미 가이드만 사용하세요.\n"
+                "반드시 6개 섹션을 출력하고 각 제목은 '### '로 시작해야 합니다(순서 고정):\n"
+                "### 1. 생명선\n### 2. 운명선\n### 3. 금운선\n### 4. 특수선①(없으면 두뇌선)\n"
+                "### 5. 특수선②(없으면 감정선)\n### 종합 조언\n"
+                "각 섹션은 약 80~120자. 본문에 '###'를 다시 쓰지 마세요."
             )
         else:
             system_prompt = (
-                "あなたは手相占い師です。与えられた意味ガイドのみを根拠に、"
-                "次の5項目を必ず出力してください：\n"
-                "【生命線】\n【運命線】\n【金運線】\n【特殊線】\n【総合】\n"
-                "各項目は80〜120文字程度。仮定や占い用語の羅列は禁止。"
+                "あなたは手相占い師です。与えられた意味ガイドのみを根拠に、必ず6項目を出力してください。\n"
+                "各見出しは必ず '### ' から始め、この順番で固定：\n"
+                "### 1. 生命線\n### 2. 運命線\n### 3. 金運線\n### 4. 特殊線①（該当がなければ頭脳線）\n"
+                "### 5. 特殊線②（該当がなければ感情線）\n### 手相の総合アドバイス\n"
+                "各項目は80〜120文字程度。本文中に '###' を再登場させない。用語の羅列は禁止。"
             )
 
         user_prompt = (
             f"意味ガイド:\n{description_text}\n\n"
             f"特殊線候補一覧:\n{special_lines_text}\n\n"
-            "画像を見て該当する線を読み取り、鑑定文を作ってください。"
+            "画像を見て該当する線を読み取り、指定形式で鑑定文を作ってください。"
         )
 
         response = openai.ChatCompletion.create(
@@ -452,6 +458,7 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
 
     # -------------------------
     # ② 詳細本文（Excel由来）＋既存の簡易説明（旧DB）を根拠に、鑑定文生成
+    # ※ 必ず "### " 6見出し形式で返す
     # -------------------------
     life_id = int(detect.get("life_id", 0) or 0)
     fate_id = int(detect.get("fate_id", 0) or 0)
@@ -461,6 +468,7 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
     special = detect.get("special", [])
     if not isinstance(special, list):
         special = []
+
     # 最大2つ、重複除外
     special_clean = []
     for s in special:
@@ -469,6 +477,23 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
             special_clean.append(s)
         if len(special_clean) >= 2:
             break
+
+    # 足りない分は「頭脳線」「感情線」で補完（旧仕様）
+    if is_en:
+        fallback_s1, fallback_s2 = "Head Line", "Heart Line"
+    elif is_zh:
+        fallback_s1, fallback_s2 = "智慧线", "感情线"
+    elif is_ko:
+        fallback_s1, fallback_s2 = "두뇌선", "감정선"
+    else:
+        fallback_s1, fallback_s2 = "頭脳線", "感情線"
+
+    if len(special_clean) == 0:
+        special_clean = [fallback_s1, fallback_s2]
+    elif len(special_clean) == 1:
+        special_clean = [special_clean[0], fallback_s2]
+
+    sp1_name, sp2_name = special_clean[0], special_clean[1]
 
     # 生命線詳細
     life_row = PALM_DETAIL_BY_ID.get(life_id, {})
@@ -482,13 +507,11 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
 
     # 金運：太陽線の詳細が取れればそれを優先。なければ旧DBの金運線説明。
     money_detail = ""
-    money_label = "金運線"
     money_name = ""
     if money_sun_id and money_sun_id in PALM_DETAIL_BY_ID:
         sun_row = PALM_DETAIL_BY_ID.get(money_sun_id, {})
-        money_name = sun_row.get("name", "")
+        money_name = sun_row.get("name", "") or "太陽線"
         money_detail = sun_row.get("detail", "")
-        money_label = "金運線"  # 出力見出しは維持
     else:
         money_name = "金運線（基本）"
         money_detail = ""
@@ -499,65 +522,63 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
     base_money = tesou_descriptions.get("金運線", "")
 
     # 特殊線の詳細（Excel側にもあれば拾う）
-    special_payload = []
-    for sname in special_clean:
-        base = tesou_descriptions.get(sname, "")
+    def _special_detail(name: str):
+        base = tesou_descriptions.get(name, "")
         detail_text = ""
-        # Excel詳細DBからも探す
         try:
-            ids = find_palm_detail_ids_by_name(sname)
+            ids = find_palm_detail_ids_by_name(name)
             if ids:
                 detail_text = get_palm_detail_text_by_id(ids[0])
         except Exception:
             detail_text = ""
-        special_payload.append({"name": sname, "base": base, "detail": detail_text})
+        return {"name": name, "base": base, "detail": detail_text}
 
-    # 生成プロンプト
+    sp1 = _special_detail(sp1_name)
+    sp2 = _special_detail(sp2_name)
+
+    # 生成プロンプト（6見出し）
     if is_en:
         system_prompt = (
-            "You are a professional palmistry reader. Use ONLY the provided facts and meaning texts. "
-            "Return exactly 5 sections with headings:\n"
-            "【Life Line】, 【Fate Line】, 【Money Line】, 【Special Lines】, 【Overall】\n"
-            "Each section should be about 80-120 characters (not words). "
-            "Do not mention IDs, numbers, databases, or that you used reference material."
+            "You are a professional palmistry reader. Use ONLY the provided facts and meaning texts.\n"
+            "Return EXACTLY 6 sections with headings that start with '### ' in this order:\n"
+            "### 1. Life Line\n### 2. Fate Line\n### 3. Money Line\n### 4. Special Line 1 (" + sp1_name + ")\n"
+            "### 5. Special Line 2 (" + sp2_name + ")\n### Overall Advice\n"
+            "Each section should be ~80-120 characters (not words). Do NOT mention IDs, databases, or references. "
+            "Do NOT use '###' anywhere else."
         )
-        headings = ("【Life Line】", "【Fate Line】", "【Money Line】", "【Special Lines】", "【Overall】")
     elif is_zh:
         system_prompt = (
-            "你是一位专业且温和的手相解读师。只能使用提供的“事实”和“含义文本”。"
-            "必须输出5段并带标题：\n"
-            "【生命线】, 【命运线】, 【金运线】, 【特殊线】, 【综合】\n"
-            "每段约80-120个汉字。不要提及编号/数据库/参考资料。"
+            "你是一位专业且温和的手相解读师。只能使用提供的“事实”和“含义文本”。\n"
+            "必须输出6段，并且每个标题都以 '### ' 开头，顺序固定：\n"
+            f"### 1. 生命线\n### 2. 命运线\n### 3. 金运线\n### 4. 特殊线①（{sp1_name}）\n"
+            f"### 5. 特殊线②（{sp2_name}）\n### 综合建议\n"
+            "每段约80-120个汉字。不要提及编号/数据库/参考资料。正文不要再出现'###'。"
         )
-        headings = ("【生命线】", "【命运线】", "【金运线】", "【特殊线】", "【综合】")
     elif is_ko:
         system_prompt = (
-            "당신은 전문적이고 친절한 손금 해석가입니다. 제공된 '사실'과 '의미 텍스트'만 사용하세요. "
-            "반드시 5개 섹션과 제목을 출력:\n"
-            "【생명선】, 【운명선】, 【금운선】, 【특수선】, 【종합】\n"
-            "각 섹션은 약 80~120자. 번호/DB/참고자료 언급 금지."
+            "당신은 전문적이고 친절한 손금 해석가입니다. 제공된 '사실'과 '의미 텍스트'만 사용하세요.\n"
+            "반드시 6개 섹션을 출력하고 각 제목은 '### '로 시작해야 합니다(순서 고정):\n"
+            f"### 1. 생명선\n### 2. 운명선\n### 3. 금운선\n### 4. 특수선①({sp1_name})\n"
+            f"### 5. 특수선②({sp2_name})\n### 종합 조언\n"
+            "각 섹션은 약 80~120자. 번호/DB/참고자료 언급 금지. 본문에 '###' 재사용 금지."
         )
-        headings = ("【생명선】", "【운명선】", "【금운선】", "【특수선】", "【종합】")
     else:
         system_prompt = (
             "あなたはプロの手相占い師です。以下に与えた『事実（判定結果）』と『意味テキスト』のみを根拠に、"
-            "必ず5項目を出力してください：\n"
-            "【生命線】\n【運命線】\n【金運線】\n【特殊線】\n【総合】\n"
-            "各項目は80〜120文字程度。ID/番号/DB/参照といった裏側の話は一切書かない。"
+            "必ず6項目を出力してください。\n"
+            "各見出しは必ず '### ' から始め、この順番で固定：\n"
+            f"### 1. 生命線\n### 2. 運命線\n### 3. 金運線\n### 4. 特殊線①（{sp1_name}）\n"
+            f"### 5. 特殊線②（{sp2_name}）\n### 手相の総合アドバイス\n"
+            "各項目は80〜120文字程度。ID/番号/DB/参照といった裏側の話は一切書かない。本文中に '###' を再登場させない。"
         )
-        headings = ("【生命線】", "【運命線】", "【金運線】", "【特殊線】", "【総合】")
 
-    # specialの表示用テキスト（2本未満でもOK）
-    sp_names = [p["name"] for p in special_payload]
-    sp_display = "、".join(sp_names) if sp_names else "（該当なし）"
-
-    # 意味テキストは「詳細→ベース」の順で提示（合併）
     meaning_block = f"""
 [FACTS]
 - Life: {life_name}
 - Fate: {fate_name}
 - Money: {money_name}
-- Special: {sp_display}
+- Special1: {sp1_name}
+- Special2: {sp2_name}
 - Notes: {notes}
 
 [MEANINGS]
@@ -579,14 +600,17 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
 (Money base)
 {base_money}
 
-(Special)
-{json.dumps(special_payload, ensure_ascii=False)}
+(Special1)
+{json.dumps(sp1, ensure_ascii=False)}
+
+(Special2)
+{json.dumps(sp2, ensure_ascii=False)}
 """.strip()
 
     user_prompt = (
         f"{meaning_block}\n\n"
-        "Write the final reading in the required 5-section format. "
-        "Keep it positive, practical, and customer-friendly."
+        "上の内容だけを根拠に、指定の6見出し形式で最終鑑定文を書いてください。"
+        "前向きで現実的、かつお客様に伝わる言葉にしてください。"
     )
 
     response2 = openai.ChatCompletion.create(
@@ -596,17 +620,9 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.7,
-        max_tokens=900,
+        max_tokens=1000,
     )
-    content = response2.choices[0].message["content"]
-
-    # 念のため、見出しが欠けた場合の保険（最低限の整形）
-    for h in headings:
-        if h not in content:
-            # 生成が崩れた場合はそのまま返す（ここで無理に直すと破綻しがち）
-            break
-
-    return content
+    return response2.choices[0].message["content"]
 
 
 def get_iching_advice(lang: str = 'ja'):
