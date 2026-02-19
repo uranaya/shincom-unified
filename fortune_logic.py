@@ -18,7 +18,7 @@ from pdf_generator_unified import create_pdf_unified
 
 def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang: str = 'ja'):
     import json
-    lang_norm = (lang_norm or 'ja').lower()
+    lang_norm = (lang or 'ja').lower()
     is_en = lang_norm.startswith('en')
     is_zh = lang_norm.startswith('zh') or lang_norm.startswith('cn')
     is_ko = lang_norm.startswith('ko') or lang_norm.startswith('kr')
@@ -751,7 +751,7 @@ Translate any Japanese line names into natural English. Write in English only an
 
 def get_iching_advice(lang: str = 'ja'):
     try:
-        lang_norm = (lang_norm or 'ja').lower()
+        lang_norm = (lang or 'ja').lower()
         if lang_norm.startswith('en'):
             prompt = "You are an I Ching advisor. Give a gentle, positive message the customer needs right now in natural English (about 180–220 characters)."
         elif lang_norm.startswith('zh') or lang_norm.startswith('cn'):
@@ -935,7 +935,7 @@ def generate_lucky_info_mixed(
     else:
         food_ja = rng.choice(sum(food_map_ja.values(), []))
 
-    lang_norm = (lang_norm or 'ja').lower()
+    lang_norm = (lang or 'ja').lower()
 
     # 英語化（ラベル + 主要値）
     if lang_norm.startswith("en"):
@@ -1230,7 +1230,7 @@ def generate_lucky_info_mixed(
 
 def _lang_pack(lang: str):
     """Return (system_prompt, lang_note) for OpenAI calls."""
-    lang_norm = (lang_norm or 'ja').lower()
+    lang_norm = (lang or 'ja').lower()
     if lang_norm.startswith('en'):
         system = "You are a professional fortune teller. Write clear, natural English for customers. Do not mention Japanese astrology jargon, eto names, or Ten-God terms; translate meanings into plain English."
         note = "\n\nWrite in English. Do NOT include eto names or Ten-God terms. Keep it friendly, practical, and positive."
@@ -1380,7 +1380,7 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     
     # --- Safety: ensure we always have 5 palm sections + 1 overall comment (so PDF never crashes) ---
     min_blocks = 6  # 5 lines + overall
-    lang_norm = (lang_norm or 'ja').lower()
+    lang_norm = (lang or 'ja').lower()
     if lang_norm.startswith("en"):
         fallback_titles = [
             "Life Line",
