@@ -297,6 +297,7 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
     special_line_candidates = sorted(
         set([n for n in tesou_names if n not in base_lines] + special_from_excel)
     )
+    special_candidates_set = set(special_line_candidates)
 
     # -------------------------
     # ユーティリティ：候補一覧文字列（番号: 名称）
@@ -333,6 +334,15 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
             return None
 
     # -------------------------
+    # 名称の正規化（ゆるい補正）
+    # -------------------------
+    def _norm_name(s: str) -> str:
+        s = str(s or "").strip()
+        s = s.replace("\u3000", " ").strip()  # 全角スペース
+        s = re.sub(r"\s+", " ", s)
+        return s
+
+    # -------------------------
     # ① 画像判定：番号/名称の選択（詳細本文は渡さない）
     # -------------------------
     detect = None
@@ -349,6 +359,7 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
 - 金運（カテゴリ: 太陽線）: 見える場合のみ（見えない/判断不可なら 0）
 
 また、特殊線は候補一覧から「最大2つ」選んでください（見当たらなければ空配列）。
+※ 生命線/運命線/金運線/頭脳線/感情線 は “基本線” なので special に入れてはいけません。
 
 【生命線 候補（番号: 名称）】
 {life_options}
@@ -388,7 +399,7 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
                 ]}
             ],
             temperature=0.1,
-            max_tokens=600,
+            max_tokens=650,
         )
         raw1 = resp1.choices[0].message["content"]
         detect = _safe_json_load(raw1)
@@ -405,35 +416,39 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
 
         if is_en:
             system_prompt = (
-                "You are a friendly palmistry reader. Use ONLY the given meaning guide.\n"
+                "You are a warm, entertaining but practical palmistry reader. Use ONLY the given meaning guide.\n"
                 "Return EXACTLY 6 sections with headings that start with '### ' in this order:\n"
-                "### 1. Life Line\n### 2. Fate Line\n### 3. Money Line\n### 4. Special Line 1 (if none, use Head Line)\n"
-                "### 5. Special Line 2 (if none, use Heart Line)\n### Overall Advice\n"
-                "Each section should be ~80-120 characters (not words). Do NOT use '###' anywhere else."
+                "### 1. Life Line\n### 2. Fate Line\n### 3. Money Line\n### 4. Special Line 1\n"
+                "### 5. Special Line 2\n### Overall Advice\n"
+                "Each section should be about 130-220 characters (not words). Avoid negative phrasing like 'cannot see'. "
+                "Do NOT mention IDs, databases, or references. Do NOT use '###' anywhere else."
             )
         elif is_zh:
             system_prompt = (
-                "你是一位温和、实用的手相解读师。只使用提供的含义指南。\n"
+                "你是一位温和、带点娱乐感但务实的手相解读师。只使用提供的含义指南。\n"
                 "必须输出6段，并且每个标题都以 '### ' 开头，顺序固定：\n"
-                "### 1. 生命线\n### 2. 命运线\n### 3. 金运线\n### 4. 特殊线①（没有就用 智慧线）\n"
-                "### 5. 特殊线②（没有就用 感情线）\n### 综合建议\n"
-                "每段约80-120个汉字。不要在正文里再出现'###'。"
+                "### 1. 生命线\n### 2. 命运线\n### 3. 金运线\n### 4. 特殊线①\n"
+                "### 5. 特殊线②\n### 综合建议\n"
+                "每段约130-220个汉字。避免消极措辞如“看不到/无法确认”。不要提及编号/数据库/参考资料。正文不要再出现'###'。"
             )
         elif is_ko:
             system_prompt = (
-                "당신은 친절하고 실용적인 손금 해석가입니다. 제공된 의미 가이드만 사용하세요.\n"
+                "당신은 친절하면서도 엔터테인먼트 감각이 있는 현실적인 손금 해석가입니다. 제공된 의미 가이드만 사용하세요.\n"
                 "반드시 6개 섹션을 출력하고 각 제목은 '### '로 시작해야 합니다(순서 고정):\n"
-                "### 1. 생명선\n### 2. 운명선\n### 3. 금운선\n### 4. 특수선①(없으면 두뇌선)\n"
-                "### 5. 특수선②(없으면 감정선)\n### 종합 조언\n"
-                "각 섹션은 약 80~120자. 본문에 '###'를 다시 쓰지 마세요."
+                "### 1. 생명선\n### 2. 운명선\n### 3. 금운선\n### 4. 특수선①\n"
+                "### 5. 특수선②\n### 종합 조언\n"
+                "각 섹션은 약 130~220자. '보이지 않는다' 같은 부정적 표현은 피하고, 번호/DB/참고자료 언급 금지. 본문에 '###' 재사용 금지."
             )
         else:
             system_prompt = (
-                "あなたは手相占い師です。与えられた意味ガイドのみを根拠に、必ず6項目を出力してください。\n"
+                "あなたはプロの手相占い師です。与えられた意味ガイドのみを根拠に、必ず6項目を出力してください。\n"
                 "各見出しは必ず '### ' から始め、この順番で固定：\n"
-                "### 1. 生命線\n### 2. 運命線\n### 3. 金運線\n### 4. 特殊線①（該当がなければ頭脳線）\n"
-                "### 5. 特殊線②（該当がなければ感情線）\n### 手相の総合アドバイス\n"
-                "各項目は80〜120文字程度。本文中に '###' を再登場させない。用語の羅列は禁止。"
+                "### 1. 生命線\n### 2. 運命線\n### 3. 金運線\n### 4. 特殊線①\n"
+                "### 5. 特殊線②\n### 手相の総合アドバイス\n"
+                "各項目は200〜320文字程度（総合は320〜480文字）。"
+                "『確認できない/見えない』などの言い方は禁止。線が薄い場合は『繊細に出ており、これから育つタイプ』のように前向きに言い換える。"
+                "用語の羅列は禁止。お客様がワクワクする比喩を1つ入れつつ、現実的な行動提案で締める。"
+                "本文中に '###' を再登場させない。"
             )
 
         user_prompt = (
@@ -451,8 +466,10 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64data}"}}
                 ]}
             ],
-            temperature=0.7,
-            max_tokens=900,
+            temperature=0.85,
+            presence_penalty=0.3,
+            frequency_penalty=0.1,
+            max_tokens=1600,
         )
         return response.choices[0].message["content"]
 
@@ -469,29 +486,58 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
     if not isinstance(special, list):
         special = []
 
-    # 最大2つ、重複除外
+    # 最大2つ、重複除外、候補外は捨てる（頭脳線/感情線など基本線が混ざる事故防止）
     special_clean = []
     for s in special:
-        s = str(s).strip()
-        if s and s not in special_clean:
-            special_clean.append(s)
+        s = _norm_name(s)
+        if not s:
+            continue
+        if s not in special_candidates_set:
+            continue
+        if s in special_clean:
+            continue
+        special_clean.append(s)
         if len(special_clean) >= 2:
             break
 
-    # 足りない分は「頭脳線」「感情線」で補完（旧仕様）
-    if is_en:
-        fallback_s1, fallback_s2 = "Head Line", "Heart Line"
-    elif is_zh:
-        fallback_s1, fallback_s2 = "智慧线", "感情线"
-    elif is_ko:
-        fallback_s1, fallback_s2 = "두뇌선", "감정선"
-    else:
-        fallback_s1, fallback_s2 = "頭脳線", "感情線"
+    # 足りない分は、候補から “エンタメ性が高い” 特殊線を優先して補完（基本線には絶対にしない）
+    def _pick_priority_specials(need: int, already: list) -> list:
+        if need <= 0:
+            return []
+        # よく盛り上がるキーワード（候補名に含まれていれば優先）
+        priority_keywords = [
+            "金星帯", "神秘十字", "覇王", "太陽", "フィッシュ", "スター", "仏眼", "ますかけ",
+            "直感", "火星", "ソロモン", "二重", "結婚", "財運", "成功", "人気"
+        ]
+        picks = []
+        # 1) キーワード一致で拾う
+        for kw in priority_keywords:
+            for name in special_line_candidates:
+                if name in already or name in picks:
+                    continue
+                if kw in name:
+                    picks.append(name)
+                    if len(picks) >= need:
+                        return picks
+        # 2) それでも足りない場合は、候補順で埋める
+        for name in special_line_candidates:
+            if name in already or name in picks:
+                continue
+            picks.append(name)
+            if len(picks) >= need:
+                break
+        return picks
 
-    if len(special_clean) == 0:
-        special_clean = [fallback_s1, fallback_s2]
-    elif len(special_clean) == 1:
-        special_clean = [special_clean[0], fallback_s2]
+    if len(special_clean) < 2:
+        special_clean.extend(_pick_priority_specials(2 - len(special_clean), special_clean))
+
+    # 最終保険：万一 still 足りなければ、空文字ではなく候補から埋める
+    if len(special_clean) < 2:
+        for name in special_line_candidates:
+            if name not in special_clean:
+                special_clean.append(name)
+            if len(special_clean) >= 2:
+                break
 
     sp1_name, sp2_name = special_clean[0], special_clean[1]
 
@@ -536,40 +582,64 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
     sp1 = _special_detail(sp1_name)
     sp2 = _special_detail(sp2_name)
 
+    # -------------------------
+    # 出力スタイル（ゆるい切替）
+    # -------------------------
+    style_hint = ""
+    try:
+        if str(output_style).lower() in ("yuta", "mystic") or str(output_mode).lower() in ("yuta", "mystic"):
+            # ユタ調：少し神秘寄り。ただし煽りすぎない
+            style_hint = "語り口は少し神秘的で断定的。ただし不安を煽らず、最後は安心させる。"
+    except Exception:
+        style_hint = ""
+
+    # -------------------------
     # 生成プロンプト（6見出し）
+    # -------------------------
     if is_en:
         system_prompt = (
             "You are a professional palmistry reader. Use ONLY the provided facts and meaning texts.\n"
             "Return EXACTLY 6 sections with headings that start with '### ' in this order:\n"
-            "### 1. Life Line\n### 2. Fate Line\n### 3. Money Line\n### 4. Special Line 1 (" + sp1_name + ")\n"
-            "### 5. Special Line 2 (" + sp2_name + ")\n### Overall Advice\n"
-            "Each section should be ~80-120 characters (not words). Do NOT mention IDs, databases, or references. "
-            "Do NOT use '###' anywhere else."
+            "### 1. Life Line\n### 2. Fate Line\n### 3. Money Line\n"
+            f"### 4. Special Line 1 ({sp1_name})\n"
+            f"### 5. Special Line 2 ({sp2_name})\n"
+            "### Overall Advice\n"
+            "Each section should be about 160-260 characters (not words). Avoid negative phrasing like 'cannot see'. "
+            "Be vivid but practical. Do NOT mention IDs, databases, or references. Do NOT use '###' anywhere else."
         )
     elif is_zh:
         system_prompt = (
-            "你是一位专业且温和的手相解读师。只能使用提供的“事实”和“含义文本”。\n"
+            "你是一位专业、温和、带一点娱乐感的手相解读师。只能使用提供的“事实”和“含义文本”。\n"
             "必须输出6段，并且每个标题都以 '### ' 开头，顺序固定：\n"
             f"### 1. 生命线\n### 2. 命运线\n### 3. 金运线\n### 4. 特殊线①（{sp1_name}）\n"
             f"### 5. 特殊线②（{sp2_name}）\n### 综合建议\n"
-            "每段约80-120个汉字。不要提及编号/数据库/参考资料。正文不要再出现'###'。"
+            "每段约160-260个汉字（综合建议更长一些）。避免“看不到/无法确认”等消极措辞。"
+            "不要提及编号/数据库/参考资料。正文不要再出现'###'。"
         )
     elif is_ko:
         system_prompt = (
-            "당신은 전문적이고 친절한 손금 해석가입니다. 제공된 '사실'과 '의미 텍스트'만 사용하세요.\n"
+            "당신은 전문적이고 따뜻하며 약간의 엔터테인먼트 감각이 있는 손금 해석가입니다. 제공된 '사실'과 '의미 텍스트'만 사용하세요.\n"
             "반드시 6개 섹션을 출력하고 각 제목은 '### '로 시작해야 합니다(순서 고정):\n"
             f"### 1. 생명선\n### 2. 운명선\n### 3. 금운선\n### 4. 특수선①({sp1_name})\n"
             f"### 5. 특수선②({sp2_name})\n### 종합 조언\n"
-            "각 섹션은 약 80~120자. 번호/DB/참고자료 언급 금지. 본문에 '###' 재사용 금지."
+            "각 섹션은 약 160~260자(종합은 더 길게). '보이지 않는다' 같은 부정적 표현은 피하세요. 번호/DB/참고자료 언급 금지. 본문에 '###' 재사용 금지."
         )
     else:
         system_prompt = (
             "あなたはプロの手相占い師です。以下に与えた『事実（判定結果）』と『意味テキスト』のみを根拠に、"
-            "必ず6項目を出力してください。\n"
-            "各見出しは必ず '### ' から始め、この順番で固定：\n"
-            f"### 1. 生命線\n### 2. 運命線\n### 3. 金運線\n### 4. 特殊線①（{sp1_name}）\n"
-            f"### 5. 特殊線②（{sp2_name}）\n### 手相の総合アドバイス\n"
-            "各項目は80〜120文字程度。ID/番号/DB/参照といった裏側の話は一切書かない。本文中に '###' を再登場させない。"
+            "お客様が“占ってよかった”と思えるエンタメ性と、今日から動ける実用性を両立した文章を書いてください。\n"
+            f"{style_hint}\n"
+            "必ず6項目を出力し、各見出しは必ず '### ' から始め、この順番で固定：\n"
+            "### 1. 生命線\n### 2. 運命線\n### 3. 金運線\n"
+            f"### 4. 特殊線①（{sp1_name}）\n"
+            f"### 5. 特殊線②（{sp2_name}）\n"
+            "### 手相の総合アドバイス\n"
+            "文字量の目安：1〜5は各200〜320文字、総合は320〜520文字。短すぎる場合は必ず増やす。\n"
+            "禁止事項：『確認できない/見えない/不明』などの否定表現、ID/番号/DB/参照、箇条書きの羅列、過度な脅し。\n"
+            "書き方：断定口調（あなたは〜です）を基本に、比喩を1つ入れてワクワクさせる。"
+            "ただし根拠は意味テキストから逸脱しすぎない。線が弱い場合は『繊細に出ており、これから育つ』のように前向きに言い換える。"
+            "総合アドバイスの最後は、具体的な行動提案（1〜2個）と、背中を押す一言で締める。\n"
+            "本文中に '###' を再登場させない。"
         )
 
     meaning_block = f"""
@@ -610,7 +680,7 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
     user_prompt = (
         f"{meaning_block}\n\n"
         "上の内容だけを根拠に、指定の6見出し形式で最終鑑定文を書いてください。"
-        "前向きで現実的、かつお客様に伝わる言葉にしてください。"
+        "前向きで、情景が浮かぶ言葉を使い、各項目は“短い結論→理由→活かし方”の流れにしてください。"
     )
 
     response2 = openai.ChatCompletion.create(
@@ -619,11 +689,12 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        temperature=0.7,
-        max_tokens=1000,
+        temperature=0.9,
+        presence_penalty=0.35,
+        frequency_penalty=0.12,
+        max_tokens=1800,
     )
     return response2.choices[0].message["content"]
-
 
 def get_iching_advice(lang: str = 'ja'):
     try:
