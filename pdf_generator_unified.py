@@ -195,15 +195,18 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
 
     return y
 
-def draw_palm_image(c, base64_image, width, y):
+def draw_palm_image(c, base64_image, width, y, page_height=None):
     try:
         image_data = base64.b64decode(base64_image.split(',')[1])
         img = ImageReader(io.BytesIO(image_data))
         img_width, img_height = img.getSize()
 
-        # アスペクト比を保ちつつ、A4用紙の高さの約30%に収まるよう縮小
-        max_height = 0.3 * A4[1]  # 高さ制限（A4用紙の30%）
-        scale_w = (width * 0.7) / img_width  # 横幅70%を基準
+        page_h = page_height or A4[1]
+
+        # アスペクト比を保ちつつ、1ページ目の本文領域を確保するため少し小さめに配置
+        # （手相文章量が増えても 1P の3項目が欠けにくいようにする）
+        max_height = 0.24 * page_h  # 高さ制限（ページ高の24%）
+        scale_w = (width * 0.62) / img_width  # 横幅62%を基準
         scale_h = max_height / img_height
         scale = min(scale_w, scale_h)
 
@@ -211,9 +214,9 @@ def draw_palm_image(c, base64_image, width, y):
         img_height *= scale
 
         x_center = (width - img_width) / 2
-        y -= img_height + 5 * mm
+        y -= img_height + 4 * mm
         c.drawImage(img, x_center, y, width=img_width, height=img_height)
-        y -= 10 * mm
+        y -= 6 * mm
     except Exception as e:
         print("Image decode error:", e)
 
@@ -306,7 +309,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
     margin = 20 * mm
     y = height - margin
     y = draw_header(c, width, margin, y)
-    y = draw_palm_image(c, data["palm_image"], width, y)
+    y = draw_palm_image(c, data["palm_image"], width, y, page_height=height)
 
     # 生年月日・星座・干支・動物占い・本命星（手相画像の直下に表示）
     birthdate = data.get("birthdate")
@@ -342,41 +345,64 @@ def draw_shincom_a4(c, data, include_yearly=False):
         info_lines.append(" / ".join(line2_parts))
 
     if info_lines:
-        _set_font(c, lang, 11)
+        _set_font(c, lang, 10.2)
         for line in info_lines:
             c.drawString(margin, y, line)
-            y -= 5 * mm
-        y -= 3 * mm
+            y -= 4.4 * mm
+        y -= 2.2 * mm
 
     # 手相3項目（1ページ目）
     # 1ページ目は「画像 + 基本情報 + 3項目 + ラッキー情報」で下端ギリギリになりやすい。
     # ここは保険として、残りスペースが少ない場合は自動でコンパクト描画に切り替える。
-    BOTTOM_P1 = 20 * mm
+    BOTTOM_P1 = 14 * mm
 
     def _draw_palm_block_p1(title: str, body: str, y: float) -> float:
-        # 見積もり（通常）
-        title_step = 6 * mm
-        body_size = 10
-        line_step = 6 * mm
-        wrap_len = _wrap_len(45, lang)
-        lines = smart_wrap(body, wrap_len, lang)
-        need_h = title_step + len(lines) * line_step + 3 * mm
+        """1ページ目の手相ブロックは文章量のブレが大きいので、
+        画像・基本情報とのバランスを見ながら自動で詰めて描画する。
+        - 通常→コンパクト→最小の順でレイアウトを試す
+        - それでも入らない場合は末尾を省略しつつ、最低限の行数を確保する
+        """
 
-        # 入りきらない場合は、フォントは落とさずに『折り返し』と『行間』で安全側へ
-        if (y - need_h) < BOTTOM_P1:
-            title_step = 5.4 * mm
-            body_size = 10
-            line_step = 5.4 * mm
-            wrap_len = _wrap_len(46, lang)  # さらに横を使って縦を削る（尻すぼみ防止）
-            lines = smart_wrap(body, wrap_len, lang)
-            need_h = title_step + len(lines) * line_step + 2 * mm
+        # (title_step, body_font_size, line_step, wrap_base, gap_after)
+        presets = [
+            (5.6 * mm, 9.6, 5.2 * mm, 48, 2.2 * mm),
+            (5.2 * mm, 9.2, 4.9 * mm, 50, 2.0 * mm),
+            (5.0 * mm, 8.8, 4.6 * mm, 52, 1.8 * mm),
+        ]
 
-        # それでも入らない場合は末尾を省略して必ず収める
-        max_lines = int(max(0, (y - BOTTOM_P1 - title_step) // line_step))
-        if max_lines and len(lines) > max_lines:
-            lines = lines[:max_lines]
-            if lines:
-                lines[-1] = (lines[-1].rstrip("…") + "…")
+        chosen = None
+        chosen_lines = None
+
+        for title_step, body_size, line_step, wrap_base, gap_after in presets:
+            wrap_len = _wrap_len(wrap_base, lang)
+            lines = smart_wrap(body or "", wrap_len, lang)
+            need_h = title_step + (len(lines) * line_step) + gap_after
+            if (y - need_h) >= BOTTOM_P1:
+                chosen = (title_step, body_size, line_step, wrap_len, gap_after)
+                chosen_lines = lines
+                break
+
+        if chosen is None:
+            # どれでも入らない場合は最小レイアウトで切り詰めて必ず表示する
+            title_step, body_size, line_step, wrap_base, gap_after = presets[-1]
+            wrap_len = _wrap_len(wrap_base, lang)
+            lines = smart_wrap(body or "", wrap_len, lang)
+
+            # 「ほぼ文章が無い」を避けるため、最低でも数行は見せる
+            min_lines = 4
+            max_lines = int(max(0, (y - BOTTOM_P1 - title_step) // line_step))
+            max_lines = max(min_lines, max_lines)
+
+            if len(lines) > max_lines:
+                lines = lines[:max_lines]
+                if lines:
+                    lines[-1] = (lines[-1].rstrip("…") + "…")
+
+            chosen = (title_step, body_size, line_step, wrap_len, gap_after)
+            chosen_lines = lines
+
+        title_step, body_size, line_step, wrap_len, gap_after = chosen
+        lines = chosen_lines or []
 
         _set_font(c, lang, 12)
         c.drawString(margin, y, f"◆ {title}")
@@ -389,7 +415,7 @@ def draw_shincom_a4(c, data, include_yearly=False):
             c.drawString(margin, y, line)
             y -= line_step
 
-        return y - 2.5 * mm
+        return y - gap_after
 
     for i in range(3):
         y = _draw_palm_block_p1(data['palm_titles'][i], data['palm_texts'][i], y)
@@ -477,7 +503,7 @@ def draw_shincom_b4(c, data, include_yearly=False):
     margin = 20 * mm
     y = height - margin
     y = draw_header(c, width, margin, y)
-    y = draw_palm_image(c, data["palm_image"], width, y)
+    y = draw_palm_image(c, data["palm_image"], width, y, page_height=height)
 
     _set_font(c, lang, 14)
     for i in range(3):
