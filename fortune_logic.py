@@ -232,7 +232,7 @@ Rules:
             }
 
 
-def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mode="normal"):
+def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mode="normal", lang=None, **kwargs):
     """
     画像から手相を分析して、5項目（生命線/運命線/金運線/特殊線1/特殊線2）の鑑定文を返す。
     2026-02: Excel由来の詳細DB（tesou.PALM_DETAIL_*）を使い、
@@ -248,6 +248,18 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
         base64data = image_data.split(",", 1)[1]
     else:
         base64data = image_data
+
+    # -------------------------
+    # Backward-compatible language alias:
+    # generate_fortune() passes lang=..., while older callers may pass output_lang=...
+    # Prefer explicit output_lang unless it's default/empty.
+    # -------------------------
+    try:
+        if lang is not None and (output_lang is None or str(output_lang).strip() == "" or str(output_lang).lower() == "ja"):
+            output_lang = lang
+    except Exception:
+        if lang is not None:
+            output_lang = lang
 
     lang_norm = (output_lang or "ja").lower()
     is_en = lang_norm.startswith("en")
