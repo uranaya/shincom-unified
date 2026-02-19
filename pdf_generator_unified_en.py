@@ -327,8 +327,28 @@ def draw_palm_image(c, data_or_base64, width, margin_or_y=None, y=None, font_nam
     # If a local file path is provided, load it directly (covers newer upload flows).
     try:
         if isinstance(base64_image, str) and len(base64_image) < 512 and os.path.exists(base64_image):
-            c.drawImage(ImageReader(base64_image), x, y - img_h, width=img_w, height=img_h, preserveAspectRatio=True, anchor='c')
-            return y - img_h - 8
+            img = ImageReader(base64_image)
+            img_width, img_height = img.getSize()
+
+            # Determine page height from width (A4 vs B4)
+            is_b4 = abs(width - B4[0]) < 1e-6
+            page_height = B4[1] if is_b4 else A4[1]
+
+            # Fit image: B4 is larger; A4 is tighter to leave room for text
+            max_height = (0.30 if is_b4 else 0.24) * page_height
+            max_width_ratio = 0.70 if is_b4 else 0.62
+
+            scale_w = (width * max_width_ratio) / float(img_width)
+            scale_h = max_height / float(img_height)
+            scale = min(scale_w, scale_h)
+
+            draw_w = float(img_width) * scale
+            draw_h = float(img_height) * scale
+
+            x_center = (width - draw_w) / 2.0
+            y_draw = float(y) - draw_h - 5 * mm
+            c.drawImage(img, x_center, y_draw, width=draw_w, height=draw_h)
+            return y_draw - 10 * mm
     except Exception:
         pass
 
@@ -347,8 +367,9 @@ def draw_palm_image(c, data_or_base64, width, margin_or_y=None, y=None, font_nam
         page_height = B4[1] if abs(width - B4[0]) < 1e-6 else A4[1]
 
         # Keep aspect ratio; fit within 30% of page height; use 70% of page width as baseline
-        max_height = 0.30 * page_height
-        scale_w = (width * 0.70) / float(img_width)
+        max_height = (0.30 if abs(width - B4[0]) < 1e-6 else 0.24) * page_height
+        max_width_ratio = 0.70 if abs(width - B4[0]) < 1e-6 else 0.62
+        scale_w = (width * max_width_ratio) / float(img_width)
         scale_h = max_height / float(img_height)
         scale = min(scale_w, scale_h)
 
@@ -1202,18 +1223,127 @@ def draw_shincom_a4(c, data, include_yearly=False):
     palm_titles = data.get("palm_titles", []) or []
     palm_texts = data.get("palm_texts", []) or []
 
-    def write_block(title: str, body: str, font_size=10, title_size=12):
+    # --- Wrapping & font fallback (EN pages may still include Japanese labels) ---
+    _cjk_re = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]")
+    def _is_cjk(s: str) -> bool:
+        return bool(_cjk_re.search(s or ""))
+
+    max_w = page_width - 2 * margin
+    bottom_y = margin  # keep bottom margin
+
+    def _wrap_text_to_width(text, font_size: float):
+        """Wrap text to the available width using stringWidth.
+
+        - If a paragraph contains CJK, wrap by character while measuring with JA font.
+        - Otherwise wrap by words while measuring with EN font.
+        """
+        if text is None:
+            return []
+        s = str(text)
+        if not s:
+            return []
+        out = []
+        for para in s.splitlines():
+            if para == "":
+                out.append("")
+                continue
+            if _is_cjk(para):
+                face = _font("ja")
+                cur = ""
+                for ch in para:
+                    test = cur + ch
+                    if stringWidth(test, face, font_size) <= max_w:
+                        cur = test
+                    else:
+                        if cur:
+                            out.append(cur)
+                        cur = ch
+                if cur:
+                    out.append(cur)
+            else:
+                face = _font("en")
+                words = para.split(" ")
+                cur = ""
+                for w in words:
+                    test = w if not cur else (cur + " " + w)
+                    if stringWidth(test, face, font_size) <= max_w:
+                        cur = test
+                    else:
+                        if cur:
+                            out.append(cur)
+                        # break long words if needed
+                        if stringWidth(w, face, font_size) <= max_w:
+                            cur = w
+                        else:
+                            chunk = ""
+                            for ch in w:
+                                t2 = chunk + ch
+                                if stringWidth(t2, face, font_size) <= max_w:
+                                    chunk = t2
+                                else:
+                                    if chunk:
+                                        out.append(chunk)
+                                    chunk = ch
+                            cur = chunk
+                if cur:
+                    out.append(cur)
+        return out
+
+    def write_block(title: str, body: str):
+        """Draw one titled text block with auto fitting.
+
+        English A4 often needs tighter spacing; if it still doesn't fit, truncate with ellipsis.
+        """
         nonlocal y
+
+        title = title or ""
+        body = body or ""
+
+        styles = [
+            dict(title_size=12, title_step=14, body_size=10, line_step=12, gap=8),
+            dict(title_size=11, title_step=13, body_size=9.5, line_step=11, gap=6),
+            dict(title_size=10.5, title_step=12, body_size=9.0, line_step=10.5, gap=5),
+        ]
+
+        chosen = styles[0]
+        lines = _wrap_text_to_width(body, chosen["body_size"])
+
+        # Pick the first style that fits; otherwise truncate in the most compact style.
+        for st in styles:
+            st_lines = _wrap_text_to_width(body, st["body_size"])
+            need = (st["title_step"] if title else 0) + len(st_lines) * st["line_step"] + st["gap"]
+            if (y - need) >= bottom_y:
+                chosen, lines = st, st_lines
+                break
+        else:
+            chosen = styles[-1]
+            all_lines = _wrap_text_to_width(body, chosen["body_size"])
+            avail = y - bottom_y - (chosen["title_step"] if title else 0) - chosen["gap"]
+            max_lines = max(1, int(avail // chosen["line_step"]))
+            lines = all_lines[:max_lines]
+            if len(all_lines) > max_lines and lines:
+                ell = "..."
+                last = lines[-1]
+                face = _font("ja") if _is_cjk(last) else _font("en")
+                while last and stringWidth(last + ell, face, chosen["body_size"]) > max_w:
+                    last = last[:-1]
+                lines[-1] = (last + ell) if last else ell
+
         if title:
-            _set_font(c, font_name, title_size)
+            t_lang = "ja" if _is_cjk(title) else "en"
+            _set_font(c, t_lang, chosen["title_size"])
             c.drawString(margin, y, f"◆ {title}")
-            y -= 14
+            y -= chosen["title_step"]
+
         if body:
-            _set_font(c, font_name, font_size)
-            for line in split_text(body):
+            for line in lines:
+                l_lang = "ja" if _is_cjk(line) else "en"
+                _set_font(c, l_lang, chosen["body_size"])
                 c.drawString(margin, y, line)
-                y -= 12
-        y -= 8
+                y -= chosen["line_step"]
+
+        y -= chosen["gap"]
+
 
     # --- Page 1: Palm sections 1-3 ---
     for i in range(3):
@@ -1347,20 +1477,94 @@ def draw_shincom_b4(c, data, include_yearly=False):
             y = page_height - margin
         return y
 
+    # --- Wrapping & font fallback (EN pages may still include Japanese labels) ---
+    _cjk_re = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]")
+    def _is_cjk(s: str) -> bool:
+        return bool(_cjk_re.search(s or ""))
+
+    max_w = page_width - 2 * margin
+
+    def _wrap_text_to_width(text, font_size: float):
+        if text is None:
+            return []
+        s = str(text)
+        if not s:
+            return []
+        out = []
+        for para in s.splitlines():
+            if para == "":
+                out.append("")
+                continue
+            if _is_cjk(para):
+                face = _font("ja")
+                cur = ""
+                for ch in para:
+                    test = cur + ch
+                    if stringWidth(test, face, font_size) <= max_w:
+                        cur = test
+                    else:
+                        if cur:
+                            out.append(cur)
+                        cur = ch
+                if cur:
+                    out.append(cur)
+            else:
+                face = _font("en")
+                words = para.split(" ")
+                cur = ""
+                for w in words:
+                    test = w if not cur else (cur + " " + w)
+                    if stringWidth(test, face, font_size) <= max_w:
+                        cur = test
+                    else:
+                        if cur:
+                            out.append(cur)
+                        if stringWidth(w, face, font_size) <= max_w:
+                            cur = w
+                        else:
+                            chunk = ""
+                            for ch in w:
+                                t2 = chunk + ch
+                                if stringWidth(t2, face, font_size) <= max_w:
+                                    chunk = t2
+                                else:
+                                    if chunk:
+                                        out.append(chunk)
+                                    chunk = ch
+                            cur = chunk
+                if cur:
+                    out.append(cur)
+        return out
+
     def write_block(title: str, body: str):
         nonlocal y
+        title = title or ""
+        body = body or ""
+
+        title_size = 12
+        body_size = 10
+        title_step = 14
+        line_step = 12
+        gap = 8
+
         if title:
-            ensure_space(18)
-            _set_font(c, font_name, 12)
+            ensure_space(title_step + 2)
+            t_lang = "ja" if _is_cjk(title) else "en"
+            _set_font(c, t_lang, title_size)
             c.drawString(margin, y, f"◆ {title}")
-            y -= 14
+            y -= title_step
+
         if body:
-            _set_font(c, font_name, 10)
-            for line in split_text(body):
-                ensure_space(14)
+            lines = _wrap_text_to_width(body, body_size)
+            for line in lines:
+                ensure_space(line_step + 2)
+                l_lang = "ja" if _is_cjk(line) else "en"
+                _set_font(c, l_lang, body_size)
                 c.drawString(margin, y, line)
-                y -= 12
-        y -= 8
+                y -= line_step
+
+        y -= gap
+
 
     # --- Page 1: all 5 palm sections ---
     for i in range(5):
