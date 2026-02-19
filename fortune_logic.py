@@ -18,7 +18,7 @@ from pdf_generator_unified import create_pdf_unified
 
 def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang: str = 'ja'):
     import json
-    lang_norm = (lang or 'ja').lower()
+    lang_norm = (lang_norm or 'ja').lower()
     is_en = lang_norm.startswith('en')
     is_zh = lang_norm.startswith('zh') or lang_norm.startswith('cn')
     is_ko = lang_norm.startswith('ko') or lang_norm.startswith('kr')
@@ -291,6 +291,8 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
     # ※ tesou_names / tesou_descriptions は元ファイル側で import 済み
     try:
         special_from_excel = [name for _id, name in PALM_DETAIL_INDEX_BY_CATEGORY.get("特殊な線", [])]
+        # 基本線が混ざると「特殊線が基本線になる」不具合になるため除外
+        special_from_excel = [n for n in special_from_excel if n and n not in base_lines and n != "太陽線"]
     except Exception:
         special_from_excel = []
 
@@ -415,14 +417,19 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
         special_lines_text = ", ".join(special_line_candidates)
 
         if is_en:
-            system_prompt = (
-                "You are a warm, entertaining but practical palmistry reader. Use ONLY the given meaning guide.\n"
-                "Return EXACTLY 6 sections with headings that start with '### ' in this order:\n"
-                "### 1. Life Line\n### 2. Fate Line\n### 3. Money Line\n### 4. Special Line 1\n"
-                "### 5. Special Line 2\n### Overall Advice\n"
-                "Each section should be about 130-220 characters (not words). Avoid negative phrasing like 'cannot see'. "
-                "Do NOT mention IDs, databases, or references. Do NOT use '###' anywhere else."
-            )
+            system_prompt = """You are a warm, entertaining but practical palm reader.
+Use ONLY the provided meaning guide (translate it internally), and base everything on what you see in the image.
+Return EXACTLY 6 sections with headings that start with '### ' in this order:
+### 1. Life Line
+### 2. Fate Line
+### 3. Money Line
+### 4. Special Line 1
+### 5. Special Line 2
+### Overall Advice
+Length targets (EN): sections 1–5 are ~95–140 words each; Overall Advice is ~170–230 words. If too short, add more.
+Style: confident, vivid, a touch mystical but grounded. Avoid hedging words like 'maybe'/'might'.
+Never say 'cannot see'/'not visible'. If a line looks faint, reframe positively (e.g., 'subtle now, grows with habit').
+Do NOT mention IDs, databases, or references. Do NOT use '###' anywhere else. Write in English only."""
         elif is_zh:
             system_prompt = (
                 "你是一位温和、带点娱乐感但务实的手相解读师。只使用提供的含义指南。\n"
@@ -450,12 +457,38 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
                 "用語の羅列は禁止。お客様がワクワクする比喩を1つ入れつつ、現実的な行動提案で締める。"
                 "本文中に '###' を再登場させない。"
             )
+        if is_en:
+            user_prompt = f"""Meaning guide:
+{description_text}
 
-        user_prompt = (
-            f"意味ガイド:\n{description_text}\n\n"
-            f"特殊線候補一覧:\n{special_lines_text}\n\n"
-            "画像を見て該当する線を読み取り、指定形式で鑑定文を作ってください。"
-        )
+Special-line candidates:
+{special_lines_text}
+
+Look at the image, identify the relevant lines, and write the reading in the required format. Write in English only."""
+        elif is_zh:
+            user_prompt = f"""含义指南:
+{description_text}
+
+特殊线候选列表:
+{special_lines_text}
+
+请看图像并按指定格式写出解读（仅使用简体中文）。"""
+        elif is_ko:
+            user_prompt = f"""의미 가이드:
+{description_text}
+
+특수선 후보 목록:
+{special_lines_text}
+
+이미지를 보고 해당 선을 읽어 지정 형식으로 해석을 작성하세요(한국어만)."""
+        else:
+            user_prompt = f"""意味ガイド:
+{description_text}
+
+特殊線候補一覧:
+{special_lines_text}
+
+画像を見て該当する線を読み取り、指定形式で鑑定文を作ってください。"""
 
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
@@ -597,16 +630,21 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
     # 生成プロンプト（6見出し）
     # -------------------------
     if is_en:
-        system_prompt = (
-            "You are a professional palmistry reader. Use ONLY the provided facts and meaning texts.\n"
-            "Return EXACTLY 6 sections with headings that start with '### ' in this order:\n"
-            "### 1. Life Line\n### 2. Fate Line\n### 3. Money Line\n"
-            f"### 4. Special Line 1 ({sp1_name})\n"
-            f"### 5. Special Line 2 ({sp2_name})\n"
-            "### Overall Advice\n"
-            "Each section should be about 160-260 characters (not words). Avoid negative phrasing like 'cannot see'. "
-            "Be vivid but practical. Do NOT mention IDs, databases, or references. Do NOT use '###' anywhere else."
-        )
+        system_prompt = """You are a professional palm reader with an entertaining, cinematic voice — but always practical.
+Use ONLY the provided [FACTS] and [MEANINGS] (translate Japanese into English internally). Do not invent facts.
+Return EXACTLY 6 sections with headings that start with '### ' in this order:
+### 1. Life Line
+### 2. Fate Line
+### 3. Money Line
+### 4. Special Line 1
+### 5. Special Line 2
+### Overall Advice
+In 'Special Line 1' interpret Special1 from [FACTS]. In 'Special Line 2' interpret Special2 from [FACTS].
+Length targets (EN): sections 1–5 are ~110–170 words each; Overall Advice is ~190–260 words. If too short, add more.
+Style: confident, warm, a touch mystical but grounded. Avoid hedging ('maybe', 'might').
+Never say 'cannot see'/'not visible'. If something looks subtle, reframe positively.
+Do NOT mention IDs, databases, prompts, or references. Do NOT use '###' anywhere else.
+Write in English only; avoid Japanese characters in the output."""
     elif is_zh:
         system_prompt = (
             "你是一位专业、温和、带一点娱乐感的手相解读师。只能使用提供的“事实”和“含义文本”。\n"
@@ -676,12 +714,27 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
 (Special2)
 {json.dumps(sp2, ensure_ascii=False)}
 """.strip()
+    if is_en:
+        user_prompt = f"""{meaning_block}
 
-    user_prompt = (
-        f"{meaning_block}\n\n"
-        "上の内容だけを根拠に、指定の6見出し形式で最終鑑定文を書いてください。"
-        "前向きで、情景が浮かぶ言葉を使い、各項目は“短い結論→理由→活かし方”の流れにしてください。"
-    )
+Using ONLY the above [FACTS] and [MEANINGS], write the final reading in the required 6-section format.
+Keep it upbeat, vivid, and practical. Structure each section as: short conclusion → reason → how to use.
+Translate any Japanese line names into natural English. Write in English only and avoid Japanese characters in the output."""
+    elif is_zh:
+        user_prompt = f"""{meaning_block}
+
+只根据以上[FACTS]与[MEANINGS]，按要求的6段标题格式写出最终解读。
+语气积极、生动但务实；每段遵循：结论→理由→如何运用。仅使用简体中文。"""
+    elif is_ko:
+        user_prompt = f"""{meaning_block}
+
+위의 [FACTS] 와 [MEANINGS] 만을 근거로, 지정된 6개 제목 형식으로 최종 해석을 작성하세요.
+톤은 긍정적이고 생동감 있게, 그러나 실용적으로. 각 섹션은: 결론→이유→활용법 순서. 한국어만 사용."""
+    else:
+        user_prompt = f"""{meaning_block}
+
+上の内容だけを根拠に、指定の6見出し形式で最終鑑定文を書いてください。
+前向きで、情景が浮かぶ言葉を使い、各項目は“短い結論→理由→活かし方”の流れにしてください。"""
 
     response2 = openai.ChatCompletion.create(
         model="gpt-4o-mini",
@@ -698,7 +751,7 @@ def analyze_palm(image_data, output_lang="ja", output_style="normal", output_mod
 
 def get_iching_advice(lang: str = 'ja'):
     try:
-        lang_norm = (lang or 'ja').lower()
+        lang_norm = (lang_norm or 'ja').lower()
         if lang_norm.startswith('en'):
             prompt = "You are an I Ching advisor. Give a gentle, positive message the customer needs right now in natural English (about 180–220 characters)."
         elif lang_norm.startswith('zh') or lang_norm.startswith('cn'):
@@ -882,7 +935,7 @@ def generate_lucky_info_mixed(
     else:
         food_ja = rng.choice(sum(food_map_ja.values(), []))
 
-    lang_norm = (lang or 'ja').lower()
+    lang_norm = (lang_norm or 'ja').lower()
 
     # 英語化（ラベル + 主要値）
     if lang_norm.startswith("en"):
@@ -1177,7 +1230,7 @@ def generate_lucky_info_mixed(
 
 def _lang_pack(lang: str):
     """Return (system_prompt, lang_note) for OpenAI calls."""
-    lang_norm = (lang or 'ja').lower()
+    lang_norm = (lang_norm or 'ja').lower()
     if lang_norm.startswith('en'):
         system = "You are a professional fortune teller. Write clear, natural English for customers. Do not mention Japanese astrology jargon, eto names, or Ten-God terms; translate meanings into plain English."
         note = "\n\nWrite in English. Do NOT include eto names or Ten-God terms. Keep it friendly, practical, and positive."
@@ -1197,12 +1250,51 @@ def _lang_pack(lang: str):
 
 def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool=False, style: str='normal', lang: str='ja', **kwargs):
     import re
-    palm_result = analyze_palm(image_data, lang=lang)
-    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, lang=lang)
-    iching_result = get_iching_advice(lang=lang)
+
+    # --- Normalize output language (UI may send output_lang, or english_output flag) ---
+    def _normalize_lang(lang_value: str, kw: dict) -> str:
+        out = kw.get("output_lang") or lang_value
+        # Some UIs toggle English via a boolean flag instead of output_lang
+        eng_flag = kw.get("english_output")
+        if isinstance(eng_flag, str):
+            eng_flag = eng_flag.strip().lower() in ("1", "true", "yes", "on")
+        if eng_flag:
+            out = "en"
+
+        mode = (kw.get("output_mode") or "").strip().lower()
+        if mode in ("en", "english", "eng"):
+            out = "en"
+
+        out = (out or "ja")
+        out = str(out).strip().lower()
+        if out.startswith(("zh", "cn")):
+            return "zh"
+        if out.startswith(("ko", "kr")):
+            return "ko"
+        if out.startswith("en"):
+            return "en"
+        return "ja"
+
+    lang_norm = _normalize_lang(lang, kwargs)
+    output_style = kwargs.get("output_style", style)
+    output_mode = kwargs.get("output_mode", "normal")
+
+    palm_result = analyze_palm(
+        image_data,
+        output_lang=lang_norm,
+        output_style=output_style,
+        output_mode=output_mode,
+        lang=lang_norm,  # backward compatibility
+    )
+    shichu_result_raw = get_shichu_fortune(
+        birthdate, now=now, force_next_month=force_next_month, lang=lang_norm
+    )
+    iching_result = get_iching_advice(lang=lang_norm)
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
-    raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text, lang=lang)
+    raw_lucky_info = generate_lucky_info_mixed(
+        nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text, lang=lang_norm
+    )
 
 
     # Lucky info is used as a small 2-column block in the PDF.
@@ -1288,15 +1380,15 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     
     # --- Safety: ensure we always have 5 palm sections + 1 overall comment (so PDF never crashes) ---
     min_blocks = 6  # 5 lines + overall
-    lang_norm = (lang or 'ja').lower()
+    lang_norm = (lang_norm or 'ja').lower()
     if lang_norm.startswith("en"):
         fallback_titles = [
             "Life Line",
-            "Head Line",
-            "Heart Line",
+            "Fate Line",
+            "Money Line",
             "Special Line 1",
             "Special Line 2",
-            "Overall Palm Reading",
+            "Overall Advice",
         ]
         fallback_text = (
             "This part couldn't be clearly identified from the photo. "
@@ -1305,21 +1397,31 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     elif lang_norm.startswith(("zh", "cn")):
         fallback_titles = [
             "生命线",
-            "头脑线",
-            "感情线",
-            "特殊线 1",
-            "特殊线 2",
-            "手相总体建议",
+            "命运线",
+            "金运线",
+            "特殊线①",
+            "特殊线②",
+            "综合建议",
         ]
         fallback_text = "※从图片中无法清晰判断该项目。建议在更明亮、对焦清晰的环境重新拍摄。"
+    elif lang_norm.startswith(("ko", "kr")):
+        fallback_titles = [
+            "생명선",
+            "운명선",
+            "금운선",
+            "특수선①",
+            "특수선②",
+            "종합 조언",
+        ]
+        fallback_text = "※사진에서 이 항목을 명확히 판정하기 어려웠습니다. 가능하면 더 밝은 곳에서 초점을 맞춰 다시 촬영해 주세요."
     else:
         fallback_titles = [
             "生命線",
-            "頭脳線",
-            "感情線",
+            "運命線",
+            "金運線",
             "特殊線①",
             "特殊線②",
-            "手相総合アドバイス",
+            "手相の総合アドバイス",
         ]
         fallback_text = "※画像からこの項目を明確に判定できませんでした。可能なら明るい場所で撮り直してください。"
 
