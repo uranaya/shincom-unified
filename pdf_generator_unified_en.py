@@ -4,7 +4,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 # Debug marker to verify EN PDF generator is actually used (printed only when this module is invoked)
-EN_PDFGEN_MARKER = 'ENPDFGEN|wrap=90|2026-01-31'
+EN_PDFGEN_MARKER = 'ENPDFGEN|wrap=99|2026-02-20'
 
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
@@ -122,9 +122,9 @@ def _set_font(c, lang: str, size: float):
 def _wrap_len(base: int, lang: str) -> int:
     # IMPORTANT:
     # - Japanese output stays in pdf_generator_unified.py (stable).
-    # - This English module enforces 90 chars/line for EN paragraphs.
+    # - This English module enforces 99 chars/line (+10%) for EN paragraphs.
     if (lang or "ja").lower().startswith("en"):
-        return 90
+        return 99
     return base
 def _has_non_ascii(s: str) -> bool:
     return any(ord(ch) > 127 for ch in (s or ""))
