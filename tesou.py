@@ -235,6 +235,52 @@ for _row in PALM_DETAIL_EXCEL:
 for _cat, _lst in PALM_DETAIL_INDEX_BY_CATEGORY.items():
     PALM_DETAIL_INDEX_BY_CATEGORY[_cat] = sorted(_lst, key=lambda x: x[0])
 
+
+# -------------------------
+# Fallback entries to avoid ID=0 outputs
+# These are "sign" (兆し) variants used when the photo is ambiguous.
+# -------------------------
+_FALLBACK_ENTRIES = [
+    {
+        "category": "太陽線",
+        "id": 98001,
+        "name": "太陽線（兆し）",
+        "detail": "太陽線が『くっきり一本』でなくても、あなたの中には“評価される芽”が確かにあります。今はまだ線が育つ途中で、結果が形になる直前の静かな助走期間。褒め言葉を素直に受け取り、得意分野を『見える形』で積み上げるほど、人気運と金運は連動して伸びます。"
+    },
+    {
+        "category": "特殊な線",
+        "id": 98011,
+        "name": "守護線（兆し）",
+        "detail": "守護線は『強運の防波堤』のような線です。はっきり太く出ていなくても、あなたの手には“守られながら強くなる兆し”が見えます。無理をしがちな場面ほど、休む・整える・頼るを挟むことで、運の流れが途切れずに続きます。"
+    },
+    {
+        "category": "特殊な線",
+        "id": 98012,
+        "name": "直感線（兆し）",
+        "detail": "直感線は『ひらめきのセンサー』。線が薄くても、あなたは人の空気や流れを読む力が強く、チャンスの匂いに早く気づけるタイプです。迷ったときは、情報を増やし過ぎず“最初の直感＋1つの根拠”で決めると、あなたの運が一番回ります。"
+    },
+]
+
+for _row in _FALLBACK_ENTRIES:
+    try:
+        _id = int(_row.get("id"))
+    except Exception:
+        continue
+    if _id in PALM_DETAIL_BY_ID:
+        continue
+    PALM_DETAIL_BY_ID[_id] = _row
+    _cat = str(_row.get("category", ""))
+    _name = str(_row.get("name", ""))
+    PALM_DETAIL_INDEX_BY_CATEGORY.setdefault(_cat, []).append((_id, _name))
+    _nn = _norm_palm_name(_name)
+    if _nn:
+        PALM_DETAIL_IDS_BY_NORMNAME.setdefault(_nn, []).append(_id)
+
+for _cat in ("太陽線", "特殊な線"):
+    if _cat in PALM_DETAIL_INDEX_BY_CATEGORY:
+        PALM_DETAIL_INDEX_BY_CATEGORY[_cat] = sorted(PALM_DETAIL_INDEX_BY_CATEGORY[_cat], key=lambda x: x[0])
+
+
 def find_palm_detail_ids_by_name(name: str):
     """名称から詳細DBのID候補を返す（完全一致→正規化一致）"""
     if not name:

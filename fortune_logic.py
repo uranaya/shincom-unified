@@ -367,22 +367,22 @@ def analyze_palm(
 From the following candidate lists, choose:
 - life_id: exactly 1 from Life Line list
 - fate_id: exactly 1 from Fate Line list
-- money_sun_id: 0 if unclear, otherwise 1 from Sun Line list
-- special_ids: up to 2 IDs from Special list (use [] if none)
+- money_sun_id: exactly 1 from Sun Line list (if subtle/uncertain, choose a '兆し' variant rather than 0)
+- special_ids: choose exactly 2 IDs from Special list (if subtle/uncertain, choose '兆し' variants; never return empty)
 
 Return JSON ONLY with this schema:
 {{
   "life_id": 1,
   "fate_id": 1,
-  "money_sun_id": 0,
-  "special_ids": [0, 0],
+  "money_sun_id": 1,
+  "special_ids": [1, 2],
   "notes": "brief visual notes (<= 2 sentences, in the target language)"
 }}
 
 Rules:
 - IDs must exist in the lists. Never invent.
-- special_ids must be unique; max length 2; if none, []
-- If unclear, use 0 / [] instead of guessing.
+- special_ids must be unique; length must be 2
+- If subtle/uncertain, choose the closest '兆し' (sign) variants from the lists; NEVER output 0 or empty.
 
 [Life Line candidates]
 {life_list}
@@ -490,6 +490,13 @@ Rules:
     life_id = int(detect.get("life_id", 0) or 0)
     fate_id = int(detect.get("fate_id", 0) or 0)
     money_sun_id = int(detect.get("money_sun_id", 0) or 0)
+
+    # Prefer non-zero IDs: if classifier returned 0/invalid, use "兆し" fallback IDs
+    FALLBACK_SUN_ID = 98001
+    FALLBACK_SPECIAL_IDS = [98011, 98012]
+
+    if money_sun_id <= 0 or money_sun_id not in PALM_DETAIL_BY_ID:
+        money_sun_id = FALLBACK_SUN_ID
     notes = str(detect.get("notes", "") or "").strip()
 
     special_ids = detect.get("special_ids", [])
@@ -508,6 +515,22 @@ Rules:
             special_clean.append(xi)
         if len(special_clean) >= 2:
             break
+
+    # Ensure we always have 2 special IDs (avoid 0/empty): fill with fallback "兆し" lines
+    for _fid in FALLBACK_SPECIAL_IDS:
+        if len(special_clean) >= 2:
+            break
+        try:
+            _fid = int(_fid)
+        except Exception:
+            continue
+        if _fid <= 0:
+            continue
+        if _fid in special_clean:
+            continue
+        if _fid in PALM_DETAIL_BY_ID:
+            special_clean.append(_fid)
+
 
     # legacy payload
     legacy = {
