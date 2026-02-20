@@ -185,7 +185,19 @@ _PALM_DETAIL_EXCEL_JSON = r'''[{"category": "生命線", "id": 1, "name": "綺�
 
 import re
 
-PALM_DETAIL_EXCEL = _json.loads(_PALM_DETAIL_EXCEL_JSON)
+# Excel由来の詳細DBを読み込む（JSONファイルがあれば優先）
+import os as _os
+_THIS_DIR = _os.path.dirname(_os.path.abspath(__file__))
+_json_path = _os.path.join(_THIS_DIR, "tesou_detail_db_ja.json")
+try:
+    if _os.path.exists(_json_path):
+        with open(_json_path, "r", encoding="utf-8") as _f:
+            PALM_DETAIL_EXCEL = _json.load(_f)
+    else:
+        PALM_DETAIL_EXCEL = _json.loads(_PALM_DETAIL_EXCEL_JSON)
+except Exception:
+    PALM_DETAIL_EXCEL = _json.loads(_PALM_DETAIL_EXCEL_JSON)
+
 
 # id(int) -> {category, id, name, detail}
 PALM_DETAIL_BY_ID = {}
@@ -433,3 +445,112 @@ def build_shape_guide_text(lang: str = "ja") -> str:
             out.append(f"- {shape_key}: {body}")
         out.append("")
     return "\n".join(out).strip()
+
+# ============================================================
+# 旧 tesou.py 側の追加入力（tesou_descriptions）を
+# Excel詳細DB（PALM_DETAIL_*）へ“上書きではなく追加”で統合する
+# - Excelに無い線でも番号（ID）を振って選択候補にできる
+# - 旧文は detail として保持し、fortune_logic 側で“シンコン文体で増幅”する
+# ============================================================
+
+def _infer_category_from_name(name: str) -> str:
+    n = name or ""
+    if "生命線" in n:
+        return "生命線"
+    if "運命線" in n:
+        return "運命線"
+    # 金運系は太陽線カテゴリに寄せる（既存ロジックと合わせる）
+    if ("太陽線" in n) or ("金運" in n) or ("財運" in n) or ("水星線" in n):
+        return "太陽線"
+    if "感情線" in n:
+        return "感情線"
+    if ("頭脳線" in n) or ("知能線" in n):
+        return "頭脳線"
+    if "結婚" in n:
+        return "結婚線"
+    return "特殊な線"
+
+def merge_legacy_descriptions_into_detail_db(id_start: int = 1000):
+    """
+    tesou_descriptions に存在するが Excel DB には無い項目を
+    PALM_DETAIL_BY_ID / PALM_DETAIL_INDEX_BY_CATEGORY / PALM_DETAIL_IDS_BY_NORMNAME に追加する。
+
+    id_start:
+      追加分のID開始値（既存IDと衝突しないよう大きめ推奨）
+    """
+    global PALM_DETAIL_BY_ID, PALM_DETAIL_INDEX_BY_CATEGORY, PALM_DETAIL_IDS_BY_NORMNAME
+
+    try:
+        legacy = tesou_descriptions  # type: ignore
+    except Exception:
+        legacy = {}
+
+    if not isinstance(legacy, dict) or not legacy:
+        return
+
+    existing_names = set()
+    for _row in (PALM_DETAIL_BY_ID or {}).values():
+        _nm = str(_row.get("name", "") or "").strip()
+        if _nm:
+            existing_names.add(_nm)
+
+    try:
+        current_max = max([int(k) for k in (PALM_DETAIL_BY_ID or {}).keys()] or [0])
+    except Exception:
+        current_max = 0
+
+    next_id = max(int(id_start), current_max + 1)
+
+    added = 0
+    for name, desc in legacy.items():
+        name = str(name or "").strip()
+        desc = str(desc or "").strip()
+        if not name or not desc:
+            continue
+        if name in existing_names:
+            continue
+
+        cat = _infer_category_from_name(name)
+        _id = next_id
+        next_id += 1
+
+        PALM_DETAIL_BY_ID[_id] = {
+            "id": _id,
+            "category": cat,
+            "name": name,
+            "detail": desc,
+            "source": "legacy_tesou_py",
+        }
+        PALM_DETAIL_INDEX_BY_CATEGORY.setdefault(cat, []).append((_id, name))
+
+        # 正規化インデックス
+        try:
+            _nn = _norm_palm_name(name)
+            if _nn:
+                PALM_DETAIL_IDS_BY_NORMNAME.setdefault(_nn, []).append(_id)
+        except Exception:
+            pass
+
+        existing_names.add(name)
+        added += 1
+
+    # 安定ソート
+    try:
+        for _cat, _lst in PALM_DETAIL_INDEX_BY_CATEGORY.items():
+            PALM_DETAIL_INDEX_BY_CATEGORY[_cat] = sorted(_lst, key=lambda x: x[0])
+    except Exception:
+        pass
+
+    try:
+        for _nn, _ids in PALM_DETAIL_IDS_BY_NORMNAME.items():
+            PALM_DETAIL_IDS_BY_NORMNAME[_nn] = sorted(list(dict.fromkeys(_ids)))
+    except Exception:
+        pass
+
+    return added
+
+# import 時に自動マージ（Excel+旧追加 = “統合DB”）
+try:
+    merge_legacy_descriptions_into_detail_db()
+except Exception:
+    pass
