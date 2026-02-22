@@ -12,11 +12,13 @@ import re
 import psycopg2
 import psycopg2.extras
 
+from functools import wraps
+
 from io import TextIOWrapper
 from datetime import datetime
 from urllib.parse import quote
 from sqlalchemy import create_engine, text
-from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response,render_template_string
+from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response, render_template_string, Response
 from fortune_logic import generate_fortune
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
@@ -1459,6 +1461,36 @@ def privacy():
 @app.route("/terms")
 def terms():
     return render_template("terms.html")
+
+
+# --- Staff Basic Auth ---
+def _staff_auth_required(realm="URANA-ya Staff"):
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(*args, **kwargs):
+            staff_user = os.environ.get("STAFF_USER", "staff")
+            staff_pass = os.environ.get("STAFF_PASSWORD", "")
+
+            if not staff_pass:
+                return Response("STAFF_PASSWORD is not set.", 503)
+
+            auth = request.authorization
+            if not auth or auth.username != staff_user or auth.password != staff_pass:
+                return Response(
+                    "Authentication required",
+                    401,
+                    {"WWW-Authenticate": f'Basic realm=\"{realm}\"'}
+                )
+            return view_func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+@app.route("/staff")
+@_staff_auth_required()
+def staff_page():
+    return render_template("staff.html", updated_at=datetime.now().strftime("%Y-%m-%d"))
+
 
 @app.route("/tokutei")
 def tokutei():
