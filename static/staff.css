@@ -1,0 +1,76 @@
+:root{
+  --bg:#0b0d12;
+  --card:#121622;
+  --text:#e9edf7;
+  --muted:#a8b0c3;
+  --line:#232a3a;
+  --btn:#2b6cff;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:linear-gradient(180deg,#0b0d12 0%, #0a0c10 100%);
+  color:var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+}
+.wrap{max-width:920px;margin:0 auto;padding:18px}
+.hero{
+  display:grid;
+  grid-template-columns: 1fr 280px;
+  gap:16px;
+  padding:18px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:rgba(18,22,34,0.8);
+}
+.hero h1{margin:0 0 6px;font-size:22px}
+.sub{margin:0;color:var(--muted)}
+.desc{margin:10px 0 0;color:var(--muted);line-height:1.5}
+.qr-box{
+  border:1px dashed var(--line);
+  border-radius:12px;
+  padding:12px;
+  background:rgba(0,0,0,0.18);
+}
+.qr-note{margin:0 0 6px;color:var(--muted);font-size:12px}
+.qr-url{margin:0;font-size:12px;word-break:break-all;color:var(--text)}
+.card{
+  margin-top:14px;
+  padding:16px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:rgba(18,22,34,0.75);
+}
+.card h2{margin:0 0 10px;font-size:18px}
+.note{color:var(--text);line-height:1.7}
+.muted{color:var(--muted)}
+.links{display:flex;flex-wrap:wrap;gap:10px}
+.links a{
+  color:var(--text);
+  text-decoration:none;
+  border:1px solid var(--line);
+  padding:8px 10px;
+  border-radius:10px;
+  background:rgba(0,0,0,0.12);
+}
+.links a:hover{border-color:#3a4662}
+.btn{
+  display:inline-block;
+  text-decoration:none;
+  color:white;
+  background:var(--btn);
+  padding:10px 12px;
+  border-radius:10px;
+  font-weight:700;
+  border:1px solid rgba(255,255,255,0.08);
+}
+.btn.ghost{
+  background:transparent;
+  border:1px solid var(--line);
+  color:var(--text);
+}
+.btn:hover{filter:brightness(1.05)}
+.foot{margin:18px 0 6px;text-align:center}
+@media (max-width: 720px){
+  .hero{grid-template-columns:1fr}
+}

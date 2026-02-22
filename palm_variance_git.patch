@@ -1,0 +1,250 @@
+diff --git a/tesou.py b/tesou.py
+--- a/tesou.py	2026-02-22 03:15:47.716249538 +0000
++++ b/tesou.py	2026-02-22 03:19:25.268366171 +0000
+@@ -248,6 +248,54 @@
+         "detail": "太陽線が『くっきり一本』でなくても、あなたの中には“評価される芽”が確かにあります。今はまだ線が育つ途中で、結果が形になる直前の静かな助走期間。褒め言葉を素直に受け取り、得意分野を『見える形』で積み上げるほど、人気運と金運は連動して伸びます。"
+     },
+     {
++        "category": "太陽線",
++        "id": 98002,
++        "name": "太陽線（芽吹き）",
++        "detail": "太陽線は“芽”の段階。まだ薄くても、あなたの努力が評価に変わる瞬間が近づいています。小さな成功を毎回『記録・発信』すると、線が育つスピードが一気に上がります。"
++    },
++    {
++        "category": "太陽線",
++        "id": 98003,
++        "name": "太陽線（点描）",
++        "detail": "太陽線が点々と見えるのは、運が『段階的に伸びる』サイン。評価は一気に爆発するより、ステップを踏んで積み上がるタイプです。焦らず“今の一段”を丁寧に仕上げると、次のチャンスが連鎖します。"
++    },
++    {
++        "category": "太陽線",
++        "id": 98004,
++        "name": "太陽線（複線）",
++        "detail": "細い太陽線が複数ある兆し。あなたは“複数の強み”で人気と収入を作れる人です。一本化よりも、得意を2〜3本立てにして回すほど、金運が安定しやすくなります。"
++    },
++    {
++        "category": "太陽線",
++        "id": 98005,
++        "name": "太陽線（遅咲き）",
++        "detail": "太陽線は遅咲きタイプの兆し。今は準備期でも、後半から評価が伸びる手です。『一度作った価値が長く残るもの』に注力すると、年々ラクに金運が上向きます。"
++    },
++    {
++        "category": "太陽線",
++        "id": 98006,
++        "name": "太陽線（裏運）",
++        "detail": "表で目立つより“裏で効く”太陽線の兆し。あなたは信頼と実力で、じわじわ評価されていきます。派手さよりも『丁寧さ・約束を守る・仕上げの美しさ』が最大の金運スイッチです。"
++    },
++    {
++        "category": "太陽線",
++        "id": 98007,
++        "name": "太陽線（口コミ運）",
++        "detail": "太陽線が薄い時期は“紹介・口コミ”で伸びる相。あなたの良さは体験した人が広めるタイプです。『お礼・フォロー・一言の気遣い』が、次の仕事を連れてきます。"
++    },
++    {
++        "category": "太陽線",
++        "id": 98008,
++        "name": "太陽線（転機前夜）",
++        "detail": "太陽線が育ち始める前夜の兆し。今は“変わる直前”で、やり方を一つ変えるだけで評価が跳ねます。環境より先に、手順・見せ方・客層を微調整すると一気に流れが変わります。"
++    },
++    {
++        "category": "太陽線",
++        "id": 98009,
++        "name": "太陽線（趣味発火）",
++        "detail": "太陽線は『好き』から火が付く兆し。義務感で頑張るより、ワクワクする分野に寄せるほど金運が上がります。趣味・特技の見せ方を整えると、人気運が先に立ち上がります。"
++    },
++    {
+         "category": "特殊な線",
+         "id": 98011,
+         "name": "守護線（兆し）",
+@@ -259,6 +307,84 @@
+         "name": "直感線（兆し）",
+         "detail": "直感線は『ひらめきのセンサー』。線が薄くても、あなたは人の空気や流れを読む力が強く、チャンスの匂いに早く気づけるタイプです。迷ったときは、情報を増やし過ぎず“最初の直感＋1つの根拠”で決めると、あなたの運が一番回ります。"
+     },
++    {
++        "category": "特殊な線",
++        "id": 98013,
++        "name": "金星帯（兆し）",
++        "detail": "金星帯は“魅力のオーラ”。はっきり出ていなくても、あなたは『惹きつける力』を持っています。自分の世界観を整え、言葉や所作を磨くほど、人運が金運に直結します。"
++    },
++    {
++        "category": "特殊な線",
++        "id": 98014,
++        "name": "神秘十字（兆し）",
++        "detail": "神秘十字は“守られ運”の兆し。偶然に見える助けや、タイミングの良さがあなたの味方になります。迷う時ほど『直感＋誠実さ』で選ぶと、最短ルートを引き当てます。"
++    },
++    {
++        "category": "特殊な線",
++        "id": 98015,
++        "name": "ソロモンの環（兆し）",
++        "detail": "ソロモンの環は“人を導く器”の兆し。言葉に説得力があり、年齢とともに信頼が厚くなる手です。教える・まとめる・相談に乗る場面で運が開きます。"
++    },
++    {
++        "category": "特殊な線",
++        "id": 98016,
++        "name": "スター線（兆し）",
++        "detail": "スター線は“一発の輝き”の兆し。小さくても、勝負どころで光る瞬間があります。準備を怠らず、ここぞの場面で思い切るほど、評価が一気に跳ねます。"
++    },
++    {
++        "category": "特殊な線",
++        "id": 98017,
++        "name": "フィッシュ（兆し）",
++        "detail": "フィッシュは“祝福”の兆し。困った時に不思議と助けが入る、救いの手が差し伸べられる相です。感謝を形にすると、幸運の連鎖が長く続きます。"
++    },
++    {
++        "category": "特殊な線",
++        "id": 98018,
++        "name": "覇王線（兆し）",
++        "detail": "覇王線は“強い収益力”の兆し。一本でなくても、あなたは『稼ぐ仕組み』を作れる人です。守りを固めてから攻めると、金運が安定しながら伸びます。"
++    },
++    {
++        "category": "特殊な線",
++        "id": 98019,
++        "name": "二重生命線（兆し）",
++        "detail": "二重生命線は“回復力”の兆し。疲れても立て直せる底力があり、忙しい時ほど強さが出ます。睡眠・食・体を温める習慣が、運の伸びしろを最大化します。"
++    },
++    {
++        "category": "特殊な線",
++        "id": 98020,
++        "name": "旅行線（兆し）",
++        "detail": "旅行線は“移動で運が動く”兆し。場所を変える、会う人を変える、景色を変えるほど、停滞がほどけます。新しい土地・新しい客層が開運キーです。"
++    },
++    {
++        "category": "特殊な線",
++        "id": 98021,
++        "name": "芸術線（兆し）",
++        "detail": "芸術線は“表現力”の兆し。美意識や感性が強く、センスが価値になります。作品・文章・見せ方を磨くほど、あなたの魅力が仕事に変わります。"
++    },
++    {
++        "category": "特殊な線",
++        "id": 98022,
++        "name": "引き立て線（兆し）",
++        "detail": "引き立て線は“後押し”の兆し。あなたは一人で抱えるより、誰かの協力で一気に伸びる相です。相談・共同・紹介を恐れないほど、運が加速します。"
++    },
++    {
++        "category": "特殊な線",
++        "id": 98023,
++        "name": "人気線（兆し）",
++        "detail": "人気線は“ファンが付く”兆し。目立つ運というより、『好きになってもらう運』です。丁寧な接客、印象の整え、口コミの導線づくりが勝ち筋になります。"
++    },
++    {
++        "category": "特殊な線",
++        "id": 98024,
++        "name": "ますかけ線（兆し）",
++        "detail": "ますかけ線は“集中力と突破力”の兆し。はっきり出ていなくても、あなたは一点突破で道を開きます。やると決めたら、途中で変えない強さが運になります。"
++    },
++    {
++        "category": "特殊な線",
++        "id": 98025,
++        "name": "仏眼（兆し）",
++        "detail": "仏眼は“人を見る目”の兆し。相手の本質を見抜き、言葉の奥を感じ取れる手です。相談・カウンセリング・対人仕事で、あなたの才能が輝きます。"
++    },
+ ]
+ 
+ for _row in _FALLBACK_ENTRIES:
+
+diff --git a/fortune_logic.py b/fortune_logic.py
+--- a/fortune_logic.py	2026-02-22 03:15:48.112269703 +0000
++++ b/fortune_logic.py	2026-02-22 03:20:40.220924280 +0000
+@@ -492,11 +492,65 @@
+     money_sun_id = int(detect.get("money_sun_id", 0) or 0)
+ 
+     # Prefer non-zero IDs: if classifier returned 0/invalid, use "兆し" fallback IDs
+-    FALLBACK_SUN_ID = 98001
+-    FALLBACK_SPECIAL_IDS = [98011, 98012]
++    # NOTE:
++    #  - Fixed single-ID fallbacks cause visible bias (98001/98011/98012). To add entertainment variability,
++    #    we choose from a pool of "兆し" variants deterministically based on the image hash.
++    FALLBACK_SUN_IDS = [98001, 98002, 98003, 98004, 98005, 98006, 98007, 98008, 98009]
++    FALLBACK_SPECIAL_IDS = [
++        98011, 98012, 98013, 98014, 98015, 98016, 98017, 98018, 98019, 98020,
++        98021, 98022, 98023, 98024, 98025,
++    ]
++
++    def _stable_seed(tag: str) -> int:
++        """Stable seed derived from the image (base64) + tag. Same photo -> same fallback choice."""
++        try:
++            prefix = (base64data or "")[:20000]
++        except Exception:
++            prefix = ""
++        h = hashlib.sha256((prefix + "|" + (tag or "")).encode("utf-8", errors="ignore")).hexdigest()
++        return int(h[:12], 16)
++
++    def _stable_choice(pool, tag: str, default_id: int):
++        pool2 = []
++        for i in (pool or []):
++            try:
++                ii = int(i)
++            except Exception:
++                continue
++            if ii > 0 and ii in PALM_DETAIL_BY_ID:
++                pool2.append(ii)
++        if not pool2:
++            return default_id if default_id in PALM_DETAIL_BY_ID else (pool[0] if pool else 0)
++        rnd = random.Random(_stable_seed(tag))
++        return rnd.choice(pool2)
++
++    def _stable_sample(pool, k: int, tag: str, exclude=None):
++        exclude = set(exclude or [])
++        pool2 = []
++        for i in (pool or []):
++            try:
++                ii = int(i)
++            except Exception:
++                continue
++            if ii <= 0:
++                continue
++            if ii in exclude:
++                continue
++            if ii not in PALM_DETAIL_BY_ID:
++                continue
++            pool2.append(ii)
++        if not pool2:
++            return []
++        rnd = random.Random(_stable_seed(tag))
++        if len(pool2) <= k:
++            # shuffle for variety but keep deterministic
++            rnd.shuffle(pool2)
++            return pool2[:k]
++        return rnd.sample(pool2, k)
+ 
+     if money_sun_id <= 0 or money_sun_id not in PALM_DETAIL_BY_ID:
+-        money_sun_id = FALLBACK_SUN_ID
++        money_sun_id = _stable_choice(FALLBACK_SUN_IDS, "sun", default_id=98001)
++
+     notes = str(detect.get("notes", "") or "").strip()
+ 
+     special_ids = detect.get("special_ids", [])
+@@ -516,23 +570,20 @@
+         if len(special_clean) >= 2:
+             break
+ 
+-    # Ensure we always have 2 special IDs (avoid 0/empty): fill with fallback "兆し" lines
+-    for _fid in FALLBACK_SPECIAL_IDS:
++    # Ensure we always have 2 special IDs (avoid 0/empty): fill with fallback "兆し" lines (deterministic)
++    need = 2 - len(special_clean)
++    if need > 0:
++        fill = _stable_sample(FALLBACK_SPECIAL_IDS, need, tag="special", exclude=special_clean)
++        special_clean.extend(fill)
++
++    # Last-resort safety: if still missing, append the classic 98011/98012
++    for _fid in (98011, 98012):
+         if len(special_clean) >= 2:
+             break
+-        try:
+-            _fid = int(_fid)
+-        except Exception:
+-            continue
+-        if _fid <= 0:
+-            continue
+-        if _fid in special_clean:
+-            continue
+-        if _fid in PALM_DETAIL_BY_ID:
++        if _fid in PALM_DETAIL_BY_ID and _fid not in special_clean:
+             special_clean.append(_fid)
+ 
+-
+-    # legacy payload
++# legacy payload
+     legacy = {
+         "life": {"id": life_id, "name": _get_name(life_id), "text": _get_detail(life_id)},
+         "fate": {"id": fate_id, "name": _get_name(fate_id), "text": _get_detail(fate_id)},
