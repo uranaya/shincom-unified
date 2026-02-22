@@ -492,11 +492,65 @@ Rules:
     money_sun_id = int(detect.get("money_sun_id", 0) or 0)
 
     # Prefer non-zero IDs: if classifier returned 0/invalid, use "兆し" fallback IDs
-    FALLBACK_SUN_ID = 98001
-    FALLBACK_SPECIAL_IDS = [98011, 98012]
+    # NOTE:
+    #  - Fixed single-ID fallbacks cause visible bias (98001/98011/98012). To add entertainment variability,
+    #    we choose from a pool of "兆し" variants deterministically based on the image hash.
+    FALLBACK_SUN_IDS = [98001, 98002, 98003, 98004, 98005, 98006, 98007, 98008, 98009]
+    FALLBACK_SPECIAL_IDS = [
+        98011, 98012, 98013, 98014, 98015, 98016, 98017, 98018, 98019, 98020,
+        98021, 98022, 98023, 98024, 98025,
+    ]
+
+    def _stable_seed(tag: str) -> int:
+        """Stable seed derived from the image (base64) + tag. Same photo -> same fallback choice."""
+        try:
+            prefix = (base64data or "")[:20000]
+        except Exception:
+            prefix = ""
+        h = hashlib.sha256((prefix + "|" + (tag or "")).encode("utf-8", errors="ignore")).hexdigest()
+        return int(h[:12], 16)
+
+    def _stable_choice(pool, tag: str, default_id: int):
+        pool2 = []
+        for i in (pool or []):
+            try:
+                ii = int(i)
+            except Exception:
+                continue
+            if ii > 0 and ii in PALM_DETAIL_BY_ID:
+                pool2.append(ii)
+        if not pool2:
+            return default_id if default_id in PALM_DETAIL_BY_ID else (pool[0] if pool else 0)
+        rnd = random.Random(_stable_seed(tag))
+        return rnd.choice(pool2)
+
+    def _stable_sample(pool, k: int, tag: str, exclude=None):
+        exclude = set(exclude or [])
+        pool2 = []
+        for i in (pool or []):
+            try:
+                ii = int(i)
+            except Exception:
+                continue
+            if ii <= 0:
+                continue
+            if ii in exclude:
+                continue
+            if ii not in PALM_DETAIL_BY_ID:
+                continue
+            pool2.append(ii)
+        if not pool2:
+            return []
+        rnd = random.Random(_stable_seed(tag))
+        if len(pool2) <= k:
+            # shuffle for variety but keep deterministic
+            rnd.shuffle(pool2)
+            return pool2[:k]
+        return rnd.sample(pool2, k)
 
     if money_sun_id <= 0 or money_sun_id not in PALM_DETAIL_BY_ID:
-        money_sun_id = FALLBACK_SUN_ID
+        money_sun_id = _stable_choice(FALLBACK_SUN_IDS, "sun", default_id=98001)
+
     notes = str(detect.get("notes", "") or "").strip()
 
     special_ids = detect.get("special_ids", [])
@@ -516,23 +570,20 @@ Rules:
         if len(special_clean) >= 2:
             break
 
-    # Ensure we always have 2 special IDs (avoid 0/empty): fill with fallback "兆し" lines
-    for _fid in FALLBACK_SPECIAL_IDS:
+    # Ensure we always have 2 special IDs (avoid 0/empty): fill with fallback "兆し" lines (deterministic)
+    need = 2 - len(special_clean)
+    if need > 0:
+        fill = _stable_sample(FALLBACK_SPECIAL_IDS, need, tag="special", exclude=special_clean)
+        special_clean.extend(fill)
+
+    # Last-resort safety: if still missing, append the classic 98011/98012
+    for _fid in (98011, 98012):
         if len(special_clean) >= 2:
             break
-        try:
-            _fid = int(_fid)
-        except Exception:
-            continue
-        if _fid <= 0:
-            continue
-        if _fid in special_clean:
-            continue
-        if _fid in PALM_DETAIL_BY_ID:
+        if _fid in PALM_DETAIL_BY_ID and _fid not in special_clean:
             special_clean.append(_fid)
 
-
-    # legacy payload
+# legacy payload
     legacy = {
         "life": {"id": life_id, "name": _get_name(life_id), "text": _get_detail(life_id)},
         "fate": {"id": fate_id, "name": _get_name(fate_id), "text": _get_detail(fate_id)},
