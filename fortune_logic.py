@@ -501,13 +501,23 @@ Rules:
         98021, 98022, 98023, 98024, 98025,
     ]
 
+    # Optional: I Ching hint (computed in generate_fortune) to add thematic variety.
+    # We will NOT mention I Ching / hexagrams explicitly in the final text; it is used as a subtle "theme".
+    iching_hint = kwargs.get("iching_hint") or kwargs.get("iching_result") or ""
+    if isinstance(iching_hint, (dict, list)):
+        try:
+            iching_hint = json.dumps(iching_hint, ensure_ascii=False)
+        except Exception:
+            iching_hint = str(iching_hint)
+    iching_hint = str(iching_hint or "").strip()
+
     def _stable_seed(tag: str) -> int:
         """Stable seed derived from the image (base64) + tag. Same photo -> same fallback choice."""
         try:
             prefix = (base64data or "")[:20000]
         except Exception:
             prefix = ""
-        h = hashlib.sha256((prefix + "|" + (tag or "")).encode("utf-8", errors="ignore")).hexdigest()
+        h = hashlib.sha256((prefix + "|" + (tag or "") + "|" + (iching_hint or "")[:300]).encode("utf-8", errors="ignore")).hexdigest()
         return int(h[:12], 16)
 
     def _stable_choice(pool, tag: str, default_id: int):
@@ -550,7 +560,9 @@ Rules:
 
     if money_sun_id <= 0 or money_sun_id not in PALM_DETAIL_BY_ID:
         money_sun_id = _stable_choice(FALLBACK_SUN_IDS, "sun", default_id=98001)
-
+    elif money_sun_id in FALLBACK_SUN_IDS:
+        # If the classifier keeps returning the same generic "兆し" ID, diversify within the sign-level pool.
+        money_sun_id = _stable_choice(FALLBACK_SUN_IDS, "sun_remap", default_id=money_sun_id)
     notes = str(detect.get("notes", "") or "").strip()
 
     special_ids = detect.get("special_ids", [])
@@ -570,6 +582,11 @@ Rules:
         if len(special_clean) >= 2:
             break
 
+
+    # If the classifier keeps returning only the same "兆し" pair (98011/98012),
+    # diversify within the broader "兆し" pool to avoid visible bias (still sign-level, not a strong claim).
+    if special_clean and all(x in (98011, 98012) for x in special_clean):
+        special_clean = _stable_sample(FALLBACK_SPECIAL_IDS, 2, tag="special_remap", exclude=[])
     # Ensure we always have 2 special IDs (avoid 0/empty): fill with fallback "兆し" lines (deterministic)
     need = 2 - len(special_clean)
     if need > 0:
@@ -667,23 +684,23 @@ Rules:
             "You are 'Shincom' palmistry: vivid, confident, poetic, and customer-friendly. "
             "Use ONLY the provided legacy texts as factual basis, then expand in a captivating style. "
             "Never mention databases, lists, IDs in the body (IDs are allowed only inside headings). "
-            "Do not fabricate specific events; keep advice actionable."
+            "Do not fabricate specific events; keep advice actionable. If JSON includes 'iching_hint', use it as a subtle theme to color metaphors and action tips, but do NOT mention I Ching/hexagrams explicitly."
         )
     elif is_zh:
         sys = (
             "你是“シンコン风格”的手相解读师：有画面感、带一点诗意、语气肯定但温和，"
-            "同时给出可执行的建议。只能以提供的旧文为根拠进行扩写，不要提编号/数据库/候选列表。"
+            "同时给出可执行的建议。只能以提供的旧文为根拠进行扩写，不要提编号/数据库/候选列表。若 JSON 中包含 'iching_hint'，将其作为“暗主题”融入比喻与行动建议，但不要在正文中提到易经/卦名等术语。"
         )
     elif is_ko:
         sys = (
             "당신은 '신콘 스타일' 손금 해석가입니다: 시적이고 단정적이지만 따뜻하고 현실적인 조언. "
-            "제공된 '레거시 텍스트'를 근거로만 확장하세요. 본문에서 ID/DB/목록 언급 금지."
+            "제공된 '레거시 텍스트'를 근거로만 확장하세요. 본문에서 ID/DB/목록 언급 금지. JSON에 'iching_hint'가 있으면 은근한 테마로 비유와 행동 조언에 섞되, 주역/괘 등 용어는 본문에 쓰지 마세요."
         )
     else:
         sys = (
             "あなたは“シンコン文体”の手相鑑定師です。"
             "詩的で断定的（『あなたは〜です』）に語りつつ、必ず前向きで実践的なアドバイスで着地してください。"
-            "与えた旧文（レガシー本文）を根拠に増幅し、本文でID/番号/DB/候補一覧の話は一切しないこと。"
+            "与えた旧文（レガシー本文）を根拠に増幅し、本文でID/番号/DB/候補一覧の話は一切しないこと。JSONにiching_hintがあれば“裏テーマ”として比喩や行動提案に薄く混ぜ、本文で『易』『イーチン』『卦』などの語は出さない。"
         )
 
     # special=0 の時は「無い」と言わず、伸ばすための一般的な“魅力”を描く
@@ -699,6 +716,7 @@ Rules:
         "lang": output_lang,
         "style": output_style,
         "notes": notes,
+        "iching_hint": iching_hint,
         "legacy": legacy,
     }
 
@@ -1322,9 +1340,9 @@ def _lang_pack(lang: str):
 
 def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool=False, style: str='normal', lang: str='ja', **kwargs):
     import re
-    palm_result = analyze_palm(image_data, output_lang=lang, output_style=style, output_mode=kwargs.get('output_mode','normal'))
-    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, lang=lang)
     iching_result = get_iching_advice(lang=lang)
+    palm_result = analyze_palm(image_data, output_lang=lang, output_style=style, output_mode=kwargs.get('output_mode','normal'), iching_hint=iching_result)
+    shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, lang=lang)
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
     raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text, lang=lang)
