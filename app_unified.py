@@ -2431,3 +2431,69 @@ def admin_invoice_staff_special_pdf():
 def google_verification_file():
     return send_from_directory('static', 'google808abc9a83ba5e55.html')
 
+
+# ============================================================
+# STAFF PAGE (password protected)
+# 目的: 1link(https://1link.jp/info) でパスワード保護できないため、
+# shincom-unified 側にスタッフ向け情報ページを内製する。
+#
+# 環境変数:
+#   STAFF_PAGE_USERNAME  (default: "staff")
+#   STAFF_PAGE_PASSWORD  (default: "change-me")
+# ============================================================
+
+from functools import wraps  # ※デコレータに必須（既存importと重複してもOK）
+
+STAFF_PAGE_USERNAME = os.getenv("STAFF_PAGE_USERNAME", "staff")
+STAFF_PAGE_PASSWORD = os.getenv("STAFF_PAGE_PASSWORD", "change-me")
+STAFF_SESSION_KEY = "staff_authed"
+
+
+def staff_login_required(view_func):
+    @wraps(view_func)
+    def _wrapped(*args, **kwargs):
+        if session.get(STAFF_SESSION_KEY):
+            return view_func(*args, **kwargs)
+        # next を持たせる（ログイン後に元のURLへ）
+        return redirect(url_for("staff_login", next=request.path))
+    return _wrapped
+
+
+@app.route("/staff/login", methods=["GET", "POST"])
+def staff_login():
+    # すでにログイン済みなら staff へ
+    if session.get(STAFF_SESSION_KEY):
+        return redirect(url_for("staff_home"))
+
+    next_url = request.args.get("next") or "/staff"
+
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip()
+        password = (request.form.get("password") or "").strip()
+
+        if username == STAFF_PAGE_USERNAME and password == STAFF_PAGE_PASSWORD:
+            session[STAFF_SESSION_KEY] = True
+            return redirect(next_url)
+
+        # 認証失敗
+        return render_template(
+            "staff_login.html",
+            error="ユーザー名またはパスワードが違います",
+            next_url=next_url,
+        ), 401
+
+    return render_template("staff_login.html", error="", next_url=next_url)
+
+
+@app.route("/staff/logout")
+def staff_logout():
+    session.pop(STAFF_SESSION_KEY, None)
+    return redirect(url_for("staff_login"))
+
+
+@app.route("/staff")
+@staff_login_required
+def staff_home():
+    # スタッフ向けリンク集（旧 1link @info 相当）
+    return render_template("staff.html")
+
