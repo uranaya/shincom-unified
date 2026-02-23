@@ -1,11 +1,10 @@
-<!DOCTYPE html>
-
+<!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1" name="viewport"/>
-<title>スタッフページ | 占いの館うらなや</title>
-<style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>スタッフページ | 占いの館うらなや</title>
+  <style>
     body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,Arial,sans-serif;margin:0;background:#f6f7fb;color:#111}
     .topbar{position:sticky;top:0;background:#fff;border-bottom:1px solid #e6e9f0}
     .topbar-inner{max-width:980px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:12px}
@@ -14,7 +13,9 @@
     .btn{display:inline-block;padding:8px 12px;border-radius:10px;border:1px solid #d7dbe3;background:#fff;color:#111;text-decoration:none;font-weight:700;font-size:13px}
     .btn.primary{background:#111;color:#fff;border-color:#111}
     .wrap{max-width:980px;margin:0 auto;padding:18px 16px 40px}
-    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;grid-auto-flow:row dense}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px
+  grid-auto-flow: row dense;
+}
     .card{grid-column:span 12;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:16px}
     @media(min-width:860px){ .card.half{grid-column:span 6} .card.third{grid-column:span 4} }
     h2{font-size:15px;margin:0 0 10px}
@@ -25,115 +26,200 @@
     .muted{color:#555;font-size:13px}
     .pill{display:inline-block;background:#f0f3ff;color:#1a3a8a;border:1px solid #d9e2ff;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700}
     code{background:#f2f4f7;padding:2px 6px;border-radius:6px}
+  
+    .media-img{max-width:100%;height:auto;border-radius:12px;border:1px solid #e6e9f0;box-shadow:0 4px 12px rgba(0,0,0,.06);margin-top:8px}
+    .embed-vertical{position:relative;padding-top:177.77%;margin-top:8px}
+    .embed-horizontal{position:relative;padding-top:56.25%;margin-top:8px}
+    .embed-vertical iframe,.embed-horizontal iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:12px}
+
   </style>
 </head>
 <body>
-<div class="topbar">
-<div class="topbar-inner">
-<div class="title">スタッフページ（おのだサンパーク）</div>
-<div class="spacer"></div>
-<a class="btn" href="/">トップ</a>
-<a class="btn primary" href="/staff/logout">ログアウト</a>
-</div>
-</div>
-<div class="wrap">
-<div class="grid">
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="title">スタッフページ（おのだサンパーク）</div>
+      <div class="spacer"></div>
+      <a class="btn" href="/">トップ</a>
+      <a class="btn primary" href="/staff/logout">ログアウト</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="grid">
 
 
-
-
-
-
-
-
-
-
+<!-- ===== シフトカレンダー ===== -->
 <div class="card">
-<h2>シフトカレンダー</h2>
-<p>
-<a href="https://calendar.google.com/calendar/u/0/embed?src=musubiya.uo@gmail.com&amp;ctz=Asia/Tokyo" rel="noopener" target="_blank">
-      ▶ おのだサンパークシフトカレンダー
+  <h2>シフトカレンダー</h2>
+  <p>
+    <a href="https://calendar.google.com/calendar/u/0/embed?src=musubiya.uo@gmail.com&ctz=Asia/Tokyo"
+       target="_blank" rel="noopener">
+       ▶ おのだサンパークシフトカレンダー
     </a>
-</p>
-<p class="muted">
+  </p>
+  <p class="muted">
     毎月25日ごろまでに来月シフトの変更がある場合は、うらなや個人LINE or グループLINEへ投稿してください。
     急な休みは、うらなや個人LINEへ先に連絡してください。
   </p>
-</div><div class="card">
-<h2>売上レジ入力</h2>
-<p><a class="pill" href="/regi">〖売上レジ入力〗へ</a></p>
-<p class="muted">
-    担当者を選択し、対面 / コンピューター占いの総売上を登録（何回登録してもOK）。<br/>
+</div>
+
+<!-- ===== 売上レジ入力 ===== -->
+<div class="card">
+  <h2>売上レジ入力</h2>
+  <p><a class="pill" href="/regi">〖売上レジ入力〗へ</a></p>
+  <p class="muted">
+    担当者を選択し、対面 / コンピューター占いの総売上を登録（何回登録してもOK）。<br>
     そのうち、QRコード・クレカ決済分を別に登録。消耗品の立替もこちらへ。
   </p>
-</div><div class="card">
-<h2>SNS</h2>
-<p>電話 → <a href="tel:09075062065">090-7506-2065</a></p>
-<p>メール → <a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a></p>
-<p>LINE → <a href="https://line.me/R/ti/p/@uranaya" rel="noopener" target="_blank">https://line.me/R/ti/p/@uranaya</a></p>
-<p>Instagram → <a href="https://www.instagram.com/futamo" rel="noopener" target="_blank">https://www.instagram.com/futamo</a></p>
-<p>X → <a href="https://twitter.com/futamopoppo" rel="noopener" target="_blank">https://twitter.com/futamopoppo</a></p>
-<p>Facebook → <a href="https://www.facebook.com/futamo" rel="noopener" target="_blank">https://www.facebook.com/futamo</a></p>
-</div><div class="card half">
-<h2>シン・コンピューター占いマニュアル🔮💻</h2>
-<p><a href="https://youtube.com/shorts/5v3KPKOny8g?si=yiPCZcLquo-ZDQtL" rel="noopener" target="_blank">▶ YouTubeで開く</a></p>
-<div class="embed-vertical">
-<iframe allowfullscreen="" src="https://www.youtube-nocookie.com/embed/5v3KPKOny8g"></iframe>
 </div>
-</div><div class="card half">
-<h2>クレジット端末操作方法</h2>
-<p><a href="https://youtube.com/shorts/aRJ2ZJ6u2ZI?si=dvlnwQnVFp0d0N8Q" rel="noopener" target="_blank">▶ YouTubeで開く</a></p>
-<div class="embed-vertical">
-<iframe allowfullscreen="" src="https://www.youtube-nocookie.com/embed/aRJ2ZJ6u2ZI"></iframe>
+
+<!-- ===== SNS ===== -->
+<div class="card">
+  <h2>SNS</h2>
+  <p>電話 → <a href="tel:09075062065">090-7506-2065</a></p>
+  <p>メール → <a href="mailto:musubiya.planning@gmail.com">musubiya.planning@gmail.com</a></p>
+  <p>LINE → <a href="https://line.me/R/ti/p/@uranaya" target="_blank" rel="noopener">https://line.me/R/ti/p/@uranaya</a></p>
+  <p>Instagram → <a href="https://www.instagram.com/futamo" target="_blank" rel="noopener">https://www.instagram.com/futamo</a></p>
+  <p>X → <a href="https://twitter.com/futamopoppo" target="_blank" rel="noopener">https://twitter.com/futamopoppo</a></p>
+  <p>Facebook → <a href="https://www.facebook.com/futamo" target="_blank" rel="noopener">https://www.facebook.com/futamo</a></p>
 </div>
-</div><div class="card third">
-<h2>駐車場・従業員口</h2>
-<p class="muted">従業員駐車場に停めて、従業員口で受付 → 店内へ。</p>
-</div><div class="card third">
-<h2>店舗情報</h2>
-<p><span class="pill">営業時間</span> 11時〜18時（早上がり可。早出・居残り・予約鑑定も可）</p>
-<p class="muted">
-          〒756-8585 山口県山陽小野田市中川6丁目4-1<br/>
+
+<!-- ===== 動画マニュアル ===== -->
+<div class="card half">
+  <h2>シン・コンピューター占いマニュアル🔮💻</h2>
+  <p>
+    <a href="https://youtube.com/shorts/5v3KPKOny8g?si=yiPCZcLquo-ZDQtL" target="_blank" rel="noopener">
+      ▶ YouTubeで開く
+    </a>
+  </p>
+  <div class="embed-vertical">
+    <iframe src="https://www.youtube-nocookie.com/embed/5v3KPKOny8g" allowfullscreen></iframe>
+  </div>
+</div>
+
+<div class="card half">
+  <h2>クレジット端末操作方法</h2>
+  <p>
+    <a href="https://youtube.com/shorts/aRJ2ZJ6u2ZI?si=dvlnwQnVFp0d0N8Q" target="_blank" rel="noopener">
+      ▶ YouTubeで開く
+    </a>
+  </p>
+  <div class="embed-vertical">
+    <iframe src="https://www.youtube-nocookie.com/embed/aRJ2ZJ6u2ZI" allowfullscreen></iframe>
+  </div>
+</div>
+
+<p><a href="https://calendar.google.com/" target="_blank" rel="noopener">おのだサンパークシフトカレンダー</a></p>
+        <p class="muted">毎月25日ごろまでに来月シフトの変更がある場合は、うらなや個人LINE or グループLINEへ投稿してください。急な休みは、うらなや個人LINEへ先に連絡してください。</p>
+      </div>
+<p><a class="pill" href="/regi">〖売上レジ入力〗へ</a></p>
+        <p class="muted">担当者を選択し、対面 / コンピューター占いの総売上を登録（何回登録してもOK）。<br>
+        そのうち、QRコード・クレカ決済分を別に登録。消耗品の立替もこちらへ。</p>
+      </div>
+
+      <div class="card third">
+        <h2>駐車場・従業員口</h2>
+
+  <p>
+    <a href="https://maps.app.goo.gl/mfyVan5f6HN4JsFMA" target="_blank" rel="noopener">📍 Googleマップで見る</a>
+  </p>
+  <p class="muted">紙の案内図（写真）</p>
+  <img class="media-img" src="/static/おのだサンパーク店1.jpg" alt="駐車場案内図" loading="lazy">
+  <img class="media-img" src="/static/おのだサンパーク店2.jpg" alt="館内マップ・店舗位置" loading="lazy">
+
+  <p style="margin-top:10px;">
+    <a href="https://youtube.com/shorts/A2N7IeKhYQ4?si=Jghe3kzhc2sbWQT0" target="_blank" rel="noopener">
+      🎥 駐車場・従業員口（動画）
+    </a>
+  </p>
+  <div class="embed-vertical">
+    <iframe src="https://www.youtube-nocookie.com/embed/A2N7IeKhYQ4" allowfullscreen></iframe>
+  </div>
+
+        <p class="muted">従業員駐車場に停めて、従業員口で受付 → 店内へ。</p>
+      </div>
+
+      <div class="card third">
+        <h2>店舗情報</h2>
+        <p><span class="pill">営業時間</span> 11時〜18時（早上がり可。早出・居残り・予約鑑定も可）</p>
+        <p class="muted">
+          〒756-8585 山口県山陽小野田市中川6丁目4-1<br>
           2階 HONEYS前 / フライングタイガー側 / マッサージチェア横
         </p>
-<p><a href="https://sunpark.co.jp/" rel="noopener" target="_blank">おのだサンパーク公式</a></p>
-</div><div class="card half">
-<h2>プリンター不具合（Brother HL-L2460DW）</h2>
-<ul>
-<li><a href="https://support.brother.co.jp/j/b/faqend.aspx?c=jp&amp;lang=ja&amp;prod=hll2460dw_as&amp;faqid=faq00100802_000" rel="noopener" target="_blank">用紙トレイで紙が詰まっている</a></li>
-<li><a href="https://support.brother.co.jp/j/b/faqend.aspx?c=jp&amp;lang=ja&amp;prod=hll2460dw_as&amp;faqid=faq00100803_000" rel="noopener" target="_blank">両面トレイの内部で紙が詰まっている</a></li>
-<li><a href="https://support.brother.co.jp/j/b/faqend.aspx?c=jp&amp;lang=ja&amp;prod=hll2460dw_as&amp;faqid=faq00100804_000" rel="noopener" target="_blank">製品の内部で紙が詰まっている</a></li>
-<li><a href="https://support.brother.co.jp/j/b/faqend.aspx?c=jp&amp;lang=ja&amp;prod=hll2460dw_as&amp;faqid=faq00100805_000" rel="noopener" target="_blank">製品の背面で紙が詰まっている</a></li>
-</ul>
-</div><div class="card half">
-<h2>Wi‑Fi</h2>
-<p class="muted">Wi‑Fiルーターのパスワードを入れて繋がらない場合：<br/>
+        <p><a href="https://sunpark.co.jp/" target="_blank" rel="noopener">おのだサンパーク公式</a></p>
+      </div>
+<div class="card half">
+        <h2>プリンター不具合（Brother HL-L2460DW）</h2>
+        <ul>
+          <li><a href="https://support.brother.co.jp/j/b/faqend.aspx?c=jp&lang=ja&prod=hll2460dw_as&faqid=faq00100802_000" target="_blank" rel="noopener">用紙トレイで紙が詰まっている</a></li>
+          <li><a href="https://support.brother.co.jp/j/b/faqend.aspx?c=jp&lang=ja&prod=hll2460dw_as&faqid=faq00100803_000" target="_blank" rel="noopener">両面トレイの内部で紙が詰まっている</a></li>
+          <li><a href="https://support.brother.co.jp/j/b/faqend.aspx?c=jp&lang=ja&prod=hll2460dw_as&faqid=faq00100804_000" target="_blank" rel="noopener">製品の内部で紙が詰まっている</a></li>
+          <li><a href="https://support.brother.co.jp/j/b/faqend.aspx?c=jp&lang=ja&prod=hll2460dw_as&faqid=faq00100805_000" target="_blank" rel="noopener">製品の背面で紙が詰まっている</a></li>
+        </ul>
+      </div>
+
+      <div class="card half">
+        <h2>Wi‑Fi</h2>
+
+  <img class="media-img" src="/static/Wi-Fi🛜の繋げ方1.jpg" alt="Wi‑Fi接続画面例" loading="lazy">
+  <p>
+    <a href="https://youtu.be/iOCRhSMHsaw" target="_blank" rel="noopener">📶 Wi‑Fi🛜の繋げ方（動画）</a>
+  </p>
+  <div class="embed-horizontal">
+    <iframe src="https://www.youtube-nocookie.com/embed/iOCRhSMHsaw" allowfullscreen></iframe>
+  </div>
+
+        <p class="muted">Wi‑Fiルーターのパスワードを入れて繋がらない場合：<br>
         ①ルーター電源オフ→オン → ②PC側Wi‑FiボタンOFF→ON → ③ダメならPC再起動</p>
-<p><span class="pill">SSID</span> <code>Rakuten-F026</code></p>
-<p><span class="pill">パスワード</span> <code>R4HPJ79BC52LJHE8</code></p>
-<p class="muted">
+
+        <p><span class="pill">SSID</span> <code>Rakuten-F026</code></p>
+        <p><span class="pill">パスワード</span> <code>R4HPJ79BC52LJHE8</code></p>
+
+        <p class="muted">
           ルーター説明（楽天モバイル）：
-          <a href="https://network.mobile.rakuten.co.jp/support/manual/" rel="noopener" target="_blank">説明書ページ</a>
+          <a href="https://network.mobile.rakuten.co.jp/support/manual/" target="_blank" rel="noopener">説明書ページ</a>
           （WPS短押しでQR/パスワード表示など）
         </p>
-</div><div class="card half">
-<h2>カメラ：コンピューター占いのカメラが映らない</h2>
-<p class="muted">カメラのUSBケーブル抜き差し → ブラウザを閉じて開き直す。<br/>
+      </div>
+
+      <div class="card half">
+        <h2>カメラ：コンピューター占いのカメラが映らない</h2>
+
+  <p class="muted">配線・USB差し込みの参考（写真）</p>
+  <img class="media-img" src="/static/コンピューター占いのカメラが映らない1.jpg" alt="カメラ配線・USB確認" loading="lazy">
+  <img class="media-img" src="/static/コンピューター占いのカメラが映らない2.jpg" alt="カメラ本体の状態確認" loading="lazy">
+
+  <p style="margin-top:10px;">
+    <a href="https://www.youtube.com/shorts/U4KNtoFM_gI?feature=share" target="_blank" rel="noopener">
+      📷 カメラが映らない（動画）
+    </a>
+  </p>
+  <div class="embed-vertical">
+    <iframe src="https://www.youtube-nocookie.com/embed/U4KNtoFM_gI" allowfullscreen></iframe>
+  </div>
+
+        <p class="muted">カメラのUSBケーブル抜き差し → ブラウザを閉じて開き直す。<br>
         接触不良の可能性があるのでケーブルに衝撃を与えないよう注意。</p>
-</div><div class="card half">
-<h2>コピー用紙が無い場合</h2>
-<p class="muted">DAISOでA4コピー用紙（100枚入り）を購入 → 領収書をレターボックス等に入れて報告。<br/>
+      </div>
+
+      <div class="card half">
+        <h2>コピー用紙が無い場合</h2>
+        <p class="muted">DAISOでA4コピー用紙（100枚入り）を購入 → 領収書をレターボックス等に入れて報告。<br>
         その金額分を売上入力の「現金外」に入力。</p>
-</div><div class="card">
-<h2>新人さん向け概要</h2>
-<p class="muted">
-          店舗はおのだサンパーク2階。対面鑑定ブース1つ・コンピューター占いブース1つ。<br/>
-          出店料は完全歩合制：対面鑑定は売上の30%、コンピューター占いは50%。<br/>
-          対面鑑定の料金（暫定）：10分ごと 1,650円（税込）。特別高いメニューは必ず説明の上で。<br/>
-          これより安いメニューを出す場合は他の先生との兼ね合いがあるため要相談。<br/>
+      </div>
+
+      <div class="card">
+        <h2>新人さん向け概要</h2>
+        <p class="muted">
+          店舗はおのだサンパーク2階。対面鑑定ブース1つ・コンピューター占いブース1つ。<br>
+          出店料は完全歩合制：対面鑑定は売上の30%、コンピューター占いは50%。<br>
+          対面鑑定の料金（暫定）：10分ごと 1,650円（税込）。特別高いメニューは必ず説明の上で。<br>
+          これより安いメニューを出す場合は他の先生との兼ね合いがあるため要相談。<br>
           釣り銭・ポップ・名刺・道具は各自持参。
         </p>
-</div></div>
-</div>
+      </div>
+
+    </div>
+  </div>
 </body>
 </html>
