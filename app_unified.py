@@ -8,15 +8,18 @@ import traceback
 import io
 import csv
 import re
+import time
+from datetime import timedelta
 
 import psycopg2
 import psycopg2.extras
 
 from io import TextIOWrapper
 from datetime import datetime
+from itsdangerous import BadSignature, URLSafeSerializer
 from urllib.parse import quote
 from sqlalchemy import create_engine, text
-from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response,render_template_string
+from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, make_response,render_template_string, abort
 from fortune_logic import generate_fortune
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
@@ -179,6 +182,65 @@ UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", ".")
 # Flask アプリ初期化
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "secret!123")
+
+PDF_SHARE_TTL_SECONDS = int(os.getenv("PDF_SHARE_TTL_SECONDS", "86400"))
+
+def _get_pdf_share_serializer():
+    return URLSafeSerializer(app.secret_key, salt="pdf-share")
+
+def _build_pdf_share_token(filename: str) -> str:
+    payload = {
+        "filename": filename,
+        "expires_at": int(time.time()) + PDF_SHARE_TTL_SECONDS,
+    }
+    return _get_pdf_share_serializer().dumps(payload)
+
+def _parse_pdf_share_token(token: str):
+    try:
+        data = _get_pdf_share_serializer().loads(token)
+    except BadSignature:
+        return None, "リンクが無効です"
+
+    filename = data.get("filename", "")
+    expires_at = int(data.get("expires_at", 0) or 0)
+    if not filename or expires_at <= 0:
+        return None, "リンクが不正です"
+    if time.time() > expires_at:
+        return None, "有効期限が切れています"
+
+    full_path = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.exists(full_path):
+        return None, "PDFが見つかりませんでした"
+
+    return {
+        "filename": filename,
+        "full_path": full_path,
+        "expires_at": expires_at,
+    }, None
+
+def _format_expire_text(expires_at: int) -> str:
+    dt = datetime.fromtimestamp(expires_at)
+    return dt.strftime("%Y-%m-%d %H:%M")
+
+def _make_qr_data_uri(value: str) -> str:
+    qr = qrcode.QRCode(box_size=6, border=2)
+    qr.add_data(value)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
+
+def _make_pdf_share_context(filename: str):
+    token = _build_pdf_share_token(filename)
+    share_url = url_for("pdf_result_page", token=token, _external=True)
+    download_url = url_for("pdf_download_via_token", token=token, _external=True)
+    return {
+        "pdf_share_url": share_url,
+        "pdf_download_url": download_url,
+        "pdf_qr_img": _make_qr_data_uri(share_url),
+        "pdf_expires_text": _format_expire_text(int(time.time()) + PDF_SHARE_TTL_SECONDS),
+    }
 
 # --- Online booking route registration ---
 if DATABASE_URL:
@@ -964,17 +1026,55 @@ def renaiselfmob_uuid(uuid_str):
 def preview(filename):
     """占い結果PDFのプレビュー画面表示"""
     user_agent = request.headers.get("User-Agent", "").lower()
+    share_ctx = _make_pdf_share_context(filename)
 
-    # iPhoneまたはAndroidの簡易判定（必要に応じて拡張可）
+    # iPhoneまたはAndroidでは、お客様用の保存ページへ
     if "iphone" in user_agent or "android" in user_agent:
-        return redirect(url_for("view_pdf", filename=filename))
+        return redirect(share_ctx["pdf_share_url"])
 
     referer = request.referrer or ""
-    return render_template("fortune_pdf.html", filename=filename, referer=referer)
+    return render_template(
+        "fortune_pdf.html",
+        filename=filename,
+        referer=referer,
+        **share_ctx,
+    )
 
 
+@app.route("/r/<token>")
+def pdf_result_page(token):
+    payload, error = _parse_pdf_share_token(token)
+    if error:
+        return render_template("pdf_result.html", error_message=error), 404
 
-import time
+    share_url = url_for("pdf_result_page", token=token, _external=True)
+    download_url = url_for("pdf_download_via_token", token=token, _external=True)
+    qr_img = _make_qr_data_uri(share_url)
+    return render_template(
+        "pdf_result.html",
+        filename=payload["filename"],
+        pdf_share_url=share_url,
+        pdf_download_url=download_url,
+        pdf_qr_img=qr_img,
+        pdf_expires_text=_format_expire_text(payload["expires_at"]),
+        error_message=None,
+    )
+
+
+@app.route("/d/<token>")
+def pdf_download_via_token(token):
+    payload, error = _parse_pdf_share_token(token)
+    if error:
+        return error, 404
+
+    return send_file(
+        payload["full_path"],
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=payload["filename"],
+    )
+
+
 @app.route('/view/<filename>')
 def view_pdf(filename):
     full_path = os.path.join(UPLOAD_FOLDER, filename)

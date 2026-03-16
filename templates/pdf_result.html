@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>鑑定結果の保存</title>
+  <style>
+    body {
+      margin: 0;
+      background: #f7f4ef;
+      color: #2c2c2c;
+      font-family: sans-serif;
+    }
+    .container {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+      text-align: center;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px 18px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    }
+    h1 {
+      font-size: 24px;
+      margin: 0 0 10px;
+    }
+    p {
+      line-height: 1.7;
+      font-size: 15px;
+      margin: 8px 0;
+    }
+    .qr {
+      margin: 18px 0;
+    }
+    .qr img {
+      width: 240px;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 10px;
+      box-sizing: border-box;
+      background: #fff;
+    }
+    .btn {
+      display: block;
+      margin-top: 12px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: bold;
+      background: #333;
+      color: #fff;
+    }
+    .btn.sub {
+      background: #777;
+    }
+    .meta {
+      font-size: 13px;
+      color: #666;
+      margin-top: 14px;
+    }
+    .error {
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px 18px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    {% if error_message %}
+      <div class="error">
+        <h1>ページを開けません</h1>
+        <p>{{ error_message }}</p>
+      </div>
+    {% else %}
+      <div class="card">
+        <h1>鑑定結果を保存できます</h1>
+        <p>下のボタンからPDFをダウンロードしてください。</p>
+        <div class="qr">
+          <img src="{{ pdf_qr_img }}" alt="保存ページQRコード">
+        </div>
+        <a class="btn" href="{{ pdf_download_url }}">PDFをダウンロード</a>
+        <a class="btn sub" href="{{ pdf_share_url }}">このページを再表示</a>
+        <p class="meta">有効期限: {{ pdf_expires_text }}</p>
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>
