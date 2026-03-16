@@ -7,6 +7,7 @@ import requests
 import traceback
 import io
 import csv
+import qrcode
 import re
 import time
 from datetime import timedelta
