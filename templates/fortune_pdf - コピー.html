@@ -111,22 +111,14 @@
 <body>
 
 <div class="topbar">
-  {% if '/selfmob_full/' in referer %}
-    <a href="{{ url_for('selfmob_start') }}">🔙 ホームに戻る</a>
-  {% elif '/selfmob/' in referer %}
-    <a href="{{ url_for('selfmob_start') }}">🔙 ホームに戻る</a>
-  {% elif '/renaiselfmob_full/' in referer %}
-    <a href="{{ url_for('selfmob_start') }}">🔙 ホームに戻る</a>
-  {% elif '/renaiselfmob/' in referer %}
-    <a href="{{ url_for('selfmob_start') }}">🔙 ホームに戻る</a>
+  {% if '/renai' in referer %}
+    <a href="{{ url_for('renai') }}">🔙 恋愛鑑定に戻る</a>
+  {% elif '/renaib4' in referer %}
+    <a href="{{ url_for('renai') }}">🔙 恋愛鑑定に戻る</a>
   {% elif '/tenmob' in referer %}
     <a href="{{ url_for('tenmob') }}">🔙 占い画面に戻る</a>
   {% elif '/ten' in referer %}
     <a href="{{ url_for('ten') }}">🔙 占い画面に戻る</a>
-  {% elif '/renai' in referer %}
-    <a href="{{ url_for('renai') }}">🔙 恋愛鑑定に戻る</a>
-  {% elif '/renaib4' in referer %}
-    <a href="{{ url_for('renai') }}">🔙 恋愛鑑定に戻る</a>
   {% else %}
     <a href="{{ url_for('home') }}">🔙 トップに戻る</a>
   {% endif %}
