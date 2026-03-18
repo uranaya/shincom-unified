@@ -167,7 +167,7 @@ import threading
 PRICE_MAP = {
     "tarotmob": 550,
     "selfmob": 550,
-    "selfmob_full": 1,
+    "selfmob_full": 1100,
     "renaiselfmob": 550,
     "renaiselfmob_full": 1100
 }
