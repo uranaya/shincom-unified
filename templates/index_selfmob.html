@@ -30,8 +30,39 @@
       font-size: 16px;
       padding: 10px;
       margin: 10px 0;
-      width: 100%;
       box-sizing: border-box;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    input[type="file"],
+    textarea,
+    select,
+    button {
+      width: 100%;
+    }
+
+    input[type="checkbox"] {
+      width: auto;
+      padding: 0;
+      margin: 0;
+      flex: 0 0 auto;
+    }
+
+    .option-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 12px 0;
+      line-height: 1.35;
+      user-select: none;
+    }
+
+    .option-label span {
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: normal;
     }
 
     .camera-controls {
@@ -46,11 +77,12 @@
       font-size: 16px;
     }
 
-    #video {
+    #camera {
       width: 100%;
-      max-height: 240px; /* モバイルでの表示対応 */
-      object-fit: contain;
+      max-width: 400px;
+      max-height: 280px;
       border: 1px solid #ccc;
+      object-fit: contain;
     }
 
     #canvas {
@@ -59,34 +91,108 @@
       border: 1px solid #ccc;
     }
 
-    #eto-display {
+    #eto-display, #zodiac-display {
       font-size: 16px;
       margin-top: 5px;
       margin-bottom: 10px;
       color: #444;
     }
+
+    .wareki-group {
+      display: flex;
+      justify-content: space-between;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+
+    .wareki-group input, .wareki-group select {
+      width: 30%;
+      padding: 8px;
+    }
+
+    .fixed-plan {
+      padding: 12px;
+      background: #f6f6f6;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      margin: 12px 0 18px;
+    }
   </style>
+
+  <audio id="shutterSound" src="/static/shutter.mp3" preload="auto"></audio>
+  <audio id="clickSound" src="/static/click.mp3" preload="auto"></audio>
+  <audio id="chimeSound" src="/static/chime.mp3" preload="auto"></audio>
 </head>
 <body>
   <div class="content-wrapper">
     <h2>📸 手相撮影＆送信フォーム</h2>
 
+    <div class="fixed-plan">
+      {% if full_year %}
+        <strong>現在のプラン：</strong> 1年分の運勢つき
+      {% else %}
+        <strong>現在のプラン：</strong> 通常鑑定
+      {% endif %}
+    </div>
+
     <canvas id="canvas" style="display:none;"></canvas>
 
     <div class="camera-controls">
-      <button onclick="toggleCamera()">🔄 カメラ切替</button>
-      <button onclick="takePhoto()">📷 撮影</button>
+      <button type="button" onclick="toggleCamera()">🔄 カメラ切替</button>
+      <button type="button" onclick="takePhoto()">📷 撮影</button>
     </div>
 
     <video id="camera" autoplay playsinline></video>
 
-    <label for="birthdate">生年月日：</label>
+    <label for="birthdate">生年月日（西暦）：</label>
     <input type="date" id="birthdate" required oninput="fetchEto()">
     <div id="eto-display"></div>
+    <div id="zodiac-display"></div>
 
-    <button id="submitBtn" onclick="submitForm()">送信してPDF生成</button>
+    <label>生年月日（和暦で入力）：</label>
+    <div class="wareki-group">
+      <select id="era">
+        <option value="令和">令和</option>
+        <option value="平成">平成</option>
+        <option value="昭和">昭和</option>
+      </select>
+      <input type="number" id="era-year" placeholder="年" min="1">
+      <input type="number" id="month" placeholder="月" min="1" max="12">
+      <input type="number" id="day" placeholder="日" min="1" max="31">
+    </div>
+    <button type="button" onclick="convertWarekiToSeireki()">⬅ 和暦 → 西暦に反映</button>
 
-    <form action="/logout"><button>ログアウト</button></form>
+    <label class="option-label" for="force_next_month">
+      <input type="checkbox" id="force_next_month" name="force_next_month" value="yes">
+      <span>来月・再来月を占う（20日以前でも来月起点にする）</span>
+    </label>
+
+    <label for="output_mode" style="display:block; margin-top:16px; font-weight:600;">出力モード：</label>
+    <select id="output_mode" style="width: 100%; max-width: 420px; padding: 10px; border-radius: 10px; border: 1px solid #ccc;">
+      <option value="ja" selected>日本語（標準）</option>
+      <option value="tokyo">日本語（東京・浅草）</option>
+      <option value="yuta_safe">日本語（ユタ調・安全版）</option>
+      <option value="en">English</option>
+      <option value="zh">中文（简体）</option>
+      <option value="ko">한국어</option>
+    </select>
+
+    <label class="option-label" for="tokyo_mode" style="display:none;">
+      <input type="checkbox" id="tokyo_mode" name="tokyo_mode" value="yes">
+      <span>東京（浅草）向けの文章にする</span>
+    </label>
+
+    <label class="option-label" for="yuta_mode" style="display:none;">
+      <input type="checkbox" id="yuta_mode" name="yuta_mode" value="yes">
+      <span>ユタ調（安全版）にする</span>
+    </label>
+
+    <label class="option-label" for="english_output" style="display:none;">
+      <input type="checkbox" id="english_output" name="english_output" value="yes">
+      <span>English output</span>
+    </label>
+
+    <button id="submitBtn" type="button" onclick="submitForm()">送信してPDF生成</button>
 
     <footer style="text-align:center; font-size:small; margin-top:40px; padding:20px; background-color:#f9f9f9;">
       <p style="margin-bottom:10px;">
@@ -131,6 +237,15 @@
     }
 
     function takePhoto() {
+      const shutter = document.getElementById("shutterSound");
+      if (shutter) {
+        try {
+          shutter.currentTime = 0;
+          const p = shutter.play();
+          if (p && typeof p.then === "function") p.catch(() => {});
+        } catch (_) {}
+      }
+
       const width = 600;
       const height = video.videoHeight * (600 / video.videoWidth);
       canvas.width = width;
@@ -140,14 +255,58 @@
       alert("📷 撮影完了しました！");
     }
 
+    function convertWarekiToSeireki() {
+      const era = document.getElementById("era").value;
+      const eraYear = parseInt(document.getElementById("era-year").value);
+      const month = parseInt(document.getElementById("month").value);
+      const day = parseInt(document.getElementById("day").value);
+
+      if (!eraYear || !month || !day) {
+        alert("和暦の年・月・日をすべて入力してください。");
+        return;
+      }
+
+      let offset = 0;
+      if (era === "令和") offset = 2018;
+      else if (era === "平成") offset = 1988;
+      else if (era === "昭和") offset = 1925;
+
+      const year = offset + eraYear;
+      const formatted = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      document.getElementById("birthdate").value = formatted;
+      fetchEto();
+    }
+
+    function getZodiacSign(month, day) {
+      if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) return "牡羊座";
+      if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) return "牡牛座";
+      if ((month === 5 && day >= 21) || (month === 6 && day <= 21)) return "双子座";
+      if ((month === 6 && day >= 22) || (month === 7 && day <= 22)) return "蟹座";
+      if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) return "獅子座";
+      if ((month === 8 && day >= 23) || (month === 9 && day <= 22)) return "乙女座";
+      if ((month === 9 && day >= 23) || (month === 10 && day <= 23)) return "天秤座";
+      if ((month === 10 && day >= 24) || (month === 11 && day <= 22)) return "蠍座";
+      if ((month === 11 && day >= 23) || (month === 12 && day <= 21)) return "射手座";
+      if ((month === 12 && day >= 22) || (month === 1 && day <= 20)) return "山羊座";
+      if ((month === 1 && day >= 21) || (month === 2 && day <= 18)) return "水瓶座";
+      if ((month === 2 && day >= 19) || (month === 3 && day <= 20)) return "魚座";
+      return "";
+    }
+
     async function fetchEto() {
       const birthdate = document.getElementById("birthdate").value;
       const etoDisplay = document.getElementById("eto-display");
+      const zodiacDisplay = document.getElementById("zodiac-display");
 
       if (!birthdate) {
         etoDisplay.textContent = "";
+        zodiacDisplay.textContent = "";
         return;
       }
+
+      const [year, month, day] = birthdate.split("-").map(Number);
+      const zodiac = getZodiacSign(month, day);
+      zodiacDisplay.textContent = `あなたの星座：${zodiac}`;
 
       try {
         const response = await fetch("/get_eto", {
@@ -173,26 +332,21 @@
       }
     }
 
-    async function waitForPDFAndRedirect(filename) {
-      const maxRetries = 10;
-      const delay = 1000;
-      for (let i = 0; i < maxRetries; i++) {
-        const res = await fetch(`/view/${filename}`, { method: "HEAD" });
-        if (res.status === 200) {
-          window.location.href = `/view/${filename}`;
-          return;
-        }
-        await new Promise(r => setTimeout(r, delay));
-      }
-      alert("PDFの準備に時間がかかっています。再読み込みしてください。");
-    }
-
     async function submitForm() {
+      const click = document.getElementById("clickSound");
+      if (click) {
+        try {
+          click.currentTime = 0;
+          const p = click.play();
+          if (p && typeof p.then === "function") p.catch(() => {});
+        } catch (_) {}
+      }
+
       const birthdate = document.getElementById("birthdate").value;
       const imageData = canvas.toDataURL("image/png");
       const path = window.location.pathname;
 
-      if (!birthdate || !imageData) {
+      if (!birthdate || !imageData || imageData === "data:,") {
         alert("生年月日と手相画像の両方を入力してください。");
         return;
       }
@@ -201,10 +355,32 @@
       btn.disabled = true;
       btn.textContent = "鑑定中... 1分程度お待ちください";
 
+      const forceNextMonth = document.getElementById("force_next_month")?.checked || false;
+      const mode = document.getElementById("output_mode")?.value || "ja";
+
+      const tokyoChk = document.getElementById("tokyo_mode");
+      const enChk = document.getElementById("english_output");
+      const yutaChk = document.getElementById("yuta_mode");
+      if (tokyoChk) tokyoChk.checked = (mode === "tokyo");
+      if (enChk) enChk.checked = (mode === "en");
+      if (yutaChk) yutaChk.checked = (mode === "yuta_safe");
+
+      const tokyoMode = (mode === "tokyo");
+      const englishOutput = (mode === "en");
+      const yutaMode = (mode === "yuta_safe");
+      const outputStyle = (mode === "tokyo") ? "tokyo" : (yutaMode ? "yuta_safe" : "normal");
+      const outputLang = (mode === "zh") ? "zh" : ((mode === "ko") ? "ko" : (englishOutput ? "en" : "ja"));
+
       const payload = {
         image_data: imageData,
         birthdate,
-        full_year: false
+        force_next_month: forceNextMonth,
+        tokyo_mode: tokyoMode,
+        yuta_mode: yutaMode,
+        english_output: englishOutput,
+        output_lang: outputLang,
+        output_style: outputStyle,
+        output_mode: mode
       };
 
       try {
@@ -213,15 +389,37 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
+
+        const ct = response.headers.get("content-type") || "";
+        if (!ct.includes("application/json")) {
+          const txt = await response.text();
+          throw new Error(`サーバーがJSONを返しませんでした (HTTP ${response.status}). ` + txt.slice(0, 200));
+        }
+
         const result = await response.json();
+
         if (result.redirect_url) {
-          const filename = result.redirect_url.split("/").pop();
-          waitForPDFAndRedirect(filename);
+          const chime = document.getElementById("chimeSound");
+          try {
+            chime.currentTime = 0;
+            const playPromise = chime.play();
+            if (playPromise && typeof playPromise.then === "function") {
+              await Promise.race([
+                playPromise.catch(() => {}),
+                new Promise(res => setTimeout(res, 700))
+              ]);
+            }
+          } catch (_) {}
+
+          window.location.href = result.redirect_url;
         } else {
           alert("PDF生成後のリダイレクトが取得できませんでした");
         }
       } catch (error) {
         alert("送信エラー: " + error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "送信してPDF生成";
       }
     }
 

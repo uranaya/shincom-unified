@@ -166,7 +166,7 @@ import threading
 # 料金設定（テスト中はここをいじるだけ）
 PRICE_MAP = {
     "tarotmob": 550,
-    "selfmob": 1,
+    "selfmob": 550,
     "selfmob_full": 1100,
     "renaiselfmob": 550,
     "renaiselfmob_full": 1100
@@ -548,13 +548,9 @@ def pay_redirect():
 
     if "tarotmob" in mode_key:
         return redirect(f"/tarotmob/{uuid_str}")
-    elif mode_key == "renaiselfmob_full":
-        return redirect(f"/renaiselfmob_full/{uuid_str}")
-    elif mode_key == "renaiselfmob":
+    elif "renaiselfmob" in mode_key:
         return redirect(f"/renaiselfmob/{uuid_str}")
-    elif mode_key == "selfmob_full":
-        return redirect(f"/selfmob_full/{uuid_str}")
-    elif mode_key == "selfmob":
+    elif "selfmob" in mode_key:
         return redirect(f"/selfmob/{uuid_str}")
     else:
         return "不明なモードです", 400
@@ -612,6 +608,12 @@ def selfmob_shop_entry(shop_id):
 
 
 
+@app.route("/selfmob/<uuid_str>")
+def selfmob_entry_uuid(uuid_str):
+    if not is_paid_uuid(uuid_str):
+        return "このUUIDは未決済です", 403
+    record_shop_log_if_needed(uuid_str, "selfmob")
+    return render_template("index_selfmob.html", full_year=False)
 
 
 
@@ -810,264 +812,135 @@ def webhook_renaiselfmob():
 
 
 @app.route("/selfmob/<uuid_str>", methods=["GET", "POST"])
-@app.route("/selfmob_full/<uuid_str>", methods=["GET", "POST"])
 def selfmob_uuid(uuid_str):
     full_year = None
-    mode_key = None
-
     try:
         with open(USED_UUID_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
-                if len(parts) < 3:
+                if not parts or len(parts) < 3:
                     continue
                 uid, flag, mode = parts[0], parts[1], parts[2]
                 if uid == uuid_str and mode.startswith("selfmob"):
-                    mode_key = mode
                     full_year = mode.endswith("_full")
                     break
-
         if full_year is None:
             return "無効なリンクです（UUID不一致）", 400
-
     except FileNotFoundError:
         return "使用履歴が確認できません", 400
 
-    if not is_paid_uuid(uuid_str):
-        return "このUUIDは未決済です", 403
+    if request.method == "POST":
+        is_json = request.is_json
+        try:
+            data = request.get_json() if is_json else request.form
+            image_data = data.get("image_data")
+            birthdate = data.get("birthdate")
+            now = datetime.now()
 
-    if request.method == "GET":
-        record_shop_log_if_needed(uuid_str, mode_key or "selfmob")
-        return render_template(
-            "index_selfmob.html",
-            uuid_str=uuid_str,
-            full_year=full_year
-        )
-
-    is_json = request.is_json
-
-    try:
-        data = request.get_json() if is_json else request.form
-
-        image_data = data.get("image_data")
-        birthdate = data.get("birthdate")
-        force_next_month = data.get("force_next_month", False) if is_json else (data.get("force_next_month") == "yes")
-
-        if not birthdate or not image_data:
-            return jsonify({"error": "生年月日または画像が不足しています"}) if is_json else ("生年月日または画像が不足しています", 400)
-
-        def _truthy(v):
-            if v is None:
-                return False
-            s = str(v).strip().lower()
-            return s in ("1", "true", "yes", "on", "en", "english")
-
-        output_lang = (data.get("output_lang") or data.get("lang") or data.get("language") or "").strip().lower()
-
-        if output_lang in ("en", "english"):
-            output_lang = "en"
-        elif output_lang in ("zh", "cn", "chinese", "zh-cn", "zh_cn", "zh-hans", "zh_hans"):
-            output_lang = "zh"
-        elif output_lang in ("ko", "kr", "korean"):
-            output_lang = "ko"
-        elif output_lang in ("ja", "jp", "japanese"):
-            output_lang = "ja"
-        else:
-            output_lang = ""
-
-        if not output_lang:
-            en_flag = (
-                data.get("lang_en")
-                or data.get("en")
-                or data.get("english")
-                or data.get("english_output")
-                or data.get("output_en")
-                or data.get("output_english")
+            try:
+                year, month, day = map(int, birthdate.split("-"))
+            except Exception:
+                return "生年月日が不正です", 400
+            try:
+                kyusei_text = get_kyusei_fortune(year, month, day, now=now, force_next_month=force_next_month, lang=output_lang)
+            except Exception as e:
+                print("❌ lucky_direction 取得エラー:", e)
+                kyusei_text = ""
+            eto = get_nicchu_eto(birthdate)
+            # NOTE: output_lang(ja/en/zh/ko) を fortune_logic 側へ渡す。
+            # これにより「ラッキー情報/ラッキーナンバー」等が言語に合わせて出力され、
+            # KOフォントでの文字化け（□表示）も回避できます。
+            palm_titles, palm_texts, shichu_result, iching_result, lucky_info = generate_fortune_shincom(
+                image_data, birthdate, kyusei_text, lang=output_lang
             )
-            if _truthy(en_flag):
-                output_lang = "en"
-
-        if not output_lang:
-            for k, v in (data.items() if hasattr(data, "items") else []):
-                kl = str(k).strip().lower()
-                vl = str(v).strip().lower() if v is not None else ""
-                if vl in ("en", "english") and ("lang" in kl or "language" in kl or "output" in kl):
-                    output_lang = "en"
-                    break
-                if ("english" in kl) or re.search(r"(^|_)en($|_)", kl):
-                    if _truthy(v):
-                        output_lang = "en"
-                        break
-
-        output_lang = output_lang or "ja"
-        if output_lang not in ("ja", "en", "zh", "ko"):
-            output_lang = "ja"
-
-        output_style = (data.get("output_style") or data.get("style") or data.get("outputStyle") or "").strip().lower()
-        output_mode = (data.get("output_mode") or data.get("mode") or "").strip().lower()
-        yuta_flag = data.get("yuta_mode") or data.get("yuta")
-        tokyo_flag = data.get("tokyo_mode") or data.get("tokyo")
-
-        if not output_style:
-            if output_mode in ("yuta_safe", "yuta") or _truthy(yuta_flag):
-                output_style = "yuta_safe"
-            elif output_mode in ("tokyo", "asakusa") or _truthy(tokyo_flag):
-                output_style = "tokyo"
+            palm_result = "\n".join(palm_texts)
+            summary_text = palm_texts[5] if len(palm_texts) > 5 else ""
+            lucky_lines = []
+            if isinstance(lucky_info, str):
+                for line in lucky_info.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+                    line = line.strip()
+                    if line:
+                        if line.startswith("・"):
+                            line = line[1:].strip()
+                        lucky_lines.append(line.replace(":", "：", 1))
+            elif isinstance(lucky_info, dict):
+                for k, v in lucky_info.items():
+                    line = f"{k}：{v}".strip()
+                    if line:
+                        if line.startswith("・"):
+                            line = line[1:].strip()
+                        lucky_lines.append(line)
             else:
-                output_style = "normal"
+                for item in lucky_info:
+                    for line in str(item).replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+                        line = line.strip()
+                        if line:
+                            if line.startswith("・"):
+                                line = line[1:].strip()
+                            lucky_lines.append(line.replace(":", "：", 1))
 
-        if output_style not in ("normal", "tokyo", "yuta_safe"):
-            output_style = "normal"
+            today = datetime.today()
+            target1 = today.replace(day=15)
+            if today.day >= 20:
+                target1 += relativedelta(months=1)
+            target2 = target1 + relativedelta(months=1)
 
-        if output_lang != "ja":
-            output_style = "normal"
+            result_data = {
+                        "lang": output_lang,
+                "output_lang": output_lang,
+                "style": "default",
+                "palm_titles": palm_titles,
+                "palm_texts": palm_texts,
+                "titles": ({
+                    "palm_summary": "Palm Reading Summary",
+                    "personality": "Personality Profile",
+                    "year_fortune": year_label,
+                    "month_fortune": month_label,
+                    "next_month_fortune": next_month_label
+                } if output_lang == "en" else {
+                    "palm_summary": "手相の総合アドバイス",
+                    "personality": "性格診断",
+                    "year_fortune": year_label,
+                    "month_fortune": month_label,
+                    "next_month_fortune": next_month_label
+                }),
+                "texts": {
+                    "palm_summary": summary_text,
+                    "personality": shichu_result.get("personality", ""),
+                    "year_fortune": shichu_result.get("year_fortune", ""),
+                    "month_fortune": shichu_result.get("month_fortune", ""),
+                    "next_month_fortune": shichu_result.get("next_month_fortune", ""),
+                },
+                "lucky_info": lucky_lines,
+                "lucky_direction": kyusei_text,
+                "birthdate": birthdate,
+                "palm_result": palm_result,
+                "shichu_result": shichu_result,
+                "iching_result": iching_result,
+                "palm_image": image_data,
+            }
 
-        try:
-            form_keys = list(data.keys()) if hasattr(data, "keys") else []
-            print(f"[selfmob] output_lang={output_lang} output_style={output_style} keys={form_keys[:30]}", flush=True)
-        except Exception:
-            pass
+            if full_year:
+                yearly_data = generate_yearly_fortune(birthdate, today)
+                result_data["yearly_fortunes"] = yearly_data
+                result_data["titles"]["year_fortune"] = yearly_data["year_label"]
+                result_data["texts"]["year_fortune"] = yearly_data["year_text"]
 
-        try:
-            year, month, day = map(int, birthdate.split("-"))
-        except Exception:
-            return jsonify({"error": "生年月日が不正です"}) if is_json else ("生年月日が不正です", 400)
+            filename = f"result_{uuid_str}.pdf"
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            shop_id = session.get("shop_id", "default")
+            threading.Thread(
+                target=background_generate_pdf,
+                args=(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id),
+            ).start()
 
-        now = datetime.now()
-
-        try:
-            kyusei_text = get_kyusei_fortune(
-                year, month, day,
-                now=now,
-                force_next_month=force_next_month,
-                lang=output_lang,
-            )
+            redirect_url = url_for("preview", filename=filename)
+            return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
         except Exception as e:
-            print("❌ lucky_direction 取得エラー:", e)
-            kyusei_text = ""
+            print("処理エラー:", e)
+            return jsonify({"error": str(e)}) if request.is_json else "処理中にエラーが発生しました"
 
-        eto = get_nicchu_eto(birthdate)
-        zodiac = get_zodiac_sign(month, day)
-
-        eto_number = ETO_ORDER_MAP.get(eto)
-        animal = ""
-        if eto_number is not None and 1 <= eto_number <= len(ANIMAL60):
-            animal = ANIMAL60[eto_number - 1]
-
-        if output_lang == "ko":
-            animal = ""
-
-        try:
-            honmeisei = get_honmeisei(year, month, day)
-        except Exception as e:
-            print("❌ 本命星取得エラー:", e)
-            honmeisei = ""
-
-        palm_titles, palm_texts, shichu_result, iching_result, lucky_lines = generate_fortune(
-            image_data,
-            birthdate,
-            kyusei_text,
-            now=now,
-            force_next_month=force_next_month,
-            style=output_style,
-            lang=output_lang,
-        )
-
-        summary_text = ""
-        if len(palm_texts) == 6:
-            summary_text = palm_texts.pop()
-
-        target1 = now.replace(day=15)
-        if now.day >= 20 or force_next_month:
-            target1 += relativedelta(months=1)
-        target2 = target1 + relativedelta(months=1)
-
-        if output_lang == "en":
-            year_label = f"Fortune for {target1.year}"
-            month_label = f"Fortune for {target1.year}-{target1.month:02d}"
-            next_month_label = f"Fortune for {target2.year}-{target2.month:02d}"
-            palm_summary_title = "Palm Reading Summary"
-            personality_title = "Personality Profile"
-        elif output_lang == "zh":
-            year_label = f"{target1.year}年运势"
-            month_label = f"{target1.year}年{target1.month}月运势"
-            next_month_label = f"{target2.year}年{target2.month}月运势"
-            palm_summary_title = "手相综合建议"
-            personality_title = "性格诊断"
-        elif output_lang == "ko":
-            year_label = f"{target1.year}년 운세"
-            month_label = f"{target1.year}년{target1.month}월 운세"
-            next_month_label = f"{target2.year}년{target2.month}월 운세"
-            palm_summary_title = "손금 종합 조언"
-            personality_title = "성격 진단"
-        else:
-            year_label = f"{target1.year}年の運勢"
-            month_label = f"{target1.year}年{target1.month}月の運勢"
-            next_month_label = f"{target2.year}年{target2.month}月の運勢"
-            palm_summary_title = "手相の総合アドバイス"
-            personality_title = "性格診断"
-
-        result_data = {
-            "palm_titles": palm_titles,
-            "palm_texts": palm_texts,
-            "titles": {
-                "palm_summary": palm_summary_title,
-                "personality": personality_title,
-                "year_fortune": year_label,
-                "month_fortune": month_label,
-                "next_month_fortune": next_month_label
-            },
-            "texts": {
-                "palm_summary": summary_text,
-                "personality": shichu_result.get("personality", ""),
-                "year_fortune": shichu_result.get("year_fortune", ""),
-                "month_fortune": shichu_result.get("month_fortune", ""),
-                "next_month_fortune": shichu_result.get("next_month_fortune", "")
-            },
-            "lucky_info": lucky_lines,
-            "lucky_direction": kyusei_text,
-            "birthdate": birthdate,
-            "lang": output_lang,
-            "output_lang": output_lang,
-            "style": output_style,
-            "zodiac": zodiac,
-            "eto": eto,
-            "eto_number": eto_number,
-            "animal": animal,
-            "honmeisei": honmeisei,
-            "palm_result": "\n".join(palm_texts),
-            "shichu_result": shichu_result,
-            "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n") if isinstance(iching_result, str) else iching_result,
-            "palm_image": image_data
-        }
-
-        if full_year:
-            yearly_data = generate_yearly_fortune(
-                birthdate,
-                now,
-                force_next_month=force_next_month,
-                lang=output_lang
-            )
-            result_data["yearly_fortunes"] = yearly_data
-            result_data["titles"]["year_fortune"] = yearly_data["year_label"]
-            result_data["texts"]["year_fortune"] = yearly_data["year_text"]
-
-        filename = f"result_{uuid_str}.pdf"
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-
-        shop_id = session.get("shop_id", "default")
-
-        threading.Thread(
-            target=background_generate_pdf,
-            args=(filepath, result_data, "shincom", "a4", full_year, uuid_str, shop_id),
-        ).start()
-
-        redirect_url = url_for("preview", filename=filename)
-        return jsonify({"redirect_url": redirect_url}) if is_json else redirect(redirect_url)
-
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"error": str(e)}) if is_json else "処理中にエラーが発生しました", 500
+    return render_template("index_selfmob.html", uuid_str=uuid_str, full_year=full_year)
 
 
 
