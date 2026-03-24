@@ -4,18 +4,17 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>占い師を選んで予約 | うらなや（占いの館）</title>
-  <meta name="description" content="占いの館の所属占い師を選んで、オンラインで予約・鑑定。テンプレではなく、状況に合わせて丁寧に鑑定します。" />
+  <meta name="description" content="占い師を選んで、オンラインで気軽に予約・鑑定。ご自宅から落ち着いて相談できる、うらなやのオンライン占いです。" />
   <meta name="robots" content="index,follow" />
 
   <meta property="og:title" content="占い師を選んで予約 | うらなや（占いの館）" />
-  <meta property="og:description" content="所属占い師を選んで、オンラインで予約・鑑定。" />
+  <meta property="og:description" content="占い師を選んで、オンラインで気軽に予約・鑑定。" />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="/static/img/ogp_online_1200x630.png" />
   <meta property="og:url" content="{{ request.url }}" />
 
-  <link rel="stylesheet" href="/static/css/lp_online_v2.css" />
+  <link rel="stylesheet" href="/static/css/online_lp_canva.css" />
 </head>
-
 <body>
   <header class="site-header" role="banner">
     <div class="container header-inner">
@@ -23,8 +22,7 @@
         <span class="brand__name">うらなや</span>
         <span class="brand__sub">占いの館｜オンライン鑑定</span>
       </a>
-
-      <nav class="header-cta" aria-label="主要導線">
+      <nav aria-label="主要導線">
         <a class="btn btn--primary" href="#tellers">占い師を選ぶ</a>
       </nav>
     </div>
@@ -32,160 +30,153 @@
 
   <main role="main">
     <section class="hero">
-      <div class="hero-bg" aria-hidden="true"></div>
-      <div class="hero-overlay" aria-hidden="true"></div>
-
       <div class="container hero-inner">
         <div class="hero-copy">
-          <p class="hero-kicker">占いの館のオンライン鑑定</p>
-          <h1>悩みを現実的に整理する<br>館のオンライン占い</h1>
-          <p class="lead">
-            所属占い師を選んで、オンラインで予約。<br>
-            テンプレではなく、状況に合わせて丁寧に鑑定します。
-          </p>
+          <p class="hero-kicker">厳選占い師による</p>
+          <h1 class="hero-title">館のオンライン占い</h1>
+          <div class="hero-separator" aria-hidden="true"></div>
+          <p class="hero-lead">占い師を選んで、オンラインでご自宅から気軽に鑑定できます</p>
 
           <div class="hero-cta">
             <a class="btn btn--primary btn--lg" href="#tellers">占い師を選んで予約する</a>
             <a class="btn btn--ghost btn--lg" href="#how">流れを見る</a>
           </div>
-
-          <ul class="hero-badges" aria-label="特徴">
-            <li>占い師を指名</li>
-            <li>スマホで予約</li>
-            <li>オンライン完結</li>
-          </ul>
+          <p class="hero-note">恋愛・仕事・人間関係など、落ち着いて相談しやすいオンライン鑑定です。</p>
         </div>
 
-        <aside class="hero-panel" aria-label="要点">
-          <div class="panel">
-            <div class="panel-title">ポイント</div>
-            <ul class="panel-list">
-              <li>占い師を選ぶ（プロフィール・得意分野）</li>
-              <li>日程を予約（オンライン）</li>
-              <li>当日に鑑定（チャット／通話／PDF等）</li>
+        <aside class="hero-side" aria-label="要点">
+          <div class="hero-pointbox">
+            <h2 class="hero-pointbox__title">オンライン鑑定の特徴</h2>
+            <ul class="hero-pointbox__list">
+              <li>占い師を選んで予約できます</li>
+              <li>自宅から落ち着いて相談できます</li>
+              <li>気持ちを整理しながら次の一手を考えられます</li>
             </ul>
-
-            <div class="panel-cta">
-              <a class="btn btn--primary" href="#tellers">占い師を選ぶ</a>
-              <a class="btn btn--ghost" href="/contact">お問い合わせ</a>
-            </div>
-
-            <p class="panel-note">※運用に合わせて「鑑定形式（通話／チャット／PDF）」を切り替え可能です。</p>
           </div>
         </aside>
       </div>
     </section>
 
-    <section class="section section--paper">
-      <div class="container">
-        <h2 class="section-title">こんな状態ではありませんか？</h2>
-
-        <div class="checks">
-          <div class="check">誰かに相談したいが、身近な人ほど話せない</div>
-          <div class="check">ネットの占いは当たり障りなくて物足りない</div>
-          <div class="check">気持ちの整理がつかず、同じところで悩み続けている</div>
-          <div class="check">「頑張れ」「気の持ちよう」はもう聞きたくない</div>
-        </div>
-
-        <p class="section-lead">
-          占い師を選べるから、あなたのテーマに合う鑑定が受けられます。<br>
-          悩みを言葉にして整理し、次の一手を明確にします。
-        </p>
-      </div>
-    </section>
-
-    <section class="section" id="tellers">
+    <section class="tellers-wrap" id="tellers">
       <div class="container">
         <div class="section-head">
+          <p class="section-kicker">PICK YOUR TELLER</p>
           <h2 class="section-title">占い師を選んで予約</h2>
-          <p class="section-sub">プロフィール・得意分野・稼働状況を見て選べます。</p>
+          <p class="section-sub">プロフィールや得意分野を見ながら、今の自分に合う占い師を選べます。</p>
         </div>
 
-        <div class="teller-grid">
-          {% if tellers and tellers|length > 0 %}
+        {% if tellers and tellers|length > 0 %}
+          <div class="teller-grid">
             {% for t in tellers %}
+              {% set profile_url = '/teller/' ~ t.slug if t.slug else '/online' %}
               <article class="teller-card">
-                <div class="teller-top">
-                  <div class="avatar" style="background-image:url('{{ t.photo_url if t.photo_url else '' }}');" aria-hidden="true"></div>
-
-                  <div class="teller-meta">
-                    <div class="teller-name">{{ t.display_name }}</div>
-                    <div class="teller-tags">
-                      {% for tag in t.tags %}
-                        <span class="tag">{{ tag }}</span>
-                      {% endfor %}
+                {% if t.slug %}
+                  <a class="teller-photo-link" href="{{ profile_url }}">
+                    <div class="teller-photo-frame">
+                      <img class="teller-photo" src="{{ t.photo_url if t.photo_url else '/static/img/tellers/uranaya.jpg' }}" alt="{{ t.display_name }}" loading="lazy">
+                    </div>
+                  </a>
+                {% else %}
+                  <div class="teller-photo-static">
+                    <div class="teller-photo-frame">
+                      <img class="teller-photo" src="{{ t.photo_url if t.photo_url else '/static/img/tellers/uranaya.jpg' }}" alt="{{ t.display_name }}" loading="lazy">
                     </div>
                   </div>
+                {% endif %}
 
-                  {% if t.is_active %}
-                    {% if t.is_accepting %}
-                      <div class="status status--on">予約可</div>
-                    {% else %}
-                      <div class="status status--busy">待機中</div>
-                    {% endif %}
-                  {% else %}
-                    <div class="status status--off">準備中</div>
+                <h3 class="teller-name">{{ t.display_name }}</h3>
+
+                <div class="teller-tags">
+                  {% if t.tags %}
+                    {% for tag in t.tags %}
+                      <span class="tag">{{ tag }}</span>
+                    {% endfor %}
                   {% endif %}
                 </div>
 
-                <p class="teller-desc">{{ t.short_bio }}</p>
+                {% if t.is_active %}
+                  {% if t.is_accepting %}
+                    <a class="teller-status is-open" href="/online/booking?teller_id={{ t.id }}">予約</a>
+                  {% else %}
+                    <a class="teller-status is-wait" href="{{ profile_url }}">待機中</a>
+                  {% endif %}
+                {% else %}
+                  <span class="teller-status is-off">準備中</span>
+                {% endif %}
 
-                <div class="teller-actions">
-                  <a class="btn btn--primary" href="/online/booking?teller_id={{ t.id }}">この占い師で予約</a>
-                  <a class="btn btn--ghost" href="/teller/{{ t.slug }}">プロフィール</a>
-                </div>
+                {% if t.slug %}
+                  <div class="teller-links">
+                    <a href="{{ profile_url }}">プロフィールを見る</a>
+                  </div>
+                {% endif %}
               </article>
             {% endfor %}
-          {% else %}
-            <p style="color: rgba(255,255,255,0.75);">現在、公開中の占い師がいません。</p>
-          {% endif %}
-        </div>
-
-        <div class="note-row">
-          <span class="note">※「予約可」は予約枠が公開されている状態です。</span>
-          <span class="note">※当日キャンセル等の規定は予約ページでご確認ください。</span>
-        </div>
+          </div>
+        {% else %}
+          <p class="empty-note">現在、公開中の占い師がいません。</p>
+        {% endif %}
       </div>
     </section>
 
-    <section class="section section--paper" id="how">
+    <section class="message-band">
       <div class="container">
-        <h2 class="section-title">オンライン鑑定の流れ</h2>
-
-        <ol class="how">
-          <li class="how-item">
-            <div class="how-icon" aria-hidden="true">①</div>
-            <div class="how-body">
-              <div class="how-title">占い師を選ぶ</div>
-              <div class="how-desc">得意分野・プロフィール・稼働状況で選択。</div>
-            </div>
-          </li>
-          <li class="how-item">
-            <div class="how-icon" aria-hidden="true">②</div>
-            <div class="how-body">
-              <div class="how-title">予約・決済</div>
-              <div class="how-desc">日程を選んで予約。必要に応じて事前決済へ。</div>
-            </div>
-          </li>
-          <li class="how-item">
-            <div class="how-icon" aria-hidden="true">③</div>
-            <div class="how-body">
-              <div class="how-title">当日に鑑定</div>
-              <div class="how-desc">チャット／通話／PDF等、運用に合わせて提供。</div>
-            </div>
-          </li>
-          <li class="how-item">
-            <div class="how-icon" aria-hidden="true">④</div>
-            <div class="how-body">
-              <div class="how-title">結果を確認</div>
-              <div class="how-desc">見返せる形でお届け（PDF/ページ等）。</div>
-            </div>
-          </li>
-        </ol>
+        <h2>自宅にいながら悩みを整理できます</h2>
+        <p>誰にも言いにくいことほど、オンラインのほうが落ち着いて話せることがあります。</p>
       </div>
     </section>
 
-    <section class="section">
+    <section class="section-paper">
+      <div class="container">
+        <div class="section-head">
+          <p class="section-kicker">FOR THESE MOMENTS</p>
+          <h2 class="section-title">こんな状態ではありませんか？</h2>
+        </div>
+
+        <div class="paper-grid">
+          <div class="paper-card">誰かに相談したいが、身近な人ほど話しにくい</div>
+          <div class="paper-card">ネットの占いは当たり障りなくて物足りない</div>
+          <div class="paper-card">気持ちの整理がつかず、同じところで悩み続けている</div>
+          <div class="paper-card">一度、客観的に状況を見直したい</div>
+        </div>
+
+        <p class="paper-lead">占い師を選べるから、テーマに合う鑑定が受けやすくなります。<br>悩みを言葉にして整理し、次の一手を見つける時間にしてください。</p>
+      </div>
+    </section>
+
+    <section class="section-deep" id="how">
+      <div class="container">
+        <div class="section-head">
+          <p class="section-kicker">HOW IT WORKS</p>
+          <h2 class="section-title">オンライン鑑定の流れ</h2>
+          <p class="section-sub">はじめての方でも、予約まで迷いにくい流れにしています。</p>
+        </div>
+
+        <div class="how-grid">
+          <article class="how-card">
+            <div class="how-no">1</div>
+            <h3 class="how-title">占い師を選ぶ</h3>
+            <p class="how-desc">プロフィールや得意分野、稼働状況を見ながら選択します。</p>
+          </article>
+          <article class="how-card">
+            <div class="how-no">2</div>
+            <h3 class="how-title">予約する</h3>
+            <p class="how-desc">希望日時や相談内容を送信して、予約リクエストを行います。</p>
+          </article>
+          <article class="how-card">
+            <div class="how-no">3</div>
+            <h3 class="how-title">ご連絡を確認</h3>
+            <p class="how-desc">折り返しのご案内を受け取り、鑑定日時や方法を確認します。</p>
+          </article>
+          <article class="how-card">
+            <div class="how-no">4</div>
+            <h3 class="how-title">当日に鑑定</h3>
+            <p class="how-desc">落ち着ける場所から、じっくり相談していただけます。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-deep">
       <div class="container">
         <div class="cta-panel">
           <h2>占い師を選んで、オンラインで予約</h2>
@@ -201,17 +192,17 @@
         </div>
       </div>
     </section>
-
-    <footer class="site-footer" role="contentinfo">
-      <div class="container footer-inner">
-        <div class="footer-links">
-          <a href="/terms">利用規約</a>
-          <a href="/tokutei">特定商取引法に基づく表記</a>
-          <a href="/privacy">プライバシーポリシー</a>
-        </div>
-        <div class="footer-copy">© うらなや</div>
-      </div>
-    </footer>
   </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container footer-inner">
+      <div class="footer-links">
+        <a href="/terms">利用規約</a>
+        <a href="/tokutei">特定商取引法に基づく表記</a>
+        <a href="/privacy">プライバシーポリシー</a>
+      </div>
+      <div class="footer-copy">© うらなや</div>
+    </div>
+  </footer>
 </body>
 </html>
