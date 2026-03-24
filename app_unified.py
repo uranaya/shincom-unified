@@ -166,7 +166,7 @@ import threading
 # 料金設定（テスト中はここをいじるだけ）
 PRICE_MAP = {
     "tarotmob": 550,
-    "selfmob": 550,
+    "selfmob": 1,
     "selfmob_full": 1100,
     "renaiselfmob": 550,
     "renaiselfmob_full": 1100
