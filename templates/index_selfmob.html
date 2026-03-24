@@ -127,6 +127,13 @@
   <div class="content-wrapper">
     <h2>📸 手相撮影＆送信フォーム</h2>
 
+    {% if postpay_mode %}
+    <div class="fixed-plan" style="background:#fff7e6; border-color:#e0b96b;">
+      <strong>この画面は決済前の入力画面です。</strong><br>
+      内容を入力して最後のボタンを押すと、KOMOJU決済画面に進みます。
+    </div>
+    {% endif %}
+
     <div class="fixed-plan">
       {% if full_year %}
         <strong>現在のプラン：</strong> 1年分の運勢つき
@@ -192,7 +199,7 @@
       <span>English output</span>
     </label>
 
-    <button id="submitBtn" type="button" onclick="submitForm()">送信してPDF生成</button>
+    <button id="submitBtn" type="button" onclick="submitForm()">{% if postpay_mode %}送信して決済へ進む{% else %}送信してPDF生成{% endif %}</button>
 
     <footer style="text-align:center; font-size:small; margin-top:40px; padding:20px; background-color:#f9f9f9;">
       <p style="margin-bottom:10px;">
@@ -216,6 +223,9 @@
     const ctx = canvas.getContext("2d");
     let currentFacingMode = "environment";
     let stream = null;
+    const POSTPAY_MODE = {% if postpay_mode %}true{% else %}false{% endif %};
+    const FORCED_FULL_YEAR = {% if full_year %}true{% else %}false{% endif %};
+    const SHOP_ID = {{ (shop_id or "default")|tojson }};
 
     async function startCamera() {
       if (stream) {
@@ -353,7 +363,7 @@
 
       const btn = document.getElementById("submitBtn");
       btn.disabled = true;
-      btn.textContent = "鑑定中... 1分程度お待ちください";
+      btn.textContent = POSTPAY_MODE ? "決済画面へ移動しています..." : "鑑定中... 1分程度お待ちください";
 
       const forceNextMonth = document.getElementById("force_next_month")?.checked || false;
       const mode = document.getElementById("output_mode")?.value || "ja";
@@ -380,11 +390,15 @@
         english_output: englishOutput,
         output_lang: outputLang,
         output_style: outputStyle,
-        output_mode: mode
+        output_mode: mode,
+        full_year: FORCED_FULL_YEAR,
+        shop_id: SHOP_ID
       };
 
+      const postUrl = POSTPAY_MODE ? "/selfmob/start_checkout" : path;
+
       try {
-        const response = await fetch(path, {
+        const response = await fetch(postUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
@@ -398,7 +412,9 @@
 
         const result = await response.json();
 
-        if (result.redirect_url) {
+        if (result.checkout_url) {
+          window.location.href = result.checkout_url;
+        } else if (result.redirect_url) {
           const chime = document.getElementById("chimeSound");
           try {
             chime.currentTime = 0;
@@ -413,13 +429,13 @@
 
           window.location.href = result.redirect_url;
         } else {
-          alert("PDF生成後のリダイレクトが取得できませんでした");
+          alert(POSTPAY_MODE ? "決済画面への遷移URLが取得できませんでした" : "PDF生成後のリダイレクトが取得できませんでした");
         }
       } catch (error) {
         alert("送信エラー: " + error.message);
       } finally {
         btn.disabled = false;
-        btn.textContent = "送信してPDF生成";
+        btn.textContent = POSTPAY_MODE ? "送信して決済へ進む" : "送信してPDF生成";
       }
     }
 
