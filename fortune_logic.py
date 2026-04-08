@@ -10,12 +10,6 @@ from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 from lucky_utils import generate_lucky_info, generate_lucky_direction
 from yearly_love_fortune_utils import generate_yearly_love_fortune
 from pdf_generator_unified import create_pdf_unified
-
-
-
-
-
-
 def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang: str = 'ja'):
     import json
     lang_norm = (lang or 'ja').lower()
@@ -25,27 +19,22 @@ def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang
     eto = get_nicchu_eto(birthdate)
     try:
         today = now or datetime.today()
-
         # ★ 20日境の基準月ロジック
         target1 = today.replace(day=15)
         if today.day >= 20 or force_next_month:
             target1 += relativedelta(months=1)
         target2 = target1 + relativedelta(months=1)
-
         # 「今年」は基準月の年に合わせる
         this_year = target1.year
-
         tsuhen_year = get_tsuhensei_for_year(birthdate, this_year)
         tsuhen_month1 = get_tsuhensei_for_date(birthdate, target1.year, target1.month)
         tsuhen_month2 = get_tsuhensei_for_date(birthdate, target2.year, target2.month)
-
         if is_en:
             prompt = f"""You are a Four Pillars (BaZi) reading advisor.
 - Day pillar (eto): {eto}
 - Ten-God for the year: {tsuhen_year}
 - Ten-God for {target1.year}-{target1.month:02d}: {tsuhen_month1}
 - Ten-God for {target2.year}-{target2.month:02d}: {tsuhen_month2}
-
 Return ONLY JSON in the following schema:
 {{
   "personality": "A natural English paragraph (max ~900 characters, not words)",
@@ -53,7 +42,6 @@ Return ONLY JSON in the following schema:
   "month_fortune": "Fortune for {target1.year}-{target1.month:02d} (max ~900 characters)",
   "next_month_fortune": "Fortune for {target2.year}-{target2.month:02d} (max ~900 characters)"
 }}
-
 Rules:
 - Do NOT mention eto names or Ten-God terms; translate meanings into plain English
 - Positive, practical, and customer-friendly
@@ -65,7 +53,6 @@ Rules:
 - 年度影响（通变星，仅供参考）: {tsuhen_year}
 - {target1.year}-{target1.month:02d} 的影响（通变星，仅供参考）: {tsuhen_month1}
 - {target2.year}-{target2.month:02d} 的影响（通变星，仅供参考）: {tsuhen_month2}
-
 请只输出以下结构的 JSON（不要输出任何多余文本）：
 {{
   "personality": "用自然、友好的中文写一段性格描述（约 260 字以内）",
@@ -73,19 +60,16 @@ Rules:
   "month_fortune": "{target1.year} 年 {target1.month} 月的运势（约 200 字以内）",
   "next_month_fortune": "{target2.year} 年 {target2.month} 月的运势（约 200 字以内）"
 }}
-
 规则：
 - 绝对不要在正文中提到干支名、通变星名或任何占术术语；请把含义翻译成日常语言
 - 积极、具体、可执行（至少给 1 条行动建议）
 """
-
         elif is_ko:
             prompt = f"""당신은 사주(사주명리) 상담가입니다.
 - 일주(참고용): {eto}
 - {this_year}년의 영향(통변성/십성, 참고용): {tsuhen_year}
 - {target1.year}-{target1.month:02d}의 영향(통변성/십성, 참고용): {tsuhen_month1}
 - {target2.year}-{target2.month:02d}의 영향(통변성/십성, 참고용): {tsuhen_month2}
-
 아래 스키마의 JSON만 출력하세요(추가 문장 금지):
 {{
   "personality": "자연스러운 한국어 문단(약 260자 이내)",
@@ -93,7 +77,6 @@ Rules:
   "month_fortune": "{target1.year}년 {target1.month}월 운세(약 200자 이내)",
   "next_month_fortune": "{target2.year}년 {target2.month}월 운세(약 200자 이내)"
 }}
-
 규칙:
 - 본문에 간지명, 통변성/십성명, 전문 용어를 절대 쓰지 말고 일상적인 말로 의미만 풀어주세요
 - 긍정적이고 실천 가능한 조언을 최소 1개 포함
@@ -104,16 +87,13 @@ Rules:
 - 年の通変星: {tsuhen_year}
 - {target1.year}年{target1.month}月の通変星: {tsuhen_month1}
 - {target2.year}年{target2.month}月の通変星: {tsuhen_month2}
-
 以下の4項目について、次のJSON形式で返答してください（出力はJSONのみ）：
-
 {{
   "personality": "性格について300文字以内で自然な本文",
   "year_fortune": "{this_year}年の運勢（300文字以内）",
   "month_fortune": "{target1.year}年{target1.month}月の運勢（300文字以内）",
   "next_month_fortune": "{target2.year}年{target2.month}月の運勢（300文字以内）"
 }}
-
 出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。
 """
         # OpenAI呼び出し（たまに502等が出るためリトライ）
@@ -135,14 +115,11 @@ Rules:
                 wait = 1.0 * (2 ** attempt)
                 print(f"❌ get_shichu_fortune OpenAIエラー(try={attempt+1}/3): {e}")
                 time.sleep(wait)
-
         if response is None:
             raise RuntimeError(f"OpenAI call failed: {last_err}")
-
         raw = response.choices[0].message.content.strip()
         print("=== GPT四柱推命 JSONレスポンス ===")
         print(raw)
-
         try:
             result = json.loads(raw)
             # 月表記のズレ対策（GPTが本文先頭で別月を出すことがあるため矯正）
@@ -168,11 +145,9 @@ Rules:
                 if ko:
                     return f"{y}년 {m}월은, " + s
                 return f"{y}年{m}月は、" + s
-
             if isinstance(result, dict) and (not is_en):
                 result["month_fortune"] = _fix_month_prefix(result.get("month_fortune", ""), target1.year, target1.month, zh=is_zh, ko=is_ko)
                 result["next_month_fortune"] = _fix_month_prefix(result.get("next_month_fortune", ""), target2.year, target2.month, zh=is_zh, ko=is_ko)
-
                 # 文章が尻切れトンボに見えないよう、末尾が句点等で終わっていなければ補完
                 def _ensure_sentence_end(s: str) -> str:
                     s = (s or "").strip()
@@ -181,7 +156,6 @@ Rules:
                     if s.endswith(("。", "！", "？", "!", "?", "…", "。」", "！」", "？」")):
                         return s
                     return s + "。"
-
                 for key in ("personality", "year_fortune", "month_fortune", "next_month_fortune"):
                     if key in result:
                         result[key] = _ensure_sentence_end(str(result.get(key, "")))
@@ -230,8 +204,6 @@ Rules:
                 "month_fortune": f"{target1.year}年{target1.month}月の運勢は取得できませんでした",
                 "next_month_fortune": f"{target2.year}年{target2.month}月の運勢は取得できませんでした"
             }
-
-
 def analyze_palm(
     image_data,
     output_lang: str = "ja",
@@ -244,46 +216,38 @@ def analyze_palm(
     """
     画像から手相を分析して、6ブロック（生命線/運命線/金運線/特殊線1/特殊線2/総合）の文章を返す。
     A方式（番号選択→旧文をシンコン文体で増幅）に対応。
-
     出力フォーマット（必須）:
       ### タイトル
       本文...
       ### タイトル
       本文...
       ...（合計6ブロック）
-
     互換:
       - 旧呼び出しで lang / style が来ても動作するように吸収する
     """
     import json
     import time
-
     # 互換吸収
     if lang is not None:
         output_lang = lang
     if style is not None:
         output_style = style
-
     # -------------------------
     # base64 正規化
     # -------------------------
     if not image_data:
         return "### 生命線\n(画像がありません)\n### 運命線\n(画像がありません)\n### 金運線\n(画像がありません)\n### 特殊線1\n\n### 特殊線2\n\n### 手相総合アドバイス\n(画像がありません)"
-
     if isinstance(image_data, bytes):
         # 万一 bytes が来たら str に
         image_data = image_data.decode("utf-8", errors="ignore")
-
     if image_data.startswith("data:image"):
         base64data = image_data.split(",", 1)[1]
     else:
         base64data = image_data
-
     lang_norm = (output_lang or "ja").lower()
     is_en = lang_norm.startswith("en")
     is_zh = lang_norm.startswith(("zh", "cn"))
     is_ko = lang_norm.startswith(("ko", "kr"))
-
     # -------------------------
     # DB 取得
     # -------------------------
@@ -301,7 +265,6 @@ def analyze_palm(
         PALM_DETAIL_BY_ID = {}
         PALM_DETAIL_INDEX_BY_CATEGORY = {}
         tesou_descriptions = {}
-
     # -------------------------
     # ユーティリティ
     # -------------------------
@@ -322,7 +285,6 @@ def analyze_palm(
             return json.loads(m.group(0))
         except Exception:
             return None
-
     def _format_id_name_list(category: str, max_items: int = None) -> str:
         items = PALM_DETAIL_INDEX_BY_CATEGORY.get(category, []) or []
         if max_items is not None and max_items > 0:
@@ -330,7 +292,6 @@ def analyze_palm(
         if not items:
             return "(no data)"
         return "\n".join([f"{i}: {name}" for i, name in items])
-
     def _openai_chat_with_retry(**params):
         last_err = None
         for attempt in range(3):
@@ -340,7 +301,6 @@ def analyze_palm(
                 last_err = e
                 time.sleep(0.8 * (2 ** attempt))
         raise last_err
-
     # -------------------------
     # 候補リスト（番号: 名称）
     # -------------------------
@@ -351,7 +311,6 @@ def analyze_palm(
     special_items = PALM_DETAIL_INDEX_BY_CATEGORY.get("特殊な線", []) or []
     # プロンプト肥大を防ぐため、まずは全件ID+名称のみ。必要なら後で調整。
     special_list = "\n".join([f"{i}: {name}" for i, name in special_items]) if special_items else "(no data)"
-
     # -------------------------
     # ① 画像判定（番号選択のみ。本文は書かせない）
     # -------------------------
@@ -361,15 +320,13 @@ def analyze_palm(
             "You are a strict classifier for palmistry line variants. "
             "You MUST choose IDs from the provided lists only. Output JSON only."
         )
-
         # ※候補は日本語でもOK。出力は数値IDのみで統一。
         detect_user = f"""
 From the following candidate lists, choose:
-- life_id: exactly 1 from Life Line list
-- fate_id: exactly 1 from Fate Line list
+- life_id: exactly 1 from Life Line list (if subtle/uncertain, prefer a generic life-line variant such as a 兆し/型 variant rather than an iconic exact line like 二重生命線)
+- fate_id: exactly 1 from Fate Line list (if subtle/uncertain, prefer a generic fate-line variant such as a 兆し/型 variant rather than a dramatic exact subtype)
 - money_sun_id: exactly 1 from Sun Line list (if subtle/uncertain, choose a '兆し' variant rather than 0)
 - special_ids: choose exactly 2 IDs from Special list (if subtle/uncertain, choose '兆し' variants; never return empty)
-
 Return JSON ONLY with this schema:
 {{
   "life_id": 1,
@@ -378,25 +335,22 @@ Return JSON ONLY with this schema:
   "special_ids": [1, 2],
   "notes": "brief visual notes (<= 2 sentences, in the target language)"
 }}
-
 Rules:
 - IDs must exist in the lists. Never invent.
 - special_ids must be unique; length must be 2
-- If subtle/uncertain, choose the closest '兆し' (sign) variants from the lists; NEVER output 0 or empty.
-
+- If subtle/uncertain, choose the closest '兆し' (sign) or generic 型 variants from the lists; NEVER output 0 or empty.
+- Do NOT overcall iconic exact lines unless the visual evidence is unmistakable.
+- Do NOT choose 二重生命線 / 副生命線 unless a clearly parallel support line can be followed for a meaningful span.
+- Do NOT choose a dramatic upward/downward subtype of 運命線 unless the directionality is visually clear.
 [Life Line candidates]
 {life_list}
-
 [Fate Line candidates]
 {fate_list}
-
 [Sun Line candidates]
 {sun_list}
-
 [Special line candidates]
 {special_list}
 """.strip()
-
         resp1 = _openai_chat_with_retry(
             model="gpt-4o-mini",
             messages=[
@@ -413,7 +367,6 @@ Rules:
         detect = _safe_json_load(raw1)
     except Exception:
         detect = None
-
     # フォールバック（判定が取れない場合は、旧DBガイド方式で6ブロックを作る）
     if not isinstance(detect, dict):
         # 旧ガイド（なるべく長めに、シンコン寄り）
@@ -446,7 +399,6 @@ Rules:
                 "必ず6ブロックを'### タイトル'形式で出力。"
             )
             user = "意味ガイド:\n" + guide + "\n\n画像を見て鑑定。"
-
         resp = _openai_chat_with_retry(
             model="gpt-4o-mini",
             messages=[
@@ -461,7 +413,6 @@ Rules:
         )
         txt = resp.choices[0].message["content"]
         return _ensure_6_blocks(txt, lang_norm)
-
     # -------------------------
     # ② 旧文を根拠に“シンコン文体で増幅”
     # -------------------------
@@ -478,7 +429,6 @@ Rules:
             if n and n in (tesou_descriptions or {}):
                 d = str(tesou_descriptions.get(n, "") or "")
         return d.strip()
-
     def _get_name(_id: int) -> str:
         try:
             _id = int(_id)
@@ -486,22 +436,22 @@ Rules:
             return ""
         row = PALM_DETAIL_BY_ID.get(_id, {})
         return str(row.get("name", "") or "").strip()
-
     life_id = int(detect.get("life_id", 0) or 0)
     fate_id = int(detect.get("fate_id", 0) or 0)
     money_sun_id = int(detect.get("money_sun_id", 0) or 0)
-
     # Prefer non-zero IDs: if classifier returned 0/invalid, use "兆し" fallback IDs
     # NOTE:
     #  - Fixed single-ID fallbacks cause visible bias (98001/98011/98012). To add entertainment variability,
     #    we choose from a pool of "兆し" variants deterministically based on the image hash.
+    FALLBACK_LIFE_IDS = [98101, 98102, 98103, 98104, 98105, 98106, 98107, 98108, 98109, 98110, 98111, 98112]
+    FALLBACK_FATE_IDS = [98201, 98202, 98203, 98204, 98205, 98206, 98207, 98208, 98209, 98210, 98211, 98212]
     FALLBACK_SUN_IDS = [98001, 98002, 98003, 98004, 98005, 98006, 98007, 98008, 98009]
     FALLBACK_SPECIAL_IDS = [
         98011, 98012, 98013, 98014, 98015, 98016, 98017, 98018, 98019, 98020,
         98021, 98022, 98023, 98024, 98025,
+        98301, 98302, 98303, 98304, 98305, 98306, 98307, 98308, 98309, 98310,
     ]
-
-    # Optional: I Ching hint (computed in generate_fortune) to add thematic variety.
+    # Optional hints to add thematic variety without changing the stable external interface.
     # We will NOT mention I Ching / hexagrams explicitly in the final text; it is used as a subtle "theme".
     iching_hint = kwargs.get("iching_hint") or kwargs.get("iching_result") or ""
     if isinstance(iching_hint, (dict, list)):
@@ -510,16 +460,33 @@ Rules:
         except Exception:
             iching_hint = str(iching_hint)
     iching_hint = str(iching_hint or "").strip()
-
+    shichu_hint = kwargs.get("shichu_hint") or kwargs.get("shichu_result") or ""
+    if isinstance(shichu_hint, (dict, list)):
+        try:
+            shichu_hint = json.dumps(shichu_hint, ensure_ascii=False)
+        except Exception:
+            shichu_hint = str(shichu_hint)
+    shichu_hint = str(shichu_hint or "").strip()
+    kyusei_hint = kwargs.get("kyusei_text") or ""
+    if isinstance(kyusei_hint, (dict, list)):
+        try:
+            kyusei_hint = json.dumps(kyusei_hint, ensure_ascii=False)
+        except Exception:
+            kyusei_hint = str(kyusei_hint)
+    kyusei_hint = str(kyusei_hint or "").strip()
     def _stable_seed(tag: str) -> int:
         """Stable seed derived from the image (base64) + tag. Same photo -> same fallback choice."""
         try:
             prefix = (base64data or "")[:20000]
         except Exception:
             prefix = ""
-        h = hashlib.sha256((prefix + "|" + (tag or "") + "|" + (iching_hint or "")[:300]).encode("utf-8", errors="ignore")).hexdigest()
+        theme_bits = "|".join([
+            (iching_hint or "")[:300],
+            (shichu_hint or "")[:300],
+            (kyusei_hint or "")[:200],
+        ])
+        h = hashlib.sha256((prefix + "|" + (tag or "") + "|" + theme_bits).encode("utf-8", errors="ignore")).hexdigest()
         return int(h[:12], 16)
-
     def _stable_choice(pool, tag: str, default_id: int):
         pool2 = []
         for i in (pool or []):
@@ -533,7 +500,6 @@ Rules:
             return default_id if default_id in PALM_DETAIL_BY_ID else (pool[0] if pool else 0)
         rnd = random.Random(_stable_seed(tag))
         return rnd.choice(pool2)
-
     def _stable_sample(pool, k: int, tag: str, exclude=None):
         exclude = set(exclude or [])
         pool2 = []
@@ -557,14 +523,111 @@ Rules:
             rnd.shuffle(pool2)
             return pool2[:k]
         return rnd.sample(pool2, k)
-
+    theme_text = "\n".join([
+        str(detect.get("notes", "") or "").strip(),
+        iching_hint,
+        shichu_hint,
+        kyusei_hint,
+    ])
+    def _theme_scores(text: str):
+        base = str(text or "")
+        groups = {
+            "health": ["健康", "体", "回復", "休", "整", "睡眠", "疲", "基盤", "守", "温", "care", "rest", "health"],
+            "work": ["仕事", "評価", "目標", "挑戦", "前進", "転機", "責任", "収入", "金運", "career", "work", "success"],
+            "social": ["恋", "愛", "人気", "魅力", "縁", "出会", "人間関係", "紹介", "口コミ", "relationship", "love", "people"],
+            "creative": ["直感", "感性", "表現", "芸術", "創作", "ひらめき", "spirit", "creative", "intuition"],
+            "move": ["移動", "変化", "再出発", "旅行", "海外", "新しい", "change", "move", "travel"],
+        }
+        scores = {k: 0 for k in groups}
+        for tag, keywords in groups.items():
+            for kw in keywords:
+                try:
+                    scores[tag] += base.lower().count(str(kw).lower())
+                except Exception:
+                    pass
+        return scores
+    def _ranked_tags(text: str):
+        scores = _theme_scores(text)
+        ranked = [k for k, v in sorted(scores.items(), key=lambda kv: (-kv[1], kv[0])) if v > 0]
+        return ranked or ["work", "health", "social"]
+    THEME_POOLS = {
+        "life": {
+            "health": [98101, 98102, 98105, 98106, 98109, 98111, 98112],
+            "work": [98104, 98107, 98109, 98110],
+            "social": [98106, 98108, 98110],
+            "creative": [98103, 98108, 98111],
+            "move": [98104, 98108, 98111],
+        },
+        "fate": {
+            "health": [98201, 98207, 98210],
+            "work": [98201, 98202, 98205, 98207, 98209, 98212],
+            "social": [98203, 98206, 98211, 98212],
+            "creative": [98208, 98209, 98212],
+            "move": [98204, 98208, 98210],
+        },
+        "sun": {
+            "health": [98005, 98006],
+            "work": [98001, 98002, 98004, 98005, 98006, 98008],
+            "social": [98004, 98007, 98009],
+            "creative": [98003, 98008, 98009],
+            "move": [98007, 98008],
+        },
+        "special": {
+            "health": [98011, 98014, 98019, 98025, 98304, 98306],
+            "work": [98015, 98018, 98022, 98024, 98301, 98302, 98305],
+            "social": [98013, 98021, 98023, 98303, 98306, 98308, 98310],
+            "creative": [98012, 98016, 98017, 98021, 98025, 98309],
+            "move": [98020, 98022, 98303, 98307],
+        },
+    }
+    def _themed_pool(kind: str, base_pool):
+        ordered = []
+        seen = set()
+        for tag in _ranked_tags(theme_text):
+            for ii in THEME_POOLS.get(kind, {}).get(tag, []):
+                if ii in base_pool and ii not in seen and ii in PALM_DETAIL_BY_ID:
+                    ordered.append(ii)
+                    seen.add(ii)
+        for ii in base_pool:
+            if ii not in seen and ii in PALM_DETAIL_BY_ID:
+                ordered.append(ii)
+                seen.add(ii)
+        return ordered
+    def _family_from_id(_id: int) -> str:
+        try:
+            _id = int(_id)
+        except Exception:
+            return "other"
+        name = _get_name(_id)
+        if any(k in name for k in ["生命", "守護", "仏眼", "健康", "家庭"]):
+            return "protect"
+        if any(k in name for k in ["人気", "金星", "魅力", "相談", "影響"]):
+            return "social"
+        if any(k in name for k in ["旅行", "海外", "出発", "引き立て", "発展"]):
+            return "move"
+        if any(k in name for k in ["ソロモン", "覇王", "努力", "向上", "財運", "ますかけ"]):
+            return "power"
+        if any(k in name for k in ["直感", "神秘", "スター", "芸術", "フィッシュ"]):
+            return "spirit"
+        return "other"
+    life_pool = _themed_pool("life", FALLBACK_LIFE_IDS)
+    fate_pool = _themed_pool("fate", FALLBACK_FATE_IDS)
+    sun_pool = _themed_pool("sun", FALLBACK_SUN_IDS)
+    special_pool = _themed_pool("special", FALLBACK_SPECIAL_IDS)
+    if life_id <= 0 or life_id not in PALM_DETAIL_BY_ID:
+        life_id = _stable_choice(life_pool, "life", default_id=98101)
+    elif life_id in FALLBACK_LIFE_IDS:
+        life_id = _stable_choice(life_pool, "life_remap", default_id=life_id)
+    if fate_id <= 0 or fate_id not in PALM_DETAIL_BY_ID:
+        fate_id = _stable_choice(fate_pool, "fate", default_id=98201)
+    elif fate_id in FALLBACK_FATE_IDS:
+        fate_id = _stable_choice(fate_pool, "fate_remap", default_id=fate_id)
     if money_sun_id <= 0 or money_sun_id not in PALM_DETAIL_BY_ID:
-        money_sun_id = _stable_choice(FALLBACK_SUN_IDS, "sun", default_id=98001)
+        money_sun_id = _stable_choice(sun_pool, "sun", default_id=98001)
     elif money_sun_id in FALLBACK_SUN_IDS:
         # If the classifier keeps returning the same generic "兆し" ID, diversify within the sign-level pool.
-        money_sun_id = _stable_choice(FALLBACK_SUN_IDS, "sun_remap", default_id=money_sun_id)
+        money_sun_id = _stable_choice(sun_pool, "sun_remap", default_id=money_sun_id)
     notes = str(detect.get("notes", "") or "").strip()
-
     special_ids = detect.get("special_ids", [])
     if not isinstance(special_ids, list):
         special_ids = []
@@ -581,25 +644,41 @@ Rules:
             special_clean.append(xi)
         if len(special_clean) >= 2:
             break
-
-
-    # If the classifier keeps returning only the same "兆し" pair (98011/98012),
-    # diversify within the broader "兆し" pool to avoid visible bias (still sign-level, not a strong claim).
-    if special_clean and all(x in (98011, 98012) for x in special_clean):
-        special_clean = _stable_sample(FALLBACK_SPECIAL_IDS, 2, tag="special_remap", exclude=[])
-    # Ensure we always have 2 special IDs (avoid 0/empty): fill with fallback "兆し" lines (deterministic)
+    # If the classifier keeps returning only the same weak/generic pair, diversify within the broader themed pool.
+    if special_clean and all(x in (98011, 98012, 98019) for x in special_clean):
+        special_clean = _stable_sample(special_pool, 2, tag="special_remap", exclude=[])
+    # Avoid showing two specials from the same family too often (e.g. 守護線 + 二重生命線).
+    diversified = []
+    used_families = set()
+    for sid in special_clean:
+        fam = _family_from_id(sid)
+        if fam not in used_families or fam == "other":
+            diversified.append(sid)
+            used_families.add(fam)
+    special_clean = diversified[:]
+    # Ensure we always have 2 special IDs (avoid 0/empty): fill from themed pool, preferring a different family.
+    for sid in special_pool:
+        if len(special_clean) >= 2:
+            break
+        fam = _family_from_id(sid)
+        if sid in special_clean:
+            continue
+        if fam in used_families and fam != "other":
+            continue
+        if sid in PALM_DETAIL_BY_ID:
+            special_clean.append(sid)
+            used_families.add(fam)
+    # If still short, fill deterministically ignoring family.
     need = 2 - len(special_clean)
     if need > 0:
-        fill = _stable_sample(FALLBACK_SPECIAL_IDS, need, tag="special", exclude=special_clean)
+        fill = _stable_sample(special_pool, need, tag="special", exclude=special_clean)
         special_clean.extend(fill)
-
-    # Last-resort safety: if still missing, append the classic 98011/98012
-    for _fid in (98011, 98012):
+    # Last-resort safety
+    for _fid in (98011, 98012, 98301):
         if len(special_clean) >= 2:
             break
         if _fid in PALM_DETAIL_BY_ID and _fid not in special_clean:
             special_clean.append(_fid)
-
 # legacy payload
     legacy = {
         "life": {"id": life_id, "name": _get_name(life_id), "text": _get_detail(life_id)},
@@ -612,7 +691,6 @@ Rules:
                      "name": _get_name(special_clean[1]) if len(special_clean) >= 2 else "",
                      "text": _get_detail(special_clean[1]) if len(special_clean) >= 2 else ""},
     }
-
     # 目標文字量（PDFに収まる“中〜やや多め”）
     if is_en:
         length_rule = (
@@ -635,7 +713,6 @@ Rules:
             "- 生命線/運命線/金運線/特殊線1/特殊線2：各200〜300文字。\n"
             "- 総合：240〜360文字。\n"
         )
-
     # 見出し（PDFにIDを残す：B方式）
     if is_en:
         heading_spec = (
@@ -677,7 +754,6 @@ Rules:
             "### 特殊線2 [ID:..]\n"
             "### 手相総合アドバイス\n"
         )
-
     # Shincom tone
     if is_en:
         sys = (
@@ -702,7 +778,6 @@ Rules:
             "詩的で断定的（『あなたは〜です』）に語りつつ、必ず前向きで実践的なアドバイスで着地してください。"
             "与えた旧文（レガシー本文）を根拠に増幅し、本文でID/番号/DB/候補一覧の話は一切しないこと。JSONにiching_hintがあれば“裏テーマ”として比喩や行動提案に薄く混ぜ、本文で『易』『イーチン』『卦』などの語は出さない。"
         )
-
     # special=0 の時は「無い」と言わず、伸ばすための一般的な“魅力”を描く
     none_special_rule = (
         "If a special line ID is 0, write that section as a positive 'hidden potential' message, "
@@ -711,7 +786,6 @@ Rules:
         "特殊線IDが0の場合は、その項目は“隠れた強み・伸びしろ”として前向きに書き、"
         "『ない』『見えない』等の否定表現は書かない。\n"
     )
-
     user_payload = {
         "lang": output_lang,
         "style": output_style,
@@ -719,13 +793,11 @@ Rules:
         "iching_hint": iching_hint,
         "legacy": legacy,
     }
-
     user = (
         "You will write a palm reading based on the following JSON.\n"
         if is_en else
         "以下のJSONを根拠に鑑定文を書いてください。\n"
     ) + json.dumps(user_payload, ensure_ascii=False, indent=2)
-
     instruction = (
         f"\n\n{heading_spec}\n"
         f"Length rules:\n{length_rule}\n"
@@ -735,7 +807,6 @@ Rules:
         "- Headings must include the proper [ID:..] where required.\n"
         "- Do NOT include '###' inside the body text.\n"
     )
-
     # ここは1回で生成（6ブロックまとめて）
     try:
         resp2 = _openai_chat_with_retry(
@@ -751,9 +822,7 @@ Rules:
     except Exception:
         # API失敗時: 旧文をそのまま6ブロック化（最低限）
         txt = _fallback_6_blocks_from_legacy(legacy, lang_norm)
-
     return _ensure_6_blocks(txt, lang_norm)
-
 # -------------------------
 # ensure helpers (local-only)
 # -------------------------
@@ -761,20 +830,16 @@ def _ensure_6_blocks(text: str, lang_norm: str) -> str:
     """Return a safe string with exactly 6 blocks using '### ' headings."""
     if not text:
         return _fallback_6_blocks_from_legacy({}, lang_norm)
-
     # normalize
     text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
-
     # If user accidentally used 【】 headings, convert to ### style (best-effort)
     if "### " not in text and "【" in text:
         text = re.sub(r"^【([^】]+)】\s*$", r"### \1", text, flags=re.M)
-
     blocks = [b for b in text.split("### ") if b.strip()]
     if len(blocks) < 6:
         # try to split by heading-like lines
         # fallback to legacy-style blocks
         return _fallback_6_blocks_from_legacy({}, lang_norm)
-
     # keep first 6
     blocks = blocks[:6]
     out = []
@@ -788,7 +853,6 @@ def _ensure_6_blocks(text: str, lang_norm: str) -> str:
         body = body.replace("###", "").strip()
         out.append(f"### {title}\n{body}".strip())
     return "\n\n".join(out)
-
 def _fallback_6_blocks_from_legacy(legacy: dict, lang_norm: str) -> str:
     """Minimal fallback: build 6 blocks from legacy texts."""
     def pick(k, default_title, default_body):
@@ -801,7 +865,6 @@ def _fallback_6_blocks_from_legacy(legacy: dict, lang_norm: str) -> str:
         title = default_title + (f" [ID:{_id}]" if _id else " [ID:0]")
         body = t if t else default_body
         return f"### {title}\n{body}"
-
     if lang_norm.startswith("en"):
         return "\n\n".join([
             pick("life", "Life Line", "We couldn't clearly read this from the photo. Please retake with better lighting."),
@@ -829,7 +892,6 @@ def _fallback_6_blocks_from_legacy(legacy: dict, lang_norm: str) -> str:
             pick("special2", "특수선 2", "당신은 꾸준함이 쌓일수록 운이 크게 열리는 타입입니다."),
             "### 손금 종합 조언\n작은 습관 하나를 7일만 유지해 보세요. 그 지점에서 운이 ‘증폭’됩니다.",
         ])
-
     return "\n\n".join([
         pick("life", "生命線", "画像から判定できませんでした。明るい場所で再撮影してください。"),
         pick("fate", "運命線", "画像から判定できませんでした。明るい場所で再撮影してください。"),
@@ -838,7 +900,6 @@ def _fallback_6_blocks_from_legacy(legacy: dict, lang_norm: str) -> str:
         pick("special2", "特殊線2", "あなたは“積み上げた分だけ運が跳ねる”タイプです。"),
         "### 手相総合アドバイス\n今週は『一つだけ』決めて、毎日積む。そこから現実が動きます。",
     ])
-
 def get_iching_advice(lang: str = 'ja'):
     try:
         lang_norm = (lang or 'ja').lower()
@@ -891,7 +952,6 @@ def get_iching_advice(lang: str = 'ja'):
                 out.append(ln)
                 prev = key
             return '\n'.join(out).strip()
-
         try:
             if (lang_norm or 'ja').lower().startswith('ja'):
                 raw = _polish_palm_text(raw)
@@ -907,24 +967,17 @@ def get_iching_advice(lang: str = 'ja'):
         if (lang or 'ja').lower().startswith(('ko', 'kr')):
             return "현재 주역 메시지를 가져올 수 없습니다."
         return "現在、易占いの結果が取得できませんでした。"
-
-
 def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyusei_text):
     prompt = f"""あなたは占いの専門家です。
 相談者は現在{age}歳です。以下の鑑定結果を参考にしてください。
-
 【手相】\n{palm_result}\n
 【四柱推命】\n{shichu_result}\n
 【九星気学の方位】\n{kyusei_text}
-
 以下5つの項目を、すべて1行にまとめて簡潔に出力してください：
-
 ◆ アイテム：〇〇　　◆ カラー：〇〇　　◆ ナンバー：〇〇　　◆ フード：〇〇　　◆ デー：〇曜日
-
 - 補足、理由、改行は一切禁止
 - 各項目は短く（単語～数語）
 """
-
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
@@ -935,14 +988,6 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
     except Exception as e:
         print("❌ ラッキー情報取得失敗:", e)
         return ["◆ アイテム：ー　　◆ カラー：ー　　◆ ナンバー：ー　　◆ フード：ー　　◆ デー：ー"]
-
-
-
-
-
-
-
-
 def generate_lucky_info_mixed(
     nicchu_eto: str,
     birthdate: str,
@@ -953,20 +998,17 @@ def generate_lucky_info_mixed(
     lang: str = "ja",
 ) -> list[str]:
     """誕生日などから「ラッキー情報」を生成して返す（shincom/renai共通ユーティリティ）。
-
     返り値はPDF側でそのまま描画できる「◆ key: value」形式の行リスト。
     lang='en' のときはラベルと主要な値を英訳する（未知語は原文のまま）。
     """
     import random
     from datetime import datetime
-
     # 安定した結果にするため birthdate をシードにする
     try:
         seed_key = int(birthdate.replace("-", ""))
     except Exception:
         seed_key = random.randint(1, 99999999)
     rng = random.Random(seed_key)
-
     # 1) ラッキーアイテム（九星を軽く反映）
     item_pool = {
         "default": ["スマホ充電器", "小さなノート", "ハンドクリーム", "ミントガム", "折りたたみ傘", "白いハンカチ"],
@@ -982,7 +1024,6 @@ def generate_lucky_info_mixed(
     }
     key = (kyusei_text or "").strip()
     item_ja = rng.choice(item_pool.get(key, item_pool["default"]))
-
     # 2) ラッキーカラー
     color_pool_ja = [
         "アイアンブルー", "ネイビー", "スカイブルー",
@@ -991,13 +1032,11 @@ def generate_lucky_info_mixed(
         "ゴールド", "シルバー", "アイボリー", "ホワイト", "ブラック",
     ]
     color_ja = rng.choice(color_pool_ja)
-
     # 3) ラッキーナンバー（ライフパス優先）
     try:
         number = int(calculate_life_path_number(birthdate))
     except Exception:
         number = rng.randint(1, 9)
-
     # 4) ラッキーデー（曜日）
     weekday_ja = ["月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日", "日曜日"]
     try:
@@ -1005,14 +1044,12 @@ def generate_lucky_info_mixed(
     except Exception:
         weekday_idx = rng.randint(0, 6)
     day_ja = weekday_ja[weekday_idx]
-
     # 5) ラッキーフード（五行→食）
     try:
         wu_xing = (shichu_result_raw or {}).get("gogyou") or (shichu_result_raw or {}).get("five_elements") or ""
     except Exception:
         wu_xing = ""
     wu_xing = str(wu_xing).strip()
-
     food_map_ja = {
         "木": ["小松菜", "ブロッコリー", "枝豆", "抹茶", "緑茶"],
         "火": ["トマト", "唐辛子", "赤身肉", "いちご", "カカオ"],
@@ -1024,9 +1061,7 @@ def generate_lucky_info_mixed(
         food_ja = rng.choice(food_map_ja[wu_xing])
     else:
         food_ja = rng.choice(sum(food_map_ja.values(), []))
-
     lang_norm = (lang or 'ja').lower()
-
     # 英語化（ラベル + 主要値）
     if lang_norm.startswith("en"):
         item_en = {
@@ -1129,12 +1164,10 @@ def generate_lucky_info_mixed(
             "ところてん": "Tokoroten",
             "昆布だし": "Kombu broth",
         }
-
         item = item_en.get(item_ja, item_ja)
         color = color_en.get(color_ja, color_ja)
         day = day_en.get(day_ja, day_ja)
         food = food_en.get(food_ja, food_ja)
-
         return [
             f"◆ Item: {item}",
             f"◆ Number: {number}",
@@ -1142,7 +1175,6 @@ def generate_lucky_info_mixed(
             f"◆ Color: {color}",
             f"◆ Food: {food}",
         ]
-
     # 中文化（ラベル + 主要値）
     if lang_norm.startswith(("zh", "cn")):
         item_zh = {
@@ -1210,12 +1242,10 @@ def generate_lucky_info_mixed(
             "ところてん": "心太",
             "昆布だし": "昆布高汤",
         }
-
         item = item_zh.get(item_ja, item_ja)
         color = color_zh.get(color_ja, color_ja)
         day = day_zh.get(day_ja, day_ja)
         food = food_zh.get(food_ja, food_ja)
-
         return [
             f"◆ 物品: {item}",
             f"◆ 数字: {number}",
@@ -1223,8 +1253,6 @@ def generate_lucky_info_mixed(
             f"◆ 颜色: {color}",
             f"◆ 食物: {food}",
         ]
-
-
     # 한국어화（라벨 + 주요 값）
     if lang_norm.startswith(("ko", "kr")):
         item_ko = {
@@ -1295,12 +1323,10 @@ def generate_lucky_info_mixed(
             "ところてん": "도코로텐",
             "昆布だし": "다시마 육수",
         }
-
         item = item_ko.get(item_ja, item_ja)
         color = color_ko.get(color_ja, color_ja)
         day = day_ko.get(day_ja, day_ja)
         food = food_ko.get(food_ja, food_ja)
-
         return [
             f"◆ 아이템: {item}",
             f"◆ 숫자: {number}",
@@ -1308,8 +1334,6 @@ def generate_lucky_info_mixed(
             f"◆ 컬러: {color}",
             f"◆ 푸드: {food}",
         ]
-
-
     return [
         f"◆ アイテム: {item_ja}",
         f"◆ 数字: {number}",
@@ -1317,7 +1341,6 @@ def generate_lucky_info_mixed(
         f"◆ 色: {color_ja}",
         f"◆ 食べ物: {food_ja}",
     ]
-
 def _lang_pack(lang: str):
     """Return (system_prompt, lang_note) for OpenAI calls."""
     lang_norm = (lang or 'ja').lower()
@@ -1333,21 +1356,26 @@ def _lang_pack(lang: str):
         system = "당신은 전문 점술가입니다. 고객이 편안해지고 희망을 얻을 수 있도록 자연스러운 한국어로, 긍정적이고 구체적인 조언을 작성하세요. 간지명/통변성/점술 용어는 쓰지 말고 의미를 일상어로 풀어주세요."
         note = "\n\n한국어로 출력하세요. 간지명, 통변성/십성, 전문 용어는 절대 쓰지 마세요. 친절하고 실천 가능한 조언으로 작성하세요."
         return system, note
-
     system = "あなたは占いのプロです。お客様に寄り添い、前向きで具体的なアドバイスを自然な日本語で書いてください。占い用語や干支名は出さず、意味をやさしい言葉に置き換えてください。"
     note = ""
     return system, note
-
 def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_month: bool=False, style: str='normal', lang: str='ja', **kwargs):
     import re
     iching_result = get_iching_advice(lang=lang)
-    palm_result = analyze_palm(image_data, output_lang=lang, output_style=style, output_mode=kwargs.get('output_mode','normal'), iching_hint=iching_result)
     shichu_result_raw = get_shichu_fortune(birthdate, now=now, force_next_month=force_next_month, lang=lang)
+    palm_result = analyze_palm(
+        image_data,
+        output_lang=lang,
+        output_style=style,
+        output_mode=kwargs.get('output_mode','normal'),
+        iching_hint=iching_result,
+        shichu_hint=shichu_result_raw,
+        kyusei_text=kyusei_text,
+        birthdate=birthdate,
+    )
     age = datetime.today().year - int(birthdate[:4])
     nicchu_eto = get_nicchu_eto(birthdate)
     raw_lucky_info = generate_lucky_info_mixed(nicchu_eto, birthdate, age, palm_result, shichu_result_raw, kyusei_text, lang=lang)
-
-
     # Lucky info is used as a small 2-column block in the PDF.
     # IMPORTANT: Do not collapse it to a single line (regression that made only "Item" appear).
     lucky_lines: list[str] = []
@@ -1355,7 +1383,6 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
         if isinstance(raw_lucky_info, list):
             # Expected shape: ["◆ Item: ...", "◆ Number: ...", "◆ Color: ...", "◆ Day: ...", "◆ Food: ..."]
             lucky_lines = [str(x).strip() for x in raw_lucky_info if str(x).strip()]
-
         elif isinstance(raw_lucky_info, dict):
             # Defensive: accept dict-style lucky info
             order = ["item", "number", "color", "day", "food"]
@@ -1373,7 +1400,6 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
                 v = raw_lucky_info.get(k)
                 if v is not None and str(v).strip():
                     lucky_lines.append(f"◆ {labels[k]}: {str(v).strip()}")
-
         else:
             # String: keep each bullet line if present, otherwise split by newlines.
             s = str(raw_lucky_info or "").strip()
@@ -1384,11 +1410,9 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
                 lucky_lines = [f"◆ {p}" for p in parts]
             else:
                 lucky_lines = lines
-
     except Exception as e:
         print("❌ lucky_info 整形失敗:", e)
         lucky_lines = []
-
     today = now or datetime.today()
     target1 = today.replace(day=15)
     if today.day >= 20 or force_next_month:
@@ -1396,7 +1420,6 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     target2 = target1 + relativedelta(months=1)
     month_label = f"{target1.year}年{target1.month}月の運勢"
     next_month_label = f"{target2.year}年{target2.month}月の運勢"
-
     if isinstance(shichu_result_raw, dict):
         shichu_texts = {
             "personality": shichu_result_raw.get("personality", ""),
@@ -1419,7 +1442,6 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
                 shichu_texts["next_month_fortune"] = body
             elif "年" in title and "運勢" in title:
                 shichu_texts["year_fortune"] = body
-
     palm_titles = []
     palm_texts = []
     for part in palm_result.split("### "):
@@ -1427,7 +1449,6 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
             title, *body = part.strip().split("\n", 1)
             palm_titles.append(title.strip())
             palm_texts.append(body[0].strip() if body else "")
-
     
     # --- Safety: ensure we always have 5 palm sections + 1 overall comment (so PDF never crashes) ---
     min_blocks = 6  # 5 lines + overall
@@ -1465,19 +1486,16 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
             "手相総合アドバイス",
         ]
         fallback_text = "※画像からこの項目を明確に判定できませんでした。可能なら明るい場所で撮り直してください。"
-
     # Normalize list lengths
     while len(palm_titles) < min_blocks:
         palm_titles.append(fallback_titles[min(len(palm_titles), len(fallback_titles) - 1)])
     while len(palm_texts) < min_blocks:
         palm_texts.append(fallback_text)
-
     # Trim excessive blocks (keep first 5 + overall)
     if len(palm_titles) > min_blocks:
         palm_titles = palm_titles[:min_blocks]
     if len(palm_texts) > min_blocks:
         palm_texts = palm_texts[:min_blocks]
-
     # Ensure non-empty titles/texts for the first 5 blocks
     for i in range(5):
         if not (palm_titles[i] or "").strip():
@@ -1487,13 +1505,7 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     # Ensure the overall comment exists
     if not (palm_texts[5] or "").strip():
         palm_texts[5] = fallback_text
-
-
     return palm_titles, palm_texts, shichu_texts, iching_result, lucky_lines
-
-
-
-
 def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_yearly: bool = False, size: str = 'a4', lang: str = 'ja') -> dict:
     """
     恋愛版：相性・今年/今月/来月の恋愛運・テーマ別アドバイス・ラッキー情報・年運12ヶ月をまとめて生成する。
@@ -1508,10 +1520,8 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
     from nicchu_utils import get_nicchu_eto
     from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
     from yearly_love_fortune_utils import generate_yearly_love_fortune
-
     # 日柱
     user_eto = get_nicchu_eto(user_birth)
-
     # partner_birth が未入力や不正な場合に備える
     partner_eto = None
     if partner_birth:
@@ -1520,7 +1530,6 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         except Exception as e:
             print("⚠ partner_eto 計算エラー:", e)
             partner_eto = None
-
     # =========================
     # 1. 相性／総合恋愛運テキスト
     # =========================
@@ -1530,37 +1539,29 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
             prompt_comp = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}
 - お相手の日柱: {partner_eto}
-
 二人の性格的な相性と、関係を良くするためのポイントを、
 200文字でやさしく、具体的に教えてください。"""
-
             prompt_future = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}
 - お相手の日柱: {partner_eto}
-
 お相手の今の気持ちと、この先3か月ほどの関係の流れについて、
 200文字で具体的に教えてください。"""
         else:
             # お相手がいない場合：あなたの恋愛傾向 ＋ 理想の相手像と出会いのチャンス
             prompt_comp = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}
-
 あなたの恋愛傾向・魅力・パートナーシップの癖について、
 200文字でやさしく、前向きに教えてください。"""
-
             prompt_future = f"""あなたは恋愛占いの専門家です。
 - あなたの日柱: {user_eto}
-
 理想の相手像と、今後1年の出会いのチャンスについて、
 200文字で具体的に教えてください。"""
-
         comp_text = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_comp}],
             max_tokens=400,
             temperature=0.9
         ).choices[0].message.content.strip()
-
         future_text = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_future}],
@@ -1571,19 +1572,16 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         print("❌ 相性・総合恋愛運取得エラー:", e)
         comp_text = f"（相性・性格占い取得エラー: {e}）"
         future_text = ""
-
     # =========================
     # 2. テーマ別アドバイス（3項目：注意点・復縁・結婚）
     # =========================
     from_section_topics = ["恋愛の注意点", "復縁のヒント", "結婚について"]
-
     topic_sections = []
     try:
         iching_result = get_iching_advice()
     except Exception as e:
         print("⚠ 易占い取得エラー（テーマ用）:", e)
         iching_result = "（易占い結果取得エラー）"
-
     for topic in from_section_topics:
         try:
             topic_prompt = f"""あなたは恋愛占いの専門家です。
@@ -1592,52 +1590,42 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
                 topic_prompt += f"\n- お相手の日柱: {partner_eto}"
             topic_prompt += f"""
 - 易占いからの示唆：{iching_result}
-
 以下の条件で「{topic}」についてアドバイスしてください：
-
 ・相談者の傾向（日柱）と、易の示唆を元にした、個別性の高い具体的な鑑定にする  
 ・200文字以内  
 ・現実的で誠実だが希望が持てる言葉で  
 ・一般論や抽象的な助言ではなく、読み手に刺さるような内容にする
 """
-
             topic_text = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": topic_prompt}],
                 max_tokens=600,
                 temperature=0.9
             ).choices[0].message.content.strip()
-
             topic_sections.append({"title": topic, "content": topic_text})
         except Exception as e:
             topic_sections.append(
                 {"title": topic, "content": f"（この項目の取得エラー: {e}）"}
             )
-
     # =========================
     # 3. 今年／今月／来月（20日境で base を決定）
     # =========================
     try:
         today = datetime.today()
-
         # 20日境で基準月 base を決める
         base = today.replace(day=15)
         if today.day >= 20:
             base += relativedelta(months=1)
-
         this_year = base.year      # 「今年」は base の年
         this_month = base.month    # 「今月」は base の月
-
         # 来月（基準月の翌月）
         next_base = base + relativedelta(months=1)
         next_year = next_base.year
         next_month = next_base.month
-
         # 通変星
         tsuhen_year = get_tsuhensei_for_year(user_birth, this_year)
         tsuhen_month = get_tsuhensei_for_date(user_birth, this_year, this_month)
         tsuhen_next_month = get_tsuhensei_for_date(user_birth, next_year, next_month)
-
         # 今年の恋愛運
         prompt_year = f"""あなたは四柱推命の専門家です。
 - 日柱: {user_eto}
@@ -1645,33 +1633,28 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 - 月の通変星: {tsuhen_month}
 今年（{this_year}年）の恋愛運について、出会いや進展、距離の縮まり方などに触れて
 200文字でやさしく教えてください。主語は「あなた」。"""
-
         # 今月の恋愛運
         prompt_month = f"""あなたは四柱推命の専門家です。
 - 日柱: {user_eto}
 - 年の通変星: {tsuhen_year}
 - 月の通変星: {tsuhen_month}
 今月（{this_month}月）の恋愛運を150文字でやさしく教えてください。"""
-
         # 来月の恋愛運
         prompt_next = f"""あなたは四柱推命の専門家です。
 - 日柱: {user_eto}
 - 年の通変星: {tsuhen_year}
 - 月の通変星: {tsuhen_next_month}
 来月（{next_month}月）の恋愛運を150文字でやさしく教えてください。"""
-
         year_love = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_year}],
             max_tokens=400
         ).choices[0].message.content.strip()
-
         month_love = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_month}],
             max_tokens=400
         ).choices[0].message.content.strip()
-
         next_month_love = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt_next}],
@@ -1690,7 +1673,6 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         next_base = base + relativedelta(months=1)
         next_year = next_base.year
         next_month = next_base.month
-
     # =========================
     # 4. 年運 12 ヶ月（include_yearly=True のとき）
     # =========================
@@ -1703,7 +1685,6 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         except Exception as e:
             print(f"❌ 年運取得失敗: {e}")
             yearly_love_fortunes = {}
-
     # =========================
     # 5. 恋愛版ラッキー情報＆吉方位
     # =========================
@@ -1713,10 +1694,8 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         age = base.year - birth_date_obj.year - (
             (base.month, base.day) < (birth_date_obj.month, birth_date_obj.day)
         )
-
         # 吉方位テキスト（九星気学ベース）
         kyusei_text = generate_lucky_direction(user_birth, base.date(), lang=lang)
-
         # ラッキー情報（恋愛版）
         lucky_info = generate_lucky_renai_info(
             user_eto, user_birth, age, year_love, kyusei_text
@@ -1725,7 +1704,6 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
         print("❌ 恋愛ラッキー情報取得失敗:", e)
         lucky_info = []
         kyusei_text = ""
-
     # =========================
     # 6. まとめて返却
     # =========================
