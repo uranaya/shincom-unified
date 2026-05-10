@@ -32,6 +32,9 @@ from pdf_generator_unified_en import create_pdf_unified as create_pdf_unified_en
 from pdf_generator_unified_zh import create_pdf_unified as create_pdf_unified_zh
 from pdf_generator_unified_ko import create_pdf_unified as create_pdf_unified_ko
 
+from regi_multi_shop import init_regi_multi_shop_tables, register_regi_multi_shop_routes
+
+
 # ------------------------------------------------------------
 # PDF language guard
 #
@@ -329,6 +332,18 @@ if DATABASE_URL:
 else:
     print("⚠️ DATABASE_URL が未設定。ローカル実行ではDB非使用。")
 
+
+# --- 店舗別レジ（おのだサンパーク店 / バジリスク店） ---
+try:
+    init_regi_multi_shop_tables(DATABASE_URL)
+    register_regi_multi_shop_routes(
+        app,
+        DATABASE_URL,
+        globals().get("STAFF_LIST"),
+        globals().get("METHOD_LIST"),
+    )
+except Exception as e:
+    print(f"⚠️ [REGI-MULTI-SHOP] setup skipped: {e}", flush=True)
 
 
 
