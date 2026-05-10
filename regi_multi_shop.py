@@ -1,64 +1,86 @@
 # -*- coding: utf-8 -*-
 """
-店舗別レジ拡張モジュール
+店舗別レジ拡張モジュール v4
 
-目的:
-- 既存 sales テーブルに shop_key を追加し、売上を店舗別に分離する。
-- おのだサンパーク店 / バジリスク店の入力・管理画面を分ける。
-- バジリスク店はキャンペーンとして、対面・コンピューター占いともに売上の20%で出店料計算する。
+- /regi/onosun       おのだサンパーク店 売上入力
+- /regi/basilisk     バジリスク店 売上入力
+- /admin/regi/onosun おのだサンパーク店 管理画面（店舗別パスワード）
+- /admin/regi/basilisk バジリスク店 管理画面（店舗別パスワード）
 
-app_unified.py の末尾付近で以下を呼び出してください。
-
-    from regi_multi_shop import init_regi_multi_shop_tables, register_regi_multi_shop_routes
-
-    init_regi_multi_shop_tables(DATABASE_URL)
-    register_regi_multi_shop_routes(
-        app,
-        DATABASE_URL,
-        globals().get("STAFF_LIST"),
-        globals().get("METHOD_LIST"),
-    )
+重要:
+スタッフ・鑑定方法は app_unified.py 側の STAFF_LIST / METHOD_LIST を正とする。
+register_regi_multi_shop_routes(app, DATABASE_URL, STAFF_LIST, METHOD_LIST) の形で渡してください。
 """
 
-from __future__ import annotations
-
-import csv
-import io
 import os
-import hmac
-from urllib.parse import quote
-from collections import defaultdict
-from datetime import date, datetime
+import io
+import csv
+from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from urllib.parse import quote
 
 import psycopg2
 import psycopg2.extras
-from psycopg2 import sql
-from flask import Response, abort, make_response, redirect, request, render_template_string, session
+from flask import (
+    abort,
+    make_response,
+    redirect,
+    render_template_string,
+    request,
+    send_file,
+    session,
+)
+
+# PDF
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+try:
+    from reportlab.pdfbase.ttfonts import TTFont
+except Exception:  # pragma: no cover
+    TTFont = None
 
 
 SHOP_CONFIGS: Dict[str, Dict[str, Any]] = {
     "onosun": {
+        "key": "onosun",
         "name": "おのだサンパーク店",
         "short_name": "おのだ",
-        "invoice_note": "通常出店料：対面30％・コンピューター50％。必要に応じて特別出店料（対面20％・コンピューター40％）も選択できます。",
+        "invoice_note": "通常出店料：対面30％・コンピューター50％。特別出店料：対面20％・コンピューター40％。",
         "normal_rates": {"taimen": Decimal("0.30"), "pc": Decimal("0.50")},
         "special_rates": {"taimen": Decimal("0.20"), "pc": Decimal("0.40")},
         "force_campaign": False,
+        "password_env": "REGI_ONOSUN_ADMIN_PASSWORD",
+        "fallback_password_env": "REGI_ADMIN_PASSWORD",
+        "default_password": "admin123",
     },
     "basilisk": {
+        "key": "basilisk",
         "name": "バジリスク店",
         "short_name": "バジリスク",
         "invoice_note": "キャンペーン出店料：対面・コンピューター占いともに売上の20％。",
         "normal_rates": {"taimen": Decimal("0.20"), "pc": Decimal("0.20")},
         "special_rates": {"taimen": Decimal("0.20"), "pc": Decimal("0.20")},
         "force_campaign": True,
+        "password_env": "REGI_BASILISK_ADMIN_PASSWORD",
+        "fallback_password_env": None,
+        "default_password": "basilisk123",
     },
 }
 
-DEFAULT_STAFF_LIST: List[str] = []
-DEFAULT_METHOD_LIST = ["対面", "コンピューター", "現金外（クレカQR)"]
+# app_unified.py の既存仕様に合わせた既定値。
+# register_regi_multi_shop_routes() へ STAFF_LIST が渡ってこない場合でも、
+# 「新保・二見・スタッフ」のような仮リストを出さないための保険です。
+DEFAULT_STAFF_LIST: List[str] = [
+    "HIROMI", "美帆", "あい", "礼", "あお",
+    "月のかけら", "金子美月", "水木杏香", "幽香", "優芳",
+    "蛍石", "うらなや", "ふく", "COCORAKU", "リリア",
+]
+
+DEFAULT_METHOD_LIST: List[str] = ["対面", "コンピューター", "現金外（クレカQR)"]
 CASHLESS_KEYWORDS = ("現金外", "クレジット", "カード", "PayPay", "ペイペイ", "電子", "QR")
 
 
@@ -74,161 +96,87 @@ def _money(value: Any) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
 
-def _yen(value: Any) -> int:
-    return int(_money(value))
+def _int_yen(value: Any) -> int:
+    return int(_money(value).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
-def _is_cashless(method: str) -> bool:
-    text = method or ""
-    return any(keyword in text for keyword in CASHLESS_KEYWORDS)
+def _format_yen(value: Any) -> str:
+    return f"{_int_yen(value):,}"
 
 
-def _is_taimen(method: str) -> bool:
-    text = method or ""
-    return ("対面" in text) and not _is_cashless(text)
-
-
-def _is_pc(method: str) -> bool:
-    text = method or ""
-    return (("コンピューター" in text) or ("PC" in text.upper())) and not _is_cashless(text)
-
-
-def _shop_or_404(shop_key: str) -> Dict[str, Any]:
-    if shop_key not in SHOP_CONFIGS:
-        abort(404)
-    return SHOP_CONFIGS[shop_key]
+def _normalize_method(method: str) -> str:
+    """DBに入っている '現金外（クレカQR）' などをPDF集計用に正規化"""
+    if method == "対面":
+        return "対面"
+    if method == "コンピューター":
+        return "コンピューター"
+    if "現金外" in (method or ""):
+        return "現金外"
+    return method or ""
 
 
 def _normalize_staff_list(staff_list: Optional[Iterable[str]]) -> List[str]:
-    """引数で渡された候補を整形する。固定の仮スタッフ名は使わない。"""
+    names: List[str] = []
     seen = set()
-    items: List[str] = []
-    for raw in (staff_list or []):
+    for raw in staff_list or []:
         name = str(raw or "").strip()
         if name and name not in seen:
             seen.add(name)
-            items.append(name)
-    return items
+            names.append(name)
+    return names
 
 
 def _normalize_method_list(method_list: Optional[Iterable[str]]) -> List[str]:
-    items = [str(x) for x in (method_list or []) if str(x).strip()]
+    methods: List[str] = []
+    seen = set()
+    for raw in method_list or []:
+        method = str(raw or "").strip()
+        if method and method not in seen:
+            seen.add(method)
+            methods.append(method)
     for required in DEFAULT_METHOD_LIST:
-        if required not in items:
-            items.append(required)
-    return items or DEFAULT_METHOD_LIST
+        if required not in seen:
+            methods.append(required)
+            seen.add(required)
+    return methods or DEFAULT_METHOD_LIST[:]
 
 
-def _table_columns(cur, table_name: str) -> List[str]:
-    cur.execute(
-        """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = %s
-        """,
-        (table_name,),
-    )
-    return [str(row[0]) for row in cur.fetchall()]
-
-
-def _fetch_staff_list(database_url: Optional[str], fallback_staffs: Optional[Iterable[str]] = None) -> List[str]:
-    """
-    スタッフ名はDBマスタを優先する。
-    想定: tellers テーブル / staffs テーブル等。
-    DBマスタが取れない場合のみ、app_unified.py 側から渡された既存 STAFF_LIST を使う。
-    """
-    fallback = _normalize_staff_list(fallback_staffs)
-    if not database_url:
-        return fallback or DEFAULT_STAFF_LIST
-
-    table_candidates = ["tellers", "staffs", "staff"]
-    name_candidates = [
-        "display_name",
-        "name",
-        "staff_name",
-        "teller_name",
-        "nickname",
-        "full_name",
-    ]
-    order_candidates = ["display_order", "sort_order", "order_no", "id"]
-
-    conn = None
+def _month_range(month: Optional[str]) -> Tuple[str, date, date]:
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
     try:
-        conn = _conn(database_url)
-        with conn.cursor() as cur:
-            for table in table_candidates:
-                cols = _table_columns(cur, table)
-                if not cols:
-                    continue
-
-                name_col = next((c for c in name_candidates if c in cols), None)
-                if not name_col:
-                    continue
-
-                order_col = next((c for c in order_candidates if c in cols), None)
-
-                query = sql.SQL("SELECT DISTINCT {name_col}::text AS staff_name FROM {table} WHERE {name_col} IS NOT NULL AND TRIM({name_col}::text) <> ''").format(
-                    name_col=sql.Identifier(name_col),
-                    table=sql.Identifier(table),
-                )
-                if order_col:
-                    # DISTINCT と任意の並び順を安全に両立させるため、Python側で重複除去する。
-                    query = sql.SQL("SELECT {name_col}::text AS staff_name FROM {table} WHERE {name_col} IS NOT NULL AND TRIM({name_col}::text) <> '' ORDER BY {order_col} NULLS LAST, {name_col}").format(
-                        name_col=sql.Identifier(name_col),
-                        table=sql.Identifier(table),
-                        order_col=sql.Identifier(order_col),
-                    )
-
-                cur.execute(query)
-                names: List[str] = []
-                seen = set()
-                for row in cur.fetchall():
-                    name = str(row[0] or "").strip()
-                    if name and name not in seen:
-                        seen.add(name)
-                        names.append(name)
-
-                if names:
-                    return names
-
-            # マスタが空の場合は、過去の sales に存在するスタッフ名を補助的に使う
-            try:
-                cur.execute(
-                    """
-                    SELECT DISTINCT staff_name
-                    FROM sales
-                    WHERE staff_name IS NOT NULL AND TRIM(staff_name) <> ''
-                    ORDER BY staff_name
-                    """
-                )
-                names = [str(row[0]).strip() for row in cur.fetchall() if str(row[0]).strip()]
-                if names:
-                    return names
-            except Exception:
-                pass
-
-    except Exception as e:
-        print(f"⚠️ [REGI-MULTI-SHOP] staff list DB load failed: {e}", flush=True)
-    finally:
-        if conn is not None:
-            conn.close()
-
-    return fallback or DEFAULT_STAFF_LIST
+        start = datetime.strptime(month, "%Y-%m").date()
+    except ValueError:
+        raise ValueError("month は YYYY-MM 形式で指定してください。")
+    if start.month == 12:
+        end = date(start.year + 1, 1, 1)
+    else:
+        end = date(start.year, start.month + 1, 1)
+    return month, start, end
 
 
-def _admin_password(shop_key: str) -> str:
-    """
-    店舗別管理画面パスワード。
-    Render の Environment に以下を設定すると変更できます。
-      REGI_ONOSUN_ADMIN_PASSWORD
-      REGI_BASILISK_ADMIN_PASSWORD
-    未設定時は onosun=admin123 / basilisk=basilisk123。
-    """
-    if shop_key == "onosun":
-        return os.environ.get("REGI_ONOSUN_ADMIN_PASSWORD") or os.environ.get("REGI_ADMIN_PASSWORD") or "admin123"
-    if shop_key == "basilisk":
-        return os.environ.get("REGI_BASILISK_ADMIN_PASSWORD") or "basilisk123"
-    return os.environ.get("REGI_ADMIN_PASSWORD") or "admin123"
+def _date_from_form(value: Optional[str]) -> date:
+    if not value:
+        return date.today()
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return date.today()
+
+
+def _shop_or_404(shop_key: str) -> Dict[str, Any]:
+    shop = SHOP_CONFIGS.get(shop_key)
+    if not shop:
+        abort(404)
+    return shop
+
+
+def _shop_admin_password(shop_key: str) -> str:
+    shop = _shop_or_404(shop_key)
+    password = os.getenv(shop["password_env"], "")
+    if not password and shop.get("fallback_password_env"):
+        password = os.getenv(shop["fallback_password_env"], "")
+    return password or shop["default_password"]
 
 
 def _admin_session_key(shop_key: str) -> str:
@@ -251,15 +199,55 @@ def _invoice_force_special(shop_key: str) -> bool:
 
 
 def _invoice_label(shop_key: str, force_special: bool) -> str:
-    if shop_key == "basilisk":
-        return "キャンペーン出店料（対面20％・コンピューター20％）"
-    if force_special:
-        return "特別出店料（対面20％・コンピューター40％）"
-    return "通常出店料（対面30％・コンピューター50％）"
+    if SHOP_CONFIGS[shop_key].get("force_campaign"):
+        return "キャンペーン出店料"
+    return "特別出店料" if force_special else "通常出店料"
 
 
-def _special_query(force_special: bool) -> str:
-    return "&special=1" if force_special else ""
+def _rates_for(shop_key: str, force_special: bool) -> Dict[str, Decimal]:
+    shop = SHOP_CONFIGS[shop_key]
+    if shop.get("force_campaign") or force_special:
+        return shop["special_rates"]
+    return shop["normal_rates"]
+
+
+def _calc_invoice_totals(total_taiken: Decimal, total_pc: Decimal, total_cashless: Decimal,
+                         shop_key: str, force_special: bool) -> Dict[str, Any]:
+    rates = _rates_for(shop_key, force_special)
+    store_fee = total_taiken * rates["taimen"] + total_pc * rates["pc"]
+    store_fee = store_fee.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    store_fee_tax = (store_fee * Decimal("1.10")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    final_invoice = store_fee_tax - total_cashless
+    return {
+        "rates": rates,
+        "store_fee": store_fee,
+        "store_fee_tax": store_fee_tax,
+        "final_invoice": final_invoice,
+    }
+
+
+def _register_pdf_font() -> str:
+    """
+    既存仕様では static/ipaexg.ttf を使用。
+    見つからない環境でもPDF生成が落ちないよう、CIDフォントにフォールバック。
+    """
+    font_path_candidates = [
+        os.path.join("static", "ipaexg.ttf"),
+        "ipaexg.ttf",
+    ]
+    if TTFont:
+        for font_path in font_path_candidates:
+            if os.path.exists(font_path):
+                try:
+                    pdfmetrics.registerFont(TTFont("IPAexGothic", font_path))
+                    return "IPAexGothic"
+                except Exception:
+                    pass
+    try:
+        pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
+        return "HeiseiKakuGo-W5"
+    except Exception:
+        return "Helvetica"
 
 
 def init_regi_multi_shop_tables(database_url: Optional[str]) -> None:
@@ -276,415 +264,204 @@ def init_regi_multi_shop_tables(database_url: Optional[str]) -> None:
                     """
                     CREATE TABLE IF NOT EXISTS sales (
                         id SERIAL PRIMARY KEY,
-                        date DATE NOT NULL DEFAULT CURRENT_DATE,
-                        staff_name TEXT NOT NULL,
-                        method TEXT NOT NULL,
-                        amount INTEGER NOT NULL DEFAULT 0
+                        date DATE DEFAULT CURRENT_DATE,
+                        staff_name TEXT,
+                        method TEXT,
+                        amount INTEGER
                     );
                     """
                 )
-                cur.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS shop_key TEXT;")
-                cur.execute("UPDATE sales SET shop_key = 'onosun' WHERE shop_key IS NULL OR shop_key = '';")
-                cur.execute("ALTER TABLE sales ALTER COLUMN shop_key SET DEFAULT 'onosun';")
+                cur.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS shop_key TEXT DEFAULT 'onosun';")
                 cur.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;")
+                cur.execute("UPDATE sales SET shop_key = 'onosun' WHERE shop_key IS NULL OR shop_key = '';")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_sales_shop_date ON sales (shop_key, date);")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_sales_shop_staff_date ON sales (shop_key, staff_name, date);")
-        print("✅ [REGI-MULTI-SHOP] sales テーブル店舗別拡張 OK", flush=True)
+        print("✅ [REGI-MULTI-SHOP] sales 店舗別拡張完了", flush=True)
     finally:
         conn.close()
 
 
-def _fetch_sales(
-    database_url: Optional[str],
-    shop_key: str,
-    *,
-    month: Optional[str] = None,
-    day: Optional[str] = None,
-    staff: Optional[str] = None,
-) -> List[Dict[str, Any]]:
-    params: List[Any] = [shop_key]
-    where = ["COALESCE(shop_key, 'onosun') = %s"]
-
-    if month:
-        where.append("date::text LIKE %s")
-        params.append(f"{month}%")
-    if day:
-        where.append("date::text = %s")
-        params.append(day)
-    if staff:
-        where.append("staff_name = %s")
-        params.append(staff)
-
-    sql = f"""
-        SELECT id, date::text AS date, staff_name, method, amount, COALESCE(shop_key, 'onosun') AS shop_key
-        FROM sales
-        WHERE {' AND '.join(where)}
-        ORDER BY date DESC, id DESC
-    """
-
+def _fetch_monthly_rows(database_url: str, shop_key: str, month_start: date, month_end: date,
+                        staff: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = _conn(database_url)
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(sql, params)
-            return [dict(row) for row in cur.fetchall()]
+            params: List[Any] = [shop_key, month_start, month_end]
+            staff_sql = ""
+            if staff:
+                staff_sql = " AND staff_name = %s "
+                params.append(staff)
+            cur.execute(
+                f"""
+                SELECT staff_name, method, SUM(amount)::numeric AS total
+                FROM sales
+                WHERE shop_key = %s
+                  AND date >= %s
+                  AND date < %s
+                  {staff_sql}
+                GROUP BY staff_name, method
+                ORDER BY staff_name, method;
+                """,
+                params,
+            )
+            return list(cur.fetchall())
     finally:
         conn.close()
 
 
-def _calc_totals(rows: Iterable[Dict[str, Any]], shop_key: str, *, force_special: bool = False) -> Dict[str, Any]:
-    shop = SHOP_CONFIGS[shop_key]
-    rates = shop["special_rates"] if (force_special or shop.get("force_campaign")) else shop["normal_rates"]
+def _fetch_daily_details(database_url: str, shop_key: str, month_start: date, month_end: date,
+                         staff: str) -> Dict[str, Dict[str, Decimal]]:
+    conn = _conn(database_url)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT date, method, SUM(amount)::numeric AS total
+                FROM sales
+                WHERE shop_key = %s
+                  AND date >= %s
+                  AND date < %s
+                  AND staff_name = %s
+                GROUP BY date, method
+                ORDER BY date;
+                """,
+                (shop_key, month_start, month_end, staff),
+            )
+            daily: Dict[str, Dict[str, Decimal]] = {}
+            for row_date, method, total in cur.fetchall():
+                key = row_date.strftime("%Y-%m-%d") if hasattr(row_date, "strftime") else str(row_date)
+                cat = _normalize_method(method)
+                if key not in daily:
+                    daily[key] = {"対面": Decimal("0"), "コンピューター": Decimal("0"), "現金外": Decimal("0")}
+                if cat in daily[key]:
+                    daily[key][cat] += _money(total)
+            return daily
+    finally:
+        conn.close()
 
-    total_taimen = Decimal("0")
+
+def _aggregate_invoice(database_url: str, shop_key: str, month: str, staff: str,
+                       force_special: bool) -> Dict[str, Any]:
+    month, month_start, month_end = _month_range(month)
+    rows = _fetch_monthly_rows(database_url, shop_key, month_start, month_end, staff=staff)
+
+    total_taiken = Decimal("0")
     total_pc = Decimal("0")
     total_cashless = Decimal("0")
-    total_other = Decimal("0")
-    methods: Dict[str, int] = defaultdict(int)
-    dates = set()
 
     for row in rows:
-        amount = _money(row.get("amount"))
-        method = str(row.get("method") or "")
-        methods[method] += int(amount)
-        if row.get("date"):
-            dates.add(str(row.get("date")))
-
-        if _is_cashless(method):
-            total_cashless += amount
-        elif _is_taimen(method):
-            total_taimen += amount
-        elif _is_pc(method):
+        cat = _normalize_method(row.get("method"))
+        amount = _money(row.get("total"))
+        if cat == "対面":
+            total_taiken += amount
+        elif cat == "コンピューター":
             total_pc += amount
-        else:
-            total_other += amount
+        elif cat == "現金外":
+            total_cashless += amount
 
-    store_fee = (total_taimen * rates["taimen"] + total_pc * rates["pc"]).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-    store_fee_tax = (store_fee * Decimal("1.10")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-    final_invoice = store_fee_tax - total_cashless
-    sales_total = total_taimen + total_pc + total_other
-    visit_days = len(dates)
-    avg_sales = (sales_total / visit_days).quantize(Decimal("1"), rounding=ROUND_HALF_UP) if visit_days else Decimal("0")
+    totals = _calc_invoice_totals(total_taiken, total_pc, total_cashless, shop_key, force_special)
+    daily_details = _fetch_daily_details(database_url, shop_key, month_start, month_end, staff)
 
     return {
-        "total_taimen": int(total_taimen),
-        "total_pc": int(total_pc),
-        "total_cashless": int(total_cashless),
-        "total_other": int(total_other),
-        "sales_total": int(sales_total),
-        "store_fee": int(store_fee),
-        "store_fee_tax": int(store_fee_tax),
-        "final_invoice": int(final_invoice),
-        "visit_days": visit_days,
-        "avg_sales": int(avg_sales),
-        "methods": dict(methods),
-        "rate_taimen": int(rates["taimen"] * Decimal("100")),
-        "rate_pc": int(rates["pc"] * Decimal("100")),
-        "is_special": bool(force_special or shop.get("force_campaign")),
+        "month": month,
+        "staff": staff,
+        "total_taiken": total_taiken,
+        "total_pc": total_pc,
+        "total_cashless": total_cashless,
+        "daily_details": daily_details,
+        **totals,
     }
 
 
-def _monthly_group(rows: Iterable[Dict[str, Any]]) -> Dict[Tuple[str, str], int]:
-    grouped: Dict[Tuple[str, str], int] = defaultdict(int)
+def _aggregate_monthly(database_url: str, shop_key: str, month: str) -> Dict[str, Any]:
+    month, month_start, month_end = _month_range(month)
+    rows = _fetch_monthly_rows(database_url, shop_key, month_start, month_end)
+
+    details: Dict[str, Dict[str, Any]] = {}
+    staff_names = set()
+
     for row in rows:
-        grouped[(str(row.get("staff_name") or ""), str(row.get("method") or ""))] += int(row.get("amount") or 0)
-    return dict(sorted(grouped.items(), key=lambda item: (item[0][0], item[0][1])))
-
-
-def _staff_details(rows: Iterable[Dict[str, Any]], shop_key: str, *, force_special: bool = False) -> Dict[str, Dict[str, Any]]:
-    by_staff: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-    for row in rows:
-        by_staff[str(row.get("staff_name") or "未設定")].append(row)
-    return {staff: _calc_totals(sales, shop_key, force_special=force_special) for staff, sales in sorted(by_staff.items())}
-
-
-def _daily_details(rows: Iterable[Dict[str, Any]]) -> Dict[str, Dict[str, int]]:
-    """PDF用の日別内訳を既存請求書と同じ列構成で作る。"""
-    details: Dict[str, Dict[str, int]] = {}
-    for row in rows:
-        date_str = str(row.get("date") or "")
-        if not date_str:
+        staff = (row.get("staff_name") or "").strip()
+        method = row.get("method") or ""
+        amount = _money(row.get("total"))
+        if not staff:
             continue
-        method = str(row.get("method") or "")
-        amount = int(row.get("amount") or 0)
-        if date_str not in details:
-            details[date_str] = {"対面": 0, "コンピューター": 0, "現金外": 0}
 
-        if _is_cashless(method):
-            details[date_str]["現金外"] += amount
-        elif _is_taimen(method):
-            details[date_str]["対面"] += amount
-        elif _is_pc(method):
-            details[date_str]["コンピューター"] += amount
+        staff_names.add(staff)
+        if staff not in details:
+            details[staff] = {
+                "methods": {},
+                "total": Decimal("0"),
+                "cashless_total": Decimal("0"),
+                "visit_days": 0,
+                "avg_sales": Decimal("0"),
+            }
 
-    return dict(sorted(details.items(), key=lambda item: item[0]))
+        cat = _normalize_method(method)
+        details[staff]["methods"][cat] = details[staff]["methods"].get(cat, Decimal("0")) + amount
+        if cat in ("対面", "コンピューター"):
+            details[staff]["total"] += amount
+        elif cat == "現金外":
+            details[staff]["cashless_total"] += amount
 
-
-def _fmt_yen(value: Any) -> str:
-    return f"{int(value):,}"
-
-
-def _current_month() -> str:
-    return date.today().strftime("%Y-%m")
-
-
-def _current_day() -> str:
-    return date.today().isoformat()
-
-
-
-LOGIN_TEMPLATE = """
-<!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ shop.name }} 管理ログイン</title>
-<style>
-body{font-family:sans-serif;margin:0;padding:20px;background:#f6f6f6}.wrap{max-width:420px;margin:40px auto;background:#fff;border-radius:12px;padding:22px;box-shadow:0 2px 8px rgba(0,0,0,.08)}label,input,button{display:block;width:100%;box-sizing:border-box;font-size:17px}input{padding:12px;margin:8px 0 16px}button{padding:12px;border:0;border-radius:8px;background:#1976d2;color:#fff;font-weight:bold}.error{background:#ffebee;border:1px solid #ef9a9a;color:#b71c1c;padding:10px;border-radius:6px;margin-bottom:14px}.links a{display:inline-block;margin-top:12px;color:#1976d2}
-</style></head><body><div class="wrap">
-<h2>{{ shop.name }} 管理ログイン</h2>
-{% if error %}<div class="error">{{ error }}</div>{% endif %}
-<form method="post">
-  <input type="hidden" name="next" value="{{ next_url }}">
-  <label>管理パスワード</label>
-  <input type="password" name="password" autocomplete="current-password" required autofocus>
-  <button type="submit">管理画面へ入る</button>
-</form>
-<div class="links"><a href="/regi/{{ shop_key }}">売上入力へ戻る</a> / <a href="/regi-shops">店舗選択</a></div>
-</div></body></html>
-"""
-
-PORTAL_TEMPLATE = """
-<!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>店舗別レジ</title>
-<style>
-body{font-family:sans-serif;margin:0;padding:20px;background:#f6f6f6}.wrap{max-width:760px;margin:auto}.card{background:#fff;border-radius:12px;padding:18px;margin:12px 0;box-shadow:0 2px 8px rgba(0,0,0,.08)}
-a.btn{display:block;text-align:center;padding:14px;margin:10px 0;border-radius:8px;text-decoration:none;color:#fff;background:#1976d2;font-weight:bold}.btn.sub{background:#555}.note{color:#555;font-size:14px;line-height:1.7}
-</style></head><body><div class="wrap">
-<h1>店舗別レジ</h1>
-{% for key, shop in shops.items() %}
-<div class="card">
-  <h2>{{ shop.name }}</h2>
-  <p class="note">{{ shop.invoice_note }}</p>
-  <a class="btn" href="/regi/{{ key }}">売上入力</a>
-  <a class="btn sub" href="/admin/regi/{{ key }}">管理画面</a>
-</div>
-{% endfor %}
-</div></body></html>
-"""
-
-INPUT_TEMPLATE = """
-<!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ shop.name }} 売上入力</title>
-<style>
-body{font-family:sans-serif;font-size:16px;padding:20px;margin:0;max-width:560px;margin:auto;background:#fafafa}label,select,input,button{display:block;width:100%;margin-bottom:15px;font-size:17px;padding:12px;box-sizing:border-box}button{background:#2e7d32;color:#fff;border:0;border-radius:6px;font-weight:bold}.top{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.top a{background:#1976d2;color:white;text-decoration:none;padding:8px 10px;border-radius:5px;font-size:14px}.shop{background:#fff;border-left:6px solid #2e7d32;padding:12px;margin-bottom:16px}.success{background:#e8f5e9;border:1px solid #81c784;padding:12px;border-radius:6px;margin-bottom:15px}.note{font-size:13px;color:#555;line-height:1.6}
-</style></head><body>
-<div class="top"><a href="/regi-shops">店舗選択</a><a href="/admin/regi/{{ shop_key }}">管理画面（要パスワード）</a></div>
-<div class="shop"><h2>{{ shop.name }} 売上入力</h2><div class="note">{{ shop.invoice_note }}</div></div>
-{% if success %}<div class="success">✅ 登録が完了しました</div>{% endif %}{% if not staff_list %}<div class="success" style="background:#fff8e1;border-color:#ffe082">⚠️ スタッフマスタが取得できません。DBの tellers/staffs テーブルを確認してください。</div>{% endif %}
-<form method="post">
-  <label>日付:</label>
-  <input type="date" name="date" value="{{ selected_date }}" required>
-  <label>店員名:</label>
-  <select name="staff" required>
-    {% if staff_list %}
-      {% for s in staff_list %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
-    {% else %}
-      <option value="" disabled selected>スタッフマスタ未登録</option>
-    {% endif %}
-  </select>
-  <label>鑑定方法:</label>
-  <select name="method" required>{% for m in method_list %}<option value="{{ m }}">{{ m }}</option>{% endfor %}</select>
-  <label>金額:</label>
-  <input type="number" name="amount" min="0" inputmode="numeric" required>
-  <button type="submit" {% if not staff_list %}disabled{% endif %}>{{ shop.short_name }}の売上として登録</button>
-</form>
-</body></html>
-"""
-
-ADMIN_TEMPLATE = """
-<!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ shop.name }} 本日の売上</title>
-<style>
-body{font-family:sans-serif;font-size:16px;padding:20px;margin:0}.btn{display:inline-block;margin:4px 4px 12px 0;padding:8px 12px;background:#1976d2;color:white;text-decoration:none;border-radius:5px}.btn.gray{background:#555}.summary{font-size:20px;font-weight:bold;margin:16px 0}table{width:100%;border-collapse:collapse;display:block;overflow-x:auto}th,td{border:1px solid #bbb;padding:8px;text-align:center;white-space:nowrap}th{background:#f0f0f0}.danger{background:#c62828;color:white;border:0;padding:5px 8px;border-radius:4px}.edit{background:#2e7d32;color:white;text-decoration:none;padding:5px 8px;border-radius:4px}
-</style></head><body>
-<h2>{{ shop.name }} 本日の売上</h2>
-<a class="btn gray" href="/regi-shops">店舗選択</a><a class="btn" href="/regi/{{ shop_key }}">売上入力</a><a class="btn" href="/admin/regi/{{ shop_key }}/daily?date={{ current_date }}">日別売上</a><a class="btn" href="/admin/regi/{{ shop_key }}/monthly">月別集計</a><a class="btn gray" href="/admin/regi/{{ shop_key }}/logout">ログアウト</a>
-<div class="summary">{{ current_date }} 合計：{{ total|yen }}円</div>
-<table><tr><th>日付</th><th>店員</th><th>方法</th><th>金額</th><th>修正</th></tr>
-{% for s in sales %}
-<tr><td>{{ s.date }}</td><td>{{ s.staff_name }}</td><td>{{ s.method }}</td><td>{{ s.amount|yen }}</td><td><a class="edit" href="/admin/regi/{{ shop_key }}/edit/{{ s.id }}">修正</a></td></tr>
-{% endfor %}
-</table>
-<form method="post" action="/admin/regi/{{ shop_key }}/export" style="margin-top:20px"><button type="submit">CSV出力（{{ shop.short_name }}）</button></form>
-</body></html>
-"""
-
-DAILY_TEMPLATE = """
-<!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ shop.name }} 日別売上</title><style>
-body{font-family:sans-serif;font-size:16px;padding:20px;margin:0}input,button{font-size:16px;padding:8px}.btn{display:inline-block;margin:4px 4px 12px 0;padding:8px 12px;background:#1976d2;color:white;text-decoration:none;border-radius:5px}table{width:100%;border-collapse:collapse;display:block;overflow-x:auto}th,td{border:1px solid #bbb;padding:8px;text-align:center;white-space:nowrap}th{background:#f0f0f0}.edit{background:#2e7d32;color:white;text-decoration:none;padding:5px 8px;border-radius:4px}.danger{background:#c62828;color:white;border:0;padding:5px 8px;border-radius:4px}
-</style></head><body>
-<h2>{{ shop.name }} 日別売上</h2>
-<a class="btn" href="/admin/regi/{{ shop_key }}">管理画面</a><a class="btn" href="/regi/{{ shop_key }}">売上入力</a><a class="btn" href="/admin/regi/{{ shop_key }}/monthly">月別集計</a>
-<form method="get"><input type="date" name="date" value="{{ selected_date }}"><button type="submit">表示</button></form>
-<p><b>{{ selected_date }} 合計：{{ total|yen }}円</b></p>
-<table><tr><th>ID</th><th>日付</th><th>店員</th><th>方法</th><th>金額</th><th>操作</th></tr>
-{% for s in sales %}
-<tr><td>{{ s.id }}</td><td>{{ s.date }}</td><td>{{ s.staff_name }}</td><td>{{ s.method }}</td><td>{{ s.amount|yen }}</td><td><a class="edit" href="/admin/regi/{{ shop_key }}/edit/{{ s.id }}">修正</a> <form method="post" action="/admin/regi/{{ shop_key }}/delete/{{ s.id }}" style="display:inline" onsubmit="return confirm('削除しますか？')"><button class="danger" type="submit">削除</button></form></td></tr>
-{% endfor %}</table>
-</body></html>
-"""
-
-MONTHLY_TEMPLATE = """
-<!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ shop.name }} 月別集計</title><style>
-body{font-family:sans-serif;font-size:16px;padding:20px;margin:0}.btn{display:inline-block;margin:4px 4px 12px 0;padding:8px 12px;background:#1976d2;color:white;text-decoration:none;border-radius:5px}.btn.gray{background:#555}.btn.green{background:#2e7d32}.btn.orange{background:#ef6c00}input,button{font-size:16px;padding:8px}table{width:100%;border-collapse:collapse;display:block;overflow-x:auto;margin-top:12px}th,td{border:1px solid #bbb;padding:8px;text-align:center;white-space:nowrap}th{background:#f0f0f0}.note{background:#fff8e1;border:1px solid #ffe082;padding:10px;margin:12px 0;line-height:1.6}.staffbox{margin:8px 0;padding:10px;border:1px solid #ddd;border-radius:8px}
-</style></head><body>
-<h2>{{ shop.name }} 月別売上集計</h2>
-<a class="btn gray" href="/regi-shops">店舗選択</a><a class="btn" href="/admin/regi/{{ shop_key }}">管理画面</a><a class="btn" href="/regi/{{ shop_key }}">売上入力</a><a class="btn gray" href="/admin/regi/{{ shop_key }}/logout">ログアウト</a>
-<div class="note">{{ shop.invoice_note }}</div>
-<form method="get"><input type="month" name="month" value="{{ month }}"><button type="submit">表示</button></form>
-<h3>{{ month }} 請求書作成</h3>
-{% if shop_key == "onosun" %}
-  <a class="btn green" href="/admin/regi/{{ shop_key }}/invoice?month={{ month }}" target="_blank">通常出店料で請求書</a>
-  <a class="btn orange" href="/admin/regi/{{ shop_key }}/invoice?month={{ month }}&special=1" target="_blank">特別出店料で請求書</a>
-{% else %}
-  <a class="btn orange" href="/admin/regi/{{ shop_key }}/invoice?month={{ month }}" target="_blank">キャンペーン20％で請求書</a>
-{% endif %}
-<table><tr><th>店員</th><th>方法</th><th>合計金額</th></tr>
-{% for key, total in grouped.items() %}<tr><td>{{ key[0] }}</td><td>{{ key[1] }}</td><td>{{ total|yen }}</td></tr>{% endfor %}
-</table>
-<h3>占い師ごとの請求書</h3>
-{% for staff in staff_list %}
-  <div class="staffbox">
-    <b>{{ staff }}</b><br>
-    {% if shop_key == "onosun" %}
-      <a class="btn green" href="/admin/regi/{{ shop_key }}/invoice_staff?month={{ month }}&staff={{ staff|urlencode }}" target="_blank">通常</a>
-      <a class="btn green" href="/admin/regi/{{ shop_key }}/invoice_staff_pdf?month={{ month }}&staff={{ staff|urlencode }}" target="_blank">通常PDF</a>
-      <a class="btn orange" href="/admin/regi/{{ shop_key }}/invoice_staff?month={{ month }}&staff={{ staff|urlencode }}&special=1" target="_blank">特別</a>
-      <a class="btn orange" href="/admin/regi/{{ shop_key }}/invoice_staff_pdf?month={{ month }}&staff={{ staff|urlencode }}&special=1" target="_blank">特別PDF</a>
-    {% else %}
-      <a class="btn orange" href="/admin/regi/{{ shop_key }}/invoice_staff?month={{ month }}&staff={{ staff|urlencode }}" target="_blank">20％請求書</a>
-      <a class="btn orange" href="/admin/regi/{{ shop_key }}/invoice_staff_pdf?month={{ month }}&staff={{ staff|urlencode }}" target="_blank">20％PDF</a>
-    {% endif %}
-  </div>
-{% endfor %}
-</body></html>
-"""
-
-INVOICE_TEMPLATE = """
-<!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ month }} {{ shop.name }} 請求書</title><style>
-body{font-family:sans-serif;padding:20px;max-width:900px;margin:auto;font-size:16px;line-height:1.6}h2{text-align:center}table{width:100%;border-collapse:collapse;margin-bottom:20px}th,td{border:1px solid #ccc;padding:8px;text-align:right}th{text-align:center;background:#f0f0f0}.left{text-align:left}.total-row td{font-weight:bold;font-size:18px;background:#f9f9f9}.btn{display:inline-block;margin:4px 4px 12px 0;padding:9px 14px;background:#1976d2;color:white;text-decoration:none;border-radius:5px}button{padding:9px 14px;font-size:16px}@media print{.noprint{display:none}}
-</style></head><body>
-<h2>{{ month }} {{ shop.name }} 請求書</h2>
-<p><b>計算条件：{{ invoice_label }}</b></p>
-<p>{{ shop.invoice_note }}</p>
-<div class="noprint"><button onclick="window.print()">印刷</button> <a class="btn" href="/admin/regi/{{ shop_key }}/invoice_pdf?month={{ month }}{{ special_query }}">PDF出力</a></div>
-<table><tr><th>占い師</th><th>対面売上</th><th>コンピューター売上</th><th>現金外</th><th>出店料率</th><th>出店料 税抜</th><th>税込10%</th><th>請求額</th><th class="noprint">個別</th></tr>
-{% for staff, d in details.items() %}
-<tr><td class="left">{{ staff }}</td><td>{{ d.total_taimen|yen }}</td><td>{{ d.total_pc|yen }}</td><td>{{ d.total_cashless|yen }}</td><td>対面{{ d.rate_taimen }}% / PC{{ d.rate_pc }}%</td><td>{{ d.store_fee|yen }}</td><td>{{ d.store_fee_tax|yen }}</td><td>{{ d.final_invoice|yen }}</td><td class="noprint"><a href="/admin/regi/{{ shop_key }}/invoice_staff?month={{ month }}&staff={{ staff|urlencode }}{{ special_query }}">表示</a></td></tr>
-{% endfor %}
-<tr class="total-row"><td class="left">合計</td><td>{{ totals.total_taimen|yen }}</td><td>{{ totals.total_pc|yen }}</td><td>{{ totals.total_cashless|yen }}</td><td>—</td><td>{{ totals.store_fee|yen }}</td><td>{{ totals.store_fee_tax|yen }}</td><td>{{ totals.final_invoice|yen }}</td><td class="noprint"></td></tr>
-</table>
-</body></html>
-"""
-
-STAFF_INVOICE_TEMPLATE = """
-<!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ month }} {{ shop.name }} {{ staff }} 請求書</title><style>
-body{font-family:sans-serif;padding:20px;max-width:760px;margin:auto;font-size:16px;line-height:1.6}h2{text-align:center}table{width:100%;border-collapse:collapse;margin-bottom:20px}th,td{border:1px solid #ccc;padding:8px;text-align:right}th{text-align:center;background:#f0f0f0}.left{text-align:left}.total-row td{font-weight:bold;font-size:18px;background:#f9f9f9}.btn{display:inline-block;margin:4px 4px 12px 0;padding:9px 14px;background:#1976d2;color:white;text-decoration:none;border-radius:5px}button{padding:9px 14px;font-size:16px}@media print{.noprint{display:none}}
-</style></head><body>
-<h2>{{ month }} {{ shop.name }}<br>{{ staff }} 請求書</h2>
-<p><b>計算条件：{{ invoice_label }}</b></p>
-<p>{{ shop.invoice_note }}</p>
-<div class="noprint"><button onclick="window.print()">印刷</button> <a class="btn" href="/admin/regi/{{ shop_key }}/invoice_staff_pdf?month={{ month }}&staff={{ staff|urlencode }}{{ special_query }}">PDF出力</a></div>
-<table>
-<tr><th>項目</th><th>金額</th></tr>
-<tr><td class="left">対面売上合計</td><td>{{ d.total_taimen|yen }}円</td></tr>
-<tr><td class="left">コンピューター売上合計</td><td>{{ d.total_pc|yen }}円</td></tr>
-<tr><td class="left">現金外合計</td><td>{{ d.total_cashless|yen }}円</td></tr>
-<tr><td class="left">出店料率</td><td>対面{{ d.rate_taimen }}% / コンピューター{{ d.rate_pc }}%</td></tr>
-<tr><td class="left">出店料（税抜）</td><td>{{ d.store_fee|yen }}円</td></tr>
-<tr><td class="left">出店料（税込10％）</td><td>{{ d.store_fee_tax|yen }}円</td></tr>
-<tr class="total-row"><td class="left">請求額（現金外差引後）</td><td>{{ d.final_invoice|yen }}円</td></tr>
-</table>
-</body></html>
-"""
-
-EDIT_TEMPLATE = """
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ shop.name }} 取引修正</title><style>body{font-family:sans-serif;font-size:16px;padding:20px;margin:0;max-width:560px;margin:auto}label,select,input,button{display:block;width:100%;margin-bottom:15px;font-size:17px;padding:12px;box-sizing:border-box}button{background:#1976d2;color:#fff;border:0;border-radius:6px}.back{display:inline-block;margin-bottom:16px}</style></head><body>
-<a class="back" href="/admin/regi/{{ shop_key }}/daily?date={{ sale.date }}">← 日別一覧へ戻る</a>
-<h2>{{ shop.name }} 取引修正</h2>
-<form method="post">
-<label>日付:</label><input type="date" name="date" value="{{ sale.date }}" required>
-<label>占い師:</label><select name="staff" required>{% for s in staff_list %}<option value="{{ s }}" {% if s == sale.staff_name %}selected{% endif %}>{{ s }}</option>{% endfor %}</select>
-<label>鑑定方法:</label><select name="method" required>{% for m in method_list %}<option value="{{ m }}" {% if m == sale.method %}selected{% endif %}>{{ m }}</option>{% endfor %}</select>
-<label>金額:</label><input type="number" name="amount" min="0" value="{{ sale.amount }}" required>
-<button type="submit">修正する</button>
-</form></body></html>
-"""
-
-
-def _register_pdf_font() -> str:
+    conn = _conn(database_url)
     try:
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
-        candidates = [
-            "static/ipaexg.ttf",
-            "ipaexg.ttf",
-            os.path.join(os.getcwd(), "static", "ipaexg.ttf"),
-            os.path.join(os.getcwd(), "ipaexg.ttf"),
-            os.path.join(os.getcwd(), "fonts", "ipaexg.ttf"),
-            "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        ]
-        for path in candidates:
-            if path and os.path.exists(path):
-                name = "RegiJapaneseFont"
-                try:
-                    pdfmetrics.registerFont(TTFont(name, path))
-                except Exception:
-                    pass
-                return name
-    except Exception:
-        pass
-    return "Helvetica"
+        with conn.cursor() as cur:
+            for staff in list(details.keys()):
+                cur.execute(
+                    """
+                    SELECT COUNT(DISTINCT date)
+                    FROM sales
+                    WHERE shop_key = %s
+                      AND date >= %s
+                      AND date < %s
+                      AND staff_name = %s;
+                    """,
+                    (shop_key, month_start, month_end, staff),
+                )
+                visit_days = cur.fetchone()[0] or 0
+                details[staff]["visit_days"] = visit_days
+                details[staff]["avg_sales"] = (
+                    (details[staff]["total"] / Decimal(visit_days)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+                    if visit_days > 0 else Decimal("0")
+                )
+    finally:
+        conn.close()
+
+    total_taiken = sum((d["methods"].get("対面", Decimal("0")) for d in details.values()), Decimal("0"))
+    total_pc = sum((d["methods"].get("コンピューター", Decimal("0")) for d in details.values()), Decimal("0"))
+    total_cashless = sum((d["cashless_total"] for d in details.values()), Decimal("0"))
+
+    return {
+        "month": month,
+        "month_start": month_start,
+        "month_end": month_end,
+        "details": details,
+        "staff_list": sorted(staff_names),
+        "total_taiken": total_taiken,
+        "total_pc": total_pc,
+        "total_cashless": total_cashless,
+    }
 
 
-def _pdf_response(
-    title: str,
-    d: Dict[str, Any],
-    daily_details: Dict[str, Dict[str, int]],
-    *,
-    shop_name: str,
-    invoice_label: str,
-    filename_prefix: str = "invoice",
-) -> Response:
-    """
-    既存 app_unified.py の generate_invoice_pdf() に寄せた請求書PDF。
-    構成: タイトル → 会社情報 → 売上・請求額 → 日別内訳 → 振込先。
-    """
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.units import mm
-    from reportlab.pdfgen import canvas
-
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
+def _create_invoice_pdf(output_path: str, shop_name: str, invoice_label: str, month: str, staff: str,
+                        total_taiken: Decimal, total_pc: Decimal, total_cashless: Decimal,
+                        store_fee: Decimal, store_fee_tax: Decimal, final_invoice: Decimal,
+                        daily_details: Dict[str, Dict[str, Decimal]]) -> None:
     font_name = _register_pdf_font()
+
+    c = canvas.Canvas(output_path, pagesize=A4)
+    width, height = A4
 
     # タイトル
     c.setFont(font_name, 18)
-    c.drawString(20 * mm, height - 20 * mm, title)
+    c.drawString(20 * mm, height - 20 * mm, f"{month} {staff} 請求書")
 
-    # 会社情報（元の請求書レイアウト準拠）
+    # 店舗・出店料区分
+    c.setFont(font_name, 10)
+    c.drawString(20 * mm, height - 28 * mm, f"店舗：{shop_name}　区分：{invoice_label}")
+
+    # 会社情報（元仕様準拠）
     c.setFont(font_name, 9)
     company_info = [
         "〒756-0817 山口県山陽小野田市大字小野田７３０番地２",
@@ -693,79 +470,61 @@ def _pdf_response(
         "TEL: 090-7506-2065",
         "Email: musubiya.planning@gmail.com",
     ]
-    y_info = height - 35 * mm
+    y_info = height - 38 * mm
     for line in company_info:
         c.drawString(20 * mm, y_info, line)
         y_info -= 5 * mm
 
     c.drawString(20 * mm, y_info, "適格請求書発行事業者登録番号：＿＿＿＿＿＿＿＿＿＿＿＿")
-    y_info -= 5 * mm
-    c.drawString(20 * mm, y_info, f"店舗：{shop_name}")
-    y_info -= 5 * mm
-    c.drawString(20 * mm, y_info, f"計算条件：{invoice_label}")
 
-    # 売上・請求額
-    y = height - 80 * mm
+    # 売上・請求額（元仕様準拠）
+    y = height - 75 * mm
     c.setFont(font_name, 10)
     rows = [
-        ("対面売上合計", d.get("total_taimen", 0)),
-        ("コンピューター売上合計", d.get("total_pc", 0)),
-        ("現金外合計", d.get("total_cashless", 0)),
-        ("出店料率", f"対面 {d.get('rate_taimen', 0)}% / コンピューター {d.get('rate_pc', 0)}%"),
-        ("出店料（税抜）", d.get("store_fee", 0)),
-        ("出店料（税込10％）", d.get("store_fee_tax", 0)),
-        ("請求額（現金外差引後）", d.get("final_invoice", 0)),
+        ("対面売上合計", total_taiken),
+        ("コンピューター売上合計", total_pc),
+        ("現金外合計", total_cashless),
+        ("出店料（税抜）", store_fee),
+        ("出店料（税込10％）", store_fee_tax),
+        ("請求額（現金外差引後）", final_invoice),
     ]
     for label, value in rows:
-        c.drawString(20 * mm, y, str(label))
-        if isinstance(value, str):
-            c.drawRightString(180 * mm, y, value)
-        else:
-            c.drawRightString(180 * mm, y, f"{_fmt_yen(value)} 円")
+        c.drawString(20 * mm, y, label)
+        c.drawRightString(180 * mm, y, f"{_format_yen(value)} 円")
         y -= 10 * mm
 
-    # 日別内訳
-    y -= 8 * mm
+    # 日別内訳（元仕様準拠）
+    y -= 10 * mm
     c.setFont(font_name, 12)
     c.drawString(20 * mm, y, "【日別内訳】")
     y -= 8 * mm
 
-    def draw_daily_header(current_y: float) -> float:
-        c.setFont(font_name, 10)
-        c.drawString(20 * mm, current_y, "日付")
-        c.drawString(70 * mm, current_y, "対面")
-        c.drawString(110 * mm, current_y, "コンピューター")
-        c.drawString(150 * mm, current_y, "現金外")
-        current_y -= 6 * mm
-        c.line(20 * mm, current_y, 180 * mm, current_y)
-        current_y -= 6 * mm
-        return current_y
-
-    y = draw_daily_header(y)
-
     c.setFont(font_name, 10)
-    if daily_details:
-        for date_str, amounts in daily_details.items():
-            if y < 45 * mm:
-                c.showPage()
-                c.setFont(font_name, 10)
-                y = height - 20 * mm
-                y = draw_daily_header(y)
-            c.drawString(20 * mm, y, str(date_str))
-            c.drawRightString(90 * mm, y, f"{_fmt_yen(amounts.get('対面', 0))}")
-            c.drawRightString(130 * mm, y, f"{_fmt_yen(amounts.get('コンピューター', 0))}")
-            c.drawRightString(170 * mm, y, f"{_fmt_yen(amounts.get('現金外', 0))}")
-            y -= 6 * mm
-    else:
-        c.drawString(20 * mm, y, "該当する売上データがありません。")
-        y -= 8 * mm
+    c.drawString(20 * mm, y, "日付")
+    c.drawString(70 * mm, y, "対面")
+    c.drawString(110 * mm, y, "コンピューター")
+    c.drawString(150 * mm, y, "現金外")
+    y -= 6 * mm
+    c.line(20 * mm, y, 180 * mm, y)
+    y -= 6 * mm
 
-    # 振込先情報
-    if y < 60 * mm:
+    for date_str, amounts in daily_details.items():
+        c.drawString(20 * mm, y, date_str)
+        c.drawRightString(90 * mm, y, _format_yen(amounts.get("対面", 0)))
+        c.drawRightString(130 * mm, y, _format_yen(amounts.get("コンピューター", 0)))
+        c.drawRightString(170 * mm, y, _format_yen(amounts.get("現金外", 0)))
+        y -= 6 * mm
+        if y < 40 * mm:
+            c.showPage()
+            c.setFont(font_name, 10)
+            y = height - 20 * mm
+
+    # 振込先情報（元仕様準拠）
+    y -= 10 * mm
+    if y < 40 * mm:
         c.showPage()
+        c.setFont(font_name, 10)
         y = height - 20 * mm
-    else:
-        y -= 10 * mm
 
     c.setFont(font_name, 11)
     c.drawString(20 * mm, y, "【振込先】")
@@ -782,13 +541,361 @@ def _pdf_response(
         y -= 6 * mm
 
     c.save()
-    buffer.seek(0)
 
-    filename = f"{filename_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    response = make_response(buffer.read())
-    response.headers["Content-Type"] = "application/pdf"
-    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
-    return response
+
+PORTAL_TEMPLATE = """
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>店舗別レジ</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 720px; margin: auto; }
+    a.btn { display:block; padding:14px; margin:12px 0; border-radius:8px; background:#f3f3f3; color:#111; text-decoration:none; border:1px solid #ddd; }
+    small { color:#666; }
+  </style>
+</head>
+<body>
+  <h1>店舗別レジ</h1>
+  {% for key, shop in shops.items() %}
+    <a class="btn" href="/regi/{{ key }}">売上入力：{{ shop.name }}</a>
+    <a class="btn" href="/admin/regi/{{ key }}">管理画面：{{ shop.name }}</a>
+  {% endfor %}
+</body>
+</html>
+"""
+
+INPUT_TEMPLATE = """
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ shop.name }} 売上入力</title>
+  <style>
+    body { font-family: sans-serif; padding: 16px; max-width: 560px; margin: auto; }
+    label { display:block; font-weight: bold; margin-top: 14px; }
+    input, select, button { width:100%; box-sizing:border-box; padding:12px; font-size:16px; margin-top:6px; }
+    button { background:#2e7d32; color:white; border:0; border-radius:6px; margin-top:20px; }
+    .ok { background:#e8f5e9; padding:12px; border-radius:6px; margin:12px 0; }
+    .links a { display:inline-block; margin-top:16px; margin-right:12px; }
+  </style>
+</head>
+<body>
+  <h1>{{ shop.name }} 売上入力</h1>
+  {% if saved %}<div class="ok">保存しました。</div>{% endif %}
+  <form method="post">
+    <label>日付</label>
+    <input type="date" name="date" value="{{ today }}">
+
+    <label>スタッフ</label>
+    <select name="staff" required>
+      {% for staff in staffs %}
+        <option value="{{ staff }}">{{ staff }}</option>
+      {% endfor %}
+    </select>
+
+    <label>鑑定方法</label>
+    <select name="method" required>
+      {% for method in methods %}
+        <option value="{{ method }}">{{ method }}</option>
+      {% endfor %}
+    </select>
+
+    <label>金額</label>
+    <input type="number" name="amount" inputmode="numeric" min="0" step="1" required>
+
+    <button type="submit">売上を登録</button>
+  </form>
+
+  <div class="links">
+    <a href="/regi-shops">店舗選択へ</a>
+  </div>
+</body>
+</html>
+"""
+
+LOGIN_TEMPLATE = """
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ shop.name }} 管理ログイン</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 480px; margin:auto; }
+    input, button { width:100%; box-sizing:border-box; padding:12px; font-size:16px; margin-top:8px; }
+    button { background:#1565c0; color:white; border:0; border-radius:6px; margin-top:16px; }
+    .err { color:#b00020; margin:12px 0; }
+  </style>
+</head>
+<body>
+  <h1>{{ shop.name }} 管理ログイン</h1>
+  {% if error %}<div class="err">{{ error }}</div>{% endif %}
+  <form method="post">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <label>管理パスワード</label>
+    <input type="password" name="password" autocomplete="current-password" autofocus>
+    <button type="submit">ログイン</button>
+  </form>
+</body>
+</html>
+"""
+
+ADMIN_TEMPLATE = """
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ shop.name }} 管理画面</title>
+  <style>
+    body { font-family:sans-serif; padding:20px; max-width:800px; margin:auto; }
+    a.btn { display:block; padding:14px; margin:12px 0; background:#f3f3f3; border:1px solid #ddd; border-radius:8px; color:#111; text-decoration:none; }
+  </style>
+</head>
+<body>
+  <h1>{{ shop.name }} 管理画面</h1>
+  <p>{{ shop.invoice_note }}</p>
+  <a class="btn" href="/admin/regi/{{ shop.key }}/monthly">月別集計・請求書</a>
+  <a class="btn" href="/admin/regi/{{ shop.key }}/daily">日別売上一覧・修正</a>
+  <a class="btn" href="/admin/regi/{{ shop.key }}/csv">CSV出力</a>
+  <a class="btn" href="/admin/regi/{{ shop.key }}/logout">ログアウト</a>
+</body>
+</html>
+"""
+
+MONTHLY_TEMPLATE = """
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ shop.name }} 月別集計</title>
+  <style>
+    body { font-family:sans-serif; padding:16px; max-width:1100px; margin:auto; }
+    table { width:100%; border-collapse:collapse; margin-top:16px; }
+    th, td { border:1px solid #ccc; padding:8px; text-align:right; }
+    th { background:#f0f0f0; text-align:center; }
+    td.name { text-align:left; }
+    input, button { padding:8px; font-size:14px; }
+    a.btn { display:inline-block; padding:7px 10px; margin:2px; background:#eee; border-radius:4px; text-decoration:none; color:#111; }
+  </style>
+</head>
+<body>
+  <h1>{{ shop.name }} 月別集計</h1>
+  <form method="get">
+    <input type="month" name="month" value="{{ month }}">
+    <button type="submit">表示</button>
+  </form>
+
+  <p>{{ shop.invoice_note }}</p>
+
+  <table>
+    <tr>
+      <th>スタッフ</th>
+      <th>対面</th>
+      <th>コンピューター</th>
+      <th>現金外</th>
+      <th>対面+コンピューター</th>
+      <th>出勤日数</th>
+      <th>平均売上</th>
+      <th>請求書</th>
+    </tr>
+    {% for staff, d in details.items() %}
+      <tr>
+        <td class="name">{{ staff }}</td>
+        <td>{{ yen(d.methods.get("対面", 0)) }}</td>
+        <td>{{ yen(d.methods.get("コンピューター", 0)) }}</td>
+        <td>{{ yen(d.cashless_total) }}</td>
+        <td>{{ yen(d.total) }}</td>
+        <td>{{ d.visit_days }}</td>
+        <td>{{ yen(d.avg_sales) }}</td>
+        <td>
+          {% if shop.key == "onosun" %}
+            <a class="btn" href="/admin/regi/{{ shop.key }}/invoice?month={{ month }}&staff={{ staff }}">通常</a>
+            <a class="btn" href="/admin/regi/{{ shop.key }}/invoice?month={{ month }}&staff={{ staff }}&special=1">特別</a>
+            <a class="btn" href="/admin/regi/{{ shop.key }}/invoice_pdf?month={{ month }}&staff={{ staff }}">通常PDF</a>
+            <a class="btn" href="/admin/regi/{{ shop.key }}/invoice_pdf?month={{ month }}&staff={{ staff }}&special=1">特別PDF</a>
+          {% else %}
+            <a class="btn" href="/admin/regi/{{ shop.key }}/invoice?month={{ month }}&staff={{ staff }}">請求書</a>
+            <a class="btn" href="/admin/regi/{{ shop.key }}/invoice_pdf?month={{ month }}&staff={{ staff }}">PDF</a>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+
+  <p>
+    <a href="/admin/regi/{{ shop.key }}">管理トップへ</a>
+  </p>
+</body>
+</html>
+"""
+
+INVOICE_TEMPLATE = """
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ month }} {{ staff }} 請求書</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      margin: 0;
+      max-width: 700px;
+      margin: auto;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    h2 { margin-bottom: 8px; text-align: center; }
+    .sub { text-align:center; color:#555; margin-bottom:20px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: right; }
+    th { background-color: #f0f0f0; text-align: center; }
+    .left { text-align:left; }
+    .total-row td { font-weight: bold; font-size: 18px; background-color: #f9f9f9; }
+    button, a.btn {
+      display:inline-block;
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-top: 12px;
+      margin-right: 8px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      text-decoration:none;
+    }
+    @media print { button, a.btn { display: none; } }
+  </style>
+</head>
+<body>
+  <h2>{{ month }} {{ staff }} 請求書</h2>
+  <div class="sub">{{ shop.name }} / {{ invoice_label }}</div>
+
+  <table>
+    <tr><th>項目</th><th>金額 (円)</th></tr>
+    <tr><td class="left">対面売上合計</td><td>{{ yen(total_taiken) }}</td></tr>
+    <tr><td class="left">コンピューター売上合計</td><td>{{ yen(total_pc) }}</td></tr>
+    <tr><td class="left">現金外合計</td><td>{{ yen(total_cashless) }}</td></tr>
+    <tr><td class="left">出店料（税抜）</td><td>{{ yen(store_fee) }}</td></tr>
+    <tr><td class="left">出店料（税込10％）</td><td>{{ yen(store_fee_tax) }}</td></tr>
+    <tr class="total-row"><td class="left">請求額（現金外差引後）</td><td>{{ yen(final_invoice) }}</td></tr>
+  </table>
+
+  <a class="btn" href="/admin/regi/{{ shop.key }}/invoice_pdf?month={{ month }}&staff={{ staff }}{% if force_special %}&special=1{% endif %}">
+    PDF出力
+  </a>
+
+  {% if shop.key == "onosun" %}
+    {% if force_special %}
+      <a class="btn" href="/admin/regi/{{ shop.key }}/invoice?month={{ month }}&staff={{ staff }}">通常出店料へ</a>
+    {% else %}
+      <a class="btn" href="/admin/regi/{{ shop.key }}/invoice?month={{ month }}&staff={{ staff }}&special=1">特別出店料へ</a>
+    {% endif %}
+  {% endif %}
+
+  <a class="btn" href="/admin/regi/{{ shop.key }}/monthly?month={{ month }}">月別集計へ</a>
+</body>
+</html>
+"""
+
+DAILY_TEMPLATE = """
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ shop.name }} 日別売上一覧</title>
+  <style>
+    body { font-family:sans-serif; padding:16px; max-width:1000px; margin:auto; }
+    table { width:100%; border-collapse:collapse; margin-top:16px; }
+    th, td { border:1px solid #ccc; padding:8px; }
+    th { background:#f0f0f0; }
+    td.num { text-align:right; }
+    input, select, button { padding:8px; }
+    a.btn, button.btn { display:inline-block; padding:6px 10px; background:#eee; border:1px solid #ccc; border-radius:4px; color:#111; text-decoration:none; }
+    form.inline { display:inline; }
+  </style>
+</head>
+<body>
+  <h1>{{ shop.name }} 日別売上一覧</h1>
+  <form method="get">
+    <input type="date" name="date" value="{{ target_date }}">
+    <button type="submit">表示</button>
+  </form>
+  <table>
+    <tr>
+      <th>ID</th><th>日付</th><th>スタッフ</th><th>方法</th><th>金額</th><th>操作</th>
+    </tr>
+    {% for row in rows %}
+      <tr>
+        <td>{{ row.id }}</td>
+        <td>{{ row.date }}</td>
+        <td>{{ row.staff_name }}</td>
+        <td>{{ row.method }}</td>
+        <td class="num">{{ yen(row.amount) }}</td>
+        <td>
+          <a class="btn" href="/admin/regi/{{ shop.key }}/sale/{{ row.id }}/edit">修正</a>
+          <form class="inline" method="post" action="/admin/regi/{{ shop.key }}/sale/{{ row.id }}/delete" onsubmit="return confirm('削除してよろしいですか？');">
+            <button class="btn" type="submit">削除</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+  <p><a href="/admin/regi/{{ shop.key }}">管理トップへ</a></p>
+</body>
+</html>
+"""
+
+EDIT_TEMPLATE = """
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>売上修正</title>
+  <style>
+    body { font-family:sans-serif; padding:16px; max-width:560px; margin:auto; }
+    label { display:block; font-weight:bold; margin-top:14px; }
+    input, select, button { width:100%; box-sizing:border-box; padding:12px; font-size:16px; margin-top:6px; }
+    button { background:#1565c0; color:white; border:0; border-radius:6px; margin-top:20px; }
+  </style>
+</head>
+<body>
+  <h1>{{ shop.name }} 売上修正</h1>
+  <form method="post">
+    <label>日付</label>
+    <input type="date" name="date" value="{{ row.date }}">
+
+    <label>スタッフ</label>
+    <select name="staff" required>
+      {% for staff in staffs %}
+        <option value="{{ staff }}" {% if staff == row.staff_name %}selected{% endif %}>{{ staff }}</option>
+      {% endfor %}
+    </select>
+
+    <label>鑑定方法</label>
+    <select name="method" required>
+      {% for method in methods %}
+        <option value="{{ method }}" {% if method == row.method %}selected{% endif %}>{{ method }}</option>
+      {% endfor %}
+    </select>
+
+    <label>金額</label>
+    <input type="number" name="amount" value="{{ row.amount }}" min="0" step="1" required>
+
+    <button type="submit">更新</button>
+  </form>
+  <p><a href="/admin/regi/{{ shop.key }}/daily?date={{ row.date }}">戻る</a></p>
+</body>
+</html>
+"""
 
 
 def register_regi_multi_shop_routes(
@@ -797,14 +904,20 @@ def register_regi_multi_shop_routes(
     staff_list: Optional[Iterable[str]] = None,
     method_list: Optional[Iterable[str]] = None,
 ) -> None:
-    """Flask app に店舗別レジのルートを追加する。"""
-    fallback_staffs = _normalize_staff_list(staff_list)
+    """
+    店舗別レジルートを Flask app に登録する。
+
+    staff_list / method_list は app_unified.py の STAFF_LIST / METHOD_LIST を渡してください。
+    ここでは固定の仮スタッフを使わず、渡された一覧を最優先します。
+    """
+    fallback_staffs = _normalize_staff_list(staff_list) or DEFAULT_STAFF_LIST[:]
     methods = _normalize_method_list(method_list)
 
-    app.jinja_env.filters["yen"] = _fmt_yen
+    def yen(value: Any) -> str:
+        return _format_yen(value)
 
     def current_staffs() -> List[str]:
-        return _fetch_staff_list(database_url, fallback_staffs)
+        return fallback_staffs
 
     def require_shop_admin(shop_key: str):
         _shop_or_404(shop_key)
@@ -816,49 +929,24 @@ def register_regi_multi_shop_routes(
     def portal():
         return render_template_string(PORTAL_TEMPLATE, shops=SHOP_CONFIGS)
 
-    def admin_login(shop_key: str):
-        shop = _shop_or_404(shop_key)
-        next_url = request.values.get("next") or f"/admin/regi/{shop_key}"
-        error = ""
-        if request.method == "POST":
-            entered = request.form.get("password") or ""
-            expected = _admin_password(shop_key)
-            if hmac.compare_digest(entered, expected):
-                session[_admin_session_key(shop_key)] = True
-                return redirect(_safe_next_url(shop_key, next_url))
-            error = "パスワードが違います。"
-        return render_template_string(
-            LOGIN_TEMPLATE,
-            shop_key=shop_key,
-            shop=shop,
-            next_url=_safe_next_url(shop_key, next_url),
-            error=error,
-        )
-
-    def admin_logout(shop_key: str):
-        _shop_or_404(shop_key)
-        session.pop(_admin_session_key(shop_key), None)
-        return redirect(f"/admin/regi/{shop_key}/login")
-
     def input_sales(shop_key: str):
         shop = _shop_or_404(shop_key)
-        selected_date = request.values.get("date") or _current_day()
-        success = request.args.get("success") == "1"
-        staffs = current_staffs()
-
         if request.method == "POST":
-            sale_date = request.form.get("date") or _current_day()
-            staff = (request.form.get("staff") or "").strip()
-            method = (request.form.get("method") or "").strip()
-            try:
-                amount = int(request.form.get("amount") or 0)
-            except Exception:
-                return "❌ 金額は数字で入力してください。", 400
+            if not database_url:
+                return "DATABASE_URL が未設定です。", 500
 
-            if not staff:
-                return "❌ スタッフ名が未選択です。スタッフマスタを確認してください。", 400
-            if not method:
-                return "❌ 鑑定方法が未選択です。", 400
+            staff = (request.form.get("staff") or request.form.get("staff_name") or "").strip()
+            method = (request.form.get("method") or "").strip()
+            amount_raw = request.form.get("amount") or "0"
+            sale_date = _date_from_form(request.form.get("date"))
+
+            if not staff or not method:
+                return "スタッフ名と鑑定方法を入力してください。", 400
+
+            try:
+                amount = int(str(amount_raw).replace(",", "").strip())
+            except ValueError:
+                return "金額は数値で入力してください。", 400
 
             conn = _conn(database_url)
             try:
@@ -867,227 +955,311 @@ def register_regi_multi_shop_routes(
                         cur.execute(
                             """
                             INSERT INTO sales (date, staff_name, method, amount, shop_key)
-                            VALUES (%s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s);
                             """,
                             (sale_date, staff, method, amount, shop_key),
                         )
             finally:
                 conn.close()
-            return redirect(f"/regi/{shop_key}?success=1")
+
+            return redirect(f"/regi/{shop_key}?saved=1")
 
         return render_template_string(
             INPUT_TEMPLATE,
-            shop_key=shop_key,
             shop=shop,
-            staff_list=staffs,
-            method_list=methods,
-            selected_date=selected_date,
-            success=success,
+            staffs=current_staffs(),
+            methods=methods,
+            today=date.today().strftime("%Y-%m-%d"),
+            saved=request.args.get("saved") == "1",
         )
 
-    def admin_top(shop_key: str):
-        auth = require_shop_admin(shop_key)
-        if auth:
-            return auth
+    def admin_login(shop_key: str):
         shop = _shop_or_404(shop_key)
-        today = _current_day()
-        rows = _fetch_sales(database_url, shop_key, day=today)
-        total = sum(int(r.get("amount") or 0) for r in rows if not _is_cashless(str(r.get("method") or "")))
-        return render_template_string(ADMIN_TEMPLATE, shop_key=shop_key, shop=shop, sales=rows, total=total, current_date=today)
+        next_url = _safe_next_url(shop_key, request.values.get("next"))
+        error = ""
 
-    def daily(shop_key: str):
-        auth = require_shop_admin(shop_key)
-        if auth:
-            return auth
+        if request.method == "POST":
+            password = request.form.get("password", "")
+            if password == _shop_admin_password(shop_key):
+                session[_admin_session_key(shop_key)] = True
+                return redirect(next_url)
+            error = "パスワードが違います。"
+
+        return render_template_string(LOGIN_TEMPLATE, shop=shop, error=error, next_url=next_url)
+
+    def admin_logout(shop_key: str):
+        _shop_or_404(shop_key)
+        session.pop(_admin_session_key(shop_key), None)
+        return redirect(f"/admin/regi/{shop_key}/login")
+
+    def admin_top(shop_key: str):
+        guard = require_shop_admin(shop_key)
+        if guard:
+            return guard
         shop = _shop_or_404(shop_key)
-        selected_date = request.args.get("date") or _current_day()
-        rows = _fetch_sales(database_url, shop_key, day=selected_date)
-        total = sum(int(r.get("amount") or 0) for r in rows if not _is_cashless(str(r.get("method") or "")))
-        return render_template_string(DAILY_TEMPLATE, shop_key=shop_key, shop=shop, sales=rows, total=total, selected_date=selected_date)
+        return render_template_string(ADMIN_TEMPLATE, shop=shop)
 
     def monthly(shop_key: str):
-        auth = require_shop_admin(shop_key)
-        if auth:
-            return auth
+        guard = require_shop_admin(shop_key)
+        if guard:
+            return guard
         shop = _shop_or_404(shop_key)
-        month = request.args.get("month") or _current_month()
-        rows = _fetch_sales(database_url, shop_key, month=month)
-        grouped = _monthly_group(rows)
-        staff_names = sorted({str(r.get("staff_name") or "") for r in rows if str(r.get("staff_name") or "").strip()} | set(current_staffs()))
-        return render_template_string(MONTHLY_TEMPLATE, shop_key=shop_key, shop=shop, month=month, grouped=grouped, staff_list=staff_names)
+        if not database_url:
+            return "DATABASE_URL が未設定です。", 500
+
+        try:
+            month, _, _ = _month_range(request.args.get("month"))
+            data = _aggregate_monthly(database_url, shop_key, month)
+        except Exception as e:
+            return f"❌ 集計エラー: {e}", 500
+
+        return render_template_string(
+            MONTHLY_TEMPLATE,
+            shop=shop,
+            month=data["month"],
+            details=data["details"],
+            staff_list=data["staff_list"],
+            total_taiken=data["total_taiken"],
+            total_pc=data["total_pc"],
+            total_cashless=data["total_cashless"],
+            yen=yen,
+        )
 
     def invoice(shop_key: str):
-        auth = require_shop_admin(shop_key)
-        if auth:
-            return auth
+        guard = require_shop_admin(shop_key)
+        if guard:
+            return guard
         shop = _shop_or_404(shop_key)
-        month = request.args.get("month") or _current_month()
-        rows = _fetch_sales(database_url, shop_key, month=month)
+        staff = (request.args.get("staff") or "").strip()
+        if not staff:
+            return "staff が指定されていません。", 400
+        if not database_url:
+            return "DATABASE_URL が未設定です。", 500
+
         force_special = _invoice_force_special(shop_key)
-        totals = _calc_totals(rows, shop_key, force_special=force_special)
-        details = _staff_details(rows, shop_key, force_special=force_special)
+        try:
+            month, _, _ = _month_range(request.args.get("month"))
+            data = _aggregate_invoice(database_url, shop_key, month, staff, force_special)
+        except Exception as e:
+            return f"❌ 集計エラー: {e}", 500
+
         return render_template_string(
             INVOICE_TEMPLATE,
-            shop_key=shop_key,
             shop=shop,
-            month=month,
-            totals=totals,
-            details=details,
             invoice_label=_invoice_label(shop_key, force_special),
-            special_query=_special_query(force_special),
+            force_special=force_special,
+            yen=yen,
+            **data,
         )
 
     def invoice_pdf(shop_key: str):
-        auth = require_shop_admin(shop_key)
-        if auth:
-            return auth
+        guard = require_shop_admin(shop_key)
+        if guard:
+            return guard
         shop = _shop_or_404(shop_key)
-        month = request.args.get("month") or _current_month()
-        rows = _fetch_sales(database_url, shop_key, month=month)
-        force_special = _invoice_force_special(shop_key)
-        d = _calc_totals(rows, shop_key, force_special=force_special)
-        invoice_label = _invoice_label(shop_key, force_special)
-        title = f"{month} {shop['name']} 請求書"
-        return _pdf_response(
-            title,
-            d,
-            _daily_details(rows),
-            shop_name=shop["name"],
-            invoice_label=invoice_label,
-            filename_prefix=f"invoice_{shop_key}_{month}",
-        )
+        staff = (request.args.get("staff") or "").strip()
+        if not staff:
+            return "staff が指定されていません。", 400
+        if not database_url:
+            return "DATABASE_URL が未設定です。", 500
 
-    def invoice_staff(shop_key: str):
-        auth = require_shop_admin(shop_key)
-        if auth:
-            return auth
-        shop = _shop_or_404(shop_key)
-        month = request.args.get("month") or _current_month()
-        staff = request.args.get("staff") or ""
-        rows = _fetch_sales(database_url, shop_key, month=month, staff=staff)
         force_special = _invoice_force_special(shop_key)
-        d = _calc_totals(rows, shop_key, force_special=force_special)
-        return render_template_string(
-            STAFF_INVOICE_TEMPLATE,
-            shop_key=shop_key,
-            shop=shop,
-            month=month,
-            staff=staff,
-            d=d,
-            invoice_label=_invoice_label(shop_key, force_special),
-            special_query=_special_query(force_special),
-        )
+        try:
+            month, _, _ = _month_range(request.args.get("month"))
+            data = _aggregate_invoice(database_url, shop_key, month, staff, force_special)
+            label = _invoice_label(shop_key, force_special)
 
-    def invoice_staff_pdf(shop_key: str):
-        auth = require_shop_admin(shop_key)
-        if auth:
-            return auth
-        shop = _shop_or_404(shop_key)
-        month = request.args.get("month") or _current_month()
-        staff = request.args.get("staff") or ""
-        rows = _fetch_sales(database_url, shop_key, month=month, staff=staff)
-        force_special = _invoice_force_special(shop_key)
-        d = _calc_totals(rows, shop_key, force_special=force_special)
-        invoice_label = _invoice_label(shop_key, force_special)
-        title = f"{month} {staff} 請求書"
-        return _pdf_response(
-            title,
-            d,
-            _daily_details(rows),
-            shop_name=shop["name"],
-            invoice_label=invoice_label,
-            filename_prefix=f"invoice_{shop_key}_{staff}_{month}",
-        )
+            safe_staff = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in staff)
+            filename = f"invoice_{shop_key}_{safe_staff}_{month}_{'special' if force_special else 'normal'}.pdf"
+            output_dir = os.getenv("UPLOAD_FOLDER", ".")
+            os.makedirs(output_dir, exist_ok=True)
+            pdf_path = os.path.join(output_dir, filename)
 
-    def edit_sale(shop_key: str, sale_id: int):
-        auth = require_shop_admin(shop_key)
-        if auth:
-            return auth
+            _create_invoice_pdf(
+                pdf_path,
+                shop_name=shop["name"],
+                invoice_label=label,
+                month=data["month"],
+                staff=data["staff"],
+                total_taiken=data["total_taiken"],
+                total_pc=data["total_pc"],
+                total_cashless=data["total_cashless"],
+                store_fee=data["store_fee"],
+                store_fee_tax=data["store_fee_tax"],
+                final_invoice=data["final_invoice"],
+                daily_details=data["daily_details"],
+            )
+            return send_file(pdf_path, as_attachment=True, mimetype="application/pdf")
+        except Exception as e:
+            return f"❌ PDF生成エラー: {e}", 500
+
+    def daily(shop_key: str):
+        guard = require_shop_admin(shop_key)
+        if guard:
+            return guard
         shop = _shop_or_404(shop_key)
+        if not database_url:
+            return "DATABASE_URL が未設定です。", 500
+
+        target_date = request.args.get("date") or date.today().strftime("%Y-%m-%d")
         conn = _conn(database_url)
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
-                    "SELECT id, date::text AS date, staff_name, method, amount FROM sales WHERE id = %s AND COALESCE(shop_key, 'onosun') = %s",
-                    (sale_id, shop_key),
+                    """
+                    SELECT id, date, staff_name, method, amount
+                    FROM sales
+                    WHERE shop_key = %s AND date = %s
+                    ORDER BY id DESC;
+                    """,
+                    (shop_key, target_date),
                 )
-                sale = cur.fetchone()
-                if not sale:
-                    abort(404)
-            if request.method == "POST":
-                sale_date = request.form.get("date") or _current_day()
-                staff = request.form.get("staff") or ""
-                method = request.form.get("method") or ""
-                amount = int(request.form.get("amount") or 0)
-                with conn:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            "UPDATE sales SET date=%s, staff_name=%s, method=%s, amount=%s, shop_key=%s WHERE id=%s",
-                            (sale_date, staff, method, amount, shop_key, sale_id),
-                        )
-                return redirect(f"/admin/regi/{shop_key}/daily?date={sale_date}")
+                rows = list(cur.fetchall())
         finally:
             conn.close()
 
-        staffs = current_staffs()
-        existing_staff = str(sale.get("staff_name") or "").strip()
-        if existing_staff and existing_staff not in staffs:
-            staffs.append(existing_staff)
-        return render_template_string(EDIT_TEMPLATE, shop_key=shop_key, shop=shop, sale=sale, staff_list=staffs, method_list=methods)
+        return render_template_string(
+            DAILY_TEMPLATE,
+            shop=shop,
+            target_date=target_date,
+            rows=rows,
+            yen=yen,
+        )
+
+    def edit_sale(shop_key: str, sale_id: int):
+        guard = require_shop_admin(shop_key)
+        if guard:
+            return guard
+        shop = _shop_or_404(shop_key)
+        if not database_url:
+            return "DATABASE_URL が未設定です。", 500
+
+        conn = _conn(database_url)
+        try:
+            with conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        """
+                        SELECT id, date, staff_name, method, amount
+                        FROM sales
+                        WHERE id = %s AND shop_key = %s;
+                        """,
+                        (sale_id, shop_key),
+                    )
+                    row = cur.fetchone()
+                    if not row:
+                        abort(404)
+
+                    if request.method == "POST":
+                        staff = (request.form.get("staff") or "").strip()
+                        method = (request.form.get("method") or "").strip()
+                        sale_date = _date_from_form(request.form.get("date"))
+                        try:
+                            amount = int(str(request.form.get("amount") or "0").replace(",", "").strip())
+                        except ValueError:
+                            return "金額は数値で入力してください。", 400
+
+                        cur.execute(
+                            """
+                            UPDATE sales
+                            SET date = %s, staff_name = %s, method = %s, amount = %s
+                            WHERE id = %s AND shop_key = %s;
+                            """,
+                            (sale_date, staff, method, amount, sale_id, shop_key),
+                        )
+                        return redirect(f"/admin/regi/{shop_key}/daily?date={sale_date}")
+
+                    row["date"] = row["date"].strftime("%Y-%m-%d") if hasattr(row["date"], "strftime") else str(row["date"])
+                    return render_template_string(
+                        EDIT_TEMPLATE,
+                        shop=shop,
+                        row=row,
+                        staffs=current_staffs(),
+                        methods=methods,
+                    )
+        finally:
+            conn.close()
 
     def delete_sale(shop_key: str, sale_id: int):
-        auth = require_shop_admin(shop_key)
-        if auth:
-            return auth
+        guard = require_shop_admin(shop_key)
+        if guard:
+            return guard
         _shop_or_404(shop_key)
+        if not database_url:
+            return "DATABASE_URL が未設定です。", 500
+
+        back_date = request.form.get("date") or request.args.get("date") or date.today().strftime("%Y-%m-%d")
         conn = _conn(database_url)
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT date::text FROM sales WHERE id=%s AND COALESCE(shop_key, 'onosun')=%s", (sale_id, shop_key))
+                    cur.execute("SELECT date FROM sales WHERE id = %s AND shop_key = %s;", (sale_id, shop_key))
                     row = cur.fetchone()
-                    selected_date = row[0] if row else _current_day()
-                    cur.execute("DELETE FROM sales WHERE id=%s AND COALESCE(shop_key, 'onosun')=%s", (sale_id, shop_key))
+                    if row and row[0]:
+                        back_date = row[0].strftime("%Y-%m-%d") if hasattr(row[0], "strftime") else str(row[0])
+                    cur.execute("DELETE FROM sales WHERE id = %s AND shop_key = %s;", (sale_id, shop_key))
         finally:
             conn.close()
-        return redirect(f"/admin/regi/{shop_key}/daily?date={selected_date}")
 
-    def export_csv(shop_key: str):
-        auth = require_shop_admin(shop_key)
-        if auth:
-            return auth
+        return redirect(f"/admin/regi/{shop_key}/daily?date={back_date}")
+
+    def csv_export(shop_key: str):
+        guard = require_shop_admin(shop_key)
+        if guard:
+            return guard
         shop = _shop_or_404(shop_key)
-        month = request.values.get("month") or None
-        rows = _fetch_sales(database_url, shop_key, month=month)
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(["店舗", "ID", "日付", "店員", "方法", "金額"])
+        if not database_url:
+            return "DATABASE_URL が未設定です。", 500
+
+        month, month_start, month_end = _month_range(request.args.get("month"))
+        conn = _conn(database_url)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT date, staff_name, method, amount
+                    FROM sales
+                    WHERE shop_key = %s
+                      AND date >= %s
+                      AND date < %s
+                    ORDER BY date, id;
+                    """,
+                    (shop_key, month_start, month_end),
+                )
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+
+        sio = io.StringIO()
+        writer = csv.writer(sio)
+        writer.writerow(["date", "shop", "staff_name", "method", "amount"])
         for row in rows:
-            writer.writerow([shop["name"], row.get("id"), row.get("date"), row.get("staff_name"), row.get("method"), row.get("amount")])
-        data = output.getvalue().encode("utf-8-sig")
-        filename_month = month or "all"
-        return Response(
-            data,
-            mimetype="text/csv; charset=utf-8",
-            headers={"Content-Disposition": f"attachment; filename=regi_{shop_key}_{filename_month}.csv"},
-        )
+            writer.writerow([row[0], shop["name"], row[1], row[2], row[3]])
 
-    # 新規URLだけを追加し、既存 /regi /admin/monthly などは壊さない。
-    app.add_url_rule("/regi-shops", endpoint="regi_multi_shop_portal", view_func=portal, methods=["GET"])
-    app.add_url_rule("/regi/<shop_key>", endpoint="regi_multi_shop_input", view_func=input_sales, methods=["GET", "POST"])
+        data = sio.getvalue().encode("utf-8-sig")
+        resp = make_response(data)
+        resp.headers["Content-Type"] = "text/csv; charset=utf-8"
+        resp.headers["Content-Disposition"] = f'attachment; filename="sales_{shop_key}_{month}.csv"'
+        return resp
 
-    app.add_url_rule("/admin/regi/<shop_key>/login", endpoint="regi_multi_shop_login", view_func=admin_login, methods=["GET", "POST"])
-    app.add_url_rule("/admin/regi/<shop_key>/logout", endpoint="regi_multi_shop_logout", view_func=admin_logout, methods=["GET"])
+    # 二重登録対策：同名endpointが既にあれば登録をスキップ
+    def safe_add(rule: str, endpoint: str, view_func, methods: List[str]) -> None:
+        if endpoint in app.view_functions:
+            print(f"⚠️ [REGI-MULTI-SHOP] endpoint already exists, skipped: {endpoint}", flush=True)
+            return
+        app.add_url_rule(rule, endpoint=endpoint, view_func=view_func, methods=methods)
 
-    app.add_url_rule("/admin/regi/<shop_key>", endpoint="regi_multi_shop_admin", view_func=admin_top, methods=["GET"])
-    app.add_url_rule("/admin/regi/<shop_key>/daily", endpoint="regi_multi_shop_daily", view_func=daily, methods=["GET"])
-    app.add_url_rule("/admin/regi/<shop_key>/monthly", endpoint="regi_multi_shop_monthly", view_func=monthly, methods=["GET"])
-    app.add_url_rule("/admin/regi/<shop_key>/invoice", endpoint="regi_multi_shop_invoice", view_func=invoice, methods=["GET"])
-    app.add_url_rule("/admin/regi/<shop_key>/invoice_pdf", endpoint="regi_multi_shop_invoice_pdf", view_func=invoice_pdf, methods=["GET"])
-    app.add_url_rule("/admin/regi/<shop_key>/invoice_staff", endpoint="regi_multi_shop_invoice_staff", view_func=invoice_staff, methods=["GET"])
-    app.add_url_rule("/admin/regi/<shop_key>/invoice_staff_pdf", endpoint="regi_multi_shop_invoice_staff_pdf", view_func=invoice_staff_pdf, methods=["GET"])
-    app.add_url_rule("/admin/regi/<shop_key>/edit/<int:sale_id>", endpoint="regi_multi_shop_edit", view_func=edit_sale, methods=["GET", "POST"])
-    app.add_url_rule("/admin/regi/<shop_key>/delete/<int:sale_id>", endpoint="regi_multi_shop_delete", view_func=delete_sale, methods=["POST"])
-    app.add_url_rule("/admin/regi/<shop_key>/export", endpoint="regi_multi_shop_export", view_func=export_csv, methods=["GET", "POST"])
+    safe_add("/regi-shops", "regi_multi_shop_portal", portal, ["GET"])
+    safe_add("/regi/<shop_key>", "regi_multi_shop_input", input_sales, ["GET", "POST"])
 
-    print("✅ [REGI-MULTI-SHOP] 店舗別レジルート登録 OK", flush=True)
+    safe_add("/admin/regi/<shop_key>/login", "regi_multi_shop_login", admin_login, ["GET", "POST"])
+    safe_add("/admin/regi/<shop_key>/logout", "regi_multi_shop_logout", admin_logout, ["GET"])
+
+    safe_add("/admin/regi/<shop_key>", "regi_multi_shop_admin", admin_top, ["GET"])
+    safe_add("/admin/regi/<shop_key>/daily", "regi_multi_shop_daily", daily, ["GET"])
+    safe_add("/admin/regi/<shop_key>/monthly", "regi_multi_shop_monthly", monthly, ["GET"])
+    safe_add("/admin/regi/<shop_key>/invoice", "regi_multi_shop_invoice", invoice, ["GET"])
+    safe_add("/admin/regi/<shop_key>/invoice_pdf", "regi_multi_shop_invoice_pdf", invoice_pdf, ["GET"])
+    safe_add("/admin/regi/<shop_key>/sale/<int:sale_id>/edit", "regi_multi_shop_sale_edit", edit_sale, ["GET", "POST"])
+    safe_add("/admin/regi/<shop_key>/sale/<int:sale_id>/delete", "regi_multi_shop_sale_delete", delete_sale, ["POST"])
+    safe_add("/admin/regi/<shop_key>/csv", "regi_multi_shop_csv", csv_export, ["GET"])

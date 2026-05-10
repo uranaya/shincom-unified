@@ -333,6 +333,40 @@ else:
     print("⚠️ DATABASE_URL が未設定。ローカル実行ではDB非使用。")
 
 
+
+# 占い師・鑑定方法の選択肢（input.htmlと同じ構成に統一）
+STAFF_LIST = [
+    "HIROMI", "美帆", "あい", "礼", "あお",
+    "月のかけら", "金子美月", "水木杏香", "幽香", "優芳",
+    "蛍石", "うらなや","ふく","COCORAKU","リリア"
+]
+
+METHOD_LIST = ["対面", "コンピューター", "現金外（クレカQR)"]
+
+def normalize_method(method: str) -> str:
+    """DBに入っている '現金外（クレカQR）' などをPDF集計用に正規化"""
+    if method == "対面":
+        return "対面"
+    if method == "コンピューター":
+        return "コンピューター"
+    if "現金外" in method:
+        return "現金外"
+    return method or ""
+
+
+try:
+    init_regi_multi_shop_tables(DATABASE_URL)
+    register_regi_multi_shop_routes(
+        app,
+        DATABASE_URL,
+        STAFF_LIST,
+        METHOD_LIST,
+    )
+except Exception as e:
+    print(f"⚠️ [REGI-MULTI-SHOP] setup skipped: {e}", flush=True)
+
+
+
 # --- 店舗別レジ（おのだサンパーク店 / バジリスク店） ---
 try:
     init_regi_multi_shop_tables(DATABASE_URL)
@@ -2108,24 +2142,6 @@ def webhook_tarotmob():
 
 
 
-# 占い師・鑑定方法の選択肢（input.htmlと同じ構成に統一）
-STAFF_LIST = [
-    "HIROMI", "美帆", "あい", "礼", "あお",
-    "月のかけら", "金子美月", "水木杏香", "幽香", "優芳",
-    "蛍石", "うらなや","ふく","COCORAKU","リリア"
-]
-
-METHOD_LIST = ["対面", "コンピューター", "現金外（クレカQR)"]
-
-def normalize_method(method: str) -> str:
-    """DBに入っている '現金外（クレカQR）' などをPDF集計用に正規化"""
-    if method == "対面":
-        return "対面"
-    if method == "コンピューター":
-        return "コンピューター"
-    if "現金外" in method:
-        return "現金外"
-    return method or ""
 
 
 @app.route("/regi", methods=["GET", "POST"])
