@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-店舗別レジ拡張モジュール v4
+店舗別レジ拡張モジュール v5
 
 - /regi/onosun       おのだサンパーク店 売上入力
 - /regi/basilisk     バジリスク店 売上入力
@@ -432,6 +432,15 @@ def _aggregate_monthly(database_url: str, shop_key: str, month: str) -> Dict[str
     total_pc = sum((d["methods"].get("コンピューター", Decimal("0")) for d in details.values()), Decimal("0"))
     total_cashless = sum((d["cashless_total"] for d in details.values()), Decimal("0"))
 
+    # 月別画面の上部に、旧仕様と同じ「対面合計 / コンピューター合計 / 現金外合計 / 出店料 / 請求額」を表示する。
+    # おのだサンパーク店は通常・特別の両方を使うため、通常計算と特別計算の両方を用意する。
+    monthly_normal_invoice = _calc_invoice_totals(
+        total_taiken, total_pc, total_cashless, shop_key, force_special=False
+    )
+    monthly_special_invoice = _calc_invoice_totals(
+        total_taiken, total_pc, total_cashless, shop_key, force_special=True
+    )
+
     return {
         "month": month,
         "month_start": month_start,
@@ -441,6 +450,8 @@ def _aggregate_monthly(database_url: str, shop_key: str, month: str) -> Dict[str
         "total_taiken": total_taiken,
         "total_pc": total_pc,
         "total_cashless": total_cashless,
+        "monthly_normal_invoice": monthly_normal_invoice,
+        "monthly_special_invoice": monthly_special_invoice,
     }
 
 
@@ -681,6 +692,11 @@ MONTHLY_TEMPLATE = """
     td.name { text-align:left; }
     input, button { padding:8px; font-size:14px; }
     a.btn { display:inline-block; padding:7px 10px; margin:2px; background:#eee; border-radius:4px; text-decoration:none; color:#111; }
+    .summary-wrap { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:12px; margin:16px 0 22px; }
+    .summary-box { border:1px solid #ccc; border-radius:8px; padding:12px; background:#fafafa; }
+    .summary-box h2 { font-size:18px; margin:0 0 8px; }
+    .summary-line { display:flex; justify-content:space-between; border-bottom:1px dotted #ddd; padding:5px 0; }
+    .summary-line strong { font-size:18px; }
   </style>
 </head>
 <body>
@@ -691,6 +707,38 @@ MONTHLY_TEMPLATE = """
   </form>
 
   <p>{{ shop.invoice_note }}</p>
+
+  <div class="summary-wrap">
+    <div class="summary-box">
+      <h2>
+        {% if shop.key == "onosun" %}
+          月全体の請求計算（通常出店料）
+        {% elif shop.key == "basilisk" %}
+          月全体の請求計算（キャンペーン20％）
+        {% else %}
+          月全体の請求計算
+        {% endif %}
+      </h2>
+      <div class="summary-line"><span>対面合計</span><strong>{{ yen(total_taiken) }}円</strong></div>
+      <div class="summary-line"><span>コンピューター合計</span><strong>{{ yen(total_pc) }}円</strong></div>
+      <div class="summary-line"><span>現金外合計</span><strong>{{ yen(total_cashless) }}円</strong></div>
+      <div class="summary-line"><span>出店料（税抜）</span><strong>{{ yen(monthly_normal_invoice.store_fee) }}円</strong></div>
+      <div class="summary-line"><span>出店料（税込10％）</span><strong>{{ yen(monthly_normal_invoice.store_fee_tax) }}円</strong></div>
+      <div class="summary-line"><span>請求額（現金外差引後）</span><strong>{{ yen(monthly_normal_invoice.final_invoice) }}円</strong></div>
+    </div>
+
+    {% if shop.key == "onosun" %}
+      <div class="summary-box">
+        <h2>月全体の請求計算（特別出店料）</h2>
+        <div class="summary-line"><span>対面合計</span><strong>{{ yen(total_taiken) }}円</strong></div>
+        <div class="summary-line"><span>コンピューター合計</span><strong>{{ yen(total_pc) }}円</strong></div>
+        <div class="summary-line"><span>現金外合計</span><strong>{{ yen(total_cashless) }}円</strong></div>
+        <div class="summary-line"><span>出店料（税抜）</span><strong>{{ yen(monthly_special_invoice.store_fee) }}円</strong></div>
+        <div class="summary-line"><span>出店料（税込10％）</span><strong>{{ yen(monthly_special_invoice.store_fee_tax) }}円</strong></div>
+        <div class="summary-line"><span>請求額（現金外差引後）</span><strong>{{ yen(monthly_special_invoice.final_invoice) }}円</strong></div>
+      </div>
+    {% endif %}
+  </div>
 
   <table>
     <tr>
@@ -1022,6 +1070,8 @@ def register_regi_multi_shop_routes(
             total_taiken=data["total_taiken"],
             total_pc=data["total_pc"],
             total_cashless=data["total_cashless"],
+            monthly_normal_invoice=data["monthly_normal_invoice"],
+            monthly_special_invoice=data["monthly_special_invoice"],
             yen=yen,
         )
 
