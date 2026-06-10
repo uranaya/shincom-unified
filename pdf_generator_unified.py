@@ -101,6 +101,48 @@ def _wrap_len(base: int, lang: str) -> int:
     return base
 
 
+def _wrap_by_width(text: str, font_name: str, font_size: float, max_w: float) -> list[str]:
+    """PDF上の実幅で折り返す。日本語のように空白が無い文も右端で切らさない。"""
+    s = (text or "").strip()
+    if not s:
+        return []
+
+    lines: list[str] = []
+    for raw in s.splitlines() or [s]:
+        raw = raw.strip()
+        if not raw:
+            continue
+        cur = ""
+        for ch in raw:
+            candidate = cur + ch
+            if cur and stringWidth(candidate, font_name, font_size) > max_w:
+                lines.append(cur.rstrip())
+                cur = ch.lstrip()
+            else:
+                cur = candidate
+        if cur.strip():
+            lines.append(cur.strip())
+    return lines
+
+
+def _estimate_lucky_section_height(width, margin, lucky_lines, lucky_direction, lang='ja') -> float:
+    """2ページ目末尾のラッキー情報＋方位に必要な高さを事前計算する。"""
+    lucky_lines = lucky_lines or []
+    l = str(lang).lower()
+    is_en = l.startswith("en")
+    font_name = _font(lang)
+    font_size = 10 if is_en else 9.2
+    line_h = (5.6 * mm) if is_en else (5.0 * mm)
+
+    h = 6 * mm  # ラッキー情報見出し分
+    h += ((len(lucky_lines) + 1) // 2) * line_h
+    if lucky_direction:
+        max_w = width - 2 * margin - (6 * mm if is_en else 0)
+        dir_lines = _wrap_by_width((lucky_direction or "").strip(), font_name, font_size, max_w)
+        h += 1.5 * mm + 5.5 * mm + max(1, len(dir_lines)) * line_h
+    return h + 2 * mm
+
+
 
 def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='ja', page_height=None, **kwargs):
     """ラッキー情報セクション
@@ -171,27 +213,12 @@ def draw_lucky_section(c, width, margin, y, lucky_lines, lucky_direction, lang='
         y -= 5.5 * mm
 
         dir_text = (lucky_direction or "").strip()
-        # 1行で無理なら折り返し（左列幅いっぱいで）
-        # Keep some extra right padding for English to avoid clipping.
+        # 日本語は空白が無いことが多いため、PDF上の実幅で必ず折り返す。
+        # これにより「ラッキー方位」が右端・下端で切れる事故を避ける。
         max_w = width - 2 * margin - (6 * mm if str(lang).lower().startswith("en") else 0)
-        if stringWidth(dir_text, font_name, font_size) <= max_w:
-            c.drawString(margin, y, dir_text)
+        for line in _wrap_by_width(dir_text, font_name, font_size, max_w) or [dir_text]:
+            c.drawString(margin, y, line)
             y -= line_h
-        else:
-            # 簡易折り返し
-            words = dir_text.split()
-            cur = ""
-            for w in words:
-                candidate = (cur + " " + w).strip()
-                if stringWidth(candidate, font_name, font_size) <= max_w:
-                    cur = candidate
-                else:
-                    c.drawString(margin, y, cur)
-                    y -= line_h
-                    cur = w
-            if cur:
-                c.drawString(margin, y, cur)
-                y -= line_h
 
     return y
 
@@ -423,75 +450,98 @@ def draw_shincom_a4(c, data, include_yearly=False):
 
     # 新ページ：手相残り2項目 + 鑑定結果
     c.showPage()
-    y = height - margin
 
-    _set_font(c, lang, 12)
+    # A4 2ページ目は「手相2項目 + 鑑定本文 + ラッキー方位」が同居するため、
+    # 先に全ブロックの高さを見積もり、必要な時だけ全体を段階的にコンパクト化する。
+    # 重要：本文を「…」で省略しない。最後まで描画したうえで、最終手段として縦方向のみ縮尺をかける。
+    top_y = height - margin
+    BOTTOM = 18 * mm
+    available_h = top_y - BOTTOM
+
+    page2_blocks_src = []
     for i in range(3, 5):
-        c.drawString(margin, y, f"◆ {data['palm_titles'][i]}")
-        y -= 6 * mm
-        _set_font(c, lang, 10)
-        for line in smart_wrap(data['palm_texts'][i], _wrap_len(40, lang), lang):
-            c.drawString(margin, y, line)
-            y -= 6 * mm
-        y -= 3 * mm
-        _set_font(c, lang, 12)
-
-    # 四柱推命・まとめ等（A4 2ページ目はテキストが増えやすいので自動で詰める）
-    # - 行間を少し詰める
-    # - 必要ならフォントを段階的に落としてオーバーフローを防ぐ
-    BOTTOM = 22 * mm
-
-    def _draw_block(title: str, content: str, y: float, wrap_base: int) -> float:
-        nonlocal c
-        if title:
-            _set_font(c, lang, 12)
-            c.drawString(margin, y, f"◆ {title}")
-            y -= 5.5 * mm
-
-        if not content:
-            return y - 2.5 * mm
-
-        # まず通常モードで必要行数を見積もり、入りきらない場合は compact に切り替える。
-        lines_normal = smart_wrap(content, _wrap_len(wrap_base, lang), lang)
-        need_h_normal = len(lines_normal) * (5.6 * mm)
-
-        compact = (y - need_h_normal) < BOTTOM
-        if compact:
-            body_size = 9.2
-            line_step = 5.0 * mm
-            wrap_len = _wrap_len(wrap_base + 2, lang)  # 少し横を使って縦を削る
-        else:
-            body_size = 10
-            line_step = 5.6 * mm
-            wrap_len = _wrap_len(wrap_base, lang)
-
-        _set_font(c, lang, body_size)
-        lines = smart_wrap(content, wrap_len, lang)
-
-        # それでも入らない場合は最後を省略して…で閉じる（はみ出しを絶対に出さない）
-        max_lines = int(max(0, (y - BOTTOM) // line_step))
-        if max_lines and len(lines) > max_lines:
-            lines = lines[:max_lines]
-            if lines:
-                lines[-1] = (lines[-1].rstrip("…") + "…")
-
-        for line in lines:
-            if y < BOTTOM:
-                break
-            c.drawString(margin, y, line)
-            y -= line_step
-
-        return y - 2.5 * mm
+        page2_blocks_src.append({
+            "kind": "palm",
+            "title": data['palm_titles'][i],
+            "content": data['palm_texts'][i],
+            "wrap_base": 40,
+        })
 
     for key in ['palm_summary', 'personality', 'year_fortune', 'month_fortune', 'next_month_fortune']:
-        # month/next は文字量が増えやすいので、以前の36→40へ（縦を削る）
-        wrap_len = 40 if 'month' in key else 42
-        title = data['titles'].get(key, "")
-        content = data['texts'].get(key, "")
-        y = _draw_block(title, content, y, wrap_len)
+        page2_blocks_src.append({
+            "kind": "fortune",
+            "title": data['titles'].get(key, ""),
+            "content": data['texts'].get(key, ""),
+            "wrap_base": 40 if 'month' in key else 42,
+        })
 
-    # ラッキー情報を2ページ目末尾に移動
-    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''))
+    # 通常 → コンパクト → 最小の順。通常時の見た目は極力変えず、
+    # 長文時だけ文字サイズ・行間・折返し幅で吸収する。
+    page2_presets = [
+        {"title_size": 12.0, "title_step": 6.0 * mm, "body_size": 10.0, "line_step": 5.6 * mm, "gap": 3.0 * mm, "wrap_boost": 0},
+        {"title_size": 11.5, "title_step": 5.4 * mm, "body_size": 9.2,  "line_step": 4.9 * mm, "gap": 2.2 * mm, "wrap_boost": 3},
+        {"title_size": 11.0, "title_step": 5.0 * mm, "body_size": 8.5,  "line_step": 4.4 * mm, "gap": 1.8 * mm, "wrap_boost": 6},
+        {"title_size": 10.2, "title_step": 4.6 * mm, "body_size": 7.8,  "line_step": 3.9 * mm, "gap": 1.4 * mm, "wrap_boost": 10},
+        {"title_size": 9.5,  "title_step": 4.2 * mm, "body_size": 7.0,  "line_step": 3.5 * mm, "gap": 1.0 * mm, "wrap_boost": 14},
+    ]
+
+    def _build_page2_layout(preset):
+        blocks = []
+        total_h = 0.0
+        for src in page2_blocks_src:
+            wrap_len = _wrap_len(src["wrap_base"] + preset["wrap_boost"], lang)
+            lines = smart_wrap(src.get("content", "") or "", wrap_len, lang)
+            block_h = (preset["title_step"] if src.get("title") else 0) + (len(lines) * preset["line_step"]) + preset["gap"]
+            total_h += block_h
+            blocks.append({**src, "lines": lines, "height": block_h})
+
+        lucky_h = _estimate_lucky_section_height(
+            width, margin, data.get('lucky_info', []), data.get('lucky_direction', ''), lang
+        )
+        total_h += lucky_h
+        return total_h, blocks
+
+    chosen_preset = page2_presets[-1]
+    chosen_total_h, chosen_blocks = _build_page2_layout(chosen_preset)
+    for preset in page2_presets:
+        total_h, blocks = _build_page2_layout(preset)
+        if total_h <= available_h:
+            chosen_preset = preset
+            chosen_total_h = total_h
+            chosen_blocks = blocks
+            break
+
+    # どのプリセットでも入り切らない非常時だけ、ページ上端を基準に縦方向へ縮尺。
+    # 省略はしないため、文末が「…」で未完になることはない。
+    scale_y = 1.0
+    if chosen_total_h > 0 and chosen_total_h > available_h:
+        scale_y = available_h / chosen_total_h
+
+    if scale_y < 1.0:
+        c.saveState()
+        c.translate(0, top_y)
+        c.scale(1, scale_y)
+        c.translate(0, -top_y)
+
+    y = top_y
+    for block in chosen_blocks:
+        title = block.get("title", "")
+        if title:
+            _set_font(c, lang, chosen_preset["title_size"])
+            c.drawString(margin, y, f"◆ {title}")
+            y -= chosen_preset["title_step"]
+
+        _set_font(c, lang, chosen_preset["body_size"])
+        for line in block.get("lines", []):
+            c.drawString(margin, y, line)
+            y -= chosen_preset["line_step"]
+        y -= chosen_preset["gap"]
+
+    # ラッキー情報を2ページ目末尾に移動。本文が長い場合でも本文省略ではなく全体縮尺で収める。
+    y = draw_lucky_section(c, width, margin, y, data['lucky_info'], data.get('lucky_direction', ''), lang=lang, page_height=height)
+
+    if scale_y < 1.0:
+        c.restoreState()
 
     if include_yearly:
         draw_yearly_pages_shincom_a4(c, data['yearly_fortunes'], lang)

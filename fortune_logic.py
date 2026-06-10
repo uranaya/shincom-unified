@@ -10,6 +10,67 @@ from tsuhensei_utils import get_tsuhensei_for_year, get_tsuhensei_for_date
 from lucky_utils import generate_lucky_info, generate_lucky_direction
 from yearly_love_fortune_utils import generate_yearly_love_fortune
 from pdf_generator_unified import create_pdf_unified
+
+
+def _fallback_shichu_result(this_year: int, target1, target2, lang: str = 'ja') -> dict:
+    """OpenAIの一時失敗・JSON不正時でも、お客様向けPDFに失敗文を出さないための保険。"""
+    lang_norm = (lang or 'ja').lower()
+    if lang_norm.startswith('en'):
+        return {
+            "personality": "You are steady, observant, and capable of growing through responsibility. Small daily actions strengthen your confidence and open better opportunities.",
+            "year_fortune": f"In {this_year}, your luck improves when you choose steady progress over rushing. Trust, learning, and practical action will become your strongest support.",
+            "month_fortune": f"{target1.year}-{target1.month:02d} brings chances to show leadership through calm decisions. Listen well, organize priorities, and move one step at a time.",
+            "next_month_fortune": f"{target2.year}-{target2.month:02d} favors flexible thinking and honest communication. A positive response to change will lead to better results.",
+        }
+    if lang_norm.startswith(('zh', 'cn')):
+        return {
+            "personality": "你稳重、有观察力，越是在责任中越能成长。每天累积一点行动，信心和机会都会逐渐增强。",
+            "year_fortune": f"{this_year}年，选择稳步前进会比急于求成更有利。信任、学习与实际行动，会成为你的好运基础。",
+            "month_fortune": f"{target1.year}年{target1.month}月，适合用冷静判断展现领导力。多倾听、整理重点，一步一步推进会有好结果。",
+            "next_month_fortune": f"{target2.year}年{target2.month}月，灵活思考与真诚沟通会带来好运。积极面对变化，结果会更顺利。",
+        }
+    if lang_norm.startswith(('ko', 'kr')):
+        return {
+            "personality": "당신은 차분하고 관찰력이 있으며, 책임 속에서 더 크게 성장하는 사람입니다. 작은 실천이 쌓일수록 자신감과 기회가 커집니다.",
+            "year_fortune": f"{this_year}년은 서두르기보다 꾸준히 나아갈 때 운이 열립니다. 신뢰, 배움, 현실적인 행동이 좋은 흐름을 만듭니다.",
+            "month_fortune": f"{target1.year}년 {target1.month}월은 침착한 판단으로 리더십을 보이기 좋은 시기입니다. 잘 듣고 우선순위를 정하면 좋은 결과가 따릅니다.",
+            "next_month_fortune": f"{target2.year}년 {target2.month}월은 유연한 생각과 솔직한 소통이 운을 돕습니다. 변화를 긍정적으로 받아들이면 길이 열립니다.",
+        }
+    return {
+        "personality": "あなたは観察力と粘り強さを持ち、責任ある場面ほど力を発揮できる人です。日々の小さな積み重ねが自信となり、良い流れを引き寄せます。",
+        "year_fortune": f"{this_year}年は、急がず着実に進むことで運が開きます。信頼を積み、学びを行動に変えるほど、周囲からの評価とチャンスが高まります。",
+        "month_fortune": f"{target1.year}年{target1.month}月は、落ち着いた判断と丁寧な対話が運を押し上げます。優先順位を整え、一つずつ進めることで良い結果につながります。",
+        "next_month_fortune": f"{target2.year}年{target2.month}月は、柔軟さと理解力を活かすほど運が開きます。変化を前向きに受け止めることで、次の成長につながります。",
+    }
+
+
+def _sanitize_fortune_uncertainty(text: str, fallback: str = "") -> str:
+    """「確認できませんが」「分かりませんが」等をPDF本文に残さない。"""
+    if not isinstance(text, str):
+        text = str(text or "")
+    s = text.strip()
+    if not s:
+        return fallback
+
+    patterns = [
+        r"^\s*(?:現状|現時点|現在)(?:では)?\s*[、,]?\s*(?:運勢(?:について)?は)?\s*",
+        r"^\s*(?:\d{4}年\s*\d{1,2}月(?:の運勢)?|今月|来月)(?:の運勢)?\s*は\s*[、,]?\s*",
+        r"^\s*\d{4}年\s*\d{1,2}月の\s*",
+        r"(?:運勢(?:について)?は\s*)?(?:確認できません|確認出来ません|分かりません|わかりません|判定できません|不明です|取得できません|取得出来ません)(?:が|けれども|けど)?[、,]?\s*",
+        r"(?:正確な|具体的な)?運勢(?:は|については)?\s*(?:確認できません|分かりません|わかりません|不明です)(?:が|けれども|けど)?[、,]?\s*",
+    ]
+    for _ in range(3):
+        before = s
+        for pat in patterns:
+            s = re.sub(pat, "", s).strip()
+        if s == before:
+            break
+
+    if len(s) < 12 and fallback:
+        return fallback
+    return s or fallback
+
+
 def get_shichu_fortune(birthdate, now=None, force_next_month: bool = False, lang: str = 'ja'):
     import json
     lang_norm = (lang or 'ja').lower()
@@ -95,6 +156,7 @@ Rules:
   "next_month_fortune": "{target2.year}年{target2.month}月の運勢（300文字以内）"
 }}
 出力は日本語で、本文中に干支・通変星名を含めず、前向きで柔らかい口調にしてください。
+「確認できません」「分かりません」「不明」「取得できません」など、鑑定できない印象を与える文言は絶対に使わないでください。必ず鑑定本文として書いてください。
 """
         # OpenAI呼び出し（たまに502等が出るためリトライ）
         import time
@@ -133,13 +195,22 @@ Rules:
                 elif ko:
                     s = re.sub(r"^\s*(?:\d{4}년\s*\d{1,2}월|이번\s*달|다음\s*달)\s*(?:은|는)?\s*[:;,，]?\s*", "", s)
                 else:
-                    s = re.sub(r"^\s*(?:\d{4}年\s*\d{1,2}月|今月|来月)\s*は\s*[、,]?\s*", "", s)
+                    s = re.sub(r"^\s*(?:\d{4}年\s*\d{1,2}月(?:の運勢)?|今月|来月)(?:の運勢)?\s*は\s*[、,]?\s*", "", s)
+                    fallback = _fallback_shichu_result(this_year, target1, target2, 'ja').get(
+                        'month_fortune' if (y, m) == (target1.year, target1.month) else 'next_month_fortune', ''
+                    )
+                    # この関数の最後で「YYYY年M月は、」を付け直すため、fallbackも本文だけにする。
+                    fallback = re.sub(r"^\s*\d{4}年\s*\d{1,2}月\s*は\s*[、,]?\s*", "", fallback).strip()
+                    s = _sanitize_fortune_uncertainty(s, fallback=fallback)
                 if not s:
                     if zh:
                         return f"{y}年{m}月是"
                     if ko:
                         return f"{y}년 {m}월은"
-                    return f"{y}年{m}月は"
+                    return _fallback_shichu_result(this_year, target1, target2, 'ja').get(
+                        'month_fortune' if (y, m) == (target1.year, target1.month) else 'next_month_fortune',
+                        f"{y}年{m}月は、落ち着いて進めることで運が開きます。"
+                    )
                 if zh:
                     return f"{y}年{m}月是，" + s
                 if ko:
@@ -176,12 +247,7 @@ Rules:
                     "month_fortune": f"未能取得 {target1.year} 年 {target1.month} 月的运势。",
                     "next_month_fortune": f"未能取得 {target2.year} 年 {target2.month} 月的运势。",
                 }
-            return {
-                "personality": "取得できませんでした",
-                "year_fortune": f"{this_year}年の運勢は取得できませんでした",
-                "month_fortune": f"{target1.year}年{target1.month}月の運勢は取得できませんでした",
-                "next_month_fortune": f"{target2.year}年{target2.month}月の運勢は取得できませんでした"
-            }
+            return _fallback_shichu_result(this_year, target1, target2, lang)
     except Exception as e:
         print("❌ get_shichu_fortune エラー:", e)
         if is_en:
@@ -198,12 +264,7 @@ Rules:
                 "month_fortune": f"未能取得 {target1.year} 年 {target1.month} 月的运势。",
                 "next_month_fortune": f"未能取得 {target2.year} 年 {target2.month} 月的运势。",
             }
-        return {
-                "personality": "取得できませんでした",
-                "year_fortune": f"{this_year}年の運勢は取得できませんでした",
-                "month_fortune": f"{target1.year}年{target1.month}月の運勢は取得できませんでした",
-                "next_month_fortune": f"{target2.year}年{target2.month}月の運勢は取得できませんでした"
-            }
+        return _fallback_shichu_result(this_year, target1, target2, lang)
 def analyze_palm(
     image_data,
     output_lang: str = "ja",
@@ -1421,11 +1482,12 @@ def generate_fortune(image_data, birthdate, kyusei_text, now=None, force_next_mo
     month_label = f"{target1.year}年{target1.month}月の運勢"
     next_month_label = f"{target2.year}年{target2.month}月の運勢"
     if isinstance(shichu_result_raw, dict):
+        fallback_shichu = _fallback_shichu_result(target1.year, target1, target2, lang)
         shichu_texts = {
-            "personality": shichu_result_raw.get("personality", ""),
-            "year_fortune": shichu_result_raw.get("year_fortune", ""),
-            "month_fortune": shichu_result_raw.get("month_fortune", ""),
-            "next_month_fortune": shichu_result_raw.get("next_month_fortune", "")
+            "personality": _sanitize_fortune_uncertainty(shichu_result_raw.get("personality", ""), fallback=fallback_shichu.get("personality", "")),
+            "year_fortune": _sanitize_fortune_uncertainty(shichu_result_raw.get("year_fortune", ""), fallback=fallback_shichu.get("year_fortune", "")),
+            "month_fortune": _sanitize_fortune_uncertainty(shichu_result_raw.get("month_fortune", ""), fallback=fallback_shichu.get("month_fortune", "")),
+            "next_month_fortune": _sanitize_fortune_uncertainty(shichu_result_raw.get("next_month_fortune", ""), fallback=fallback_shichu.get("next_month_fortune", ""))
         }
     else:
         shichu_texts = {"personality": "", "year_fortune": "", "month_fortune": "", "next_month_fortune": ""}
