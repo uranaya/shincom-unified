@@ -332,89 +332,103 @@ def draw_yearly_pages_renai_b4(c, yearly, lang="ja"):
 
 
 def draw_neko_uranai_page(c, data, lang="ja", page_size=A4):
-    """猫占いオプション用の追加1ページ。
-
-    通常鑑定2ページの本文レイアウトを触らず、チェックON時だけ後ろにA4相当の
-    猫タイプ・猫画像・猫御籤ページを追加する。
-    """
+    # 猫占いオプション用の追加1ページ。
+    # PDF上では動物占い名は出さず、猫占いとして独立表示する。
     neko = (data or {}).get("neko_uranai") or {}
     if not neko:
         return
 
     width, height = page_size
-    margin = 20 * mm
+    margin = 18 * mm
     c.showPage()
     y = height - margin
     y = draw_header(c, width, margin, y)
 
     _set_font(c, lang, 18)
     c.drawCentredString(width / 2, y, "猫占い")
-    y -= 11 * mm
+    y -= 10 * mm
 
     number = neko.get("number") or ""
     name = neko.get("name") or "猫"
     tag = neko.get("tag") or ""
-    animal = neko.get("animal") or data.get("animal") or ""
-    eto = neko.get("eto") or data.get("eto") or ""
+    description = (
+        neko.get("description")
+        or neko.get("personality")
+        or neko.get("性質")
+        or neko.get("性格")
+        or ""
+    )
 
     _set_font(c, lang, 12)
     c.drawString(margin, y, f"◆ あなたの猫タイプ：{number}. {name}")
     y -= 6 * mm
-    _set_font(c, lang, 10)
-    if animal or eto:
-        base = []
-        if eto:
-            base.append(f"日柱：{eto}")
-        if animal:
-            base.append(f"対応する動物占い：{animal}")
-        c.drawString(margin, y, " / ".join(base))
-        y -= 5 * mm
-    if tag:
-        c.drawString(margin, y, f"猫キャラの性質：{tag}")
-        y -= 7 * mm
 
-    # 猫画像
+    _set_font(c, lang, 10.2)
+    if tag:
+        c.drawString(margin, y, f"猫キャラの一言：{tag}")
+        y -= 6 * mm
+
+    # 猫画像。説明文を厚く入れるため、以前より少し小さめにする。
     image_path = neko.get("image_path") or ""
     try:
         if image_path and os.path.exists(image_path):
             img = ImageReader(image_path)
             iw, ih = img.getSize()
-            max_w = 72 * mm
-            max_h = 72 * mm
+            max_w = 50 * mm
+            max_h = 50 * mm
             scale = min(max_w / iw, max_h / ih)
             draw_w, draw_h = iw * scale, ih * scale
             x = (width - draw_w) / 2
             c.drawImage(img, x, y - draw_h, width=draw_w, height=draw_h, mask='auto')
-            y -= draw_h + 8 * mm
+            y -= draw_h + 7 * mm
         else:
             c.drawCentredString(width / 2, y, "（猫画像が見つかりません）")
-            y -= 10 * mm
+            y -= 9 * mm
     except Exception as e:
         print("Neko image draw error:", e)
         c.drawCentredString(width / 2, y, "（猫画像の読み込みに失敗しました）")
-        y -= 10 * mm
+        y -= 9 * mm
+
+    bottom = 18 * mm
+
+    # 性質・性格
+    _set_font(c, lang, 13)
+    c.drawString(margin, y, "◆ 性質・性格")
+    y -= 6 * mm
+
+    if not description:
+        description = f"{name}は、自分らしい感覚と猫のような勘を大切にするタイプです。無理に周囲へ合わせすぎず、心が落ち着く場所と人を選ぶことで本来の魅力が伸びていきます。"
+
+    _set_font(c, lang, 9.7)
+    for line in smart_wrap(description, 42, lang):
+        if y < bottom + 44 * mm:
+            break
+        c.drawString(margin, y, line)
+        y -= 5.0 * mm
+
+    y -= 3 * mm
 
     # 猫御籤
     _set_font(c, lang, 13)
     c.drawString(margin, y, "◆ 猫御籤")
-    y -= 7 * mm
+    y -= 6 * mm
 
     omikuji = neko.get("omikuji") or "今日はひげの向く方へ、ゆっくり進むにゃ。"
-    _set_font(c, lang, 10.2)
-    bottom = 22 * mm
-    for line in smart_wrap(omikuji, 38, lang):
+    _set_font(c, lang, 9.7)
+    for line in smart_wrap(omikuji, 42, lang):
         if y < bottom:
             break
         c.drawString(margin, y, line)
-        y -= 5.6 * mm
+        y -= 5.0 * mm
 
-    y -= 4 * mm
-    if y >= bottom + 14 * mm:
-        _set_font(c, lang, 11)
+    y -= 3 * mm
+    if y >= bottom + 10 * mm:
+        _set_font(c, lang, 10.5)
         c.drawString(margin, y, "◆ 今日の合言葉")
-        y -= 6 * mm
-        _set_font(c, lang, 10)
+        y -= 5.5 * mm
+        _set_font(c, lang, 9.7)
         c.drawString(margin, y, "焦らず、すり寄りすぎず、必要な時だけ爪を出すにゃん。")
+
 
 def draw_shincom_a4(c, data, include_yearly=False):
     lang = _get_lang(data)
