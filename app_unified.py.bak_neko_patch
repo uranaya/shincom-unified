@@ -27,7 +27,6 @@ from dateutil.relativedelta import relativedelta
 from yearly_fortune_utils import generate_yearly_fortune
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
-from neko_uranai_utils import get_neko_profile, build_neko_omikuji
 from pdf_generator_unified import create_pdf_unified
 from pdf_generator_unified_en import create_pdf_unified as create_pdf_unified_en
 from pdf_generator_unified_zh import create_pdf_unified as create_pdf_unified_zh
@@ -1104,13 +1103,6 @@ def _build_selfmob_redirect_url(data, full_year, uuid_str, shop_id=None):
     if output_lang not in ("ja", "en", "zh", "ko"):
         output_lang = "ja"
 
-    include_neko = _truthy(
-        data.get("neko_uranai")
-        or data.get("cat_uranai")
-        or data.get("include_neko")
-        or data.get("neko")
-    )
-
     output_style = (data.get("output_style") or data.get("style") or data.get("outputStyle") or "").strip().lower()
     output_mode = (data.get("output_mode") or data.get("mode") or "").strip().lower()
     yuta_flag = data.get("yuta_mode") or data.get("yuta")
@@ -1129,7 +1121,6 @@ def _build_selfmob_redirect_url(data, full_year, uuid_str, shop_id=None):
 
     if output_lang != "ja":
         output_style = "normal"
-        include_neko = False
 
     try:
         form_keys = list(data.keys()) if hasattr(data, "keys") else []
@@ -1249,18 +1240,6 @@ def _build_selfmob_redirect_url(data, full_year, uuid_str, shop_id=None):
         "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n") if isinstance(iching_result, str) else iching_result,
         "palm_image": image_data
     }
-
-    if include_neko and eto_number:
-        try:
-            neko_profile = get_neko_profile(eto_number)
-            result_data["neko_uranai"] = {
-                **neko_profile,
-                "animal": animal,
-                "eto": eto,
-                "omikuji": build_neko_omikuji(result_data.get("iching_result", ""), neko_profile.get("name", "猫")),
-            }
-        except Exception as e:
-            print("❌ 猫占い生成エラー:", e, flush=True)
 
     if full_year:
         yearly_data = generate_yearly_fortune(

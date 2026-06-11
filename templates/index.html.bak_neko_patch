@@ -120,11 +120,6 @@
       <input type="checkbox" id="force_next_month" name="force_next_month" value="yes">
       <span>来月・再来月を占う（20日以前でも来月起点にする）</span>
     </label>
-
-    <label class="option-label" for="neko_uranai">
-      <input type="checkbox" id="neko_uranai" name="neko_uranai" value="yes">
-      <span>猫占いを出す（＋A4 1ページ）</span>
-    </label>
     <label for="output_mode" style="display:block; margin-top:16px; font-weight:600;">出力モード：</label>
     <select id="output_mode" style="width: 100%; max-width: 420px; padding: 10px; border-radius: 10px; border: 1px solid #ccc;">
       <option value="ja" selected>日本語（標準）</option>
@@ -372,7 +367,6 @@
       }
 
       const forceNextMonth = document.getElementById("force_next_month")?.checked || false;
-      const nekoUranai = document.getElementById("neko_uranai")?.checked || false;
 
       const mode = document.getElementById("output_mode")?.value || "ja";
 
@@ -391,7 +385,6 @@
       const outputLang = (mode === "zh") ? "zh" : ((mode === "ko") ? "ko" : (englishOutput ? "en" : "ja"));
 
       const payload = { image_data: imageData, birthdate, full_year: fullYear, force_next_month: forceNextMonth,
-                        neko_uranai: nekoUranai,
                         tokyo_mode: tokyoMode, yuta_mode: yutaMode, english_output: englishOutput,
                         output_lang: outputLang, output_style: outputStyle, output_mode: mode };
 
