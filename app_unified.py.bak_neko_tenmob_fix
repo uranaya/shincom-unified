@@ -337,9 +337,9 @@ else:
 
 # 占い師・鑑定方法の選択肢（input.htmlと同じ構成に統一）
 STAFF_LIST = [
-    "HIROMI", "美帆", "マリア", "礼", "あお",
+    "HIROMI", "美帆", "あい", "礼", "あお",
     "月のかけら", "金子美月", "水木杏香", "幽香", "優芳",
-    "蛍石", "うらなや", "ふく", "COCORAKU", "リリア", "蓮月"
+    "蛍石", "うらなや","ふく","COCORAKU","リリア"
 ]
 
 METHOD_LIST = ["対面", "コンピューター", "現金外（クレカQR)"]
@@ -1749,17 +1749,9 @@ def ten_shincom():
             if output_style not in ("normal", "tokyo", "yuta_safe"):
                 output_style = "normal"
 
-            include_neko = _truthy(
-                data.get("neko_uranai")
-                or data.get("cat_uranai")
-                or data.get("include_neko")
-                or data.get("neko")
-            )
-
             # Hard guard: style is JA-only (no side effects on en/zh/ko)
             if output_lang != "ja":
                 output_style = "normal"
-                include_neko = False
 
 
 
@@ -1769,7 +1761,7 @@ def ten_shincom():
 
                 form_keys = list(data.keys()) if hasattr(data, "keys") else []
 
-                print(f"[tenmob] output_lang={output_lang} include_neko={include_neko} keys={form_keys[:30]}", flush=True)
+                print(f"[tenmob] output_lang={output_lang} keys={form_keys[:30]}")
 
             except Exception:
 
@@ -1882,19 +1874,6 @@ def ten_shincom():
                 "iching_result": iching_result.replace("\r\n", "\n").replace("\r", "\n"),
                 "palm_image": image_data
             }
-            if include_neko and eto_number:
-                try:
-                    neko_profile = get_neko_profile(eto_number)
-                    result_data["neko_uranai"] = {
-                        **neko_profile,
-                        "animal": animal,
-                        "eto": eto,
-                        "omikuji": build_neko_omikuji(result_data.get("iching_result", ""), neko_profile.get("name", "猫")),
-                    }
-                    print(f"[tenmob] neko_uranai added: {neko_profile.get('number')} {neko_profile.get('name')}", flush=True)
-                except Exception as e:
-                    print("❌ 猫占い生成エラー(/tenmob):", e, flush=True)
-
             if full_year:
                 yearly_data = generate_yearly_fortune(birthdate, now, force_next_month=force_next_month, lang=output_lang)
                 result_data["yearly_fortunes"] = yearly_data
