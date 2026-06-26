@@ -229,28 +229,84 @@
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
     let currentFacingMode = "environment";
+    let currentDeviceId = null;
+    let videoDevices = [];
     let stream = null;
     const POSTPAY_MODE = {% if postpay_mode %}true{% else %}false{% endif %};
     const FORCED_FULL_YEAR = {% if full_year %}true{% else %}false{% endif %};
     const SHOP_ID = {{ (shop_id or "default")|tojson }};
 
-    async function startCamera() {
+    function stopCurrentStream() {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
+        stream = null;
       }
+    }
+
+    async function refreshVideoDevices() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      videoDevices = devices.filter(device => device.kind === "videoinput");
+      return videoDevices;
+    }
+
+    function pickEnvironmentCamera(devices) {
+      if (!devices || devices.length === 0) return null;
+      const rearPattern = /back|rear|environment|world|外|背面|アウト|後/i;
+      return devices.find(device => rearPattern.test(device.label || "")) || devices[devices.length - 1];
+    }
+
+    async function startCamera(deviceId = null) {
+      stopCurrentStream();
+
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: currentFacingMode }
-        });
+        const videoConstraint = deviceId
+          ? { deviceId: { exact: deviceId } }
+          : { facingMode: { ideal: currentFacingMode } };
+
+        stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraint });
         video.srcObject = stream;
+
+        await refreshVideoDevices();
+        const activeTrack = stream.getVideoTracks()[0];
+        const activeSettings = activeTrack && activeTrack.getSettings ? activeTrack.getSettings() : {};
+        currentDeviceId = activeSettings.deviceId || deviceId || currentDeviceId;
       } catch (e) {
         alert("カメラが使用できません：" + e.message);
       }
     }
 
-    function toggleCamera() {
-      currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
-      startCamera();
+    async function toggleCamera() {
+      try {
+        if (videoDevices.length < 2) {
+          await refreshVideoDevices();
+        }
+
+        if (videoDevices.length >= 2) {
+          const currentIndex = videoDevices.findIndex(device => device.deviceId === currentDeviceId);
+          const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % videoDevices.length : 0;
+          await startCamera(videoDevices[nextIndex].deviceId);
+          return;
+        }
+
+        // カメラ一覧が取れない端末向けの予備処理
+        currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+        await startCamera();
+      } catch (e) {
+        alert("カメラ切替に失敗しました：" + e.message);
+      }
+    }
+
+    async function startPreferredCamera() {
+      // 初回は権限取得のため一度起動し、その後ラベル付きのカメラ一覧から背面候補を選ぶ
+      await startCamera();
+      const devices = await refreshVideoDevices();
+      if (devices.length >= 2) {
+        const preferred = pickEnvironmentCamera(devices);
+        if (preferred && preferred.deviceId && preferred.deviceId !== currentDeviceId) {
+          await startCamera(preferred.deviceId);
+        }
+      }
     }
 
     function takePhoto() {
@@ -448,7 +504,7 @@
       }
     }
 
-    window.onload = startCamera;
+    window.onload = startPreferredCamera;
   </script>
 </body>
 </html>
