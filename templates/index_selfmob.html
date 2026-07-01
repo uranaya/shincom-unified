@@ -231,6 +231,7 @@
     let currentFacingMode = "environment";
     let currentDeviceId = null;
     let videoDevices = [];
+    let videoDevicesReady = null;
     let stream = null;
     const POSTPAY_MODE = {% if postpay_mode %}true{% else %}false{% endif %};
     const FORCED_FULL_YEAR = {% if full_year %}true{% else %}false{% endif %};
@@ -250,6 +251,15 @@
       return videoDevices;
     }
 
+    function refreshVideoDevicesSoon() {
+      if (!videoDevicesReady) {
+        videoDevicesReady = refreshVideoDevices()
+          .catch(() => [])
+          .finally(() => { videoDevicesReady = null; });
+      }
+      return videoDevicesReady;
+    }
+
     function pickEnvironmentCamera(devices) {
       if (!devices || devices.length === 0) return null;
       const rearPattern = /back|rear|environment|world|外|背面|アウト|後/i;
@@ -267,10 +277,12 @@
         stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraint });
         video.srcObject = stream;
 
-        await refreshVideoDevices();
         const activeTrack = stream.getVideoTracks()[0];
         const activeSettings = activeTrack && activeTrack.getSettings ? activeTrack.getSettings() : {};
         currentDeviceId = activeSettings.deviceId || deviceId || currentDeviceId;
+
+        // enumerateDevices() はPCで遅くなることがあるため、起動を待たずに裏で更新する
+        refreshVideoDevicesSoon();
       } catch (e) {
         alert("カメラが使用できません：" + e.message);
       }
@@ -278,14 +290,15 @@
 
     async function toggleCamera() {
       try {
-        if (videoDevices.length < 2) {
-          await refreshVideoDevices();
+        let devices = videoDevices;
+        if (devices.length < 2) {
+          devices = await refreshVideoDevicesSoon();
         }
 
-        if (videoDevices.length >= 2) {
-          const currentIndex = videoDevices.findIndex(device => device.deviceId === currentDeviceId);
-          const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % videoDevices.length : 0;
-          await startCamera(videoDevices[nextIndex].deviceId);
+        if (devices.length >= 2) {
+          const currentIndex = devices.findIndex(device => device.deviceId === currentDeviceId);
+          const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % devices.length : 0;
+          await startCamera(devices[nextIndex].deviceId);
           return;
         }
 
@@ -298,15 +311,8 @@
     }
 
     async function startPreferredCamera() {
-      // 初回は権限取得のため一度起動し、その後ラベル付きのカメラ一覧から背面候補を選ぶ
+      // 初回表示を優先して即起動。カメラ一覧は裏で取得し、切替時に deviceId を使う。
       await startCamera();
-      const devices = await refreshVideoDevices();
-      if (devices.length >= 2) {
-        const preferred = pickEnvironmentCamera(devices);
-        if (preferred && preferred.deviceId && preferred.deviceId !== currentDeviceId) {
-          await startCamera(preferred.deviceId);
-        }
-      }
     }
 
     function takePhoto() {
