@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>鑑定結果PDF</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      background: #f7f7f7;
+      color: #222;
+    }
+    .topbar {
+      padding: 10px;
+      text-align: center;
+      background: #fff;
+      border-bottom: 1px solid #ddd;
+    }
+    .topbar a {
+      text-decoration: none;
+      color: #444;
+    }
+    .wrap {
+      display: flex;
+      gap: 16px;
+      padding: 16px;
+      box-sizing: border-box;
+      align-items: flex-start;
+    }
+    .viewer {
+      flex: 1 1 auto;
+      min-width: 0;
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    iframe {
+      width: 100%;
+      height: calc(100vh - 100px);
+      border: none;
+      display: block;
+      background: #fff;
+    }
+    .side {
+      width: 320px;
+      flex: 0 0 320px;
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      box-sizing: border-box;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .side h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+    .side p {
+      margin: 8px 0;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+    .qr {
+      text-align: center;
+      margin: 16px 0;
+    }
+    .qr img {
+      width: 220px;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+    .btn {
+      display: block;
+      margin-top: 10px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      text-align: center;
+      text-decoration: none;
+      background: #333;
+      color: #fff;
+      font-weight: bold;
+    }
+    .btn.sub {
+      background: #666;
+    }
+    .meta {
+      font-size: 13px;
+      color: #666;
+    }
+    @media (max-width: 900px) {
+      .wrap {
+        flex-direction: column;
+      }
+      .side {
+        width: 100%;
+        flex: none;
+      }
+      iframe {
+        height: 70vh;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  {% if '/renai' in referer %}
+    <a href="{{ url_for('renai') }}">🔙 恋愛鑑定に戻る</a>
+  {% elif '/renaib4' in referer %}
+    <a href="{{ url_for('renai') }}">🔙 恋愛鑑定に戻る</a>
+  {% elif '/tenmob' in referer %}
+    <a href="{{ url_for('tenmob') }}">🔙 占い画面に戻る</a>
+  {% elif '/ten' in referer %}
+    <a href="{{ url_for('ten') }}">🔙 占い画面に戻る</a>
+  {% else %}
+    <a href="{{ url_for('home') }}">🔙 トップに戻る</a>
+  {% endif %}
+</div>
+
+<div class="wrap">
+  <div class="viewer">
+    <iframe src="{{ url_for('view_pdf', filename=filename) }}"></iframe>
+  </div>
+
+  <aside class="side">
+    <h2>スマホ保存用QR</h2>
+    <p>お客様のスマホでこのQRを読み取ると、専用ページからPDFをダウンロードできます。</p>
+    <div class="qr">
+      <img src="{{ pdf_qr_img }}" alt="PDF保存用QRコード">
+    </div>
+    <a class="btn" href="{{ pdf_share_url }}" target="_blank" rel="noopener">お客様用ページを開く</a>
+    <a class="btn sub" href="{{ pdf_download_url }}" target="_blank" rel="noopener">PDFを直接ダウンロード</a>
+    <p class="meta">有効期限: {{ pdf_expires_text }}</p>
+  </aside>
+</div>
+
+</body>
+</html>

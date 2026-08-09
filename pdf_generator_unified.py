@@ -333,20 +333,23 @@ def draw_yearly_pages_renai_b4(c, yearly, lang="ja"):
 
 def draw_neko_uranai_page(c, data, lang="ja", page_size=A4):
     # 猫占いオプション用の追加1ページ。
-    # PDF上では動物占い名は出さず、猫占いとして独立表示する。
+    # 通常占い側のレイアウトやページ数には触れず、このページ内だけを拡張する。
     neko = (data or {}).get("neko_uranai") or {}
     if not neko:
         return
 
     width, height = page_size
     margin = 18 * mm
+    bottom = 16 * mm
+    wrap_chars = 43 if width <= A4[0] + 1 else 54
+
     c.showPage()
     y = height - margin
     y = draw_header(c, width, margin, y)
 
     _set_font(c, lang, 18)
     c.drawCentredString(width / 2, y, "猫占い")
-    y -= 10 * mm
+    y -= 9 * mm
 
     number = neko.get("number") or ""
     name = neko.get("name") or "猫"
@@ -358,77 +361,166 @@ def draw_neko_uranai_page(c, data, lang="ja", page_size=A4):
         or neko.get("性格")
         or ""
     )
+    love_style = neko.get("love_style") or ""
+    love_iching = neko.get("love_iching") or {}
+    domain_ichings = neko.get("domain_ichings") or {}
 
     _set_font(c, lang, 12)
     c.drawString(margin, y, f"◆ あなたの猫タイプ：{number}. {name}")
-    y -= 6 * mm
+    y -= 5.5 * mm
 
-    _set_font(c, lang, 10.2)
+    _set_font(c, lang, 10)
     if tag:
         c.drawString(margin, y, f"猫キャラの一言：{tag}")
-        y -= 6 * mm
+        y -= 5.5 * mm
 
-    # 猫画像。説明文を厚く入れるため、以前より少し小さめにする。
+    # 既存の猫画像は残しつつ、情報量を増やすため少しコンパクトに表示する。
     image_path = neko.get("image_path") or ""
     try:
         if image_path and os.path.exists(image_path):
             img = ImageReader(image_path)
             iw, ih = img.getSize()
-            max_w = 50 * mm
-            max_h = 50 * mm
+            max_w = 40 * mm if width <= A4[0] + 1 else 46 * mm
+            max_h = 40 * mm if width <= A4[0] + 1 else 46 * mm
             scale = min(max_w / iw, max_h / ih)
             draw_w, draw_h = iw * scale, ih * scale
             x = (width - draw_w) / 2
             c.drawImage(img, x, y - draw_h, width=draw_w, height=draw_h, mask='auto')
-            y -= draw_h + 7 * mm
+            y -= draw_h + 5 * mm
         else:
             c.drawCentredString(width / 2, y, "（猫画像が見つかりません）")
-            y -= 9 * mm
+            y -= 8 * mm
     except Exception as e:
         print("Neko image draw error:", e)
         c.drawCentredString(width / 2, y, "（猫画像の読み込みに失敗しました）")
-        y -= 9 * mm
+        y -= 8 * mm
 
-    bottom = 18 * mm
-
-    # 性質・性格
-    _set_font(c, lang, 13)
-    c.drawString(margin, y, "◆ 性質・性格")
-    y -= 6 * mm
+    def draw_section(title, text, y_pos, body_size=9.4, max_lines=None, gap=2.0 * mm):
+        if not text or y_pos <= bottom + 8 * mm:
+            return y_pos
+        _set_font(c, lang, 12.3)
+        c.drawString(margin, y_pos, f"◆ {title}")
+        y_pos -= 5.5 * mm
+        _set_font(c, lang, body_size)
+        lines = smart_wrap(str(text), wrap_chars, lang)
+        if max_lines:
+            lines = lines[:max_lines]
+        for line in lines:
+            if y_pos < bottom:
+                break
+            c.drawString(margin, y_pos, line)
+            y_pos -= 4.6 * mm
+        return y_pos - gap
 
     if not description:
         description = f"{name}は、自分らしい感覚と猫のような勘を大切にするタイプです。無理に周囲へ合わせすぎず、心が落ち着く場所と人を選ぶことで本来の魅力が伸びていきます。"
 
-    _set_font(c, lang, 9.7)
-    for line in smart_wrap(description, 42, lang):
-        if y < bottom + 44 * mm:
-            break
-        c.drawString(margin, y, line)
-        y -= 5.0 * mm
+    y = draw_section("性質・性格", description, y, max_lines=5)
+    y = draw_section("恋愛傾向", love_style, y, max_lines=4)
 
-    y -= 3 * mm
+    # 猫占い専用の恋愛イーチン。通常占いの iching_result とは完全に別データ。
+    if isinstance(love_iching, dict) and love_iching:
+        _set_font(c, lang, 12.3)
+        c.drawString(margin, y, "◆ 今日の恋愛イーチン")
+        y -= 5.5 * mm
 
-    # 猫御籤
-    _set_font(c, lang, 13)
-    c.drawString(margin, y, "◆ 猫御籤")
-    y -= 6 * mm
+        label = love_iching.get("label") or ""
+        if label:
+            _set_font(c, lang, 10.3)
+            c.drawString(margin, y, label)
+            y -= 5.0 * mm
+
+        iching_text = " ".join(
+            x for x in [love_iching.get("cat_line", ""), love_iching.get("love", "")] if x
+        )
+        _set_font(c, lang, 9.4)
+        for line in smart_wrap(iching_text, wrap_chars, lang)[:6]:
+            if y < bottom:
+                break
+            c.drawString(margin, y, line)
+            y -= 4.6 * mm
+        y -= 1.5 * mm
+
+        action = love_iching.get("action") or ""
+        if action and y >= bottom + 8 * mm:
+            _set_font(c, lang, 10.2)
+            c.drawString(margin, y, f"恋の一手：{action}")
+            y -= 6.0 * mm
 
     omikuji = neko.get("omikuji") or "今日はひげの向く方へ、ゆっくり進むにゃ。"
-    _set_font(c, lang, 9.7)
-    for line in smart_wrap(omikuji, 42, lang):
-        if y < bottom:
-            break
-        c.drawString(margin, y, line)
-        y -= 5.0 * mm
 
-    y -= 3 * mm
-    if y >= bottom + 10 * mm:
-        _set_font(c, lang, 10.5)
-        c.drawString(margin, y, "◆ 今日の合言葉")
-        y -= 5.5 * mm
-        _set_font(c, lang, 9.7)
-        c.drawString(margin, y, "焦らず、すり寄りすぎず、必要な時だけ爪を出すにゃん。")
+    # 仕事運・金運・対人運が生成できた場合だけ、猫占い専用の2ページ目を追加する。
+    # 拡張モジュールに不具合があって domain_ichings が無い場合は、従来通り1ページで完結する。
+    if isinstance(domain_ichings, dict) and any(
+        isinstance(domain_ichings.get(key), dict) and domain_ichings.get(key)
+        for key in ("work", "money", "relations")
+    ):
+        c.showPage()
+        y = height - margin
+        y = draw_header(c, width, margin, y)
 
+        _set_font(c, lang, 18)
+        c.drawCentredString(width / 2, y, "猫占い － 今日のイーチン運勢")
+        y -= 9 * mm
+        _set_font(c, lang, 10)
+        c.drawCentredString(width / 2, y, f"{number}. {name} の仕事運・金運・対人運")
+        y -= 10 * mm
+
+        domain_labels = {
+            "work": ("仕事運", "仕事の一手"),
+            "money": ("金運", "金運の一手"),
+            "relations": ("対人運", "対人の一手"),
+        }
+
+        for key in ("work", "money", "relations"):
+            fortune = domain_ichings.get(key) or {}
+            if not isinstance(fortune, dict) or not fortune:
+                continue
+            section_title, action_title = domain_labels[key]
+            _set_font(c, lang, 12.3)
+            c.drawString(margin, y, f"◆ 今日の{section_title}イーチン")
+            y -= 5.5 * mm
+
+            label = fortune.get("label") or ""
+            if label:
+                _set_font(c, lang, 10.3)
+                c.drawString(margin, y, label)
+                y -= 5.0 * mm
+
+            domain_text = " ".join(
+                x for x in [fortune.get("cat_line", ""), fortune.get("text", "")] if x
+            )
+            _set_font(c, lang, 9.4)
+            for line in smart_wrap(domain_text, wrap_chars, lang)[:5]:
+                if y < bottom:
+                    break
+                c.drawString(margin, y, line)
+                y -= 4.6 * mm
+
+            action = fortune.get("action") or ""
+            if action and y >= bottom + 8 * mm:
+                y -= 0.5 * mm
+                _set_font(c, lang, 10.2)
+                c.drawString(margin, y, f"{action_title}：{action}")
+                y -= 6.5 * mm
+
+        y = draw_section("猫御籤", omikuji, y, max_lines=5, gap=1.5 * mm)
+
+        if y >= bottom + 8 * mm:
+            _set_font(c, lang, 10.2)
+            c.drawString(margin, y, "◆ 今日の合言葉")
+            y -= 5.0 * mm
+            _set_font(c, lang, 9.4)
+            c.drawString(margin, y, "焦らず、すり寄りすぎず、必要な時だけ爪を出すにゃん。")
+    else:
+        y = draw_section("猫御籤", omikuji, y, max_lines=6, gap=1.5 * mm)
+
+        if y >= bottom + 8 * mm:
+            _set_font(c, lang, 10.2)
+            c.drawString(margin, y, "◆ 今日の合言葉")
+            y -= 5.0 * mm
+            _set_font(c, lang, 9.4)
+            c.drawString(margin, y, "焦らず、すり寄りすぎず、必要な時だけ爪を出すにゃん。")
 
 def draw_shincom_a4(c, data, include_yearly=False):
     lang = _get_lang(data)

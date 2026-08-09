@@ -28,6 +28,17 @@ from yearly_fortune_utils import generate_yearly_fortune
 from fortune_logic import generate_fortune as generate_fortune_shincom, get_nicchu_eto
 from kyusei_utils import get_honmeisei, get_kyusei_fortune
 from neko_uranai_utils import get_neko_profile, build_neko_omikuji
+try:
+    from neko_love_iching import build_neko_love_iching, build_neko_love_style
+except Exception as e:
+    print("⚠️ 猫恋愛イーチン拡張の読込をスキップ:", e, flush=True)
+    build_neko_love_iching = None
+    build_neko_love_style = None
+try:
+    from neko_domain_iching import build_neko_domain_ichings
+except Exception as e:
+    print("⚠️ 猫仕事・金運・対人イーチン拡張の読込をスキップ:", e, flush=True)
+    build_neko_domain_ichings = None
 from pdf_generator_unified import create_pdf_unified
 from pdf_generator_unified_en import create_pdf_unified as create_pdf_unified_en
 from pdf_generator_unified_zh import create_pdf_unified as create_pdf_unified_zh
@@ -1253,12 +1264,36 @@ def _build_selfmob_redirect_url(data, full_year, uuid_str, shop_id=None):
     if include_neko and eto_number:
         try:
             neko_profile = get_neko_profile(eto_number)
-            result_data["neko_uranai"] = {
+            neko_data = {
                 **neko_profile,
                 "animal": animal,
                 "eto": eto,
                 "omikuji": build_neko_omikuji(result_data.get("iching_result", ""), neko_profile.get("name", "猫")),
             }
+            try:
+                if build_neko_love_style and build_neko_love_iching:
+                    neko_data["love_style"] = build_neko_love_style(
+                        neko_profile.get("number"),
+                        neko_profile.get("name", "猫"),
+                        neko_profile.get("tag", ""),
+                    )
+                    neko_data["love_iching"] = build_neko_love_iching(
+                        birthdate,
+                        neko_profile.get("name", "猫"),
+                        now=now,
+                    )
+            except Exception as love_e:
+                print("⚠️ 猫恋愛イーチン生成をスキップ:", love_e, flush=True)
+            try:
+                if build_neko_domain_ichings:
+                    neko_data["domain_ichings"] = build_neko_domain_ichings(
+                        birthdate,
+                        neko_profile.get("name", "猫"),
+                        now=now,
+                    )
+            except Exception as domain_e:
+                print("⚠️ 猫仕事・金運・対人イーチン生成をスキップ:", domain_e, flush=True)
+            result_data["neko_uranai"] = neko_data
         except Exception as e:
             print("❌ 猫占い生成エラー:", e, flush=True)
 
@@ -1885,12 +1920,36 @@ def ten_shincom():
             if include_neko and eto_number:
                 try:
                     neko_profile = get_neko_profile(eto_number)
-                    result_data["neko_uranai"] = {
+                    neko_data = {
                         **neko_profile,
                         "animal": animal,
                         "eto": eto,
                         "omikuji": build_neko_omikuji(result_data.get("iching_result", ""), neko_profile.get("name", "猫")),
                     }
+                    try:
+                        if build_neko_love_style and build_neko_love_iching:
+                            neko_data["love_style"] = build_neko_love_style(
+                                neko_profile.get("number"),
+                                neko_profile.get("name", "猫"),
+                                neko_profile.get("tag", ""),
+                            )
+                            neko_data["love_iching"] = build_neko_love_iching(
+                                birthdate,
+                                neko_profile.get("name", "猫"),
+                                now=now,
+                            )
+                    except Exception as love_e:
+                        print("⚠️ 猫恋愛イーチン生成をスキップ(/tenmob):", love_e, flush=True)
+                    try:
+                        if build_neko_domain_ichings:
+                            neko_data["domain_ichings"] = build_neko_domain_ichings(
+                                birthdate,
+                                neko_profile.get("name", "猫"),
+                                now=now,
+                            )
+                    except Exception as domain_e:
+                        print("⚠️ 猫仕事・金運・対人イーチン生成をスキップ(/tenmob):", domain_e, flush=True)
+                    result_data["neko_uranai"] = neko_data
                     print(f"[tenmob] neko_uranai added: {neko_profile.get('number')} {neko_profile.get('name')}", flush=True)
                 except Exception as e:
                     print("❌ 猫占い生成エラー(/tenmob):", e, flush=True)
