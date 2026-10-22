@@ -258,6 +258,15 @@ def _make_pdf_share_context(filename: str):
         "pdf_expires_text": _format_expire_text(int(time.time()) + PDF_SHARE_TTL_SECONDS),
     }
 
+# FCロイヤリティ請求（既存の占い師向け請求と独立）
+from fc_royalty import fc_bp, init_fc_tables
+app.register_blueprint(fc_bp)
+if DATABASE_URL:
+    try:
+        init_fc_tables()
+    except Exception as exc:
+        app.logger.warning('FC請求テーブル初期化に失敗しました: %s', exc)
+
 # --- Online booking route registration ---
 if DATABASE_URL:
     register_online_routes(app, DATABASE_URL)

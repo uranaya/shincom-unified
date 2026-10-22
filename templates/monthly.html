@@ -50,6 +50,7 @@
 </head>
 <body>
   <h2>月別売上集計</h2>
+  <p><a class="btn-invoice" href="{{ url_for('fc.index') }}">FCロイヤリティ請求・請求先マスタ</a></p>
   {% for month, staff_data in data.items() %}
     <h3>
       <span>{{ month }}</span>
