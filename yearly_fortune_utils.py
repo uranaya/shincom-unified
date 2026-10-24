@@ -125,7 +125,7 @@ def _ask_openai(prompt: str, lang: str = "ja", retries: int = 3, delay: int = 2)
     for attempt in range(retries):
         try:
             response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4.1-mini",
                 max_tokens=2000,
                 temperature=0.7,
                 messages=[

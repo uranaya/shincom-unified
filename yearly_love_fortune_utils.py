@@ -13,7 +13,7 @@ def _ask_openai(prompt: str, max_tokens: int = 400, temperature: float = 0.7) ->
     OpenAI ChatCompletion の簡易ラッパ。
     """
     res = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4.1-mini",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=max_tokens,
         temperature=temperature,

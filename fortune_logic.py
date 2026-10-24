@@ -165,7 +165,7 @@ Rules:
         for attempt in range(3):
             try:
                 response = openai.ChatCompletion.create(
-                    model="gpt-4",
+                    model="gpt-4.1-mini",
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=1500,
                     temperature=0.8
@@ -973,7 +973,7 @@ def get_iching_advice(lang: str = 'ja'):
         else:
             prompt = "あなたは易占いの専門家です。今の相談者に必要なメッセージを、200文字で優しく前向きに教えてください。"
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-4.1-mini",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300
         )
@@ -1041,7 +1041,7 @@ def get_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, kyuse
 """
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-4.1-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
@@ -1619,13 +1619,13 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 理想の相手像と、今後1年の出会いのチャンスについて、
 200文字で具体的に教えてください。"""
         comp_text = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4.1-mini",
             messages=[{"role": "user", "content": prompt_comp}],
             max_tokens=400,
             temperature=0.9
         ).choices[0].message.content.strip()
         future_text = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4.1-mini",
             messages=[{"role": "user", "content": prompt_future}],
             max_tokens=400,
             temperature=0.9
@@ -1659,7 +1659,7 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 ・一般論や抽象的な助言ではなく、読み手に刺さるような内容にする
 """
             topic_text = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4.1-mini",
                 messages=[{"role": "user", "content": topic_prompt}],
                 max_tokens=600,
                 temperature=0.9
@@ -1708,17 +1708,17 @@ def generate_renai_fortune(user_birth: str, partner_birth: str = None, include_y
 - 月の通変星: {tsuhen_next_month}
 来月（{next_month}月）の恋愛運を150文字でやさしく教えてください。"""
         year_love = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4.1-mini",
             messages=[{"role": "user", "content": prompt_year}],
             max_tokens=400
         ).choices[0].message.content.strip()
         month_love = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4.1-mini",
             messages=[{"role": "user", "content": prompt_month}],
             max_tokens=400
         ).choices[0].message.content.strip()
         next_month_love = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4.1-mini",
             messages=[{"role": "user", "content": prompt_next}],
             max_tokens=400
         ).choices[0].message.content.strip()

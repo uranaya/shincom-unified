@@ -31,7 +31,7 @@ def generate_lucky_info(nicchu_eto, birthdate, age, palm_result, shichu_result, 
 
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-4.1-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.6
         )
@@ -185,7 +185,7 @@ def generate_lucky_renai_info(nicchu_eto, birthdate, age, shichu_result, kyusei_
 
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-4.1-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )

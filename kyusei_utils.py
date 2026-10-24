@@ -263,7 +263,7 @@ No extra text, JSON only.""".strip()
 
     try:
         res = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-4.1-mini",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=100,
             temperature=0.3,
